@@ -30,24 +30,28 @@ Only the host JAR is executable. The pre-existing context test was relocated wit
 
 ## Run the development host
 
-Provide an existing disposable local SQL Server database and these environment variables:
+The host defaults to the existing SQL Server Express database `apolo_workflow_dev` at `localhost:1433`, using Windows Integrated Authentication as the user running Java. No database username/password variables are required. JPA and Liquibase share this datasource. Set `WORKFLOW_TEST_DB_URL` only to override the complete connection URL.
 
-- `WORKFLOW_TEST_DB_URL`, for example `jdbc:sqlserver://localhost:1433;databaseName=workflow_test;encrypt=true;trustServerCertificate=true` for local development.
-- `WORKFLOW_TEST_DB_USERNAME`
-- `WORKFLOW_TEST_DB_PASSWORD`
+The local URL uses encryption with `trustServerCertificate=true` for the development server's certificate. Production TLS and authentication remain APOLO-owned configuration. The host does not provision a database or start Docker.
 
-The host does not provision a database or start Docker. Once configured, run:
+On Windows with an x64 JDK, the automatically activated `windows-native-auth` Maven profile downloads Microsoft's matching authentication DLL from Maven Central into `workflow-test-host/target/native/` during `generate-resources`. The host's `sqlserver-jdbc.version` property keeps the JDBC JAR and DLL at the same release, currently 12.8.1. The DLL is a local build artifact, outside the application JAR and Git. Rebuild after `clean` to restore it; there is no system PATH or JDK installation change.
+
+Build with the command above, then run from the repository root:
 
 ```powershell
-java -jar workflow-test-host/target/workflow-test-host-0.0.1-SNAPSHOT.jar
+java '-Djava.library.path=workflow-test-host/target/native' -jar workflow-test-host/target/workflow-test-host-0.0.1-SNAPSHOT.jar
 ```
 
-Alternatively, install core and the parent locally, then run the host through Maven:
+In IntelliJ, reload the Maven project and select the shared **Workflow test host (Windows)** run configuration. It supplies `java.library.path` and uses the project's JDK; use the configured x64 JDK 21. Run the Maven package command once before launching from IntelliJ, and again if `target/native` has been removed. Adding an ordinary Java run configuration requires the same VM option pointing to the DLL directory.
+
+Alternatively, install core and the parent locally, then run the host through Maven. The Windows profile supplies the DLL path to the forked application JVM:
 
 ```powershell
 ./mvnw.cmd -Dmaven.test.skip=true install
-./mvnw.cmd -f workflow-test-host/pom.xml spring-boot:run
+./mvnw.cmd -Dmaven.test.skip=true -f workflow-test-host/pom.xml spring-boot:run
 ```
+
+Starting the host runs Liquibase against `apolo_workflow_dev`, including its tracking tables. Compilation/packaging alone does not connect to or modify the database. See Microsoft's [Windows integrated authentication documentation](https://learn.microsoft.com/en-us/sql/connect/jdbc/building-the-connection-url#connecting-with-integrated-authentication-on-windows) for the native DLL requirements.
 
 The host's Liquibase master includes `db/changelog/workflow/workflow-master.xml` from the core JAR. JPA uses `ddl-auto=validate` and does not create or update the schema. Keep sample-domain migrations in the host. Once workflow schema changes are specified, add ordered changesets under core's `db/changelog/workflow/` directory and preserve applied changeset identities and paths.
 

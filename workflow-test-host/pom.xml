@@ -12,6 +12,11 @@
     <name>workflow-test-host</name>
     <description>Standalone development host for the workflow library</description>
 
+    <properties>
+        <!-- Keep the Java driver and native Windows authentication DLL on the same release. -->
+        <sqlserver-jdbc.version>12.8.1</sqlserver-jdbc.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>io.github.leontecristian</groupId>
@@ -36,6 +41,7 @@
         <dependency>
             <groupId>com.microsoft.sqlserver</groupId>
             <artifactId>mssql-jdbc</artifactId>
+            <version>${sqlserver-jdbc.version}.jre11</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
@@ -53,4 +59,51 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>windows-native-auth</id>
+            <activation>
+                <os>
+                    <family>Windows</family>
+                    <arch>amd64</arch>
+                </os>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>copy-sqlserver-auth-dll</id>
+                                <phase>generate-resources</phase>
+                                <goals>
+                                    <goal>copy</goal>
+                                </goals>
+                                <configuration>
+                                    <artifactItems>
+                                        <artifactItem>
+                                            <groupId>com.microsoft.sqlserver</groupId>
+                                            <artifactId>mssql-jdbc_auth</artifactId>
+                                            <version>${sqlserver-jdbc.version}.x64</version>
+                                            <type>dll</type>
+                                            <outputDirectory>${project.build.directory}/native</outputDirectory>
+                                        </artifactItem>
+                                    </artifactItems>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-maven-plugin</artifactId>
+                        <configuration>
+                            <jvmArguments>-Djava.library.path="${project.build.directory}/native"</jvmArguments>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
