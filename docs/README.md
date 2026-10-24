@@ -9,6 +9,7 @@ Read these documents in order:
 3. [Assumptions](assumptions.md): unverified expectations, responsible roles, required evidence and consequences if an expectation fails, with stable ASM identifiers.
 4. [Specification-driven development](specification-driven-development.md): how to turn a requirement into a specification, implementation plan, tasks and recorded evidence.
 5. [Design sources and decision status](design-sources.md): provenance, unresolved decisions and the distinction between agreed design and implemented behavior.
+6. [Coding standards](coding-standards.md): practical clean-code guidance for Java, Spring, JPA and Lombok, applied during implementation and review.
 
 The constitution is version **1.0.0**, established on **2026-10-24** from the current design documents and the project owner's subsequent instructions. It codifies the agreed direction; it does not establish that the planned engine has been implemented.
 
@@ -33,6 +34,7 @@ workflow-engine/
     assumptions.md
     specification-driven-development.md
     design-sources.md
+    coding-standards.md
     features/
       README.md
       <feature-id>-<name>/
