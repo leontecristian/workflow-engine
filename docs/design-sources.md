@@ -6,7 +6,8 @@ Recorded **2026-10-24** for [constitution v1.0.0](constitution.md).
 
 The architecture sources currently live in the sibling documentation repository at `C:\dev\apolo-docs\workflow-engine`. The relative links below work with the current sibling checkout layout. If the documentation or core moves, update links and preserve source identity and decision history.
 
-- [Consolidated design v0.7](../../apolo-docs/workflow-engine/architecture/workflow-engine-design.md): authoritative detailed architecture and section 22 decision register.
+- [Consolidated design](../../apolo-docs/workflow-engine/architecture/workflow-engine-design.md): authoritative detailed architecture and section 22 decision register. The constitution was established from v0.7; v0.8 restores concrete design detail and a complete proposed example without finalizing open contracts.
+- [Original-design reconciliation](../../apolo-docs/workflow-engine/architecture/original-design-reconciliation.md): section-by-section account of retained, restored, adapted and deferred original ideas, including the updated five-node workflow example.
 - [Approval capability](../../apolo-docs/workflow-engine/requirements/approval-capability.md): capability scope and milestone acceptance expectations.
 - [Separate development plan](../../apolo-docs/workflow-engine/development/independent-development-plan.md): specification priorities, two-module delivery and APOLO integration sequence.
 - [APOLO technical summary](../../apolo-docs/workflow-engine/reference/apolo-technical-summary.md): platform baseline and effective-build verification obligations.
