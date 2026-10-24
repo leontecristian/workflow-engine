@@ -7,6 +7,10 @@ Two Maven modules, targeting Java 17 and intended to run on JDK 21:
 
 The root `pom.xml` is the parent/aggregator. It manages dependency versions without adding host dependencies to core. Spring Boot 3.4.5 is the current build baseline; compatibility with APOLO's effective dependency versions remains to be verified.
 
+This separate project is the current development phase. Eventually `workflow-core` will move into APOLO's source tree as a sibling Maven module of backend, frontend and configuration, joining APOLO's build/release lifecycle. Backend will depend on core; core will retain its neutral integration contracts and have no dependency on backend implementation classes. A permanently separate repository or publishing process is not required.
+
+At that move, review APOLO's effective root parent, reparent core and align its coordinates/shared dependency versions while preserving Java 17 compilation and ordinary JAR packaging. Keep one authoritative core implementation. Move timing, final coordinates and whether `workflow-test-host` moves into APOLO as an optional development module remain open. The host is always outside backend's production dependency graph. The standalone POMs remain the current build configuration.
+
 This is a structural scaffold. Workflow models, entities, services and schema changesets are not implemented yet. The workflow master changelog is intentionally empty.
 
 ## Build
@@ -53,7 +57,7 @@ Core code belongs under `io.github.leontecristian.workflow.core`, with packages 
 
 The test host imports that configuration and registers core entity/repository packages against its Boot-managed persistence context. APOLO must register the same packages against its existing shared persistence context and transaction manager, accounting for its existing JPA configuration. Workflow service calls must join the host transaction.
 
-APOLO consumes only the library:
+For interim integration while development remains separate, APOLO can consume the library using the current development coordinates:
 
 ```xml
 <dependency>
@@ -63,6 +67,8 @@ APOLO consumes only the library:
 </dependency>
 ```
 
+After source integration, backend's dependency must match core's coordinates and version in the APOLO reactor; the current personal group and standalone version are not a decision about the final APOLO coordinates.
+
 Add this include to APOLO's existing Liquibase master at the appropriate position:
 
 ```xml
@@ -70,3 +76,5 @@ Add this include to APOLO's existing Liquibase master at the appropriate positio
 ```
 
 APOLO remains the single production migration owner. Core ships no global application properties, Liquibase runner or Boot executable. Its public integration interfaces must use workflow-owned or standard Java types, without exposing APOLO entities or security/messaging-provider types.
+
+Preserve the workflow changelog classpath paths and already-applied changeset identities when moving the source module. Retain APOLO's existing entity/repository packages when adding workflow registration to its shared persistence context.
