@@ -13,6 +13,12 @@ At that move, review APOLO's effective root parent, reparent core and align its 
 
 This is a structural scaffold. Workflow models, entities, services and schema changesets are not implemented yet. The workflow master changelog is intentionally empty.
 
+## Project constitution and specifications
+
+Start with the [documentation guide](docs/README.md), [project constitution](docs/constitution.md) and [specification-driven development workflow](docs/specification-driven-development.md). They capture the agreed architecture, specification and evidence requirements, current no-tests policy and remaining decisions traced to the [design sources](docs/design-sources.md).
+
+Project-wide guidance lives in `docs/`; individual feature specifications, plans, tasks and evidence belong in [docs/features/](docs/features/README.md).
+
 ## Build
 
 Run from the repository root with `JAVA_HOME` pointing to JDK 21:
