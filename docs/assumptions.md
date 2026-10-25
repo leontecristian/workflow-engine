@@ -1,14 +1,14 @@
 # Assumptions and verification register
 
-**Version:** 2.1.0
+**Version:** 2.2.0
 
 **Recorded:** 2026-10-25
 
-**Applies to:** constitution v2.1.0 and planning for APOLO integration
+**Applies to:** constitution v2.2.0 and planning for APOLO integration
 
 An assumption is an expectation used for planning whose supporting evidence is incomplete. It must not be presented as a confirmed contract or an implemented guarantee. [Constraints](constraints.md) remain requirements even when the feasibility or mechanism for satisfying them needs verification.
 
-The items below derive from the [consolidated design](../../apolo-docs/workflow-engine/architecture/workflow-engine-design.md), particularly O3/O7–O11, the [development plan](../../apolo-docs/workflow-engine/development/independent-development-plan.md), the [technical summary](../../apolo-docs/workflow-engine/reference/apolo-technical-summary.md) and the scoped superseding decisions in [database design v1.3](../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md). See [design sources](design-sources.md) for precedence. Owners identify responsible roles, not newly assigned individuals or delivery dates.
+The items below derive from the [consolidated design](../../apolo-docs/workflow-engine/architecture/workflow-engine-design.md), particularly O3/O7–O11, the [development plan](../../apolo-docs/workflow-engine/development/independent-development-plan.md), the [technical summary](../../apolo-docs/workflow-engine/reference/apolo-technical-summary.md) and the scoped superseding decisions in [database design v1.4](../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md). See [design sources](design-sources.md) for precedence. Owners identify responsible roles, not newly assigned individuals or delivery dates.
 
 No item is marked verified merely because it is plausible. Follow the [current no-tests policy](specification-driven-development.md#verification-and-current-no-tests-policy); required evidence listed here is a future verification obligation, not authorization to execute tests now.
 
@@ -142,7 +142,7 @@ The plan expects APOLO's root build and release process to accommodate core as a
 
 ## ASM-10 — Completion history can support operational result retrieval
 
-**Status:** storage direction SELECTED; contract and integration PENDING VERIFICATION — database design v1.3, sections 11.1, 13.1, 16 and 19.
+**Status:** storage direction SELECTED; contract and integration PENDING VERIFICATION — introduced in database design v1.3 and retained in v1.4, sections 11.1, 13.1, 16 and 19.
 
 **Owner:** workflow persistence/contract maintainer with APOLO integration and retention owners.
 
@@ -154,6 +154,20 @@ The selected storage is the existing TASK_COMPLETED.details_json record, with ex
 
 **If false:** revise the storage/access or retention mechanism explicitly while preserving immutable submissions, transaction guarantees and host ownership; do not silently drop evidence, create independently editable copies or expose arbitrary history as the API.
 
+## ASM-11 — JSON variables preserve persistence and expression guarantees
+
+**Status:** capability SELECTED; contracts and integration PENDING VERIFICATION — database design v1.4, section 12.
+
+**Owner:** workflow persistence/expression maintainers with APOLO integration owner.
+
+**Resolve before:** accepting JSON variable writes, enabling JSON-aware definitions or executing path-based routing.
+
+The selected model adds JSON objects/arrays in workflow_variable.json_value while preserving scalar storage and immutable task results. Whole-value updates, declared bindings and restricted read-only navigation must preserve existing concurrency, atomicity, authorization and exact-value guarantees.
+
+**Evidence needed:** SQL CHECK and null behavior, explicit JPA replacement/dirty tracking, stale-write conflicts, transaction-local visibility, rollback, bounded schema validation, exact numeric round trips and full-payload fingerprints. Specify and verify detached projections and the expression allowlist for object/index access, required/missing/null/type errors and traversal limits. Reconcile per-instance/value budgets with command/read/history envelopes; verify immutable write/routing evidence and backward-compatible scalar codecs. No host data or mutable provider object may escape into expression evaluation.
+
+**If false:** revise the mapping/access mechanism and record contract changes before enabling affected definitions; do not silently accept lossy values, unsafe navigation, lost updates or missing evidence.
+
 ## Open decisions that must not be filled with assumptions
 
 - **O1/O6:** exact node/action bindings, JSON encodings, nullability, precision, date/time semantics, expression allowlist, execution bounds and errors. The illustrative limit of 50 and decimal-as-string examples are not final selections.
@@ -161,6 +175,7 @@ The selected storage is the existing TASK_COMPLETED.details_json record, with ex
 - **Task multiplicity:** multiple tasks per activity is agreed; proposed SINGLE/ALL semantics, fixed roster, bounds and exact node JSON require specification before dependent implementation. Do not promote them to confirmed APOLO business policy.
 - **Host associations:** APOLO ownership, instance-ID queries and optional engine correlation are selected. APOLO must specify its column/table shape, historical membership storage, authorization and start-time integration without making core depend on booking tables.
 - **Structured submissions:** result contract language/features and immutable reference resolution, payload/depth/collection/string limits, number and omitted/null/default rules, versioned canonicalization, public API/error shapes, bounded retrieval and prior-activity bindings remain specification gates. Define host business validation/aggregation and reviewer visibility without treating JSON as proof of membership or reviewed material. Draft/partial task saving is excluded.
+- **JSON variables:** exact declaration/schema, start/service/update bindings, authorized read projections, expression path syntax, full-value encoding/canonicalization, unset behavior and limits remain specification work. Whole-value replacement, SQL NULL for variable null and object/array roots are the selected initial shape. JSON-path search/indexing, patch/merge APIs and arbitrary Java-object serialization are not implied.
 - **O4:** alternative-resource acceptance/reapproval behavior. No default replacement behavior has been selected.
 - **O9:** deployment-specific migration ordering, delivery/recovery and retention/redaction arrangements beyond the agreed ownership boundary.
 - **O11:** Angular version, graph library and detailed designer interactions. These do not block the first engine slice.

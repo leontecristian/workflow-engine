@@ -1,6 +1,6 @@
 # Specification-driven development
 
-This workflow operationalizes [constitution v2.1.0](constitution.md). It is a repository convention; it does not require installing a specification framework or code generator.
+This workflow operationalizes [constitution v2.2.0](constitution.md). It is a repository convention; it does not require installing a specification framework or code generator.
 
 ## 1. Specify the behavior
 
@@ -47,6 +47,7 @@ For this project, explicitly inspect:
 - Multiple tasks per activity without parallel process branches, keeping proposed completion semantics distinct from agreed scope.
 - APOLO-owned instance-ID associations, authorized engine API queries and optional engine correlation; atomic creation of required host links.
 - Pinned structured result contracts, authoritative completion history, authorized exact-activity retrieval, full-payload idempotency, same-transaction result visibility and operational retention (CON-13/ASM-10).
+- JSON execution-variable declarations, whole-value replacements, bounded read-only path navigation, exact-value evidence and scalar compatibility (CON-14/ASM-11).
 - Expression restrictions and fail-on-error routing.
 - Authorization, concurrency, idempotency, audit and durable event handoff.
 - Java target/runtime compatibility and consequences of the future APOLO source move.
@@ -90,9 +91,10 @@ Keep acceptance scenarios and required evidence in specifications even when exec
 ## First specification priorities
 
 1. **Workflow Definition v1:** node/transition semantics, typed inputs/variables, synchronous service bindings, errors, lifecycle, publication validation and execution bounds (O1/O6).
-2. **Expression Policy v1:** supported syntax, scalar encodings, nullability, date/time rules, deterministic inputs, allowlist, resource bounds and errors (O6).
+2. **Expression Policy v1:** supported scalar and JSON path syntax/encodings, nullability, date/time rules, deterministic inputs, read-only allowlist, traversal/resource bounds and errors (O6/ASM-11).
 3. **Task catalog and human-node contracts:** catalog administration and any import schema, immutable codes/retained rows, editable metadata/selectability, node-owned outcomes and inputs, and deployed-host capabilities by stable task code (O2). Specify collective completion behavior separately from the confirmed multiple-task scope; task-type business versions and publication lifecycle are superseded.
-4. **Initial database schema and command integration:** turn [database design v1.3](../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md) into a feature specification before Liquibase implementation. Cover selected numeric JPA versions, early aggregate claims/final version capture, proposed physical constraints, optional business correlation, APOLO-owned associations, completion-record uniqueness/lookup, transaction participation, idempotency fingerprint/receipt rules, event handoff and audit (Q11/O7/O9).
-5. **Structured task submissions:** specify node-declared result schema and limits, exact JSON normalization, authoritative TASK_COMPLETED evidence, authorized exact-task/activity APIs, same-transaction downstream reads, rollback, retention and compatibility (CON-13/ASM-10). Acceptance scenarios must include mixed per-item decisions, without inventing host aggregation policy, draft saving or collection-valued workflow variables.
+4. **Initial database schema and command integration:** turn [database design v1.4](../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md) into a feature specification before Liquibase implementation. Cover selected numeric JPA versions, early aggregate claims/final version capture, proposed physical constraints, optional business correlation, APOLO-owned associations, completion-record uniqueness/lookup, transaction participation, idempotency fingerprint/receipt rules, event handoff and audit (Q11/O7/O9).
+5. **Structured task submissions:** specify node-declared result schema and limits, exact JSON normalization, authoritative TASK_COMPLETED evidence, authorized exact-task/activity APIs, same-transaction downstream reads, rollback, retention and compatibility (CON-13/ASM-10). Acceptance scenarios must include mixed per-item decisions without inventing host aggregation policy, draft saving or implicit result-to-variable propagation.
+6. **JSON execution variables:** specify pinned declarations/validation, JSON column/type constraints, explicit start/service/command bindings, whole-value replacement, read/path APIs, canonicalization, evidence budgets and scalar compatibility (CON-14/ASM-11). Verify persistence dirty tracking, stale replacements, transaction visibility and expression restrictions; indexed JSON search needs separate justification.
 
 These are planned artifacts, not a mandated implementation sequence. Apply the [source precedence](design-sources.md) when older architecture examples conflict with the selected database design changes. Exact schemas, interfaces, endpoints and unresolved physical details require specification; selected numeric JPA mapping does not establish verified host behavior. Decision Definition v1 and decision-table artifacts remain deferred.

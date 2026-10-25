@@ -1,14 +1,14 @@
 # Project constraints
 
-**Version:** 2.1.0
+**Version:** 2.2.0
 
 **Recorded:** 2026-10-25
 
-**Applies to:** constitution v2.1.0 and the current separate-development phase
+**Applies to:** constitution v2.2.0 and the current separate-development phase
 
 Constraints are confirmed boundaries that specifications and implementations must satisfy. They are requirements, not evidence that the corresponding behavior already exists. This document makes the [constitution](constitution.md) operational without replacing the detailed [consolidated design](../../apolo-docs/workflow-engine/architecture/workflow-engine-design.md).
 
-References below identify constitution principles and sections/decision IDs in the consolidated design, with scoped superseding decisions from [database design v1.3](../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md) as recorded in [design sources](design-sources.md). Unverified expectations belong in [assumptions.md](assumptions.md). Exact schemas, interfaces, limits and physical mappings remain specification work where the design has not finalized them.
+References below identify constitution principles and sections/decision IDs in the consolidated design, with scoped superseding decisions from [database design v1.4](../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md) as recorded in [design sources](design-sources.md). Unverified expectations belong in [assumptions.md](assumptions.md). Exact schemas, interfaces, limits and physical mappings remain specification work where the design has not finalized them.
 
 ## CON-01 — Platform and dependency boundaries
 
@@ -39,7 +39,7 @@ The host owns business data/rules, identity, authorization policy, domain endpoi
 
 APOLO booking endpoints own business orchestration. Generic workflow endpoints must not bypass booking validation. Named extensions are registered capabilities, not class names or arbitrary bean access supplied by definition authors.
 
-APOLO stores the engine-issued workflow instance ID in host business data and uses the engine API to query state, tasks and history. Several bookings may share that ID. A booking column can hold one current association; a host association table may support multiple/historical links. Preserve prior execution links and reviewed membership. Task-detail composition and business actions resolve authorized bookings through host data; core variables remain scalar.
+APOLO stores the engine-issued workflow instance ID in host business data and uses the engine API to query state, tasks and history. Several bookings may share that ID. A booking column can hold one current association; a host association table may support multiple/historical links. Preserve prior execution links and reviewed membership. Task-detail composition and business actions resolve authorized bookings through host data; JSON variables may contain a working selection without replacing host membership or authorization.
 
 The engine's separate business_type/business_id fields are optional nonunique correlation metadata: both present at creation or both null, immutable thereafter. Neither correlation nor possession of an instance ID grants access or defines booking membership. Core has no APOLO FK or host association migration responsibility.
 
@@ -108,7 +108,7 @@ Use restricted SpEL over explicit validated `#facts` and `#vars`. Conditions ret
 
 Reject unsupported schema versions and semantics. Prevent type/constructor/bean access, general method invocation, assignment, mutation and arbitrary object access. Use an explicit syntax allowlist and bounded evaluation/input complexity. Expressions cannot fetch business data or read hidden time/random/global state.
 
-Initial scalar types are STRING, LONG, DECIMAL, BOOLEAN, DATE and DATETIME. Preserve numeric precision and use explicit dates/unambiguous timestamps. Required inputs and declared service bindings must be validated. Exact encodings, nullability, limits and error codes remain to be specified.
+Scalar types remain STRING, LONG, DECIMAL, BOOLEAN, DATE and DATETIME; execution variables also support JSON under CON-14. Preserve numeric precision and use explicit dates/unambiguous timestamps. Required inputs and declared service bindings must be validated. Exact encodings, nullability, limits and error codes remain to be specified.
 
 **Trace:** C08; design sections 5, 7.3, 8.4 and 10.4; O1/O6.
 
@@ -148,10 +148,22 @@ For temporary authorized runtime verification, stop processes afterward unless a
 - Expose authorized exact-task/activity completion APIs. Distinguish an open task from a completed task with no optional result; a missing required event is an integrity error. Respect sibling-review visibility, repeated activation identity and bounded retrieval. Hosts must not depend on arbitrary history parsing.
 - Fingerprint the full result. Formatting/property order do not affect identity; array order remains significant unless explicitly normalized by the pinned contract. Version canonicalization; successful authorized replay precedes state-dependent validation. Changed nested content conflicts under the same successful command ID.
 - Make the final submission visible to downstream actions in the shared transaction through explicit completed-activity context. Rollback removes that command's result and effects while preserving prior committed contributions.
-- JSON does not change ALL semantics: use a common configured contribution such as REVIEW_SUBMITTED when the host must combine all reviewers' per-item decisions. Host aggregation may produce validated scalar outputs through declared bindings; results do not automatically modify variables or expression facts.
+- JSON does not change ALL semantics: use a common configured contribution such as REVIEW_SUBMITTED when the host must combine all reviewers' per-item decisions. Host aggregation may produce validated scalar or JSON outputs through declared bindings; results do not automatically modify variables or expression facts. Current-value replacements never rewrite original task submissions.
 - Preserve completion records and their readers for operational dependencies and audit. Do not independently purge completion evidence while its task remains retained. Exceptional redaction/unavailability must resolve affected execution explicitly. Ordinary result edits, unfinished form saving and incremental task completion are outside this capability.
 
 **Trace:** C06–C09; database design sections 8.2, 11.1, 12–16 and 19–21; ASM-10. Business review snapshots and host association ownership remain separate concerns.
+
+## CON-14 — JSON execution variables
+
+- Add JSON alongside scalar variable types, with nullable json_value and matching-type/JSON-validity checks. Non-null roots are objects or arrays; top-level primitives use scalar types. Preserve absent row versus explicit SQL NULL, nested null, missing property and empty collection distinctions.
+- Pin declarations, validation contracts and writer/binding permissions to the workflow version. Reject duplicate keys, malformed or undeclared content, lossy numeric conversions and exceeded per-value/per-instance/request/read/history bounds. Exact schema features, numeric/null/default encoding and limits require specification.
+- Initialize or replace entire values via declared start/service bindings or authorized commands. Existing-instance updates require the early version-checked instance claim; start-time initialization shares the new instance's transaction. Stale replacements fail. No patch/deep-merge/in-place nested-write API is implied. Public boundaries expose detached/read-only data, not mutable provider/application objects.
+- Provide authorized bounded reads and explicit path projections. Restricted #vars object-key/array-index access is read-only; missing required values, null/type mismatch and invalid indices fail. Retain the expression allowlist and prohibit arbitrary methods, reflection, mutation and host-object traversal. Exact path/binding syntax and safety verification remain pending.
+- Fingerprint full replacement values and preserve accepted write/routing evidence before later mutations. Same-transaction consumers see accepted updates; failures roll back values, effects and evidence. Persist replacements explicitly rather than relying on incidental JSON-tree dirty tracking.
+- Keep immutable task submissions, current execution context and authoritative APOLO membership separate. No implicit result-to-variable merge or partial-ALL mutation of frozen material. JSON-path filtering/indexing requires a separate justified projection design; storing JSON does not create indexed search.
+- Preserve older scalar rows and definition/API behavior. Extend type checks, codecs and capability detection explicitly before enabling JSON definitions; applied schemas require ordered forward migrations.
+
+**Trace:** C06/C08/C09; database design sections 5, 12, 19–21; ASM-11.
 
 ## Current local configuration
 

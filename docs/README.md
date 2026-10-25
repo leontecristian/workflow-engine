@@ -11,11 +11,11 @@ Read these documents in order:
 5. [Design sources and decision status](design-sources.md): provenance, unresolved decisions and the distinction between agreed design and implemented behavior.
 6. [Coding standards](coding-standards.md): practical clean-code guidance for Java, Spring, JPA and Lombok, applied during implementation and review.
 
-The constitution is version **2.1.0**, established on **2026-10-24** and amended on **2026-10-25** to incorporate database design v1.3, including structured task submissions, and the project owner's subsequent decisions. It codifies the agreed direction; it does not establish that the planned engine has been implemented.
+The constitution is version **2.2.0**, established on **2026-10-24** and amended on **2026-10-25** to incorporate database design v1.4, including structured task submissions and JSON execution variables, and the project owner's subsequent decisions. It codifies the agreed direction; it does not establish that the planned engine has been implemented.
 
 ## Document responsibilities
 
-The constitution defines constraints that all feature specifications must respect. The consolidated design in `apolo-docs` remains the detailed architectural baseline, with scoped superseding decisions from [database design v1.3](../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md) documented in [design sources](design-sources.md). Feature specifications will define exact behavior within those constraints. Plans describe implementation choices; tasks identify bounded changes; evidence records what was actually checked.
+The constitution defines constraints that all feature specifications must respect. The consolidated design in `apolo-docs` remains the detailed architectural baseline, with scoped superseding decisions from [database design v1.4](../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md) documented in [design sources](design-sources.md). Feature specifications will define exact behavior within those constraints. Plans describe implementation choices; tasks identify bounded changes; evidence records what was actually checked.
 
 The constraints register makes confirmed boundaries easy to reference. The assumptions register identifies expectations that need verification and keeps provisional business choices distinct from mandatory guarantees. Both derive from the existing design; they do not finalize its open contracts or change the constitution version.
 
@@ -46,6 +46,6 @@ workflow-engine/
         examples/      # when concrete contract examples are needed
 ```
 
-Feature subfolders in this tree describe the convention for future work, not existing specifications. Required contracts include Workflow Definition v1, Expression Policy v1, the simple task catalog and human-node/host-capability contracts, structured task submissions, and the initial database schema with command integration. Their exact schemas and unresolved behavior remain to be specified.
+Feature subfolders in this tree describe the convention for future work, not existing specifications. Required contracts include Workflow Definition v1, Expression Policy v1, the simple task catalog and human-node/host-capability contracts, structured task submissions, JSON execution variables, and the initial database schema with command integration. Their exact schemas and unresolved behavior remain to be specified.
 
 Build and local startup instructions remain in the [project README](../README.md). Current work follows the owner's **no-tests** instruction; see the [verification policy](specification-driven-development.md#verification-and-current-no-tests-policy).
