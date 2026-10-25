@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd"
+                   logicalFilePath="db/changelog/workflow/changes/001-initial-schema.xml">
+    <!-- Preconditions belong to pending changesets so successful restarts remain valid. -->
+    <changeSet id="f001-001-create-wf-schema" author="workflow-engine">
+        <preConditions onFail="HALT" onError="HALT">
+            <dbms type="mssql"/>
+            <sqlCheck expectedResult="0"><![CDATA[
+SELECT COUNT(*) FROM sys.tables t
+JOIN sys.schemas s ON s.schema_id = t.schema_id
+WHERE s.name = N'wf' AND t.name IN (
+    N'workflow_definition', N'workflow_definition_version', N'workflow_task_type',
+    N'workflow_instance', N'workflow_activity', N'workflow_task',
+    N'workflow_variable', N'workflow_history', N'workflow_command_receipt')
+            ]]></sqlCheck>
+        </preConditions>
+        <sql dbms="mssql"><![CDATA[
+IF SCHEMA_ID(N'wf') IS NULL EXEC(N'CREATE SCHEMA wf');
+        ]]></sql>
+    </changeSet>
+
+    <changeSet id="f001-002-create-initial-tables" author="workflow-engine">
+        <preConditions onFail="HALT" onError="HALT">
+            <dbms type="mssql"/>
+            <sqlCheck expectedResult="0"><![CDATA[
+SELECT COUNT(*) FROM sys.tables t
+JOIN sys.schemas s ON s.schema_id = t.schema_id
+WHERE s.name = N'wf' AND t.name IN (
+    N'workflow_definition', N'workflow_definition_version', N'workflow_task_type',
+    N'workflow_instance', N'workflow_activity', N'workflow_task',
+    N'workflow_variable', N'workflow_history', N'workflow_command_receipt')
+            ]]></sqlCheck>
+        </preConditions>
+        <!-- Native DDL preserves explicit BIN2 collations, clustered keys, CHECKs and
+             filtered/covering indexes together in the transactional SQL Server batch. -->
+        <sql dbms="mssql" splitStatements="true"><![CDATA[
+CREATE TABLE wf.workflow_definition (
+    id BIGINT IDENTITY(1,1) NOT NULL,
+    workflow_key VARCHAR(100) COLLATE Latin1_General_100_BIN2 NOT NULL,
+    catalog_name NVARCHAR(200) NOT NULL,
+    catalog_description NVARCHAR(2000) NULL,
+    created_at DATETIME2(7) NOT NULL,
+    created_by NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
+    lock_version BIGINT NOT NULL,
+    CONSTRAINT pk_workflow_definition PRIMARY KEY CLUSTERED (id),
+    CONSTRAINT uq_workflow_definition_key UNIQUE NONCLUSTERED (workflow_key)
+);
+
+CREATE TABLE wf.workflow_definition_version (
+    id BIGINT IDENTITY(1,1) NOT NULL,
+    definition_id BIGINT NOT NULL,
+    version INT NOT NULL,
+    schema_version SMALLINT NOT NULL,
+    expression_policy VARCHAR(100) COLLATE Latin1_General_100_BIN2 NOT NULL,
+    definition_json NVARCHAR(MAX) NOT NULL,
+    status VARCHAR(12) NOT NULL,
+    content_revision BIGINT NOT NULL,
+    content_hash BINARY(32) NOT NULL,
+    canonicalization_version VARCHAR(40) NOT NULL,
+    created_at DATETIME2(7) NOT NULL,
+    created_by NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
+    updated_at DATETIME2(7) NOT NULL,
+    updated_by NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
+    validation_status VARCHAR(12) NULL,
+    validated_content_revision BIGINT NULL,
+    validated_content_hash BINARY(32) NULL,
+    validation_context_hash BINARY(32) NULL,
+    validation_details_json NVARCHAR(MAX) NULL,
+    validated_at DATETIME2(7) NULL,
+    validated_by NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL,
+    published_at DATETIME2(7) NULL,
+    published_by NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL,
+    retired_at DATETIME2(7) NULL,
+    retired_by NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL,
+    lock_version BIGINT NOT NULL,
+    CONSTRAINT pk_workflow_definition_version PRIMARY KEY CLUSTERED (id),
+    CONSTRAINT uq_workflow_definition_version_version UNIQUE NONCLUSTERED (definition_id, version),
+    CONSTRAINT fk_workflow_definition_version_definition FOREIGN KEY (definition_id)
+        REFERENCES wf.workflow_definition (id) ON UPDATE NO ACTION ON DELETE NO ACTION,
+    CONSTRAINT ck_workflow_definition_version_positive CHECK (
+        version > 0 AND schema_version > 0 AND content_revision > 0),
+    CONSTRAINT ck_workflow_definition_version_lifecycle CHECK (
+        (status = 'DRAFT' AND published_at IS NULL AND published_by IS NULL AND retired_at IS NULL AND retired_by IS NULL)
+        OR (status = 'PUBLISHED' AND published_at IS NOT NULL AND published_by IS NOT NULL AND retired_at IS NULL AND retired_by IS NULL)
+        OR (status = 'RETIRED' AND published_at IS NOT NULL AND published_by IS NOT NULL AND retired_at IS NOT NULL AND retired_by IS NOT NULL)),
+    CONSTRAINT ck_workflow_definition_version_validation CHECK (
+        (validation_status IS NULL AND validated_content_revision IS NULL AND validated_content_hash IS NULL AND validation_context_hash IS NULL AND validation_details_json IS NULL AND validated_at IS NULL AND validated_by IS NULL)
+        OR (validation_status IS NOT NULL AND validated_content_revision IS NOT NULL AND validated_content_hash IS NOT NULL AND validation_context_hash IS NOT NULL AND validation_details_json IS NOT NULL AND validated_at IS NOT NULL AND validated_by IS NOT NULL
+            AND validation_status IN ('PASSED', 'FAILED') AND validated_content_revision > 0)),
+    CONSTRAINT ck_workflow_definition_version_definition_json CHECK (
+        ISJSON(definition_json) = 1 AND DATALENGTH(definition_json) <= 2097152),
+    CONSTRAINT ck_workflow_definition_version_validation_json CHECK (
+        validation_details_json IS NULL OR (ISJSON(validation_details_json) = 1 AND DATALENGTH(validation_details_json) <= 262144))
+);
+
+CREATE TABLE wf.workflow_task_type (
+    id BIGINT IDENTITY(1,1) NOT NULL,
+    code VARCHAR(100) COLLATE Latin1_General_100_BIN2 NOT NULL,
+    name NVARCHAR(200) NOT NULL,
+    description NVARCHAR(2000) NULL,
+    selectable BIT NOT NULL,
+    lock_version BIGINT NOT NULL,
+    CONSTRAINT pk_workflow_task_type PRIMARY KEY CLUSTERED (id),
+    CONSTRAINT uq_workflow_task_type_code UNIQUE NONCLUSTERED (code)
+);
+
+CREATE TABLE wf.workflow_instance (
+    id BIGINT IDENTITY(1,1) NOT NULL,
+    definition_version_id BIGINT NOT NULL,
+    business_type VARCHAR(100) COLLATE Latin1_General_100_BIN2 NULL,
+    business_id NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL,
+    current_node_key VARCHAR(100) COLLATE Latin1_General_100_BIN2 NOT NULL,
+    status VARCHAR(12) NOT NULL,
+    result_key VARCHAR(100) COLLATE Latin1_General_100_BIN2 NULL,
+    started_at DATETIME2(7) NOT NULL,
+    started_by NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
+    ended_at DATETIME2(7) NULL,
+    ended_by NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL,
+    termination_reason NVARCHAR(2000) NULL,
+    last_history_sequence BIGINT NOT NULL,
+    lock_version BIGINT NOT NULL,
+    CONSTRAINT pk_workflow_instance PRIMARY KEY CLUSTERED (id),
+    CONSTRAINT fk_workflow_instance_definition_version FOREIGN KEY (definition_version_id)
+        REFERENCES wf.workflow_definition_version (id) ON UPDATE NO ACTION ON DELETE NO ACTION,
+    CONSTRAINT ck_workflow_instance_business_pair CHECK (
+        (business_type IS NULL AND business_id IS NULL) OR (business_type IS NOT NULL AND business_id IS NOT NULL)),
+    CONSTRAINT ck_workflow_instance_lifecycle CHECK (
+        (status = 'ACTIVE' AND result_key IS NULL AND ended_at IS NULL AND ended_by IS NULL AND termination_reason IS NULL)
+        OR (status = 'COMPLETED' AND result_key IS NOT NULL AND ended_at IS NOT NULL AND ended_by IS NOT NULL AND termination_reason IS NULL)
+        OR (status = 'CANCELLED' AND result_key IS NULL AND ended_at IS NOT NULL AND ended_by IS NOT NULL AND termination_reason IS NOT NULL)),
+    CONSTRAINT ck_workflow_instance_end_time CHECK (
+        ended_at IS NULL OR ended_at >= started_at),
+    CONSTRAINT ck_workflow_instance_history_sequence CHECK (
+        last_history_sequence >= 0)
+);
+
+CREATE TABLE wf.workflow_activity (
+    id BIGINT IDENTITY(1,1) NOT NULL,
+    instance_id BIGINT NOT NULL,
+    node_key VARCHAR(100) COLLATE Latin1_General_100_BIN2 NOT NULL,
+    activation_sequence BIGINT NOT NULL,
+    task_type_id BIGINT NOT NULL,
+    completion_policy VARCHAR(12) NOT NULL,
+    contribution_outcome_key VARCHAR(100) COLLATE Latin1_General_100_BIN2 NULL,
+    required_task_count INT NOT NULL,
+    review_revision_ref NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL,
+    status VARCHAR(12) NOT NULL,
+    outcome_key VARCHAR(100) COLLATE Latin1_General_100_BIN2 NULL,
+    entered_at DATETIME2(7) NOT NULL,
+    closed_at DATETIME2(7) NULL,
+    closed_by NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL,
+    closure_reason VARCHAR(40) NULL,
+    CONSTRAINT pk_workflow_activity PRIMARY KEY CLUSTERED (id),
+    CONSTRAINT uq_workflow_activity_activation UNIQUE NONCLUSTERED (instance_id, activation_sequence),
+    CONSTRAINT uq_workflow_activity_instance_id UNIQUE NONCLUSTERED (instance_id, id),
+    CONSTRAINT fk_workflow_activity_instance FOREIGN KEY (instance_id)
+        REFERENCES wf.workflow_instance (id) ON UPDATE NO ACTION ON DELETE NO ACTION,
+    CONSTRAINT fk_workflow_activity_task_type FOREIGN KEY (task_type_id)
+        REFERENCES wf.workflow_task_type (id) ON UPDATE NO ACTION ON DELETE NO ACTION,
+    CONSTRAINT ck_workflow_activity_range CHECK (
+        activation_sequence > 0 AND required_task_count BETWEEN 1 AND 100),
+    CONSTRAINT ck_workflow_activity_policy CHECK (
+        (completion_policy = 'SINGLE' AND required_task_count = 1 AND contribution_outcome_key IS NULL)
+        OR (completion_policy = 'ALL' AND contribution_outcome_key IS NOT NULL)),
+    CONSTRAINT ck_workflow_activity_lifecycle CHECK (
+        (status = 'ACTIVE' AND outcome_key IS NULL AND closed_at IS NULL AND closed_by IS NULL AND closure_reason IS NULL)
+        OR (status = 'COMPLETED' AND outcome_key IS NOT NULL AND closed_at IS NOT NULL AND closed_by IS NOT NULL AND closure_reason IS NOT NULL)
+        OR (status = 'CANCELLED' AND outcome_key IS NULL AND closed_at IS NOT NULL AND closed_by IS NOT NULL AND closure_reason IS NOT NULL)),
+    CONSTRAINT ck_workflow_activity_close_time CHECK (
+        closed_at IS NULL OR closed_at >= entered_at)
+);
+
+CREATE TABLE wf.workflow_task (
+    id BIGINT IDENTITY(1,1) NOT NULL,
+    activity_id BIGINT NOT NULL,
+    task_key VARCHAR(100) COLLATE Latin1_General_100_BIN2 NOT NULL,
+    assigned_user_ref NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
+    status VARCHAR(12) NOT NULL,
+    outcome_key VARCHAR(100) COLLATE Latin1_General_100_BIN2 NULL,
+    created_at DATETIME2(7) NOT NULL,
+    due_at DATETIME2(7) NULL,
+    closed_at DATETIME2(7) NULL,
+    closed_by NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL,
+    closure_reason VARCHAR(40) NULL,
+    CONSTRAINT pk_workflow_task PRIMARY KEY CLUSTERED (id),
+    CONSTRAINT uq_workflow_task_slot UNIQUE NONCLUSTERED (activity_id, task_key),
+    CONSTRAINT uq_workflow_task_activity_id UNIQUE NONCLUSTERED (activity_id, id),
+    CONSTRAINT fk_workflow_task_activity FOREIGN KEY (activity_id)
+        REFERENCES wf.workflow_activity (id) ON UPDATE NO ACTION ON DELETE NO ACTION,
+    CONSTRAINT ck_workflow_task_lifecycle CHECK (
+        (status = 'OPEN' AND outcome_key IS NULL AND closed_at IS NULL AND closed_by IS NULL AND closure_reason IS NULL)
+        OR (status = 'COMPLETED' AND outcome_key IS NOT NULL AND closed_at IS NOT NULL AND closed_by IS NOT NULL AND closure_reason IS NOT NULL AND closure_reason = 'TASK_OUTCOME')
+        OR (status = 'CANCELLED' AND outcome_key IS NULL AND closed_at IS NOT NULL AND closed_by IS NOT NULL AND closure_reason IS NOT NULL AND closure_reason IN ('ACTIVITY_RESOLVED', 'INSTANCE_CANCELLED', 'REVIEW_SUPERSEDED'))),
+    CONSTRAINT ck_workflow_task_close_time CHECK (
+        closed_at IS NULL OR closed_at >= created_at)
+);
+
+CREATE TABLE wf.workflow_variable (
+    instance_id BIGINT NOT NULL,
+    variable_key VARCHAR(100) COLLATE Latin1_General_100_BIN2 NOT NULL,
+    value_type VARCHAR(12) NOT NULL,
+    string_value NVARCHAR(4000) NULL,
+    long_value BIGINT NULL,
+    decimal_value DECIMAL(38,10) NULL,
+    boolean_value BIT NULL,
+    date_value DATE NULL,
+    datetime_value DATETIMEOFFSET(7) NULL,
+    json_value NVARCHAR(MAX) NULL,
+    CONSTRAINT pk_workflow_variable PRIMARY KEY CLUSTERED (instance_id, variable_key),
+    CONSTRAINT fk_workflow_variable_instance FOREIGN KEY (instance_id)
+        REFERENCES wf.workflow_instance (id) ON UPDATE NO ACTION ON DELETE NO ACTION,
+    CONSTRAINT ck_workflow_variable_value_type CHECK (
+        value_type IN ('STRING', 'LONG', 'DECIMAL', 'BOOLEAN', 'DATE', 'DATETIME', 'JSON')),
+    CONSTRAINT ck_workflow_variable_typed_values CHECK (
+        (string_value IS NULL OR value_type = 'STRING')
+        AND (long_value IS NULL OR value_type = 'LONG')
+        AND (decimal_value IS NULL OR value_type = 'DECIMAL')
+        AND (boolean_value IS NULL OR value_type = 'BOOLEAN')
+        AND (date_value IS NULL OR value_type = 'DATE')
+        AND (datetime_value IS NULL OR value_type = 'DATETIME')
+        AND (json_value IS NULL OR value_type = 'JSON')),
+    CONSTRAINT ck_workflow_variable_json CHECK (
+        json_value IS NULL OR ISJSON(json_value) = 1)
+);
+
+CREATE TABLE wf.workflow_history (
+    instance_id BIGINT NOT NULL,
+    sequence_number BIGINT NOT NULL,
+    event_type VARCHAR(60) NOT NULL,
+    command_id UNIQUEIDENTIFIER NOT NULL,
+    correlation_id NVARCHAR(100) NULL,
+    actor_kind VARCHAR(12) NOT NULL,
+    actor_ref NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
+    occurred_at DATETIME2(7) NOT NULL,
+    activity_id BIGINT NULL,
+    task_id BIGINT NULL,
+    source_node_key VARCHAR(100) COLLATE Latin1_General_100_BIN2 NULL,
+    target_node_key VARCHAR(100) COLLATE Latin1_General_100_BIN2 NULL,
+    transition_key VARCHAR(100) COLLATE Latin1_General_100_BIN2 NULL,
+    details_schema_version SMALLINT NOT NULL,
+    details_json NVARCHAR(MAX) NOT NULL,
+    CONSTRAINT pk_workflow_history PRIMARY KEY CLUSTERED (instance_id, sequence_number),
+    CONSTRAINT fk_workflow_history_instance FOREIGN KEY (instance_id)
+        REFERENCES wf.workflow_instance (id) ON UPDATE NO ACTION ON DELETE NO ACTION,
+    CONSTRAINT fk_workflow_history_activity_owner FOREIGN KEY (instance_id, activity_id)
+        REFERENCES wf.workflow_activity (instance_id, id) ON UPDATE NO ACTION ON DELETE NO ACTION,
+    CONSTRAINT fk_workflow_history_task_owner FOREIGN KEY (activity_id, task_id)
+        REFERENCES wf.workflow_task (activity_id, id) ON UPDATE NO ACTION ON DELETE NO ACTION,
+    CONSTRAINT ck_workflow_history_positive CHECK (
+        sequence_number > 0 AND details_schema_version > 0),
+    CONSTRAINT ck_workflow_history_actor CHECK (
+        actor_kind IN ('USER', 'SYSTEM')),
+    CONSTRAINT ck_workflow_history_task_activity CHECK (
+        task_id IS NULL OR activity_id IS NOT NULL),
+    CONSTRAINT ck_workflow_history_completion CHECK (
+        event_type <> 'TASK_COMPLETED' OR (task_id IS NOT NULL AND activity_id IS NOT NULL)),
+    CONSTRAINT ck_workflow_history_json CHECK (
+        ISJSON(details_json) = 1 AND DATALENGTH(details_json) <= 262144)
+);
+
+CREATE TABLE wf.workflow_command_receipt (
+    command_id UNIQUEIDENTIFIER NOT NULL,
+    instance_id BIGINT NOT NULL,
+    operation_type VARCHAR(40) NOT NULL,
+    actor_kind VARCHAR(12) NOT NULL,
+    actor_ref NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
+    request_fingerprint BINARY(32) NOT NULL,
+    fingerprint_version VARCHAR(40) NOT NULL,
+    recorded_at DATETIME2(7) NOT NULL,
+    result_schema_version SMALLINT NOT NULL,
+    result_json NVARCHAR(MAX) NOT NULL,
+    CONSTRAINT pk_workflow_command_receipt PRIMARY KEY NONCLUSTERED (command_id),
+    CONSTRAINT fk_workflow_command_receipt_instance FOREIGN KEY (instance_id)
+        REFERENCES wf.workflow_instance (id) ON UPDATE NO ACTION ON DELETE NO ACTION,
+    CONSTRAINT ck_workflow_command_receipt_positive CHECK (
+        result_schema_version > 0),
+    CONSTRAINT ck_workflow_command_receipt_actor CHECK (
+        actor_kind IN ('USER', 'SYSTEM')),
+    CONSTRAINT ck_workflow_command_receipt_json CHECK (
+        ISJSON(result_json) = 1 AND DATALENGTH(result_json) <= 262144)
+);
+
+CREATE NONCLUSTERED INDEX ix_workflow_instance_business
+    ON wf.workflow_instance (business_type, business_id, id);
+CREATE NONCLUSTERED INDEX ix_workflow_instance_definition_status
+    ON wf.workflow_instance (definition_version_id, status, id);
+CREATE UNIQUE NONCLUSTERED INDEX ux_workflow_activity_active
+    ON wf.workflow_activity (instance_id) WHERE status = 'ACTIVE';
+CREATE NONCLUSTERED INDEX ix_workflow_task_open_assignee
+    ON wf.workflow_task (assigned_user_ref, created_at, id)
+    INCLUDE (activity_id, due_at) WHERE status = 'OPEN';
+CREATE NONCLUSTERED INDEX ix_workflow_history_command
+    ON wf.workflow_history (command_id, instance_id, sequence_number);
+CREATE UNIQUE NONCLUSTERED INDEX ux_workflow_history_task_completed
+    ON wf.workflow_history (task_id) WHERE event_type = 'TASK_COMPLETED';
+CREATE NONCLUSTERED INDEX ix_workflow_history_activity_completed
+    ON wf.workflow_history (activity_id, sequence_number) WHERE event_type = 'TASK_COMPLETED';
+CREATE CLUSTERED INDEX ix_workflow_command_receipt_instance
+    ON wf.workflow_command_receipt (instance_id, command_id);
+        ]]></sql>
+    </changeSet>
+</databaseChangeLog>

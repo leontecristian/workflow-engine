@@ -2,7 +2,7 @@
 
 | Attribute | Value |
 | --- | --- |
-| Status | READY for schema implementation; implementation and runtime verification NOT RUN |
+| Status | IMPLEMENTED; local schema, Liquibase bookkeeping and same-artifact restart verified on 2026-10-25 |
 | Revision | 1 — 2026-10-25 |
 | Owner | Workflow project owner |
 | Constitution | [v2.2.0](../../constitution.md) |
@@ -12,7 +12,7 @@
 
 An implementing agent creates the initial Liquibase changelog for the nine workflow tables. Starting the existing development host applies it to the local SQL Server database. The agent then inspects the actual schema and Liquibase tracking records and restarts the same application to confirm that the migration is not reapplied.
 
-This feature was requested as **documentation only**. Creating this specification does not create a migration or run the application. When the owner hands F001 to an agent for implementation, its scope includes packaging with tests skipped, starting the host against `localhost:1433/apolo_workflow_dev` using Windows authentication, and performing the read-only database checks in [verification.md](verification.md). Automated tests remain prohibited by CON-12. No additional approval is needed for those task-authorized checks; normal environment permissions still apply.
+This feature was initially specified as **documentation only**; the owner subsequently authorized implementation and local verification. Implementation scope includes packaging with tests skipped, starting the host against `localhost:1433/apolo_workflow_dev` using Windows authentication, and performing the read-only database checks in [verification.md](verification.md). Actual results are recorded in [evidence.md](evidence.md). Automated tests remain prohibited by CON-12. No additional approval is needed for those task-authorized checks; normal environment permissions still apply.
 
 The source is [Workflow Engine Database Design v1.4](../../../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md), as present at `apolo-docs` commit `c32ffb07cc9f4f2f3d1d7bf087455c1af13acbc3`. Read sections 5–15 and 19 with [design-source precedence](../../design-sources.md). The [schema contract](schema-contract.md) selects the physical baseline for this feature and snapshots the column dictionaries, including the complete definition-version envelope. Later source changes require explicit reconciliation before implementation; do not silently change this baseline.
 

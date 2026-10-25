@@ -37,11 +37,13 @@ If tracking tables exist, inspect their current records before startup. If any t
 ## 2. Build and inspect the artifact
 
 ```powershell
-./mvnw.cmd -Dmaven.test.skip=true package
+./mvnw.cmd '-Dmaven.test.skip=true' package
 & "$env:JAVA_HOME/bin/jar.exe" tf workflow-core/target/workflow-core-0.0.1-SNAPSHOT.jar
 ```
 
 Check the exit code, effective versions and the two core changelog resource paths. Verify the packaged host JAR and matching native authentication DLL under `workflow-test-host/target/native`. Use the current POM artifact/version if it has changed; record the actual artifact instead of copying a stale path. Do not run `test` or `verify`, or omit the test-skip option.
+
+Quote the test-skip property in PowerShell so it reaches the Maven wrapper as one argument; this retains the prescribed package command and prevents PowerShell from splitting the dotted property name.
 
 ## 3. Start the packaged host
 

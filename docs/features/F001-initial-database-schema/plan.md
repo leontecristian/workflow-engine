@@ -1,6 +1,6 @@
 # F001 implementation plan
 
-Applies to [specification revision 1](spec.md). This is an implementation plan, not a record of implemented changes.
+Applies to [specification revision 1](spec.md). Implementation and local verification are complete; actual results are in [evidence.md](evidence.md).
 
 ## Changes
 
@@ -13,6 +13,8 @@ Applies to [specification revision 1](spec.md). This is an implementation plan, 
 7. Record findings, actual object names and tracking identities in [evidence.md](evidence.md), update task completion and reconcile documentation. Report evidence gaps without broadening the feature into execution logic or automated tests.
 
 No rollback execution or destructive rollback/reset helper is required. Future applied-schema corrections use forward changesets; this feature does not authorize dropping retained workflow records.
+
+Implementation choice: the initial tables use explicitly SQL Server-scoped native DDL in the XML changeset. This keeps BIN2 column collations, named clustered/nonclustered keys, null-safe CHECKs and filtered/covering indexes together in one reviewable transactional definition. Liquibase XML retains changeset identity, pending preconditions, transaction defaults and host-owned execution. The migration was applied successfully without changing the selected contract.
 
 ## Constitution check
 

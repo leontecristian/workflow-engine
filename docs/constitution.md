@@ -147,3 +147,5 @@ The consolidated design and database design remain the detailed architectural so
 - **1.0.0 — 2026-10-24:** initial codification of the agreed architecture and specification-driven workflow. Exact feature contracts remain pending. Current no-tests instructions govern development execution without asserting production readiness.
 
 See [design sources and decision status](design-sources.md) for principle traceability and open items.
+
+Implementation evidence, 2026-10-25: [F001](features/F001-initial-database-schema/evidence.md) implements the initial nine-table schema and records local migration, complete catalog/tracking inspection and same-artifact restart verification with both temporary hosts stopped. This evidence does not amend the principles or establish runtime command guarantees, JPA concurrency behavior or APOLO production compatibility.

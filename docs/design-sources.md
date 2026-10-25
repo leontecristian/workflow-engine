@@ -66,7 +66,7 @@ Use the consolidated design's section 22 together with database design sections 
 - **Structured submission contract — SELECTED capability, specification pending:** schema language/features, immutable reference resolution, bounds, exact-value/null/default handling, canonicalization, API/errors and prior-activity bindings. Host review visibility, aggregation and retention/redaction remain explicit integration contracts; a JSON decision document does not determine how reviewed material is preserved.
 - **JSON execution data — SELECTED capability, specification pending:** declaration/binding/path syntax, exact encodings and numeric bounds, total instance/read/request/history budgets, null/default/unset semantics, persistence dirty tracking and expression safety. Older scalar contracts remain supported. Storage is not an indexed search contract.
 
-SQL Server `ROWVERSION` is superseded by the selected numeric JPA mapping. Detailed completion policies, unselected physical limits/encodings, interface names, decimal JSON string encodings and the illustrative automatic-step limit of 50 MUST NOT be treated as finalized contracts merely because they appear in a design. The proposed nine-table persistence model still needs its initial-schema feature specification and verification evidence.
+SQL Server `ROWVERSION` is superseded by the selected numeric JPA mapping. Detailed completion policies, unselected physical limits/encodings, interface names, decimal JSON string encodings and the illustrative automatic-step limit of 50 MUST NOT be treated as finalized contracts merely because they appear in a design. [F001](features/F001-initial-database-schema/spec.md) selects the initial nine-table physical contract; its [evidence](features/F001-initial-database-schema/evidence.md) records implementation and local schema verification. Runtime completion algorithms and APIs remain separate specification work.
 
 ## Current implementation evidence
 
@@ -74,7 +74,9 @@ At constitution creation, the project has a two-module scaffold, explicit core c
 
 The local host uses SQL Server at `localhost:1433`, database `apolo_workflow_dev`, and Windows native authentication with a matching JDBC authentication DLL. A prior startup check observed NTLM-authenticated JDBC sessions and successful startup. Liquibase created its tracking tables; the workflow master was empty. That temporary host process was stopped afterward. These are historical observations, not a live status check.
 
-Workflow entities, physical schema changesets, execution services, catalog behavior, idempotency and durable handoff are not implemented by this scaffold. Runtime feature guarantees remain to be specified, implemented and evidenced. The 2.x reconciliations change documentation only; no build, host startup, database access or automated tests were performed for them.
+On 2026-10-25, F001 added the initial core schema changesets. JDK 21 packaging with tests skipped, first host migration/startup, complete SQL Server catalog inspection, tracking checks and a same-artifact second startup passed locally. The two temporary host processes were stopped. See the feature evidence for versions, exact identities/checksums and scope.
+
+Workflow entities, execution services, catalog behavior, idempotency and durable handoff remain unimplemented. Runtime feature guarantees remain to be specified, implemented and evidenced. The earlier 2.x reconciliations themselves changed documentation only; their historical no-execution statements do not describe the later F001 verification.
 
 ## Maintaining this record
 

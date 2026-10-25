@@ -46,6 +46,6 @@ workflow-engine/
         examples/      # when concrete contract examples are needed
 ```
 
-[F001 — Initial database schema with Liquibase](features/F001-initial-database-schema/spec.md) is the first feature specification, READY for schema implementation with an explicit local verification runbook. The generic folder above describes the convention. Remaining contracts include Workflow Definition v1, Expression Policy v1, the simple task catalog and human-node/host-capability contracts, structured task submissions, JSON execution variables, and runtime command integration. Their exact schemas and unresolved behavior remain to be specified.
+[F001 — Initial database schema with Liquibase](features/F001-initial-database-schema/spec.md) is the first feature specification, IMPLEMENTED with local schema and restart verification recorded in its evidence document. The generic folder above describes the convention. Remaining contracts include Workflow Definition v1, Expression Policy v1, the simple task catalog and human-node/host-capability contracts, structured task submissions, JSON execution variables, and runtime command integration. Their exact schemas and unresolved behavior remain to be specified.
 
 Build and local startup instructions remain in the [project README](../README.md). Current work follows the owner's **no-tests** instruction; see the [verification policy](specification-driven-development.md#verification-and-current-no-tests-policy).

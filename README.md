@@ -11,7 +11,7 @@ This separate project is the current development phase. Eventually `workflow-cor
 
 At that move, review APOLO's effective root parent, reparent core and align its coordinates/shared dependency versions while preserving Java 17 compilation and ordinary JAR packaging. Keep one authoritative core implementation. Move timing, final coordinates and whether `workflow-test-host` moves into APOLO as an optional development module remain open. The host is always outside backend's production dependency graph. The standalone POMs remain the current build configuration.
 
-This is a structural scaffold. Workflow models, entities, services and schema changesets are not implemented yet. The workflow master changelog is intentionally empty.
+The initial nine-table workflow schema is implemented by [F001](docs/features/F001-initial-database-schema/spec.md), with local SQL Server migration, catalog and restart verification recorded in its [evidence](docs/features/F001-initial-database-schema/evidence.md). Workflow models, entities and execution services are not implemented yet.
 
 ## Project constitution and specifications
 
