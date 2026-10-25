@@ -1,6 +1,6 @@
 # Specification-driven development
 
-This workflow operationalizes [constitution v1.0.0](constitution.md). It is a repository convention; it does not require installing a specification framework or code generator.
+This workflow operationalizes [constitution v2.0.0](constitution.md). It is a repository convention; it does not require installing a specification framework or code generator.
 
 ## 1. Specify the behavior
 
@@ -43,7 +43,9 @@ For this project, explicitly inspect:
 
 - Core/host dependency direction and public type independence.
 - One host persistence/transaction boundary and one production migration runner.
-- Version pinning, immutable publication and active-task compatibility.
+- Workflow-version pinning, immutable publication, retained task codes and compatibility with pinned node contracts, including future starts of published workflows.
+- Multiple tasks per activity without parallel process branches, keeping proposed completion semantics distinct from agreed scope.
+- APOLO-owned instance-ID associations, authorized engine API queries and optional engine correlation; atomic creation of required host links.
 - Expression restrictions and fail-on-error routing.
 - Authorization, concurrency, idempotency, audit and durable event handoff.
 - Java target/runtime compatibility and consequences of the future APOLO source move.
@@ -88,7 +90,7 @@ Keep acceptance scenarios and required evidence in specifications even when exec
 
 1. **Workflow Definition v1:** node/transition semantics, typed inputs/variables, synchronous service bindings, errors, lifecycle, publication validation and execution bounds (O1/O6).
 2. **Expression Policy v1:** supported syntax, scalar encodings, nullability, date/time rules, deterministic inputs, allowlist, resource bounds and errors (O6).
-3. **Task-type registry contracts:** API/import schema, content equivalence, draft revisions, immutable versions, retirement and deployed-host capabilities (O2).
-4. **Persistence and command integration:** concrete mappings and migrations, transaction participation, concurrency token, idempotency fingerprint/receipt rules, event handoff and audit contracts (Q11/O7/O9).
+3. **Task catalog and human-node contracts:** catalog administration and any import schema, immutable codes/retained rows, editable metadata/selectability, node-owned outcomes and inputs, and deployed-host capabilities by stable task code (O2). Specify collective completion behavior separately from the confirmed multiple-task scope; task-type business versions and publication lifecycle are superseded.
+4. **Initial database schema and command integration:** turn [database design v1.2](../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md) into a feature specification before Liquibase implementation. Cover selected numeric JPA versions, early aggregate claims/final version capture, proposed physical constraints, optional business correlation, APOLO-owned associations, transaction participation, idempotency fingerprint/receipt rules, event handoff and audit (Q11/O7/O9).
 
-These are planned artifacts. Exact schemas, interfaces, endpoints and database mappings are not defined by the constitution itself. Decision Definition v1 and decision-table artifacts remain deferred.
+These are planned artifacts, not a mandated implementation sequence. Apply the [source precedence](design-sources.md) when older architecture examples conflict with the selected database design changes. Exact schemas, interfaces, endpoints and unresolved physical details require specification; selected numeric JPA mapping does not establish verified host behavior. Decision Definition v1 and decision-table artifacts remain deferred.

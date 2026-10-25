@@ -1,14 +1,14 @@
 # Assumptions and verification register
 
-**Version:** 1.0.0
+**Version:** 2.0.0
 
-**Recorded:** 2026-10-24
+**Recorded:** 2026-10-25
 
-**Applies to:** constitution v1.0.0 and planning for APOLO integration
+**Applies to:** constitution v2.0.0 and planning for APOLO integration
 
 An assumption is an expectation used for planning whose supporting evidence is incomplete. It must not be presented as a confirmed contract or an implemented guarantee. [Constraints](constraints.md) remain requirements even when the feasibility or mechanism for satisfying them needs verification.
 
-The items below derive from the [consolidated design](../../apolo-docs/workflow-engine/architecture/workflow-engine-design.md), particularly O3/O7–O11, the [development plan](../../apolo-docs/workflow-engine/development/independent-development-plan.md) and the [technical summary](../../apolo-docs/workflow-engine/reference/apolo-technical-summary.md). Owners identify responsible roles, not newly assigned individuals or delivery dates.
+The items below derive from the [consolidated design](../../apolo-docs/workflow-engine/architecture/workflow-engine-design.md), particularly O3/O7–O11, the [development plan](../../apolo-docs/workflow-engine/development/independent-development-plan.md), the [technical summary](../../apolo-docs/workflow-engine/reference/apolo-technical-summary.md) and the scoped superseding decisions in [database design v1.2](../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md). See [design sources](design-sources.md) for precedence. Owners identify responsible roles, not newly assigned individuals or delivery dates.
 
 No item is marked verified merely because it is plausible. Follow the [current no-tests policy](specification-driven-development.md#verification-and-current-no-tests-policy); required evidence listed here is a future verification obligation, not authorization to execute tests now.
 
@@ -36,23 +36,23 @@ The separate core is expected to work with the dependency versions selected by A
 
 The architecture expects workflow JPA repositories and APOLO domain persistence to participate in the same effective transaction and persistence arrangement. Using the same server/database does not prove this.
 
-**Evidence needed:** datasource/entity-manager/transaction-manager configuration, entity/repository registration retaining APOLO's packages, propagation and flush/commit behavior; evidence of rollback in both directions, including failures at flush or commit.
+**Evidence needed:** datasource/entity-manager/transaction-manager configuration, entity/repository registration retaining APOLO's packages, propagation and flush/commit behavior; evidence of rollback in both directions, including failures at flush or commit. Verify that start can allocate an instance ID and establish required APOLO links before actions consume them, and that rollback/replay preserves the shared transaction and idempotency boundary.
 
 **If false:** correct the integration before enabling business commands. Separate commits or eventual updates to required business state do not satisfy the agreed atomicity constraint.
 
 ## ASM-03 — SQL Server concurrency can satisfy the command contract
 
-**Status:** PENDING VERIFICATION; mapping PROPOSED — O7, design section 12.3.
+**Status:** PENDING VERIFICATION; numeric JPA mapping SELECTED — O7, database design sections 5, 9 and 16.
 
 **Owner:** workflow persistence maintainer with APOLO database owner.
 
-**Resolve before:** finalizing the concurrency mapping and enabling concurrent commands.
+**Resolve before:** accepting the persistence integration and enabling concurrent commands.
 
-SQL Server with JPA is expected to support the required optimistic concurrency and instance-level serialization. `ROWVERSION` is one proposed mapping; it has not been selected as the final token contract.
+The selected mapping is Hibernate-managed BIGINT lock_version represented by Java Long with JPA @Version; the earlier SQL Server ROWVERSION proposal is superseded. Its ability to provide the required instance-level coordination in the actual host remains unverified. For existing instances, the selected approach reserves the first history sequence and flushes the checked parent update before business effects, including commands that otherwise mutate only children.
 
-**Evidence needed:** chosen token mapping, generated-value refresh, isolation/locking behavior, consistent lock ordering, duplicate-command handling and coordination with concurrent domain edits. Task/variable updates and command receipts must be covered by the same policy.
+**Evidence needed:** provider initialization/version increments, early checked write and flush timing, isolation/locking behavior, consistent lock ordering, duplicate-command handling and coordination with concurrent domain edits. Verify activity/task/variable-only commands, stale sibling task completions, rollback and capture of the actual final managed version after multiple flushes. Wire encoding must preserve full BIGINT precision. Do not assume one increment or immediate OPTIMISTIC_FORCE_INCREMENT behavior.
 
-**If false:** select and specify a supported alternative mapping/locking approach that preserves the guarantee. Do not silently remove concurrency protection.
+**If false:** resolve the integration failure and record any required change to the selected mapping through the design/constitution amendment process. Do not silently remove concurrency protection.
 
 ## ASM-04 — The host can provide a durable transactional event handoff
 
@@ -76,11 +76,11 @@ The planned neutral event-recorder contract is expected to connect to host infra
 
 **Resolve before:** publishing workflows against that host and deploying changes affecting active tasks.
 
-The design expects the deployed host to supply supported task-type versions, outcomes and registered extensions and to retain compatible screens/handlers for active tasks. A concrete capability interface and deployment compatibility process are still needed.
+The design expects the deployed host to supply supported stable task codes and registered extensions, validate support for pinned workflow-node contracts, and retain compatible screens/handlers for published workflows, including future starts. Catalog metadata and selectability do not establish executable support. A concrete capability interface and deployment compatibility process are still needed; task-type business versions are no longer part of the model.
 
-**Evidence needed:** capability-provider contract, correspondence with deployed handlers/screens, publication validation and an inventory of versions required by active tasks.
+**Evidence needed:** capability-provider contract, correspondence with deployed handlers/screens, publication validation and an inventory of task codes/node contracts required by retained published workflow versions and active tasks. Verify that disabling catalog selectability preserves execution of published definitions.
 
-**If false:** reject unsupported publication or deployment and resolve the missing support. Imported registry metadata does not create an executable capability or authorize generic completion.
+**If false:** reject unsupported publication or deployment and resolve the missing support. Catalog metadata does not create an executable capability or authorize generic completion.
 
 ## ASM-06 — APOLO will supply the rules required by the first business slice
 
@@ -143,7 +143,9 @@ The plan expects APOLO's root build and release process to accommodate core as a
 ## Open decisions that must not be filled with assumptions
 
 - **O1/O6:** exact node/action bindings, JSON encodings, nullability, precision, date/time semantics, expression allowlist, execution bounds and errors. The illustrative limit of 50 and decimal-as-string examples are not final selections.
-- **O2:** import normalization, revision-token representation and API/provider schemas. A checksum convention is not established merely by mentioning checksums.
+- **O2:** simple catalog administration, any import normalization, technical revision-token representation and API/provider schemas. The former task-type publication/import lifecycle is superseded; a checksum convention is not established merely by mentioning checksums.
+- **Task multiplicity:** multiple tasks per activity is agreed; proposed SINGLE/ALL semantics, fixed roster, bounds and exact node JSON require specification before dependent implementation. Do not promote them to confirmed APOLO business policy.
+- **Host associations:** APOLO ownership, instance-ID queries and optional engine correlation are selected. APOLO must specify its column/table shape, historical membership storage, authorization and start-time integration without making core depend on booking tables.
 - **O4:** alternative-resource acceptance/reapproval behavior. No default replacement behavior has been selected.
 - **O9:** deployment-specific migration ordering, delivery/recovery and retention/redaction arrangements beyond the agreed ownership boundary.
 - **O11:** Angular version, graph library and detailed designer interactions. These do not block the first engine slice.

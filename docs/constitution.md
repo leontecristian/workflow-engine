@@ -1,12 +1,12 @@
 # Workflow project constitution
 
-**Version:** 1.0.0
+**Version:** 2.0.0
 
 **Established:** 2026-10-24
 
-**Last amended:** 2026-10-24
+**Last amended:** 2026-10-25
 
-**Basis:** consolidated design v0.7, its decision register and subsequent owner decisions
+**Basis:** consolidated design v0.8, database design v1.2 and subsequent owner decisions; see [design sources](design-sources.md) for precedence and proposal status
 
 **Scope:** `workflow-core`, `workflow-test-host`, their specifications and future APOLO integration
 
@@ -24,11 +24,11 @@ Use AGREED, PROPOSED, PROVISIONAL, OPEN, PENDING VERIFICATION and DEFERRED consi
 
 The first capability is a small reusable workflow engine: a working sandbox workflow, then one cross-team booking approval integration in APOLO. The Angular workflow designer follows the first successful APOLO integration.
 
-V1 includes `START`, `HUMAN_TASK`, `SERVICE_TASK`, `DECISION` and `END`, one active process position, one directly assigned human task per activity, a persistent task-type registry, restricted expression routing, relational persistence and authoritative history.
+V1 includes `START`, `HUMAN_TASK`, `SERVICE_TASK`, `DECISION` and `END`, one active process position, multiple directly assigned human tasks within an activity, a simple persistent task-type catalog, restricted expression routing, relational persistence and authoritative history. Multiple tasks do not introduce parallel process branches. Detailed collective completion rules, including the proposed SINGLE/ALL policies and fixed roster, require specification before implementation; they are not confirmed APOLO approval policy.
 
 The standalone business decision engine is optional later work. Initial delivery MUST operate without decision tables, FIRST/UNIQUE policies, separate decision-definition storage or decision-management APIs. Do not add placeholder modules or schema for that extension.
 
-Claim/release, candidate groups, general delegation, timers, expiration, collective approval, parallel orchestration, subprocesses and live migration of active instances remain deferred. Audited administrative reassignment does not authorize a general delegation feature. New capabilities require a concrete need and a specification; changes to this scope require an amendment.
+Claim/release, candidate groups, general delegation, timers, expiration, advanced collective policies such as ANY/QUORUM, parallel orchestration, subprocesses and live migration of active instances remain deferred. Audited administrative reassignment does not authorize a general delegation feature. New capabilities require a concrete need and a specification; changes to this scope require an amendment.
 
 ## C03 — Keep two modules and a clear host boundary
 
@@ -65,7 +65,9 @@ Workflow migrations MUST work without APOLO-owned tables or foreign keys to them
 
 A successful command MUST atomically cover required synchronous business updates, workflow/variable changes, task changes, history, command receipt and durable event handoff. Workflow persistence participates in the host transaction; an independently committed business action violates this boundary.
 
-Optimistic concurrency MUST prevent conflicting commands from advancing the same instance twice. Command idempotency MUST return the committed result for an identical retry and reject reuse of the identifier with different input. Access to a previous result must be reauthorized. Exact token representation, request normalization, lock ordering and JPA mapping require specification and host verification.
+Optimistic concurrency MUST protect the instance aggregate, including activity, task and variable mutations. The selected mapping is Hibernate-managed numeric `BIGINT lock_version`, represented by Java `Long` with JPA `@Version`. Every mutation of an existing instance MUST acquire an early version-checked instance write before business effects; a child-row update alone is insufficient. Results and receipts MUST capture the actual final managed version, not assume a single increment. The database design specifies the history-sequence reservation approach; provider behavior, flush ordering and shared transactions remain host verification gates.
+
+Command idempotency MUST return the committed result for an identical authorized retry and reject reuse of the identifier with different input. Successful-receipt resolution precedes state-dependent stale checks and business mutations. Access to a previous result must be reauthorized. Request fingerprints include relevant host association inputs and optional business correlation. Exact wire encoding, request normalization and lock ordering require specification and host verification.
 
 Registered `SERVICE_TASK` actions execute synchronously with declared, validated inputs/outputs. Failure rolls back the command. Workflow business actions belong in service nodes; transitions select the next node. Each business effect has one owner so host orchestration and a service node do not duplicate it.
 
@@ -73,15 +75,15 @@ Automatic execution must be bounded and reach a human task or an end node on suc
 
 External delivery MUST follow a durable handoff recorded in the same transaction and occur after commit through host infrastructure. An after-commit callback alone does not establish durability. Delivery can repeat; consumers must be idempotent. These guarantees apply to every production deployment, including one preceding the designer.
 
-## C07 — Published definitions and task types are immutable
+## C07 — Published definitions are immutable; task codes are stable
 
-Workflow definitions and task-type versions follow `DRAFT -> PUBLISHED -> RETIRED`. Validation results belong to an exact draft revision; `VALIDATED` is not a lifecycle status. Publication validates the current revision and target-host capabilities.
+Workflow definition versions follow `DRAFT -> PUBLISHED -> RETIRED`. Validation results belong to an exact draft revision; `VALIDATED` is not a lifecycle status. Publication validates the current revision and target-host capabilities.
 
-Published content is immutable, including embedded designer metadata. Instances pin exact workflow versions; human tasks refer to exact task-type versions. Retirement prevents new selection while retaining existing references and compatible support for active tasks.
+Published workflow content is immutable, including embedded designer metadata. Instances pin exact workflow versions. The pinned human node owns permitted outcomes, input contracts, comment requirements, guards and completion policy. Workflow-version retirement prevents new selection while retaining existing references and compatible support.
 
-Task-type administration MUST work through an API and versioned JSON import before the designer. Equivalent reimports return the existing version. Conflicting published content is rejected, including for retired versions. Draft replacement requires an explicit revision-checked update. Normalization and revision-token details must be specified.
+Task types use a simple `workflow_task_type` catalog with codes immutable from creation, retained rows, editable descriptive metadata, an authoring `selectable` flag and a technical concurrency version. They have no business-version or publication lifecycle. Renaming codes and physically deleting rows MUST NOT be supported, even for unused entries. `selectable = false` prevents new authoring selection; it MUST NOT invalidate published definitions or prevent their execution, including new instances of those definitions. The activity holds the task-type reference; its tasks inherit that type. Catalog administration and any import contracts require specification; no versioned task-type import lifecycle is mandated.
 
-Registry metadata is not executable behavior. Publication checks both registry references and capabilities supplied by the deployed host. Unsupported task types must fail visibly. APOLO resolves screens and handlers from `taskType + taskTypeVersion`; V1 has no separate form key/version contract.
+Catalog metadata is not executable behavior. Publication checks catalog references, node contracts and capabilities supplied by the deployed host. Unsupported task types must fail visibly. APOLO resolves screens and handlers by stable task code and retains compatibility with published workflow contracts. V1 has no separate form key/version contract.
 
 ## C08 — Expressions are restricted, explicit and deterministic
 
@@ -96,6 +98,10 @@ Initial scalar types are STRING, LONG, DECIMAL, BOOLEAN, DATE and DATETIME. Pres
 ## C09 — Host policy and trusted identity govern business actions
 
 APOLO owns booking data, forms, validation, assignment sources, permissions, materiality rules and domain orchestration. Core MUST NOT encode overbooking calculations, country routing or alternative-resource policy.
+
+APOLO owns booking-to-workflow associations by storing the engine-issued instance ID in host data and using the engine API to retrieve instance state, tasks and history. Several bookings may share an instance ID. A booking column or host association table may represent the links according to cardinality and history needs; this constitution does not mandate a host table. APOLO resolves and authorizes related bookings when composing task details or applying business effects. Prior execution links and reviewed membership must remain available when current associations change; scalar core variables need not contain booking lists.
+
+Core retains separate optional `business_type` and `business_id` correlation fields. Both MUST be supplied together at creation or both be null, and the pair is immutable thereafter. Lookup is nonunique; the pair neither determines booking membership nor grants access. Possession of an instance ID likewise does not authorize access. Instance creation and required host links MUST share the host transaction and idempotency boundary, with links established before actions that need them. Host association migrations remain host-owned.
 
 Actors come from authenticated host context, never client-supplied identity. Command execution rechecks state, concurrency, authorization, assignment, inputs and guards; available-action queries are advisory. Clients may update only explicitly permitted inputs/variables.
 
@@ -119,10 +125,11 @@ A constitutional amendment must record the changed principle, reason, owner deci
 
 Use semantic versioning for this document: major for incompatible principle/scope changes, minor for added governance or principles, patch for clarifications that preserve meaning. This version is independent of library releases, JSON schema versions, definition versions and draft revisions.
 
-The consolidated design remains the detailed architectural authority. This constitution codifies its confirmed principles and the owner's later decisions. Where a conflict lacks a superseding decision, record it and resolve it before implementing affected behavior. Historical archives and illustrative contracts cannot override current decisions.
+The consolidated design and database design remain the detailed architectural sources, with scoped precedence recorded in [design sources](design-sources.md). This constitution codifies their confirmed principles and the owner's later decisions. Database design v1.2 supersedes earlier task multiplicity, task-type versioning, row-token and mandatory business-reference proposals as recorded there; other proposed details remain proposals. Where a conflict lacks a superseding decision, record it and resolve it before implementing affected behavior. Historical archives and illustrative contracts cannot override current decisions.
 
 ## Amendment history
 
+- **2.0.0 — 2026-10-25:** owner-approved reconciliation with database design v1.2. C02 includes multiple tasks per activity; C07 replaces versioned task types with retained immutable codes and workflow-node contracts; C06 records numeric JPA versions and aggregate concurrency; C09 makes APOLO's instance-ID associations and optional two-column correlation explicit. These decisions supersede incompatible 1.0.0 scope/contracts. Updated constraints, assumptions, source traceability, development priorities, documentation guides and agent instructions together. Detailed completion policies remain proposed and host behavior remains unverified. This is a documentation amendment, not a schema migration or implementation claim; any previously applied incompatible schema requires a separate forward migration preserving changeset identity, and host association migrations belong to APOLO.
 - **1.0.0 — 2026-10-24:** initial codification of the agreed architecture and specification-driven workflow. Exact feature contracts remain pending. Current no-tests instructions govern development execution without asserting production readiness.
 
 See [design sources and decision status](design-sources.md) for principle traceability and open items.

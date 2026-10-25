@@ -22,6 +22,6 @@ docs/features/
 
 Follow the [specification-driven development workflow](../specification-driven-development.md). Reference the [constitution](../constitution.md), applicable [CON constraints](../constraints.md) and [ASM assumptions](../assumptions.md). Create schemas and examples only as their contracts are specified; do not treat proposed design examples as finalized contracts.
 
-No feature specifications have been created yet. The current priorities are Workflow Definition v1, Expression Policy v1, task-type registry contracts, and persistence/command integration, as described in the development workflow. The optional business decision engine remains deferred.
+No feature specifications have been created yet. The current priorities are Workflow Definition v1, Expression Policy v1, simple task catalog and human-node contracts, and initial database schema/command integration, as described in the development workflow. Use database design v1.2 under the [source precedence](../design-sources.md), including selected numeric JPA versions and APOLO-owned instance-ID associations. Detailed completion policies remain proposals until specified. The optional business decision engine remains deferred.
 
 Acceptance scenarios describe required behavior. Creating this structure does not authorize automated tests; the current owner's no-tests instruction continues to apply.

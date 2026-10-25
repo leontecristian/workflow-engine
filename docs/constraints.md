@@ -1,14 +1,14 @@
 # Project constraints
 
-**Version:** 1.0.0
+**Version:** 2.0.0
 
-**Recorded:** 2026-10-24
+**Recorded:** 2026-10-25
 
-**Applies to:** constitution v1.0.0 and the current separate-development phase
+**Applies to:** constitution v2.0.0 and the current separate-development phase
 
 Constraints are confirmed boundaries that specifications and implementations must satisfy. They are requirements, not evidence that the corresponding behavior already exists. This document makes the [constitution](constitution.md) operational without replacing the detailed [consolidated design](../../apolo-docs/workflow-engine/architecture/workflow-engine-design.md).
 
-References below identify constitution principles and sections/decision IDs in that design. Unverified expectations belong in [assumptions.md](assumptions.md). Exact schemas, interfaces, limits and physical mappings remain specification work where the design has not finalized them.
+References below identify constitution principles and sections/decision IDs in the consolidated design, with scoped superseding decisions from [database design v1.2](../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md) as recorded in [design sources](design-sources.md). Unverified expectations belong in [assumptions.md](assumptions.md). Exact schemas, interfaces, limits and physical mappings remain specification work where the design has not finalized them.
 
 ## CON-01 — Platform and dependency boundaries
 
@@ -39,7 +39,11 @@ The host owns business data/rules, identity, authorization policy, domain endpoi
 
 APOLO booking endpoints own business orchestration. Generic workflow endpoints must not bypass booking validation. Named extensions are registered capabilities, not class names or arbitrary bean access supplied by definition authors.
 
-**Trace:** C03/C09; design sections 2–4, 8, 14 and 17; Q12/Q20.
+APOLO stores the engine-issued workflow instance ID in host business data and uses the engine API to query state, tasks and history. Several bookings may share that ID. A booking column can hold one current association; a host association table may support multiple/historical links. Preserve prior execution links and reviewed membership. Task-detail composition and business actions resolve authorized bookings through host data; core variables remain scalar.
+
+The engine's separate business_type/business_id fields are optional nonunique correlation metadata: both present at creation or both null, immutable thereafter. Neither correlation nor possession of an instance ID grants access or defines booking membership. Core has no APOLO FK or host association migration responsibility.
+
+**Trace:** C03/C09; design sections 2–4, 8, 14 and 17; Q12/Q20; database design sections 1 and 9.1.
 
 ## CON-04 — Schema ownership and one migration lifecycle
 
@@ -54,13 +58,13 @@ APOLO booking endpoints own business orchestration. Generic workflow endpoints m
 
 ## CON-05 — Initial scope and delivery order
 
-Deliver a simple sandbox workflow, then one cross-team booking approval in APOLO, followed by the workflow designer. Initial execution uses START, HUMAN_TASK, SERVICE_TASK, DECISION and END, one active process position and one directly assigned task per activity.
+Deliver a simple sandbox workflow, then one cross-team booking approval in APOLO, followed by the workflow designer. Initial execution uses START, HUMAN_TASK, SERVICE_TASK, DECISION and END, one active process position and multiple directly assigned tasks within an activity. Detailed completion rules, including proposed SINGLE/ALL policies and fixed rosters, require specification and do not establish APOLO approval policy.
 
-The persistent registry, task completion/cancellation, history, authorization and command reliability belong to initial scope. A business decision engine, decision tables and their storage/APIs/editor are optional later work and must not be dependencies of the first workflow.
+The simple persistent task catalog, task completion/cancellation, history, authorization and command reliability belong to initial scope. A business decision engine, decision tables and their storage/APIs/editor are optional later work and must not be dependencies of the first workflow.
 
-Candidate claiming/releasing, general delegation, timers, expiration, collective approval, parallel orchestration, subprocesses and active-instance migration are deferred. Audited administrative reassignment is distinct from delegation. Existing APOLO processes are not automatically migrated or replaced.
+Candidate claiming/releasing, general delegation, timers, expiration, advanced collective policies such as ANY/QUORUM, parallel orchestration, subprocesses and active-instance migration are deferred. Audited administrative reassignment is distinct from delegation. Existing APOLO processes are not automatically migrated or replaced.
 
-**Trace:** C02; design sections 1, 7, 9 and 21–22; Q1/Q4–Q9/F3.
+**Trace:** C02; design sections 1, 7, 9 and 21–22; Q1/Q4–Q9/F3, superseded for task multiplicity by database design sections 1 and 4.
 
 ## CON-06 — Atomic commands and bounded execution
 
@@ -70,9 +74,11 @@ SERVICE_TASK actions execute synchronously with declared/validated inputs and ou
 
 Automatic execution continues to a human task or end under a specified bound. Reject automatic-only cycles; exceeding the bound fails and rolls back. Initial execution does not automatically retry failed business commands.
 
-Concurrency must prevent duplicate advancement. An identical command retry returns the committed result after access checks; reuse of its identifier for different input conflicts. A database connection alone proves none of these guarantees.
+Concurrency protects the instance aggregate, including task/activity/variable changes, using Hibernate-managed BIGINT lock_version mapped to Long with JPA @Version. For an existing instance, compare the expected version, reserve the first history sequence and flush the version-checked instance update before business effects. Child-row writes alone do not acquire this protection. Capture the actual final managed version in results and receipts; do not assume expectedVersion + 1 or an immediate OPTIMISTIC_FORCE_INCREMENT. Provider and host behavior still require verification.
 
-**Trace:** C06; design sections 7 and 12; Q11/O1/O7.
+An identical authorized command retry returns its committed result before state-dependent stale checks; reuse of its identifier for different input conflicts. The fingerprint includes relevant host association inputs and optional correlation. Instance creation and required host links share the command transaction, with links available before dependent actions; a receipt replay creates neither again. A database connection alone proves none of these guarantees.
+
+**Trace:** C06; design sections 7 and 12; Q11/O1/O7; database design sections 9, 14 and 16.
 
 ## CON-07 — Durable delivery and authoritative history
 
@@ -84,17 +90,17 @@ Reliability is required before every production deployment, even one preceding t
 
 **Trace:** C06/C09/C10; design sections 12–13 and 20–21; Q11/Q20/O9.
 
-## CON-08 — Immutable publication and registry compatibility
+## CON-08 — Immutable publication and stable task catalog
 
-Definitions and task types use DRAFT/PUBLISHED/RETIRED. Validation is tied to the exact draft revision, not a separate VALIDATED state. Publication checks the current revision and deployed-host capabilities.
+Workflow definition versions use DRAFT/PUBLISHED/RETIRED. Validation is tied to the exact draft revision, not a separate VALIDATED state. Publication checks the current revision and deployed-host capabilities. Published content is immutable and instances pin workflow versions. Human-node outcomes, inputs, comments, guards and completion policies belong to that pinned definition.
 
-Published content is immutable. Instances pin workflow versions; task definitions reference exact task-type versions and supported outcomes. Retirement retains existing references and compatible support for active tasks.
+The workflow_task_type catalog has a code immutable from creation, retained rows, editable descriptive metadata, selectable and a technical lock_version. It has no business versions or DRAFT/PUBLISHED/RETIRED lifecycle. Renaming codes and deleting rows are unsupported even when unused. Disabling selectability prevents new authoring selection without invalidating published definitions or their execution, including new instances. The activity stores task_type_id; tasks inherit the type through their activity.
 
-Provide registry administration through API/versioned JSON import before the designer. Equivalent imports return the existing result, conflicting published content is rejected, and draft replacement requires an explicit revision-checked update. Registry content must not encode host implementation names, routes or messaging destinations. Imported metadata alone does not prove executable host support.
+Catalog administration and any import schemas require specification without reviving a task-type publication lifecycle. Catalog content must not encode host implementation names, routes or messaging destinations. Metadata alone does not prove executable host support. Workflow publication validates node contracts and catalog references against deployed capabilities.
 
-APOLO resolves screens and handlers using `taskType + taskTypeVersion`; separate form key/version fields are outside V1. Unsupported versions fail visibly.
+APOLO resolves screens and handlers using the stable task code and retains support for published workflow contracts. Unsupported codes/contracts fail visibly; separate form key/version fields are outside V1.
 
-**Trace:** C07; design sections 9–10; Q6/Q10/F1/F2/O2.
+**Trace:** C07; database design sections 8, 10 and 18 supersede versioned task-registry rules in consolidated design sections 9–10 and Q6/Q10/F1/F2/O2.
 
 ## CON-09 — Strict inputs and restricted routing
 
