@@ -6,6 +6,8 @@ Prefer clear, maintainable code that implements the agreed behavior. Apply the g
 
 ## 1. Name concepts and operations precisely
 
+Follow the [package structure](package-structure.md): technical layers first, features underneath. Use `dto` for commands, queries and returned data. Documented concrete services, DTOs and errors form the supported integration boundary; entities, repositories, mappers and private helpers remain implementation details. Feature plans must assign exact packages before code is added or moved.
+
 - Use the design vocabulary consistently: definition, definition version, draft revision, instance, activity, task, task type, outcome and command. Do not use these terms interchangeably.
 - Name classes for their responsibility and methods for their operation. Prefer `publishDefinition` or `resolveAssignee` over vague names such as `process`, `handleData` or `doWork` when the domain meaning is known.
 - Use standard Java naming: PascalCase types, camelCase methods/fields, uppercase constants and lowercase packages. Prefer full words to unexplained abbreviations.
@@ -23,7 +25,7 @@ Prefer clear, maintainable code that implements the agreed behavior. Apply the g
 ## 3. Use SOLID, DRY and simplicity with judgment
 
 - Keep reasons for change separate: changing JSON representation should not require rewriting execution policy, and changing a host adapter should not change public workflow contracts.
-- Introduce interfaces for actual integration boundaries, substitution needs or multiple implementations. Keep them focused on what callers need; avoid interfaces created only to mirror a single implementation.
+- Use concrete services by default. Do not automatically pair each service with an interface/implementation or create an `impl` package. Introduce an interface only for an actual host extension/integration boundary, multiple supported implementations or an explicit substitution requirement, and document the reason in the feature plan. Injection, transaction management and hypothetical future replacements do not by themselves justify the extra abstraction. Framework-required interfaces such as Spring Data repositories remain valid.
 - Depend on neutral contracts at the host boundary. Prefer composition to inheritance and avoid deep base-class hierarchies or generic CRUD frameworks without a demonstrated need.
 - Centralize repeated business knowledge and invariants. Similar-looking code with different ownership or expected evolution need not share an abstraction.
 - Implement the current specified need. Defer speculative extension hooks, new modules, caches and configurable behavior until they solve a concrete problem.

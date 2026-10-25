@@ -76,7 +76,13 @@ The local host uses SQL Server at `localhost:1433`, database `apolo_workflow_dev
 
 On 2026-10-25, F001 added the initial core schema changesets. JDK 21 packaging with tests skipped, first host migration/startup, complete SQL Server catalog inspection, tracking checks and a same-artifact second startup passed locally. The two temporary host processes were stopped. See the feature evidence for versions, exact identities/checksums and scope.
 
-Workflow entities, execution services, catalog behavior, idempotency and durable handoff remain unimplemented. Runtime feature guarantees remain to be specified, implemented and evidenced. The earlier 2.x reconciliations themselves changed documentation only; their historical no-execution statements do not describe the later F001 verification.
+On 2026-10-25, [F002](features/F002-task-type-catalog/evidence.md) added catalog Java contracts, JPA mapping, bounded reads and host-transactional versioned mutations. Packaging, discovery, JPA validate startup and unchanged catalog/Liquibase metadata were observed locally; CRUD, races and audit rollback were not executed. Concrete host authorization/audit adapters remain deferred.
+
+F002 revision 2 relocated those types to the agreed layer-first packages without changing behavior. Fresh build/startup/read-only verification passed and is recorded separately from revision 1, with the temporary host stopped and migration metadata unchanged.
+
+F002 revision 3 uses a concrete TaskTypeCatalogService directly, with no mirrored interface/impl pair. Fresh build, CGLIB transaction-proxy metadata, discovery/startup and read-only bookkeeping checks passed; behavioral scenarios remain unexecuted and earlier evidence is retained.
+
+Workflow execution services, runtime idempotency and durable handoff remain unimplemented. Runtime feature guarantees remain to be specified, implemented and evidenced. The earlier 2.x reconciliations themselves changed documentation only; their historical no-execution statements do not describe the later F001/F002 verification.
 
 ## Maintaining this record
 

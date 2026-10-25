@@ -27,7 +27,7 @@ Follow the [specification-driven development workflow](../specification-driven-d
 | Feature | Status | Scope |
 | --- | --- | --- |
 | [F001 — Initial database schema with Liquibase](F001-initial-database-schema/spec.md) | IMPLEMENTED | Nine core tables; migration, catalog/tracking inspection and repeat-start verification completed locally on 2026-10-25. |
-| [F002 — Task type catalog management](F002-task-type-catalog/spec.md) | READY | Core Java create/read/list/update service, permanent codes, optimistic concurrency and host transaction/audit handoff. Documentation only; implementation and verification not run. |
+| [F002 — Task type catalog management](F002-task-type-catalog/spec.md) | IMPLEMENTED revision 3 | Concrete TaskTypeCatalogService with fresh build/proxy/startup/read-only verification; earlier evidence retained. CRUD/race/audit-rollback execution NOT RUN. |
 
 Next specifications cover Workflow Definition v1 and validation, definition lifecycle, Expression Policy v1, human-node/host-capability contracts, structured task submissions, JSON execution variables and runtime command integration. F002 does not implement publication or workflow execution. Use database design v1.4 under the [source precedence](../design-sources.md). Structured submissions cite CON-13/ASM-10; JSON variables cite CON-14/ASM-11. Exact schemas, bounds and APIs require specification. Detailed completion policies remain proposals until specified. The optional business decision engine remains deferred.
 

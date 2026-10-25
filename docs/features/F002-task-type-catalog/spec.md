@@ -2,8 +2,8 @@
 
 | Attribute | Value |
 | --- | --- |
-| Status | READY for core-service implementation; implementation and verification NOT RUN |
-| Revision | 1 — 2026-10-25 |
+| Status | IMPLEMENTED revision 3; fresh build/proxy/startup/read-only verification PASS; AC01–AC09 behavioral execution NOT RUN |
+| Revision | 3 — 2026-10-25; concrete service by default |
 | Owner | Workflow project owner |
 | Constitution | [v2.2.0](../../constitution.md) |
 | Prerequisite | [F001 initial schema](../F001-initial-database-schema/spec.md), implemented in `4a7bf64c632b6e07216a5b285265f5ab5a0387ec` |
@@ -14,7 +14,7 @@ Provide a core Java service that lets a trusted host create, find, list and upda
 
 Authority: [database design v1.4, section 8.1](../../../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md#81-task-type-catalog), at `apolo-docs` commit `c32ffb07cc9f4f2f3d1d7bf087455c1af13acbc3`; [F001 schema contract](../F001-initial-database-schema/schema-contract.md); [source precedence](../../design-sources.md); CON-01/02/03/04/08/10/12. The operation names, validation rules, pagination and host transaction contract below are selected for F002, not claims of pre-existing APIs.
 
-This task prepares documentation only. Implementation belongs to a later agent handoff. Follow [plan.md](plan.md), [tasks.md](tasks.md), [verification.md](verification.md) and [evidence.md](evidence.md).
+Initially prepared as documentation only, F002 is implemented through revision 3, including the owner's concrete-service convention and fresh wiring/proxy verification. Historical checks and behavioral gaps remain explicit in [evidence.md](evidence.md). Follow [plan.md](plan.md), [tasks.md](tasks.md) and [verification.md](verification.md).
 
 ## Scope and ownership
 
@@ -26,7 +26,7 @@ Excluded: REST/HTTP endpoints, UI, import/export/bulk upsert, seeds, deletes/ren
 
 ## Java service contract
 
-Expose `TaskTypeCatalog` in a focused core catalog package. Public data carriers use Java 17-compatible records or equivalent immutable types; do not expose entities, repositories, Spring Data Page/Pageable, provider exceptions as business errors, or security-provider objects.
+Expose the concrete Spring-managed `TaskTypeCatalogService` under `core.service.tasktype`, with package-private TaskTypeValidation and TaskTypePersistenceErrors alongside it. Remove the former TaskTypeCatalog interface, consolidate JpaTaskTypeCatalog into the service, and remove the obsolete `impl` package. Commands/queries/result DTOs/filter enum remain under `core.dto.tasktype`, documented errors under `core.exception.tasktype`, entities under `core.entity.tasktype` and repositories under `core.repository.tasktype`; see [exact package assignments](../../package-structure.md#exact-f002-assignments). Preserve operation signatures, behavior, transaction interception and host preconditions; move interface documentation to the concrete service. Public data carriers use Java 17-compatible records or equivalent immutable types; do not expose entities, repositories, Spring Data Page/Pageable, provider exceptions as business errors, or security-provider objects.
 
 | Operation | Input | Output |
 | --- | --- | --- |

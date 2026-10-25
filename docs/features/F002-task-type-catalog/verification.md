@@ -1,8 +1,10 @@
 # F002 verification scope
 
-This runbook applies when F002 is handed to an agent for implementation. Current work is documentation only. Follow [AGENTS.md](../../../AGENTS.md), [README](../../../README.md) and the [no-tests policy](../../specification-driven-development.md#verification-and-current-no-tests-policy).
+This runbook defines F002 implementation verification. Actual executed checks and remaining behavioral gaps are recorded in [evidence.md](evidence.md). Follow [AGENTS.md](../../../AGENTS.md), [README](../../../README.md) and the [no-tests policy](../../specification-driven-development.md#verification-and-current-no-tests-policy).
 
 ## Static review
+
+For revision 3, verify the single concrete TaskTypeCatalogService, package-private helpers, removal of the old interface/impl pair, and updated injection/examples. Inspect Spring class-based proxy compatibility and preservation of transaction annotations on the concrete entry points. Startup confirms wiring only; it does not prove transactional rollback or race behavior. Record fresh revision 3 evidence separately from earlier checks.
 
 Compare every public operation with the spec, including input bounds/case preservation, nullable description replacement, disabled-inclusive reads, SQL-bounded cursor queries, immutable snapshots and categorized errors. Inspect required transaction propagation at the proxied public mutation boundary, real @Version mapping, explicit flush and absence of manual version increments or blanket save/merge paths.
 

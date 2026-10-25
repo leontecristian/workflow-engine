@@ -149,3 +149,9 @@ The consolidated design and database design remain the detailed architectural so
 See [design sources and decision status](design-sources.md) for principle traceability and open items.
 
 Implementation evidence, 2026-10-25: [F001](features/F001-initial-database-schema/evidence.md) implements the initial nine-table schema and records local migration, complete catalog/tracking inspection and same-artifact restart verification with both temporary hosts stopped. This evidence does not amend the principles or establish runtime command guarantees, JPA concurrency behavior or APOLO production compatibility.
+
+Implementation evidence, 2026-10-25: [F002](features/F002-task-type-catalog/evidence.md) adds catalog management contracts and JPA persistence. Local packaging, entity/repository discovery, schema validation and unchanged catalog/migration metadata were verified, and the temporary host was stopped. CRUD, concurrency and host audit rollback remain NOT RUN; concrete host authorization/audit and production compatibility remain integration gates. No principle changes are implied.
+
+F002 revision 2 subsequently aligned the implementation with the agreed layer-first packages. Fresh build, service wiring, entity/repository discovery, schema validation and unchanged migration metadata were observed, with the owned host stopped. Revision 1 evidence remains historical; behavioral execution gaps remain unchanged.
+
+F002 revision 3 consolidated the service into TaskTypeCatalogService under the owner's concrete-service convention. Fresh build/startup observed class-based transaction proxy creation and intended transaction metadata; read-only schema/tracking evidence remained unchanged and the owned host was stopped. CRUD, concurrency and rollback scenarios remain NOT RUN.
