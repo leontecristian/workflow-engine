@@ -22,6 +22,13 @@ docs/features/
 
 Follow the [specification-driven development workflow](../specification-driven-development.md). Reference the [constitution](../constitution.md), applicable [CON constraints](../constraints.md) and [ASM assumptions](../assumptions.md). Create schemas and examples only as their contracts are specified; do not treat proposed design examples as finalized contracts.
 
-The first feature is [F001 — Initial database schema with Liquibase](F001-initial-database-schema/spec.md), IMPLEMENTED with local verification complete. Its plan, schema contract, tasks and verification runbook cover the nine core tables and owner-authorized local startup, catalog inspection, DATABASECHANGELOG checks and repeat-start verification. The schema migration, complete catalog inspection, tracking records and same-artifact restart were verified on 2026-10-25; see its evidence record. The remaining priorities are Workflow Definition v1, Expression Policy v1, simple task catalog and human-node contracts, structured task submissions, JSON execution variables, and runtime command integration, as described in the development workflow. Use database design v1.4 under the [source precedence](../design-sources.md), including selected numeric JPA versions, APOLO-owned instance-ID associations and authoritative JSON completion evidence. Structured submissions cite CON-13/ASM-10; JSON variables cite CON-14/ASM-11. Exact schemas, bounds and APIs require specification. Detailed completion policies remain proposals until specified. The optional business decision engine remains deferred.
+## Feature index
+
+| Feature | Status | Scope |
+| --- | --- | --- |
+| [F001 — Initial database schema with Liquibase](F001-initial-database-schema/spec.md) | IMPLEMENTED | Nine core tables; migration, catalog/tracking inspection and repeat-start verification completed locally on 2026-10-25. |
+| [F002 — Task type catalog management](F002-task-type-catalog/spec.md) | READY | Core Java create/read/list/update service, permanent codes, optimistic concurrency and host transaction/audit handoff. Documentation only; implementation and verification not run. |
+
+Next specifications cover Workflow Definition v1 and validation, definition lifecycle, Expression Policy v1, human-node/host-capability contracts, structured task submissions, JSON execution variables and runtime command integration. F002 does not implement publication or workflow execution. Use database design v1.4 under the [source precedence](../design-sources.md). Structured submissions cite CON-13/ASM-10; JSON variables cite CON-14/ASM-11. Exact schemas, bounds and APIs require specification. Detailed completion policies remain proposals until specified. The optional business decision engine remains deferred.
 
 Acceptance scenarios describe required behavior. Creating this structure does not authorize automated tests; the current owner's no-tests instruction continues to apply.

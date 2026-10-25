@@ -1,0 +1,15 @@
+# F002 implementation tasks
+
+All tasks are initially unchecked. Apply [specification revision 1](spec.md) and [plan](plan.md); record evidence separately from code completion.
+
+- [ ] **T01 — Inspect baseline (R01/R08).** Read repository guidance, current POMs/scanning and F001/F002; preserve unrelated work. Completion: actual baseline and any discrepancy recorded. No dependency.
+- [ ] **T02 — Define supported Java contracts (R01–R07).** Add immutable commands/views/change/page/query types, filter/category enums and service boundary with documented input, transaction and audit semantics. Completion: exact spec contract, no entities/framework types in supported API. Depends on T01.
+- [ ] **T03 — Implement persistence mapping (R01/R02/R04/R08).** Add six-column catalog entity and narrowly used internal repository; generated identity, non-updatable code and provider-managed version. Completion: mapping matches F001, no schema changes/cascades/seeds/delete interface exposed. Depends on T01/T02.
+- [ ] **T04 — Implement reads and paging (R02/R03/R06/R07).** Exact disabled-inclusive lookups; database-filtered, bounded ascending-ID pages and immutable results. Completion: input validation, empty/end semantics and limit+1 lookahead match spec. Depends on T02/T03.
+- [ ] **T05 — Implement mutations (R02/R04–R07).** Host transaction participation, unique creation, version-checked whole-field update, before/after snapshots, explicit flush, no-op behavior and error translation. Completion: static review covers stale/race/rollback paths without auto retries or provider-managed version assignment. Depends on T02/T03.
+- [ ] **T06 — Document host handoff (R05/R06/R07).** Public service documentation and concise usage pattern for trusted authorization, same-transaction audit and response after commit. Completion: explains provisional results and no-op audit handling; no fake audit implementation or insecure transport adapter. Depends on T05.
+- [ ] **T07 — Build and inspect wiring (R01/R08).** Use JDK 21/Maven wrapper with tests skipped. Inspect mapped entity/scanning and unchanged Liquibase resources. Completion: actual build result recorded. Depends on T04–T06.
+- [ ] **T08 — Authorized local startup/read-only verification (R08).** Follow verification runbook, capture startup/JPA validation and catalog/tracking state; stop owned process. Completion: actual evidence or explicit environmental blocker, with no startup-created catalog data. Depends on T07 and reachable database.
+- [ ] **T09 — Reconcile and hand off (R01–R08).** Review code/spec/diff, update tasks/status/evidence and report all deferred behavioral scenarios and host integration. Completion: code completion distinguished from verification; logs excluded, no commit unless requested. Depends on prior tasks completed or accurately blocked.
+
+No task authorizes automated tests, persistent sample catalog records, table resets, edits to F001 checksums or a new HTTP API. AC01–AC09 execution remains deferred under the stated verification scope; implementing their required behavior is still part of T04/T05.
