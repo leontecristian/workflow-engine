@@ -1,14 +1,14 @@
 # Assumptions and verification register
 
-**Version:** 2.0.0
+**Version:** 2.1.0
 
 **Recorded:** 2026-10-25
 
-**Applies to:** constitution v2.0.0 and planning for APOLO integration
+**Applies to:** constitution v2.1.0 and planning for APOLO integration
 
 An assumption is an expectation used for planning whose supporting evidence is incomplete. It must not be presented as a confirmed contract or an implemented guarantee. [Constraints](constraints.md) remain requirements even when the feasibility or mechanism for satisfying them needs verification.
 
-The items below derive from the [consolidated design](../../apolo-docs/workflow-engine/architecture/workflow-engine-design.md), particularly O3/O7–O11, the [development plan](../../apolo-docs/workflow-engine/development/independent-development-plan.md), the [technical summary](../../apolo-docs/workflow-engine/reference/apolo-technical-summary.md) and the scoped superseding decisions in [database design v1.2](../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md). See [design sources](design-sources.md) for precedence. Owners identify responsible roles, not newly assigned individuals or delivery dates.
+The items below derive from the [consolidated design](../../apolo-docs/workflow-engine/architecture/workflow-engine-design.md), particularly O3/O7–O11, the [development plan](../../apolo-docs/workflow-engine/development/independent-development-plan.md), the [technical summary](../../apolo-docs/workflow-engine/reference/apolo-technical-summary.md) and the scoped superseding decisions in [database design v1.3](../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md). See [design sources](design-sources.md) for precedence. Owners identify responsible roles, not newly assigned individuals or delivery dates.
 
 No item is marked verified merely because it is plausible. Follow the [current no-tests policy](specification-driven-development.md#verification-and-current-no-tests-policy); required evidence listed here is a future verification obligation, not authorization to execute tests now.
 
@@ -140,12 +140,27 @@ The plan expects APOLO's root build and release process to accommodate core as a
 
 **If false:** resolve the build/release obstacle and revise the move plan. Do not silently turn the current separate checkout into a permanent independent-product requirement.
 
+## ASM-10 — Completion history can support operational result retrieval
+
+**Status:** storage direction SELECTED; contract and integration PENDING VERIFICATION — database design v1.3, sections 11.1, 13.1, 16 and 19.
+
+**Owner:** workflow persistence/contract maintainer with APOLO integration and retention owners.
+
+**Resolve before:** implementing structured completion and accepting downstream use of task submissions.
+
+The selected storage is the existing TASK_COMPLETED.details_json record, with exactly one authoritative completion per completed task and supported exact-task/activity APIs. It is expected to support bounded result reads, including the final submission inside the same transaction, without another table or JSON column.
+
+**Evidence needed:** pinned schema/reference resolution, bounded validation, canonical request handling preserving exact values, completion uniqueness and lifecycle consistency, query/index behavior, authorized sibling-result access, same-transaction visibility and rollback. Define retention/archival/redaction safeguards for operational dependencies and retained evidence, and codec compatibility for older valid no-result completions. Verify published workflows retain compatible host handlers and readers.
+
+**If false:** revise the storage/access or retention mechanism explicitly while preserving immutable submissions, transaction guarantees and host ownership; do not silently drop evidence, create independently editable copies or expose arbitrary history as the API.
+
 ## Open decisions that must not be filled with assumptions
 
 - **O1/O6:** exact node/action bindings, JSON encodings, nullability, precision, date/time semantics, expression allowlist, execution bounds and errors. The illustrative limit of 50 and decimal-as-string examples are not final selections.
 - **O2:** simple catalog administration, any import normalization, technical revision-token representation and API/provider schemas. The former task-type publication/import lifecycle is superseded; a checksum convention is not established merely by mentioning checksums.
 - **Task multiplicity:** multiple tasks per activity is agreed; proposed SINGLE/ALL semantics, fixed roster, bounds and exact node JSON require specification before dependent implementation. Do not promote them to confirmed APOLO business policy.
 - **Host associations:** APOLO ownership, instance-ID queries and optional engine correlation are selected. APOLO must specify its column/table shape, historical membership storage, authorization and start-time integration without making core depend on booking tables.
+- **Structured submissions:** result contract language/features and immutable reference resolution, payload/depth/collection/string limits, number and omitted/null/default rules, versioned canonicalization, public API/error shapes, bounded retrieval and prior-activity bindings remain specification gates. Define host business validation/aggregation and reviewer visibility without treating JSON as proof of membership or reviewed material. Draft/partial task saving is excluded.
 - **O4:** alternative-resource acceptance/reapproval behavior. No default replacement behavior has been selected.
 - **O9:** deployment-specific migration ordering, delivery/recovery and retention/redaction arrangements beyond the agreed ownership boundary.
 - **O11:** Angular version, graph library and detailed designer interactions. These do not block the first engine slice.

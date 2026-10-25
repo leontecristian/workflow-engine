@@ -1,13 +1,13 @@
 # Design sources and decision status
 
-Recorded **2026-10-25** for [constitution v2.0.0](constitution.md).
+Recorded **2026-10-25** for [constitution v2.1.0](constitution.md).
 
 ## Source documents
 
 The architecture sources currently live in the sibling documentation repository at `C:\dev\apolo-docs\workflow-engine`. The relative links below work with the current sibling checkout layout. If the documentation or core moves, update links and preserve source identity and decision history.
 
 - [Consolidated design](../../apolo-docs/workflow-engine/architecture/workflow-engine-design.md): authoritative detailed architecture and section 22 decision register. The constitution was established from v0.7; v0.8 restores concrete design detail and a complete proposed example without finalizing open contracts.
-- [Database design v1.2](../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md): persistence design and owner decisions recorded on 24–25 October 2026. Sections 1 and 21 distinguish selected changes from proposed completion rules, physical details and verification gates. The source revision reviewed for this amendment is documentation-repository commit `f7e85c9`.
+- [Database design v1.3](../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md): persistence design and owner decisions recorded on 24–25 October 2026. Sections 1 and 21 distinguish selected changes from proposed completion rules, physical details and verification gates. The v1.2 baseline was documentation-repository commit `f7e85c9`; the 2.1.0 amendment incorporates the subsequent owner-approved structured-submission revision in that document. This records source identity, not a claim that the v1.3 edit is committed or implemented.
 - [Original-design reconciliation](../../apolo-docs/workflow-engine/architecture/original-design-reconciliation.md): section-by-section account of retained, restored, adapted and deferred original ideas, including the updated five-node workflow example.
 - [Approval capability](../../apolo-docs/workflow-engine/requirements/approval-capability.md): capability scope and milestone acceptance expectations.
 - [Separate development plan](../../apolo-docs/workflow-engine/development/independent-development-plan.md): specification priorities, two-module delivery and APOLO integration sequence.
@@ -15,16 +15,17 @@ The architecture sources currently live in the sibling documentation repository 
 - [Booking business analysis](../../apolo-docs/workflow-engine/requirements/booking-business-analysis.md): business ownership, confirmed policies and provisional/deferred decisions.
 - [Design workspace overview](../../apolo-docs/workflow-engine/README.md): current scope and reading order.
 
-The original 1.0.0 baseline used the working-tree documents available on 24 October 2026. The 2.0.0 amendment incorporates database design v1.2 and the owner's subsequent decisions. This source record does not approve every proposed contract. Archived discussions explain history and do not override active decisions.
+The original 1.0.0 baseline used the working-tree documents available on 24 October 2026. The 2.0.0 amendment incorporated database design v1.2; 2.1.0 adds structured submissions from v1.3. This source record does not approve every proposed contract. Archived discussions explain history and do not override active decisions.
 
-### Scoped precedence for the 2.0.0 amendment
+### Scoped precedence for the 2.x amendments
 
-The owner's decisions recorded in database design v1.2 supersede older consolidated-design, development-plan and registry examples for these topics:
+The owner's decisions recorded in database design v1.3 (including retained v1.2 decisions) supersede older consolidated-design, development-plan and registry examples for these topics:
 
 - Multiple directly assigned tasks per activity are in V1, while the process retains one active position. Detailed SINGLE/ALL completion semantics and fixed-roster rules remain proposals requiring specification.
 - A simple retained task catalog replaces task-type business versions, publication lifecycle and outcome tables. Codes are immutable from creation; descriptive metadata and authoring selectability are editable. Published human nodes own outcome/input contracts; activities own the catalog reference and tasks inherit it.
 - Hibernate-managed numeric BIGINT/Long JPA versions replace the SQL Server ROWVERSION proposal. The early checked instance write and final managed-version capture are selected approaches whose host behavior still needs O7 verification.
 - APOLO stores instance IDs and uses the engine API; host data owns booking membership and historical links. The engine retains optional, immutable, nonunique business_type/business_id correlation, both populated or both null. No host association table is mandated.
+- Structured completion results extend scalar-only task inputs while leaving execution variables scalar. Each accepted result is immutable TASK_COMPLETED evidence with a pinned contract, supported authorized exact-task/activity retrieval, full-payload idempotency, host business validation and operational retention. Same-transaction downstream reads include the final submission. No new result table/column, draft form saving or automatic JSON-to-variable merging is selected; exact schema/limits/API shapes remain pending.
 
 The consolidated design remains the detailed source for unaffected architecture. Older text on the superseded topics must not be used to implement the previous contracts. Dependent specifications must cite this precedence and the database design; unresolved proposals are not finalized by the amendment. Initial schema design changes are not migrations of an applied schema: preserve existing changesets and specify a separate forward migration if needed. APOLO owns migrations for host associations.
 
@@ -43,6 +44,8 @@ The owner's later instructions and completed project changes additionally establ
 - **C09 — business ownership and identity:** Q12/Q17/Q18/O3–O5/O8; design sections 8–9 and 13; booking business analysis; database design sections 9.1 and 16 for host links and optional engine correlation.
 - **C10 — compatibility and evidence:** Q2/O7; design sections 4, 14 and 20; technical summary; current owner verification instructions.
 
+The 2.1.0 extension additionally traces C06–C09 to database design sections 8.2, 11.1, 12–16 and 19–21, with CON-13 and ASM-10 covering structured submission contracts and required evidence.
+
 ## Decisions that remain unresolved
 
 Use the consolidated design's section 22 together with database design sections 1 and 21 and the scoped precedence above. This list preserves status; it does not create a competing set of decisions.
@@ -57,6 +60,7 @@ Use the consolidated design's section 22 together with database design sections 
 - **O9 — PARTLY AGREED:** single production migration owner is settled; production ordering/settings, durable-handoff adapter, delivery/recovery and retention/redaction details remain APOLO integration work.
 - **O10 — PARTLY AGREED:** core's future location inside APOLO is settled; timing, final coordinates, host placement and release/compatibility responsibilities remain open.
 - **O11 — OPEN, later milestone:** Angular baseline, graph library and detailed designer interactions.
+- **Structured submission contract — SELECTED capability, specification pending:** schema language/features, immutable reference resolution, bounds, exact-value/null/default handling, canonicalization, API/errors and prior-activity bindings. Host review visibility, aggregation and retention/redaction remain explicit integration contracts; a JSON decision document does not determine how reviewed material is preserved.
 
 SQL Server `ROWVERSION` is superseded by the selected numeric JPA mapping. Detailed completion policies, unselected physical limits/encodings, interface names, decimal JSON string encodings and the illustrative automatic-step limit of 50 MUST NOT be treated as finalized contracts merely because they appear in a design. The proposed nine-table persistence model still needs its initial-schema feature specification and verification evidence.
 
@@ -66,7 +70,7 @@ At constitution creation, the project has a two-module scaffold, explicit core c
 
 The local host uses SQL Server at `localhost:1433`, database `apolo_workflow_dev`, and Windows native authentication with a matching JDBC authentication DLL. A prior startup check observed NTLM-authenticated JDBC sessions and successful startup. Liquibase created its tracking tables; the workflow master was empty. That temporary host process was stopped afterward. These are historical observations, not a live status check.
 
-Workflow entities, physical schema changesets, execution services, catalog behavior, idempotency and durable handoff are not implemented by this scaffold. Runtime feature guarantees remain to be specified, implemented and evidenced. The 2.0.0 reconciliation changes documentation only; no build, host startup, database access or automated tests were performed for it.
+Workflow entities, physical schema changesets, execution services, catalog behavior, idempotency and durable handoff are not implemented by this scaffold. Runtime feature guarantees remain to be specified, implemented and evidenced. The 2.0.0 and 2.1.0 reconciliations change documentation only; no build, host startup, database access or automated tests were performed for them.
 
 ## Maintaining this record
 

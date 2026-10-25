@@ -1,14 +1,14 @@
 # Project constraints
 
-**Version:** 2.0.0
+**Version:** 2.1.0
 
 **Recorded:** 2026-10-25
 
-**Applies to:** constitution v2.0.0 and the current separate-development phase
+**Applies to:** constitution v2.1.0 and the current separate-development phase
 
 Constraints are confirmed boundaries that specifications and implementations must satisfy. They are requirements, not evidence that the corresponding behavior already exists. This document makes the [constitution](constitution.md) operational without replacing the detailed [consolidated design](../../apolo-docs/workflow-engine/architecture/workflow-engine-design.md).
 
-References below identify constitution principles and sections/decision IDs in the consolidated design, with scoped superseding decisions from [database design v1.2](../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md) as recorded in [design sources](design-sources.md). Unverified expectations belong in [assumptions.md](assumptions.md). Exact schemas, interfaces, limits and physical mappings remain specification work where the design has not finalized them.
+References below identify constitution principles and sections/decision IDs in the consolidated design, with scoped superseding decisions from [database design v1.3](../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md) as recorded in [design sources](design-sources.md). Unverified expectations belong in [assumptions.md](assumptions.md). Exact schemas, interfaces, limits and physical mappings remain specification work where the design has not finalized them.
 
 ## CON-01 — Platform and dependency boundaries
 
@@ -139,6 +139,19 @@ Follow the owner's current no-tests instruction: do not create or run automated 
 For temporary authorized runtime verification, stop processes afterward unless asked to leave them running. Record what was actually verified, the environment and remaining gaps.
 
 **Trace:** C01/C10; Q19; design section 20; subsequent owner instructions; [development workflow](specification-driven-development.md).
+
+## CON-13 — Structured task submissions
+
+- Keep status, configured outcome, comment, scalar inputs and structured result distinct. The pinned human node declares result forbidden/optional/required and its embedded or immutable versioned contract. Preserve simple completions without optional results. No task-type business versions are introduced.
+- Validate bounded JSON object structure (including nested objects/arrays) in core, and business membership, completeness, permissions and reviewed material through configured host validation after the early instance claim and before acceptance/effects. Reject duplicate keys, unsupported values and lossy conversions. Exact schema features, bounds, null/default and number handling remain specification gates.
+- Store one authoritative immutable accepted submission in TASK_COMPLETED.details_json for each completed task, with required task/activity references and outcome agreement. Open/cancelled tasks have no successful submission. The proposed schema enforces at most one completion with a filtered unique task index; the executor enforces cross-table existence/state consistency. No separate result table/column is selected.
+- Expose authorized exact-task/activity completion APIs. Distinguish an open task from a completed task with no optional result; a missing required event is an integrity error. Respect sibling-review visibility, repeated activation identity and bounded retrieval. Hosts must not depend on arbitrary history parsing.
+- Fingerprint the full result. Formatting/property order do not affect identity; array order remains significant unless explicitly normalized by the pinned contract. Version canonicalization; successful authorized replay precedes state-dependent validation. Changed nested content conflicts under the same successful command ID.
+- Make the final submission visible to downstream actions in the shared transaction through explicit completed-activity context. Rollback removes that command's result and effects while preserving prior committed contributions.
+- JSON does not change ALL semantics: use a common configured contribution such as REVIEW_SUBMITTED when the host must combine all reviewers' per-item decisions. Host aggregation may produce validated scalar outputs through declared bindings; results do not automatically modify variables or expression facts.
+- Preserve completion records and their readers for operational dependencies and audit. Do not independently purge completion evidence while its task remains retained. Exceptional redaction/unavailability must resolve affected execution explicitly. Ordinary result edits, unfinished form saving and incremental task completion are outside this capability.
+
+**Trace:** C06–C09; database design sections 8.2, 11.1, 12–16 and 19–21; ASM-10. Business review snapshots and host association ownership remain separate concerns.
 
 ## Current local configuration
 

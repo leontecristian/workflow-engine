@@ -1,12 +1,12 @@
 # Workflow project constitution
 
-**Version:** 2.0.0
+**Version:** 2.1.0
 
 **Established:** 2026-10-24
 
 **Last amended:** 2026-10-25
 
-**Basis:** consolidated design v0.8, database design v1.2 and subsequent owner decisions; see [design sources](design-sources.md) for precedence and proposal status
+**Basis:** consolidated design v0.8, database design v1.3 and subsequent owner decisions; see [design sources](design-sources.md) for precedence and proposal status
 
 **Scope:** `workflow-core`, `workflow-test-host`, their specifications and future APOLO integration
 
@@ -81,6 +81,8 @@ Workflow definition versions follow `DRAFT -> PUBLISHED -> RETIRED`. Validation 
 
 Published workflow content is immutable, including embedded designer metadata. Instances pin exact workflow versions. The pinned human node owns permitted outcomes, input contracts, comment requirements, guards and completion policy. Workflow-version retirement prevents new selection while retaining existing references and compatible support.
 
+Human nodes also declare whether a structured completion result is forbidden, optional or required and bind its contract through embedded schema or an immutable versioned reference. Publication MUST reject unsupported or mutable contracts. Existing simple tasks remain supported without a result. Retain readers, validators and host capabilities needed by published definitions and retained evidence; task-type business versions are not required for this capability.
+
 Task types use a simple `workflow_task_type` catalog with codes immutable from creation, retained rows, editable descriptive metadata, an authoring `selectable` flag and a technical concurrency version. They have no business-version or publication lifecycle. Renaming codes and physically deleting rows MUST NOT be supported, even for unused entries. `selectable = false` prevents new authoring selection; it MUST NOT invalidate published definitions or prevent their execution, including new instances of those definitions. The activity holds the task-type reference; its tasks inherit that type. Catalog administration and any import contracts require specification; no versioned task-type import lifecycle is mandated.
 
 Catalog metadata is not executable behavior. Publication checks catalog references, node contracts and capabilities supplied by the deployed host. Unsupported task types must fail visibly. APOLO resolves screens and handlers by stable task code and retains compatibility with published workflow contracts. V1 has no separate form key/version contract.
@@ -95,6 +97,8 @@ Time and other decision inputs must be supplied explicitly; expressions cannot f
 
 Initial scalar types are STRING, LONG, DECIMAL, BOOLEAN, DATE and DATETIME. Preserve numeric precision and define explicit date/timestamp semantics. Exact JSON encoding, precision, nullability and timezone rules remain specification work. Unsupported versions and semantic features MUST be rejected.
 
+A task may submit a bounded JSON object containing nested objects/arrays under its pinned result contract. Core validates structure and bounds; the host validates business meaning. Reject duplicate JSON keys and inexact conversions. Schema syntax/features, payload/depth/collection/string limits and versioned canonicalization MUST be specified before implementation. This does not permit object-valued workflow variables or automatic exposure/merging into expressions. Declared services may aggregate exact-activity submissions and return validated scalar outputs through explicit bindings.
+
 ## C09 — Host policy and trusted identity govern business actions
 
 APOLO owns booking data, forms, validation, assignment sources, permissions, materiality rules and domain orchestration. Core MUST NOT encode overbooking calculations, country routing or alternative-resource policy.
@@ -108,6 +112,10 @@ Actors come from authenticated host context, never client-supplied identity. Com
 The APOLO integration must enforce no self-approval, country/business access and audited reassignment/administrator overrides. Harmless booking edits may proceed; material changes invalidate review and require resubmission. APOLO defines materiality. Reusing the same instance for adjustment remains provisional.
 
 Workflow history must explain task creation, assignment/reassignment, completion/cancellation and manual/automatic transitions, with the relevant actor, version, outcome and correlation. Store only necessary permitted evidence and deliberate snapshots. Full business entities remain host-owned; retention, access and redaction follow host policy.
+
+Core owns the immutable accepted task submission: outcome, comment, permitted scalar inputs and optional structured result, stored once in TASK_COMPLETED.details_json. Every completed task MUST have one authoritative completion record; open/cancelled tasks have none. Supported authorized APIs retrieve exact-task/activity submissions without requiring hosts to parse arbitrary history. Host policy governs visibility between reviewers. The JSON records decisions, not authoritative business membership or the material reviewed; APOLO owns business validation, aggregation, effects and review evidence.
+
+The complete result participates in the versioned command fingerprint. Submission acceptance, completion history, business effects and receipt MUST share the command transaction. Downstream actions receive exact completed activity context and can read the final submission before commit; rollback removes that command's result with its effects. Successful receipt replay does not rerun state-dependent validation. Retention/redaction MUST account for operational dependencies and audit obligations; missing operational evidence must be explicit, never silently interpreted as an empty decision. Draft/partial task saving and ordinary result edits remain outside this extension.
 
 ## C10 — Compatibility and evidence are explicit
 
@@ -125,10 +133,11 @@ A constitutional amendment must record the changed principle, reason, owner deci
 
 Use semantic versioning for this document: major for incompatible principle/scope changes, minor for added governance or principles, patch for clarifications that preserve meaning. This version is independent of library releases, JSON schema versions, definition versions and draft revisions.
 
-The consolidated design and database design remain the detailed architectural sources, with scoped precedence recorded in [design sources](design-sources.md). This constitution codifies their confirmed principles and the owner's later decisions. Database design v1.2 supersedes earlier task multiplicity, task-type versioning, row-token and mandatory business-reference proposals as recorded there; other proposed details remain proposals. Where a conflict lacks a superseding decision, record it and resolve it before implementing affected behavior. Historical archives and illustrative contracts cannot override current decisions.
+The consolidated design and database design remain the detailed architectural sources, with scoped precedence recorded in [design sources](design-sources.md). This constitution codifies their confirmed principles and the owner's later decisions. Database design v1.3 retains the v1.2 decisions on task multiplicity, task-type versioning, row tokens and optional business references and adds structured submissions beyond the earlier scalar-only completion contract. Other proposed details remain proposals. Where a conflict lacks a superseding decision, record it and resolve it before implementing affected behavior. Historical archives and illustrative contracts cannot override current decisions.
 
 ## Amendment history
 
+- **2.1.0 — 2026-10-25:** owner-approved additive structured task-submission capability from database design v1.3. C07 pins result contracts; C08 separates bounded JSON submissions from scalar execution variables; C09 defines authoritative completion history, authorized retrieval, host interpretation, atomicity, idempotency and operational retention. Updated constraints, assumptions, source traceability, development guidance and agent instructions together. Exact contracts/limits and integration evidence remain pending. Existing simple completions remain supported. No new result table/column is selected; completion constraints/indexes and event/definition codec compatibility require specification and a forward migration if an older schema was applied. No implementation or database changes are claimed.
 - **2.0.0 — 2026-10-25:** owner-approved reconciliation with database design v1.2. C02 includes multiple tasks per activity; C07 replaces versioned task types with retained immutable codes and workflow-node contracts; C06 records numeric JPA versions and aggregate concurrency; C09 makes APOLO's instance-ID associations and optional two-column correlation explicit. These decisions supersede incompatible 1.0.0 scope/contracts. Updated constraints, assumptions, source traceability, development priorities, documentation guides and agent instructions together. Detailed completion policies remain proposed and host behavior remains unverified. This is a documentation amendment, not a schema migration or implementation claim; any previously applied incompatible schema requires a separate forward migration preserving changeset identity, and host association migrations belong to APOLO.
 - **1.0.0 — 2026-10-24:** initial codification of the agreed architecture and specification-driven workflow. Exact feature contracts remain pending. Current no-tests instructions govern development execution without asserting production readiness.
 
