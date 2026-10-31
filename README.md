@@ -19,6 +19,10 @@ The initial nine-table workflow schema is implemented by [F001](docs/features/F0
 
 ## Project constitution and specifications
 
+[F005 — Minimal SINGLE workflow execution](docs/features/F005-minimal-single-workflow-execution/spec.md) is READY for implementation. Its four documents specify exact-version start, one directly assigned task, completion to END, concurrency, command replay, history and durable host event handoff. Runtime execution is not implemented yet.
+
+[F006 — Test-host definition console](docs/features/F006-test-host-definition-console/spec.md) is READY for implementation. Its four documents specify a small Angular application inside the test host, authenticated management endpoints, host audit and manual F002/F004 verification. The console is not implemented yet; current build/start commands below remain unchanged. Runtime UI/endpoints are outside its current scope.
+
 Start with the [documentation guide](docs/README.md), [project constitution](docs/constitution.md) and [specification-driven development workflow](docs/specification-driven-development.md). They capture the agreed architecture, specification and evidence requirements, current no-tests policy and remaining decisions traced to the [design sources](docs/design-sources.md).
 
 Project-wide guidance lives in `docs/`; individual feature specifications, plans, tasks and implementation/verification records belong in [docs/features/](docs/features/README.md).
