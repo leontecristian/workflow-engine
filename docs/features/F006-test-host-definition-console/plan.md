@@ -1,71 +1,105 @@
-# Plan — F006 Test-host definition console
+# Plan — F006 Test-host workflow console
 
-Implements [specification revision 1](spec.md). Execution is tracked in [tasks.md](tasks.md); actual results belong in [implementation.md](implementation.md). F005 runtime execution remains separate.
+Implements [specification revision 3](spec.md), retaining revision 2's execution scope and allowing isolated unit tests under the clarified owner policy. Track progress in [tasks.md](tasks.md) and actual evidence in [implementation.md](implementation.md). No implementation is claimed.
 
-## 1. Establish baseline and delivery boundary (R01, R09–10)
+## 1. Baseline, dependency and toolchain (R01, R09–10)
 
-Read repository guidance, F002/F004 contracts and source; preserve concurrent changes. Confirm the F004 review fixes are present. Retain exactly two Maven modules and core's ordinary JAR. Angular lives at `workflow-test-host/frontend/` with its own package.json/lockfile, not a third Maven module. No application build or database operation is needed while preparing these documents.
+Read repository guidance, F002/F004/F005 contracts and actual source. Preserve other-agent work. F005 owns execution; wait for its required APIs rather than inventing stub implementations in the host. Management infrastructure can progress independently, but runtime compilation/acceptance is a dependency gate. Reconcile material API differences before dependent code.
 
-At implementation time inspect installed Node/npm, consult Angular's official compatibility matrix and select exact supported versions, recording source URLs and rationale. Use Angular CLI without test scaffolding and with standalone components, routing and ordinary CSS; no UI library is required. Pin dependencies/CLI and commit package-lock.json. No test runner or e2e scaffold is added.
+Retain two Maven modules and core's ordinary JAR. Angular lives at `workflow-test-host/frontend/` with package.json/package-lock.json. Select/pin a supported Angular/Node/npm combination from official compatibility sources during implementation; record versions/URLs. Use standalone components, hash routing and plain CSS, adding focused unit-test support where needed rather than unused generated tests. This documentation revision requires no build/database action.
 
-## 2. Core family listing and HTTP DTOs (R03, R08)
+## 2. Core read addition and host packages (R03, R08, R15)
 
-Core additions use `io.github.leontecristian.workflow.core.dto.definition.DefinitionQuery` and `DefinitionPage`, `service.definition.WorkflowDefinitionService.listDefinitions`, and the existing `repository.definition.WorkflowDefinitionRepository` plus internal projection if needed. Preserve the existing core public boundary and F004 error translation. Use a bounded database query with limit+1; do not load all families or lazily load versions. No schema/index change is needed.
+F006's only core addition is DefinitionQuery/DefinitionPage in dto.definition, WorkflowDefinitionService.listDefinitions and its internal bounded repository query. Use validated ascending ID/limit+1 pagination with no version JSON or unbounded load. Execution and runtime reads use F005 public services/DTOs/exceptions; no host imports of core entities/repositories/helpers.
 
-Host root remains `io.github.leontecristian.workflow.testhost`; use these layer-first assignments:
+Under `io.github.leontecristian.workflow.testhost`, assign:
 
 | Package | Responsibility |
 | --- | --- |
-| `configuration.console` | Feature gate, bind checks, credential/session/CSRF configuration and immutable console settings. |
-| `controller.definition`, `controller.tasktype`, `controller.audit`, `controller.console` | Thin routes, transport status/media handling, session/capability information. |
-| `dto.definition`, `dto.tasktype`, `dto.audit`, `dto.console` | HTTP records with decimal-string longs; explicit request/response mapping. |
-| `service.definition`, `service.tasktype` | Concrete authenticated host transaction facades; core invocation and audit handoff. |
-| `service.audit`, `repository.audit` | Durable host audit writer and bounded reads through transaction-participating JDBC. |
-| `service.console` | Finite capability test double and trusted actor/clock context. |
-| `exception.console` | Sanitized HTTP error mapping, including errors after transaction commit attempts. |
+| `configuration.console` | Gate, loopback/credentials, session/CSRF/roles, immutable capability/failure settings. |
+| `controller.definition`, `controller.tasktype`, `controller.audit`, `controller.console` | Management/session routes and transport. |
+| `controller.runtime`, `controller.sandbox`, `controller.event` | Runtime commands/reads/replay, requests and event delivery. |
+| `dto.definition`, `dto.tasktype`, `dto.audit`, `dto.console`, `dto.runtime`, `dto.sandbox`, `dto.event` | Explicit wire records with decimal-string Longs. |
+| `service.definition`, `service.tasktype`, `service.audit` | Management transaction facades and audit writing/reads. |
+| `service.runtime` | Nontransactional coordinator, separate transactional facade, authorization and pinned task-contract projection. |
+| `service.sandbox` | Request creation/query/link callback and actual assignment resolver. |
+| `service.event` | Mandatory recorder, outbox/inbox reads and manual dispatcher. |
+| `repository.audit`, `repository.sandbox`, `repository.event` | Host JDBC persistence on the shared transaction manager. |
+| `service.console`, `exception.console` | Trusted context/capability composition and sanitized failures. |
 
-Create only classes needed by the feature. Use no mirrored service/impl interfaces. Host dependencies on core are restricted to documented services/DTOs/exceptions and WorkflowConfiguration; no core repository/entity imports.
+Use concrete services and only the genuine F005 SPIs. JDBC must participate in core's effective JpaTransactionManager connection; declare imported dependencies directly, never create another manager/autocommit connection. Keep core scanning unchanged; host JDBC tables need no new JPA scan.
 
-## 3. Authentication, transport limits and transactions (R01–02, R07–08)
+## 3. Security and exact transport (R01–02, R08)
 
-Add host-only Spring Security using the existing Boot dependency baseline. With console enabled, require environment-backed username/password, a local administrator role, server sessions/form login/logout and CSRF. Enforce loopback binding at startup. Disabled configuration must expose no console controller/provider beans and must block `/console` static resources even if assets are packaged; account for authentication library auto-configuration so the ordinary host startup remains documented. API entry/access-denied handlers return the specified envelope, while login uses the standard form. Permit only the login/bootstrap resources needed before authentication, with no management data. Set no wildcard CORS.
+Use host-only Spring Security under the existing Boot baseline. Enabled console requires distinct external admin/reviewer credentials, explicit role mapping and loopback binding. Usernames satisfy F005 actor bounds. Resolver assignment uses the configured reviewer, never a caller-selected identity. No impersonation control or automatic reassignment after configuration changes.
 
-Serve Angular and API under `/console` on the same origin. Bootstrap CSRF through authenticated `/console/api/session`; configure Angular's same-origin XSRF handling to match the cookie/header names. Do not embed credentials or bearer secrets in static assets. On session expiry, retain editor state in memory and offer sign-in; do not persist credentials or workflow documents in browser local storage.
+Use session/form login/logout and CSRF with JSON API 401/403 handlers and same-origin Angular XSRF bootstrap through /session. Only necessary login/bootstrap resources are public. Disabled mode exposes no controllers/providers and blocks packaged console static resources; account for Security auto-configuration to preserve ordinary host startup. No secrets in assets/logs/localStorage and no wildcard CORS.
 
-Use bounded raw UTF-8 body reading for import/replace so core sees original JSON text. Other command envelopes use strictly bound host DTOs, unknown-field rejection and the 16 KiB limit. Enforce actual streamed byte counts as well as Content-Length and reject content encoding. Validate numeric strings before conversion. Map definition JSON strings directly; never deserialize them to JavaScript numbers for editing/export.
+Reviewer read authorization uses F005 stored assignment, including completed tasks, not resolver output/business correlation/command IDs. Admin read access does not override completion assignment. Preserve authorization on replay without prechecking lifecycle/staleness. Project the pinned outcome label/comment requirement server-side from authorized F005 task/instance views and exact F004 canonical document; do not disclose full definitions to reviewers or create another interpreter.
 
-Controllers call separate Spring-managed host facade beans with REQUIRED transactions. Inside the facade: authorize trusted principal, construct context, call core, write audit if changed, return detached response data. Transaction interception commits before the controller can emit 200. Advice handles commit failures outside the facade; do not catch and continue a rollback-only transaction. Capture actual returned tokens, never expected+1. Failed validation is a normal result eligible for commit/audit; infrastructure errors abort.
+Preserve strict UTF-8 streamed limits and untouched raw import/replace JSON. Other envelopes have 16 KiB limits and duplicate/unknown-field rejection. Reject input/result/actor fields. Longs remain strings in browser/HTTP; UUIDs are checked. Distinguish request/family/definition-version/instance tokens. Unknown API paths never receive the Angular shell.
 
-## 4. Host audit migration and fixture wiring (R06–07)
+## 4. Host persistence and migrations (R07, R11, R14)
 
-Append a host migration include after the unchanged core master in `workflow-test-host/src/main/resources/db/changelog/test-host/test-host-master.xml`. Use new resource `changes/001-console-management-audit.xml`, author `workflow-test-host`, with stable logical path. Use two ordered changesets `f006-001-create-wf-test-schema` and `f006-002-create-management-audit`; fail clearly on unexpected pre-existing objects rather than marking them run or deleting data.
+Use the test-host master after the unchanged core include. Revision 1 migrations are only planned at this baseline; if already applied elsewhere, preserve their identities/content and append changesets. Never reset data, rewrite applied checksums or MARK_RAN unexpected objects.
 
-Physical audit contract: schema `wf_test`; table `management_audit`; `id BIGINT IDENTITY(1,1)` primary key; `occurred_at DATETIME2(7) NOT NULL`; `actor_ref NVARCHAR(200) NOT NULL`; `operation VARCHAR(32) NOT NULL`; `entity_kind VARCHAR(32) NOT NULL` (DEFINITION, DEFINITION_VERSION, TASK_TYPE); `entity_id BIGINT NOT NULL` with positive CHECK; `correlation_id UNIQUEIDENTIFIER NOT NULL`; `evidence_json NVARCHAR(MAX) NOT NULL` with ISJSON=1 and DATALENGTH<=524288 CHECK. Actor and context validation use F004 limits. No foreign keys to core or extra runtime tables; identifiers in evidence are retained references.
+Retain `changes/001-console-management-audit.xml`, author `workflow-test-host`, with stable logical path and changesets `f006-001-create-wf-test-schema` / `f006-002-create-management-audit`. Add `changes/002-console-runtime-sandbox.xml` with `f006-003-create-sandbox-request`, `f006-004-create-workflow-event-outbox`, `f006-005-create-workflow-event-inbox`. No core master/F001/F004 edits. Host startup creates infrastructure even with console disabled but inserts no application rows; document this.
 
-Evidence version 1 contains `{schemaVersion:1, operation, before, after}` using the specified transport snapshot encoding. Core summaries already carry lifecycle/revisions/hashes and validation context/outcome; catalog snapshots include all metadata/selectability. Trusted actor/time/correlation are row columns. Bound serialized evidence before insertion; overflow fails the transaction. The table primary key supports ascending pages. List summaries omit evidence_json; exact reads return it as a string. Use JdbcTemplate on the same DataSource/JpaTransactionManager connection, declaring its dependency directly if imported. Verify this transaction participation through AC09; do not introduce a second manager or independently committing connection.
+Physical contracts, all under `wf_test`:
 
-This migration creates host infrastructure on ordinary host startup through its master, even when console endpoints are disabled; it inserts no application/audit rows. Document that scope. No F001/F004 changeset or core master modification is permitted. Preserve core entity/repository scanning; JDBC audit needs no broadened JPA scan.
+| Table | Columns, keys and checks |
+| --- | --- |
+| `management_audit` | id BIGINT IDENTITY PK; occurred_at DATETIME2(7), actor_ref NVARCHAR(200), operation VARCHAR(32), entity_kind VARCHAR(32), entity_id BIGINT>0, correlation_id UNIQUEIDENTIFIER, evidence_json NVARCHAR(MAX), all NOT NULL. Kind DEFINITION/DEFINITION_VERSION/TASK_TYPE. JSON CHECK ISJSON=1 and DATALENGTH<=524288. |
+| `sandbox_request` | id BIGINT IDENTITY PK; name NVARCHAR(200), created_by NVARCHAR(200), created_at DATETIME2(7), lock_version BIGINT>=0 all NOT NULL; instance_id BIGINT nullable, positive when present. Unique filtered index on non-null instance_id. Name/creator/time immutable, instance link write-once. No core FK or edit/delete API. |
+| `workflow_event_outbox` | id BIGINT IDENTITY PK; event_id VARCHAR(40) BIN2 UNIQUE; instance_id BIGINT>0, history_sequence BIGINT>0, command_id UNIQUEIDENTIFIER, event_type VARCHAR(60), occurred_at DATETIME2(7), event_json NVARCHAR(MAX), delivery_count BIGINT>=0 all NOT NULL; delivered_at DATETIME2(7) nullable. Unique(instance_id,history_sequence); JSON CHECK ISJSON=1 and DATALENGTH<=262144. Check pending = null delivered_at/count 0, delivered = timestamp/count>=1. Index(delivered_at,id). |
+| `workflow_event_inbox` | id BIGINT IDENTITY PK; event_id VARCHAR(40) BIN2 UNIQUE, received_at DATETIME2(7), event_json NVARCHAR(MAX), all NOT NULL; JSON CHECK ISJSON=1 and DATALENGTH<=262144. Immutable accepted payload/first-receive time. |
 
-Register the finite sample/none DefinitionCapabilityProvider only with console enabled. Its descriptors certify only the synthetic validation environment, per the explicit exception in the spec. Label them in `/capabilities`, the UI and evidence. Do not implement an execution engine or claim a functioning resolver. Startup-only fail-audit mode throws after a changed core result before insert; enable it only for the manual rollback walkthrough and remove it from the normal launch environment afterward.
+All core references are logical IDs; no APOLO FK/schema cycle. Enforce Unicode/byte bounds before SQL. Outbox JSON is the full versioned F005 event with Long strings, capped at 128 KiB each in UTF-8/UTF-16 bytes. Management evidence schema 1 is `{schemaVersion:1, operation, before, after}`; trusted actor/time/correlation are columns. Omit full definition JSON/credentials. Request creation has immutable creator/time; runtime actions use F005 history, not duplicate management audit.
 
-## 5. Angular pages and packaged delivery (R03–06, R09)
+Host lists use ascending generated ID/limit+1, omitting payloads; exact reads include bounded evidence strings. Apply a 1 MiB UTF-8/UTF-16 response cap with continuation after the last emitted item. Retain rows; no cleanup/reset endpoint. No task result column/table or engine state copies.
 
-Implement definitions, version detail/editor, catalog and audit pages, with shared API/error display and exact-string ID types. Use hash routing below `/console/` to allow direct reloads without a catch-all that swallows API/asset errors. Keep API paths relative to the same origin and encode lookup query values. No client workflow evaluator, implicit save or optimistic successful-state display.
+## 5. Real adapters and command transactions (R06–07, R11–14)
 
-Use a textarea and raw file-to-text import; export via the HTTP response Blob. Display server canonical JSON as text and render diagnostics safely. Track unsaved changes and loaded tokens separately. Disable duplicate actions during requests, update tokens from committed responses and preserve edits on 409. Parse stored diagnostic evidence only for presentation; never rebuild the original workflow document from a parsed object. Treat large snapshot token values as strings throughout.
+Register one capability provider and real SingleTaskAssignmentResolver in enabled sample mode. SANDBOX_REVIEW/COMPLETE descriptors match the actual task page/completion facade. sandbox.singleReviewer verifies the same-transaction request link by allocated instanceId/business reference, then returns taskKey REVIEW assigned to the configured reviewer. No external side effects. none mode removes both descriptors/resolver; recorder remains real. Do not retain the old synthetic provider.
 
-Add an opt-in Maven profile `console-ui` in the test host: run `npm ci` and `npm run build` from frontend, then copy generated Angular browser assets to the host's target classes under `static/console/` before JAR packaging. Pin any new build plugin, use installed documented Node/npm, and fail explicitly on missing tools or frontend build failure. The default Maven build skips Node work; it must not accidentally package stale console assets from a prior profile build. In the profile, recreate only generated console output. Never place generated assets under tracked src/main/resources.
+Management facades retain F002/F004 changed-result audit behavior. Runtime uses a nontransactional HTTP coordinator and a different Spring bean with REQUIRED command transactions. Derive USER actor/time/correlation server-side. Start builds SANDBOX_REQUEST business correlation and the exact host intent in spec. Its callback performs `UPDATE ... SET instance_id=?, lock_version=lock_version+1 WHERE id=? AND instance_id IS NULL AND lock_version=?`; detect overflow/zero rows. Authorize request access before invoking core, but never reject stale/already-linked request state ahead of F005 receipt resolution. No request prelock before F005's definition lock.
 
-Update ignore rules for node_modules, .angular, dist and generated host outputs; keep lockfiles tracked. README commands cover the default backend build, the `-Pconsole-ui` build, required environment/profile settings and host-native JDBC launch. A development Angular server/proxy is optional later work; the required delivery is one packaged host origin with no additional server to operate.
+Complete preserves original instance token and nullable/empty comment. Core owns assignment/lifecycle/history; host owns access/wire mapping. Return only after facade commit. On eligible concurrency failure, including the known sandbox-link conflict, catch outside the transactional proxy after rollback and invoke findReplay once in a fresh read-only transaction. A miss leaves the conflict; a mismatched receipt is COMMAND_ID_CONFLICT. No mutation retry or self-invoked transaction proxy. Translate only the known sandbox-link conflict marker through any core wrapper to 409; other callback failures stay 500.
 
-## 6. Verification procedure (R10)
+Recorder uses MANDATORY participation and inserts the complete immutable batch before acknowledging. Duplicate event IDs from a new recording are errors, not silent upserts; receipt replay never calls it. Failure flags throw after the defined writes; post-result failure applies only to new results. All flags are startup-only, default false, visible and loopback-gated. Independent reads must establish rollback.
 
-After implementation, verify JDK 21 explicitly and use `./mvnw.cmd '-Dmaven.test.skip=true' package` and `./mvnw.cmd '-Dmaven.test.skip=true' -Pconsole-ui package`. Frontend compilation is required; do not generate/run automated tests, npm test, ng test, Maven test or verify. Inspect the produced host assets and core JAR boundary. Build both profiles in succession to check stale-asset handling.
+## 6. Explicit local delivery (R14–15)
 
-For manual acceptance, identify `localhost:1433/apolo_workflow_dev` and the actual configured target before launching. Host startup runs Liquibase. Use only explicitly created development catalog/definition records, record their IDs/keys and retained audit rows, and do not reset/delete unrelated data. Existing SANDBOX_REVIEW must be inspected rather than silently overwritten. This implementation's manual walkthrough intentionally persists data; the documentation-preparation turn does not execute it.
+Dispatcher requests are admin-only, separate REQUIRED host transactions after workflow commit. Select a bounded pending outbox batch ordered by id with transaction-held update locks; exact redelivery takes the same row lock. Serialize competing requests in that order; no automatic deadlock retries or concurrent unchecked inbox insert races.
 
-Execute AC01–AC12 from the spec through the browser and individual HTTP requests as needed. Preserve relevant action/result excerpts with sensitive values omitted. For rollback, compare independent post-request reads under normal mode with before state and audit IDs; a 500 alone is insufficient. Distinguish two-tab stale writes from true parallel races. For initialization, use separate fresh drafts so repeated lifecycle/validation state cannot hide results. For exact numbers, keep raw document/export bytes and expected values without parsing via JavaScript Number.
+For each locked event, insert inbox if absent; if present require exact identical serialized event, then report duplicate without another effect. In the same transaction set the first delivered_at and increment committed delivery_count; retain original inbox timestamp/payload. Failure rolls back inbox and marker together. Counters describe committed deliveries, not all failed attempts. Compare deterministic strings/bytes exactly, not case-insensitive SQL text equality.
 
-Where oversized payloads, credential failure or fail-audit settings require a separate launch, record that configuration and restore normal settings. The null-constraint-name branch remains a separately reported manual reproduction gap if it cannot be exercised without schema corruption or an automated harness. Do not label the finite capability fixture as runtime support or claim that all F004 acceptance is covered.
+Restart retains pending events for manual dispatch. There is no scheduler, network notification or broker. Document that this durable local sink does not prove distributed exactly-once delivery. Redelivery never invokes runtime commands.
 
-Record temporary PID/executable/start time, stop only owned processes after verification unless the user asks to keep the console open, and report their final state. Keep logs/screenshots under ignored target, without credentials. Update implementation.md with per-scenario PASS/FAIL/NOT RUN/BLOCKED, actual toolchains, migrations/checksums, retained data and outstanding gaps. Reconcile navigation and run link/whitespace checks; commit/push only when requested.
+## 7. Angular pages (R03–06, R09, R11–15)
+
+Keep hash routing under /console and same origin. Retain definition/catalog/audit pages, raw textarea/file import/export and diagnostics. Add role-aware navigation, sandbox requests/start, exact instance/task/activity/history/submission views, My tasks, command results/recovery and outbox/inbox pages. All state comes from APIs; no fake seeded/browser execution state.
+
+Start chooses an exact published version and request. Task detail gets the pinned contract and current instance token; form contains outcome/comment only. Distinguish current state from original command snapshots. Catalog disable/retired pinning rules apply to UI selection filters too. Event dispatch/redelivery is explicit.
+
+Keep attempted UUID/payload/original token in memory. A transport failure displays unknown outcome with Find result/Retry; neither silently regenerates UUID nor refreshes the frozen token. Provide envelope copy/download and explicit paste/import into replay-only recovery for full reloads, with no secrets. Clear buffers on logout/account change. New intentional action gets a new UUID; disable duplicate in-flight submission. Refresh current state without replacing the original result display.
+
+Use separate authenticated browser sessions for admin/reviewer; no actor selector. Safely render all text, preserve unsaved edits/errors, and do not store credentials/documents in localStorage. Failed validation, failed execution and unknown transport outcomes have distinct displays.
+
+## 8. Packaging, verification and handover (R09–10)
+
+Use opt-in Maven console-ui profile: npm ci, npm run build, copy generated assets into target/classes/static/console before packaging. Pin plugins/toolchain. Ordinary Maven builds require no Node and must remove stale console assets from prior profile builds. Keep generated files out of tracked src/main/resources; ignore node_modules/.angular/dist. README covers two-account settings, failure flags, native SQL Server launch and manual use.
+
+Add focused backend/frontend unit coverage for exact Long transport conversion, rejected/unknown fields, deterministic host-start fingerprints, authorization decisions using test doubles, command UUID/token preservation after lost responses and sanitized error/replay handling. Select tests that establish behavior rather than mirror implementation; no database, migrations, running host or live HTTP dependency. Mocked transaction/recorder tests cannot establish real commit/rollback/locking guarantees.
+
+Inspect Maven/frontend test discovery before execution, preserving the existing database-backed host context test without running it. Run explicitly selected unit-only suites and record their commands/results; do not assume test naming or skipITs excludes every database test. Embedded databases and Testcontainers remain database integration tests requiring separate authorization. No automatic database scenario harness is selected.
+
+Verify JDK 21; run `./mvnw.cmd '-Dmaven.test.skip=true' package` and `./mvnw.cmd '-Dmaven.test.skip=true' -Pconsole-ui package` for packaging, including successive profile/default builds and JAR inspection. These packaging commands do not replace the separately executed unit suites. Broader test/package/verify or npm/ng test commands are permitted only after confirming their selected suites remain within the authorized unit-only scope.
+
+For implementation's authorized manual verification, identify actual localhost:1433/apolo_workflow_dev target and existing data/checksums. Execute AC01–AC22 with explicitly created development records. Record safe actor refs, definition/request IDs, UUIDs, before/after state/history/receipts/outbox/inbox and final tokens. No passwords, database reset or silent overwrite of existing catalog data. Missing F005 APIs is a dependency gap, not permission to mock execution.
+
+Use independent post-rollback reads for each failure flag; 500 alone proves nothing. Distinguish true overlapping requests from sequential stale rejection. Observe link visibility before resolver, no effects on replay, retired/terminal recovery, pending-event restart and duplicate inbox suppression. Deliver only after workflow commit. Retain and identify development rows and ignored logs.
+
+Map observed scenarios to F005 acceptance only where supported. Null-name provider failures, malformed third-party providers, outer commit failures, larger-graph step boundaries and production broker recovery remain explicit gaps unless separately exercised. Local inbox behavior does not certify other host integrations.
+
+Record temporary process identities, stop only owned processes unless asked to keep them open, and restore normal failure settings. Reconcile four documents/navigation with exact revisions/toolchains/migrations, results and retained data; check links/whitespace. No unrequested commit/push. This redesign itself runs no build, application or database operation.
