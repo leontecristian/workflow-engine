@@ -46,6 +46,7 @@ workflow-engine/
         spec.md
         plan.md
         tasks.md
+        implementation.md
         evidence.md
         schemas/       # when machine-readable contracts are needed
         examples/      # when concrete contract examples are needed
@@ -54,3 +55,5 @@ workflow-engine/
 [F001 — Initial database schema with Liquibase](features/F001-initial-database-schema/spec.md) is IMPLEMENTED with local schema and restart verification recorded in its evidence document. [F002 — Task type catalog management](features/F002-task-type-catalog/spec.md) is IMPLEMENTED at revision 3 with the layer-first structure and concrete TaskTypeCatalogService. Fresh build/proxy/startup/read-only checks passed, separately from retained revision 1/2 evidence; CRUD, concurrency and audit-rollback execution remain NOT RUN. The generic folder above describes the convention. Remaining contracts include Workflow Definition v1 and lifecycle, expression rules for Workflow Definition v1, human-node/host-capability contracts, structured task submissions, JSON execution variables and runtime command integration.
 
 Build and local startup instructions remain in the [project README](../README.md). Current work follows the owner's **no-tests** instruction; see the [verification policy](specification-driven-development.md#verification-and-current-no-tests-policy).
+
+The owner selected [F003 — Core persistence model](features/F003-core-persistence-model/spec.md) as the next implementation feature on 2026-10-31. Its mapping/read foundation is IMPLEMENTED: static review, JDK 21 packaging and local nine-entity/nine-repository schema validation passed. Hydration and lookup/paging behavior remain NOT RUN; see its [evidence](features/F003-core-persistence-model/evidence.md). This is a preparatory step toward the minimal executable workflow, with no new service API or schema change. Proposed F004/F005 continue with minimal definition management and SINGLE execution respectively; their specifications remain future work.

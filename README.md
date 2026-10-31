@@ -13,6 +13,8 @@ At that move, review APOLO's effective root parent, reparent core and align its 
 
 The initial nine-table workflow schema is implemented by [F001](docs/features/F001-initial-database-schema/spec.md). [F002](docs/features/F002-task-type-catalog/spec.md) adds the core task-type catalog service and JPA persistence. Its build, entity/repository discovery and schema-validation startup are verified locally; CRUD, concurrency and audit rollback execution remain NOT RUN. Workflow execution services are not implemented yet.
 
+[F003 — Core persistence model](docs/features/F003-core-persistence-model/spec.md) is IMPLEMENTED at revision 1; see its [evidence](docs/features/F003-core-persistence-model/evidence.md) for static/build/startup results and unperformed behavioral checks. Its [plan](docs/features/F003-core-persistence-model/plan.md) and [tasks](docs/features/F003-core-persistence-model/tasks.md) cover the eight remaining entity mappings, established value types and narrow internal read repositories before definition management and runtime execution. F003 adds eight entity mappings, nine enums, two composite IDs and eight internal read repositories; it introduces no schema change or generic CRUD service.
+
 ## Project constitution and specifications
 
 Start with the [documentation guide](docs/README.md), [project constitution](docs/constitution.md) and [specification-driven development workflow](docs/specification-driven-development.md). They capture the agreed architecture, specification and evidence requirements, current no-tests policy and remaining decisions traced to the [design sources](docs/design-sources.md).
