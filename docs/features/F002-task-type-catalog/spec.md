@@ -14,7 +14,7 @@ Provide a core Java service that lets a trusted host create, find, list and upda
 
 Authority: [database design v1.4, section 8.1](../../architecture/Workflow_Engine_Database_Design_v1.md#81-task-type-catalog), at `apolo-docs` commit `c32ffb07cc9f4f2f3d1d7bf087455c1af13acbc3`; [F001 schema contract](../F001-initial-database-schema/schema-contract.md); [source precedence](../../design-sources.md); CON-01/02/03/04/08/10/12. The operation names, validation rules, pagination and host transaction contract below are selected for F002, not claims of pre-existing APIs.
 
-Initially prepared as documentation only, F002 is implemented through revision 3, including the owner's concrete-service convention and fresh wiring/proxy verification. Historical checks and behavioral gaps remain explicit in [evidence.md](evidence.md). Follow [plan.md](plan.md), [tasks.md](tasks.md) and [verification.md](verification.md).
+Initially prepared as documentation only, F002 is implemented through revision 3, including the owner's concrete-service convention and fresh wiring/proxy verification. Historical checks and behavioral gaps remain explicit in [implementation.md](implementation.md#4-verification). Follow [plan.md](plan.md), [tasks.md](tasks.md) and [verification procedure](plan.md#verification-procedure).
 
 ## Scope and ownership
 
@@ -119,7 +119,7 @@ Translate duplicate/optimistic failures from the explicit flush where possible, 
 | F002-AC10 | Public API has no code update/delete, lifecycle/versioned task-contract fields, entities or provider pagination types. Host guards are documented; no anonymous controller/no-op audit implementation is supplied. | R01/02/05/06 |
 | F002-AC11 | Build with tests skipped and start the local host with JPA validate; existing Liquibase records/checksums remain unchanged and no seeds/catalog mutations occur at startup. | R08 |
 
-These are acceptance scenarios, not authorization to create automated tests. [Verification](verification.md) distinguishes authorized build/startup/read-only inspection from deferred behavioral execution. F002 may be IMPLEMENTED with explicit verification gaps; that does not mean production acceptance.
+These are acceptance scenarios, not authorization to create automated tests. [Verification](plan.md#verification-procedure) distinguishes authorized build/startup/read-only inspection from deferred behavioral execution. F002 may be IMPLEMENTED with explicit verification gaps; that does not mean production acceptance.
 
 ## Deferred integration and assumptions
 

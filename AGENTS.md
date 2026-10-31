@@ -10,8 +10,9 @@ These instructions apply throughout this repository. Follow explicit user instru
 
 ## Specification-driven changes
 
-- Follow the [development workflow](docs/specification-driven-development.md). Substantial features belong in `docs/features/<feature-id>-<name>/`, with `spec.md`, `plan.md`, `tasks.md` and `evidence.md` as the work progresses.
+- Follow the [development workflow](docs/specification-driven-development.md). Substantial features belong in `docs/features/<feature-id>-<name>/`, with exactly four process documents: `spec.md` (required behavior), `plan.md` (intended approach), `tasks.md` (execution) and `implementation.md` (actual results, verification and handover). Keep them proportional; technical artifacts may be added when needed.
 - Specify observable behavior, errors and acceptance scenarios before dependent code or migrations. Reference applicable CON/ASM identifiers; keep schemas, examples, implementation and evidence consistent. Do not invent unresolved API fields, business rules or persistence mappings.
+- Keep planned verification in `plan.md` and actual checks/outcomes/gaps in `implementation.md`; do not require separate evidence or verification files. Link rather than repeat requirements and architecture. Implementation discoveries that change behavior must update the specification and reconcile the plan/tasks before dependent work.
 - Small maintenance changes may use a concise change description instead of a feature document set. Avoid speculative abstractions, extra modules and unrelated refactoring.
 
 ## Architecture and implementation

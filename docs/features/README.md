@@ -2,6 +2,8 @@
 
 This folder contains specifications and delivery records for individual features. Project-wide principles, constraints, assumptions and development guidance live in the parent [docs folder](../README.md).
 
+Substantive features use four process documents. Keep each proportionate to the work; small maintenance changes may use a concise change record. Schemas, examples and focused technical contracts are additional deliverables only when needed. Architecture stays at project level.
+
 Create a feature folder when substantive specification work begins:
 
 ```text
@@ -11,7 +13,6 @@ docs/features/
     plan.md
     tasks.md
     implementation.md
-    evidence.md
     schemas/       # when machine-readable contracts are needed
     examples/      # when concrete contract examples are needed
 ```
@@ -19,8 +20,9 @@ docs/features/
 - `spec.md` defines behavior, requirement IDs, acceptance scenarios and open questions.
 - `plan.md` describes the implementation approach and applicable constitutional checks.
 - `tasks.md` lists bounded work linked to requirements and completion conditions.
-- `implementation.md` records what has actually been built, its decisions and remaining work.
-- `evidence.md` records what was checked, its result and remaining gaps.
+- `implementation.md` records what was built, decisions/deviations, verification results, limitations and remaining work; it is the session handover.
+
+Planned verification belongs in plan.md; actual checks and PASS/FAIL/NOT RUN/BLOCKED results belong in implementation.md. The specification defines behavior; implementation records must not silently override it. Link between files instead of repeating content.
 
 Follow the [specification-driven development workflow](../specification-driven-development.md). Reference the [constitution](../constitution.md), applicable [CON constraints](../constraints.md) and [ASM assumptions](../assumptions.md). Create schemas and examples only as their contracts are specified; do not treat proposed design examples as finalized contracts.
 

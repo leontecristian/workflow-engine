@@ -120,7 +120,7 @@ The tentative preference is to retain the instance, refresh snapshots and create
 
 Prior startup on 2026-10-24 confirmed JDBC access to `apolo_workflow_dev` at `localhost:1433` with Windows NTLM authentication and the native DLL. Liquibase created tracking tables; no workflow changesets existed. The temporary host was subsequently stopped.
 
-**VERIFIED LOCALLY — 2026-10-25, F001:** JDK 21 packaging, Windows-authenticated database access, initial migration and two packaged-host startups succeeded. Complete schema/tracking inspection and unchanged restart metadata are recorded in [F001 evidence](features/F001-initial-database-schema/evidence.md). Both temporary processes were stopped. This revalidates local availability for that run only, not production compatibility or runtime transaction behavior.
+**VERIFIED LOCALLY — 2026-10-25, F001:** JDK 21 packaging, Windows-authenticated database access, initial migration and two packaged-host startups succeeded. Complete schema/tracking inspection and unchanged restart metadata are recorded in [F001 evidence](features/F001-initial-database-schema/implementation.md#4-verification). Both temporary processes were stopped. This revalidates local availability for that run only, not production compatibility or runtime transaction behavior.
 
 Planning assumes the instance, Windows permissions, x64 JDK and matching DLL remain available. That historical check does not prove current availability, schema compatibility, production credentials or transaction behavior. Development-only certificate trust must not be treated as production TLS policy.
 

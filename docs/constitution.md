@@ -161,9 +161,9 @@ The same **2026-10-31** review also selects centrally enforced expression rules 
 
 See [design sources and decision status](design-sources.md) for principle traceability and open items.
 
-Implementation evidence, 2026-10-25: [F001](features/F001-initial-database-schema/evidence.md) implements the initial nine-table schema and records local migration, complete catalog/tracking inspection and same-artifact restart verification with both temporary hosts stopped. This evidence does not amend the principles or establish runtime command guarantees, JPA concurrency behavior or APOLO production compatibility.
+Implementation evidence, 2026-10-25: [F001](features/F001-initial-database-schema/implementation.md#4-verification) implements the initial nine-table schema and records local migration, complete catalog/tracking inspection and same-artifact restart verification with both temporary hosts stopped. This evidence does not amend the principles or establish runtime command guarantees, JPA concurrency behavior or APOLO production compatibility.
 
-Implementation evidence, 2026-10-25: [F002](features/F002-task-type-catalog/evidence.md) adds catalog management contracts and JPA persistence. Local packaging, entity/repository discovery, schema validation and unchanged catalog/migration metadata were verified, and the temporary host was stopped. CRUD, concurrency and host audit rollback remain NOT RUN; concrete host authorization/audit and production compatibility remain integration gates. No principle changes are implied.
+Implementation evidence, 2026-10-25: [F002](features/F002-task-type-catalog/implementation.md#4-verification) adds catalog management contracts and JPA persistence. Local packaging, entity/repository discovery, schema validation and unchanged catalog/migration metadata were verified, and the temporary host was stopped. CRUD, concurrency and host audit rollback remain NOT RUN; concrete host authorization/audit and production compatibility remain integration gates. No principle changes are implied.
 
 F002 revision 2 subsequently aligned the implementation with the agreed layer-first packages. Fresh build, service wiring, entity/repository discovery, schema validation and unchanged migration metadata were observed, with the owned host stopped. Revision 1 evidence remains historical; behavioral execution gaps remain unchanged.
 

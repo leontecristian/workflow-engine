@@ -1,8 +1,24 @@
-﻿# F001 evidence
+# Implementation — F001 Initial database schema
+
+## 1. Implementation Summary
+
+Revision 1 is IMPLEMENTED. T01–T09 delivered the initial nine-table schema; local migration, catalog inspection and same-artifact restart checks passed on 2026-10-25. Runtime workflow behavior is outside this feature.
+
+## 2. Components and Files Changed
+
+Core packages `db/changelog/workflow/changes/001-initial-schema.xml` and includes it once from workflow-master.xml. The two stable changesets create the wf schema and nine tables with the specified keys, constraints and indexes. See [tasks](tasks.md) T01–T03 and the [schema contract](schema-contract.md).
+
+## 3. Technical Decisions and Deviations
+
+SQL Server-scoped native DDL preserves explicit collations, clustered/filtered/covering indexes and null-safe CHECKs inside Liquibase changesets. Host-owned migration execution and JPA validate were retained. No contract deviation was recorded.
+
+## 4. Verification
+
+The dated record below preserves the earlier evidence, including commands, failures, checksums and cleanup. Statements about worktree/commit state describe those historical sessions, not the current documentation migration. These checks were not rerun during consolidation.
 
 Specification: [revision 1](spec.md). Status: **IMPLEMENTED; authorized local schema and restart verification PASS** on 2026-10-25. Changes are uncommitted.
 
-## Baseline and environment
+### Baseline and environment
 
 - Started at workflow-engine commit `f5300f3c5fa980d69629e65f6db6aa12ddf336df`, clean working tree. Earlier documentation preparation used `85fc1b1f892bc622be141e1f2b53faf6d27d20b1`; that work did not implement or verify a migration.
 - Read database design v1.4 at apolo-docs HEAD `c32ffb07cc9f4f2f3d1d7bf087455c1af13acbc3`, matching the pinned baseline. No contract discrepancy required a decision.
@@ -12,7 +28,7 @@ Specification: [revision 1](spec.md). Status: **IMPLEMENTED; authorized local sc
 - Before startup: no wf tables; dbo.DATABASECHANGELOG empty; dbo.DATABASECHANGELOGLOCK row 1 unlocked with null grant/owner. The schema-create changeset subsequently created wf conditionally. No unrelated objects or tracking rows were changed.
 - Local logs, read-only inspection SQL, catalog exports and PID records are under ignored `workflow-test-host/target/f001-verification/`. Generated artifacts are not Git deliverables.
 
-## Static implementation review — PASS (AC01/02/05; T01–T03)
+### Static implementation review — PASS (AC01/02/05; T01–T03)
 
 Core master includes changes/001-initial-schema.xml once. Stable logical path: `db/changelog/workflow/changes/001-initial-schema.xml`. Exactly two ordered identities, author `workflow-engine`: `f001-001-create-wf-schema`, then `f001-002-create-initial-tables`. Both pending changesets have HALT/HALT preconditions for SQL Server and absence of all nine target tables. Conditional schema creation preserves an existing wf schema. No file-level absence check, MARK_RAN, CONTINUE, runAlways or runOnChange.
 
@@ -20,7 +36,7 @@ Reviewed every column and relational rule against the contract before applicatio
 
 Unsupported-database/collision rejection was reviewed statically only, as AC05 requires. Deliberate collisions and unsupported database execution were **NOT RUN**. No tracking entries/checksums were edited or failures bypassed.
 
-## Build — PASS (T04)
+### Build — PASS (T04)
 
 JAVA_HOME explicitly selected installed `C:/Users/crist/.jdks/corretto-21.0.13`. Commands executed from the repository root:
 
@@ -40,7 +56,7 @@ Core JAR contains workflow-master.xml and changes/001-initial-schema.xml at the 
 
 `6FBBBB0124516E8082B531F458A823B680BD9AE11A95333B8E09BEB69BBBD8A5`.
 
-## Local preflight and first startup — PASS (AC01; T05)
+### Local preflight and first startup — PASS (AC01; T05)
 
 Read-only preflight command, exit 0:
 
@@ -60,7 +76,7 @@ First logs: first.out.log / first.err.log; second: second.out.log / second.err.l
 
 First PID **3316**, created 18:22:44 local. Liquibase applied schema (45 ms) then tables (153 ms), reported **Run: 2 / Previously run: 0**, success and lock release. Spring completed startup at **18:22:51.656+02:00**, port 8080. Both startup stderr logs were empty. No migration failure occurred.
 
-## Complete deployed structure — PASS (AC02; T06)
+### Complete deployed structure — PASS (AC02; T06)
 
 Read-only catalog.sql follows the runbook queries and exports columns, index/key columns, FK columns/actions/trust, CHECK definitions/trust, table row counts, triggers, changelog and lock state as one ordered JSON document. Successful commands, exit 0:
 
@@ -75,7 +91,7 @@ Every expected/actual column count matches: definition **7/7**; definition_versi
 
 Reviewed each name, type, byte length, precision/scale, nullability, collation and identity against its dictionary. All six surrogate IDs are BIGINT IDENTITY(1,1). The four lock columns are ordinary non-null BIGINT, without child lock columns. Technical keys, code, expression_policy and references use Latin1_General_100_BIN2; other text inherits Latin1_General_CI_AS. NVARCHAR lengths are doubled in catalog bytes; MAX=-1; DECIMAL=(38,10); timestamp scale=7; hashes=BINARY(32). No discrepancy, missing envelope field or extra column found.
 
-### Keys and index manifest
+#### Keys and index manifest
 
 All **24** deployed indexes are enabled with ascending keys and correct uniqueness/clustering; no duplicate key-supplied indexes. Using full actual names:
 
@@ -91,7 +107,7 @@ All **24** deployed indexes are enabled with ascending keys and correct uniquene
 
 Every UQ is nonclustered. Filter text, key order and included columns were read from sys.indexes/sys.index_columns.
 
-### Foreign-key manifest
+#### Foreign-key manifest
 
 All **ten** are enabled/trusted and NO_ACTION for update/delete; every referenced schema is wf:
 
@@ -108,7 +124,7 @@ All **ten** are enabled/trusted and NO_ACTION for update/delete; every reference
 
 No history/receipt FK cycle or APOLO FK exists. Referenced table names above omit workflow_ for readability.
 
-### CHECK manifest and exclusions
+#### CHECK manifest and exclusions
 
 All **26** CHECKs have is_disabled=0 and is_not_trusted=0. Every actual definition was read and compared semantically with the required-row-check contract:
 
@@ -124,7 +140,7 @@ Braces enumerate actual suffixes, not additional objects. Nullable branches were
 
 All nine tables are empty. Zero defaults, computed columns or triggers. No prohibited task instance/type/result columns, separate result storage, graph/outcome/association tables or task-type versions. SQL syntax checks do not establish codec semantics or duplicate-key rejection.
 
-## Tracking records — PASS (AC03; T07)
+### Tracking records — PASS (AC03; T07)
 
 Tracking schema **dbo**. Exactly one record per identity, author **workflow-engine**, filename **db/changelog/workflow/changes/001-initial-schema.xml**, EXECTYPE **EXECUTED**, Liquibase **4.29.2**, deployment **2945369603**:
 
@@ -133,7 +149,7 @@ Tracking schema **dbo**. Exactly one record per identity, author **workflow-engi
 
 There were no unrelated prior tracking rows. After both starts, lock ID 1: **LOCKED=false, LOCKGRANTED=null, LOCKEDBY=null**.
 
-## Same-artifact restart and cleanup — PASS (AC04/07; T08)
+### Same-artifact restart and cleanup — PASS (AC04/07; T08)
 
 Verified PID 3316 executable, command line and creation time, then Stop-Process -Id 3316. An immediate query briefly saw it during termination; a later query confirmed absence and the second startup bound port 8080 successfully.
 
@@ -147,8 +163,17 @@ This includes all inspected columns, keys/indexes, FKs, CHECKs, row counts, trig
 
 Verified PID 30688 executable, command line and creation time, then Stop-Process -Id 30688. Final Get-Process checks: **3316 absent; 30688 absent**. No unrelated process or SQL Server service was stopped.
 
-## Reconciliation and limits (T09)
+### Reconciliation and limits (T09)
 
 Updated feature status/tasks, implementation plan and project documentation to distinguish schema implementation from later runtime work. Reviewed final diff, documentation links, XML well-formedness, new-file trailing whitespace and git diff --check. Generated evidence/artifacts are ignored; nothing staged or committed.
 
 **No local F001 blocker remains.** AC06 simulated unavailable-database/error path was NOT RUN; no actual migration failure occurred. AC05 was static review as specified. No automated tests, adversarial writes, rollback execution, concurrency/idempotency, authorization, expression safety, workflow execution, task-result retrieval, JSON replacement/retention or workload checks were run. Runtime guarantees and production/APOLO integration remain later feature/integration work.
+
+
+## 5. Known Limitations
+
+Schema/restart evidence does not prove runtime transactions, concurrency/idempotency, authorization, expression safety or APOLO production integration. Unsupported-database/collision rejection had static review only; simulated environmental failures and behavioral execution were NOT RUN.
+
+## 6. Remaining Work
+
+No local F001 implementation blocker remains. Later runtime and integration features own their behavioral and production verification gates.

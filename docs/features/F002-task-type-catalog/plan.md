@@ -1,6 +1,6 @@
 # F002 implementation plan
 
-Applies to [specification revision 3](spec.md). Revisions 1 and 2 implementation/evidence are retained. Revision 3 concrete-service simplification and fresh verification are complete, with separate results in [evidence.md](evidence.md).
+Applies to [specification revision 3](spec.md). Revisions 1 and 2 implementation/evidence are retained. Revision 3 concrete-service simplification and fresh verification are complete, with separate results in [implementation.md](implementation.md#4-verification).
 
 ## Implementation sequence
 
@@ -11,7 +11,7 @@ Applies to [specification revision 3](spec.md). Revisions 1 and 2 implementation
 5. Implement the exact validation, read/query and mutation contracts. Use database-level bounded filtering/order/cursor predicates, immutable copied collections and limit+1 lookahead. Update a loaded managed entity; capture the before snapshot before changes and after snapshot after flush. Compare full mutable values for no-op detection.
 6. Enforce host-owned transactions for mutation, including proxied entry points; reads join an existing transaction or run read-only. Flush inside the mutation boundary to surface ordinary uniqueness/optimistic conflicts and obtain generated/provider values. Translate recognized failures without querying or retrying inside an aborted transaction. Inspect effective provider exception wrapping. Do not catch arbitrary errors and turn them into DUPLICATE_CODE.
 7. Document the host integration pattern in public API documentation and a concise repository usage example: authorize trusted actor, host transaction, core call, durable before/after management audit, host commit, external response. The example may be conceptual and must not invent an existing audit API. No development security bypass, new endpoint, audit table or log-only audit sink.
-8. Follow [verification.md](verification.md), reconcile tasks/evidence and report the actual scope. Build/startup validates wiring/mapping only; leave unexecuted mutation/race/audit scenarios visible.
+8. Follow [verification procedure](plan.md#verification-procedure), reconcile tasks/evidence and report the actual scope. Build/startup validates wiring/mapping only; leave unexecuted mutation/race/audit scenarios visible.
 
 ## Transaction integration shape
 
@@ -42,12 +42,43 @@ This does not supply production host authorization/audit. Failed transaction tra
 | CON-09/11/13/14 | NOT APPLICABLE to implementation: no definition/expression/designer/submission/variable behavior; their existing boundaries remain intact. |
 | CON-12; ASM-08 | PASS: authorized build/startup/read-only inspection recorded in evidence, no automated tests or catalog fixtures; behavioral execution remains NOT RUN. |
 
-## Completion boundaries
+## Completion boundary
 
-Revision 3 implementation: TaskTypeCatalogService is the single supported, non-final Spring service. Interface Javadoc and operation documentation were moved onto it; method bodies and transaction annotations are unchanged. The former interface, JpaTaskTypeCatalog and impl package were removed, with helpers package-private beside the service. Fresh startup observed a CGLIB service proxy and the intended transaction metadata, alongside repository/entity discovery and schema validation. This does not execute CRUD, concurrency or audit rollback.
+The specified catalog API and host preconditions define code completion. Production authorization, audit and compatibility remain host integration gates. Actual implementation decisions, revision history and verification results are recorded in [implementation.md](implementation.md).
 
-Historical revision 2 relocation: all 14 types used the then-current package assignments (the service interface/impl pair is superseded by revision 3), without compatibility facades or duplicate source copies. The entity's creation constructor, replaceMetadata and snapshot methods are public so the separately packaged service can use them; its Javadoc retains the unsupported-integration boundary. The protected JPA constructor and package-private service helpers remain unchanged. No mapping, query, transaction, validation or error-handling behavior changed. WorkflowConfiguration and host scanning remain rooted at the original core marker.
+## Verification procedure
 
-Historical revision 1 implementation (package placement superseded by revision 2): the supported catalog interface/records live in `core.catalog`; the entity, narrow Spring Data read repository and managed implementation live in `core.persistence.catalog`. Mutations use EntityManager.persist/flush and loaded managed entities, with no repository save/merge/delete surface. Hibernate @Nationalized maps the two NVARCHAR fields without host-global configuration; direct Hibernate and Spring Data Commons dependencies use existing parent-managed versions. Translation inspects Jakarta/Spring/Hibernate cause chains and the named code unique constraint, including SQL Server 2627 details. The effective Hibernate 6.6.13.Final exception hierarchy and SQL Server constraint extraction were inspected locally; execution of failure/race paths remains NOT RUN.
+The procedure below is retained from the former verification document. It describes checks, not new execution evidence or authorization beyond the feature/task scope. Actual results are in [implementation.md](implementation.md#4-verification).
 
-Implementing the library API and documenting its host preconditions completes the code scope. Production administrative exposure depends on real authorization and transactional audit adapters, which are outside F002. A successful build/host startup may not be reported as proof of AC01–AC09 behavioral guarantees. Keep pending evidence explicit rather than adding scope to make every scenario appear passed.
+This runbook defines F002 implementation verification. Actual executed checks and remaining behavioral gaps are recorded in [implementation.md](implementation.md#4-verification). Follow [AGENTS.md](../../../AGENTS.md), [README](../../../README.md) and the [no-tests policy](../../specification-driven-development.md#verification-and-current-no-tests-policy).
+
+### Static review
+
+For revision 3, verify the single concrete TaskTypeCatalogService, package-private helpers, removal of the old interface/impl pair, and updated injection/examples. Inspect Spring class-based proxy compatibility and preservation of transaction annotations on the concrete entry points. Startup confirms wiring only; it does not prove transactional rollback or race behavior. Record fresh revision 3 evidence separately from earlier checks.
+
+Compare every public operation with the spec, including input bounds/case preservation, nullable description replacement, disabled-inclusive reads, SQL-bounded cursor queries, immutable snapshots and categorized errors. Inspect required transaction propagation at the proxied public mutation boundary, real @Version mapping, explicit flush and absence of manual version increments or blanket save/merge paths.
+
+Review the unique-insert race path and versioned-update race path independently of advisory checks. Check provider exception translation at the actual flush boundary. A normal successful update path is insufficient evidence that races are handled. Confirm no public rename/delete/upsert, no startup seed runner, no fake history/audit record and no new endpoint.
+
+Inspect the host integration example for trusted authorization, audit in the same transaction and success only after commit. Actual durable audit adapters are outside this feature. Do not report that integration as verified from a pseudocode example.
+
+### Build and local startup
+
+Implementation scope authorizes packaging with tests skipped, one temporary startup of the existing local test host, and read-only SQL/catalog inspection. It does not authorize automated tests or mutating catalog fixtures. Catalog rows are permanently retained; verification must not create throwaway codes in the shared development database.
+
+1. Confirm the effective target is `localhost:1433/apolo_workflow_dev`, Windows authentication, as in F001. Check overrides without exposing credentials. An unavailable database blocks runtime checks, not independent implementation.
+2. Capture the existing `wf.workflow_task_type` column/constraint metadata, row count and actual `DATABASECHANGELOG` identities/checksums/lock state using the read-only queries in the [F001 runbook](../F001-initial-database-schema/plan.md#verification-procedure). Check a pre-existing F001 installation. Do not alter tracking records; if the baseline schema has not been applied, report the prerequisite rather than silently reset/apply a different database.
+3. Select JDK 21 and record Java/Maven versions. From the repository root run `./mvnw.cmd '-Dmaven.test.skip=true' package`. Inspect actual artifact paths from current POMs. Do not run `test`, `verify` or unqualified `package`.
+4. Start the packaged host using the existing README native-authentication command. Use hidden Start-Process with captured PID/command identity and separate stdout/stderr under ignored `workflow-test-host/target/f002-verification/`. Confirm completed startup, real catalog entity/repository discovery and Hibernate schema validation; do not disable validation to fix a mapping error.
+5. Inspect the existing catalog and Liquibase metadata again. F002 requires no new changesets; verify F001 identities/checksums are unchanged, the lock is released and startup added no catalog rows. Do not assume an unchanged row count establishes functional CRUD behavior.
+6. Stop only the process started for this verification, after checking its identity, including on failure. Record final process state and any blockers.
+
+No new script, permanent verification endpoint or startup runner is needed just to perform these checks. Generated logs/build files stay out of Git. Run `git diff --check` and inspect new files too; no commit unless the owner requests it.
+
+### Behavioral evidence still required
+
+Record AC01–AC09 as NOT RUN unless actually observed under separately authorized behavioral verification. Static inspection can support their implementation review, but cannot establish persistence results, commit/rollback, concurrency races or host security/audit behavior.
+
+Before production administration is exposed, arrange concrete host authorization/audit wiring and appropriate execution evidence for create/update/read/filter behavior, duplicate-code races, stale updates, no-op semantics and rollback when audit fails. Use a deliberate isolated environment for fixture-based verification; do not silently expand this task into automated tests or write disposable records to the shared retained catalog. The chosen future verification method must respect the owner's then-current policy.
+
+F002 checks the primitive needed by later publication/execution: nonselectable types remain addressable. Actual execution of a published workflow using such a type is deferred until the execution feature exists. Do not fabricate a passing workflow-execution result here.

@@ -1,16 +1,32 @@
-# F002 evidence
+# Implementation — F002 Task type catalog management
+
+## 1. Implementation Summary
+
+Revision 3 is IMPLEMENTED. T01–T13 delivered catalog management, layer-first packages and the concrete TaskTypeCatalogService. Fresh revision 3 packaging, proxy/startup and read-only metadata checks passed on 2026-10-25; AC01–AC09 behavioral execution remains NOT RUN.
+
+## 2. Components and Files Changed
+
+TaskTypeCatalogService and private helpers reside in service.tasktype; commands/views in dto.tasktype; persistence in entity.tasktype and repository.tasktype; errors in exception.tasktype. See [tasks](tasks.md) and the [package assignments](../../package-structure.md#exact-f002-assignments). No schema or host infrastructure change was made.
+
+## 3. Technical Decisions and Deviations
+
+Revision 2 relocated the existing code to technical layers. Revision 3 replaced the service interface/implementation pair with one concrete service while preserving operation and transaction behavior. Historical verification for each revision remains distinct below.
+
+## 4. Verification
+
+The dated record below preserves the earlier evidence, including commands, failures, checksums and cleanup. Statements about worktree/commit state describe those historical sessions, not the current documentation migration. These checks were not rerun during consolidation.
 
 Historical scope: specification revision 1. Status: **revision 1 IMPLEMENTED; authorized build/startup/read-only verification PASS** on 2026-10-25. **AC01–AC09 behavioral execution NOT RUN.** Changes are uncommitted. Revision 2 relocation and its fresh verification are recorded separately below. The [current specification](spec.md) is revision 3; its completed concrete-service simplification and fresh verification are appended separately below.
 
-## Revision 3 convention preparation — historical documentation-only step
+### Revision 3 convention preparation — historical documentation-only step
 
 The owner selected concrete services by default, with interfaces reserved for actual integration/substitution requirements. The package guide, coding standards, agent instructions and F002 contract now specify TaskTypeCatalogService directly, without the former interface/impl pair. T12/T13 track implementation and fresh verification. This update changes documentation only; Java sources and earlier evidence are preserved. No build, application startup or database checks were run for this update.
 
-## Revision 2 convention preparation — historical documentation-only step
+### Revision 2 convention preparation — historical documentation-only step
 
 The owner selected technical layers first, with features underneath and `dto` terminology. The [package guide](../../package-structure.md) and revised spec/plan define exact assignments; T10/T11 track relocation and verification. No Java files were moved or modified for this documentation update, and no build, application or database check was run. Earlier evidence below applies to the original package layout.
 
-## Baseline and environment
+### Baseline and environment
 
 - Implementation began at workflow-engine commit `cbea3a40d5c9d0cc728b02f6ab0b09eedbe58ba5` with a clean working tree. F001 prerequisite commit remains `4a7bf64c632b6e07216a5b285265f5ab5a0387ec`. Earlier F002 preparation was documentation only; its historical no-execution statements do not describe this implementation run.
 - Read the pinned database design v1.4 section 8.1 at apolo-docs HEAD `c32ffb07cc9f4f2f3d1d7bf087455c1af13acbc3`, F001/F002 contracts and repository guidance. No material discrepancy was found.
@@ -18,7 +34,7 @@ The owner selected technical layers first, with features underneath and `dto` te
 - Target: localhost:1433/apolo_workflow_dev, Windows integrated authentication. WORKFLOW_TEST_DB_URL, SPRING_DATASOURCE_URL, Spring config/profile overrides, JAVA_TOOL_OPTIONS and JDK_JAVA_OPTIONS were absent. Host configuration remains unchanged, including JPA ddl-auto=validate and the single datasource/migration runner.
 - SQL Server Express 16.0.1000.6, compatibility 160, Latin1_General_CI_AS; confirmed read-only with sqlcmd. Detailed logs/catalog exports and provider inspection output are under ignored workflow-test-host/target/f002-verification/.
 
-## Static implementation review — PASS (T01–T06; R01–R07)
+### Static implementation review — PASS (T01–T06; R01–R07)
 
 Supported API: TaskTypeCatalog in core.catalog plus immutable create/update/query/view/change/page records, filter enum and categorized exception. Persistence lives in core.persistence.catalog. No supported API exposes entities, repositories, Pageable/Page or provider objects. Page items are copied, snapshots contain immutable values, create has Optional.empty before, and no-op returns equal snapshots.
 
@@ -36,7 +52,7 @@ Inspected the installed Hibernate 6.6.13.Final classes with javap: StaleStateExc
 
 AC10 static surface/ownership review: **PASS**. No rename/delete/upsert/business versions, endpoints, seeds, task/definition execution, fake audit/security adapter, runtime history/receipt use or migration change. Host authorization and durable audit adapters remain outside this library feature.
 
-## Build and artifacts — PASS (T07; AC11 wiring scope)
+### Build and artifacts — PASS (T07; AC11 wiring scope)
 
 Selected JAVA_HOME as installed C:/Users/crist/.jdks/corretto-21.0.13. Commands from repository root:
 
@@ -54,7 +70,7 @@ Core JAR includes the catalog API/implementation/entity/repository and unchanged
 
 `D124DA9C9C0009597C5867431C0C505B81F76845B4FABD5A07C8BC39BD578F31`.
 
-## Authorized startup — PASS (T08; AC11)
+### Authorized startup — PASS (T08; AC11)
 
 Before startup, read-only catalog inspection confirmed the existing six columns, identity, nullability, types/collations, clustered PK and unique code constraint/index; catalog row count **0**. All F001 bookkeeping matched its evidence. No prerequisite repair or new migration was needed.
 
@@ -68,7 +84,7 @@ PID **15092**, created **19:08:35** local. Logs record **1 JPA repository interf
 
 Liquibase: **database up to date, Run: 0 / Previously run: 2**. No catalog API was invoked to create/update data. No fixture/throwaway records, automated tests or new startup runner were used.
 
-## Read-only database and tracking comparison — PASS (T08; AC11)
+### Read-only database and tracking comparison — PASS (T08; AC11)
 
 Reused the local ignored F001 catalog.sql inspection from its runbook, exporting ordered full-width JSON of columns, indexes/keys, FK/CHECK definitions/trust, row counts, triggers, tracking records and lock. Exact commands, both exit 0:
 
@@ -96,13 +112,13 @@ Environment version probe, exit 0:
 sqlcmd -S tcp:localhost,1433 -d apolo_workflow_dev -E -C -l 5 -t 15 -b -h -1 -W -Q "SET NOCOUNT ON; SELECT DB_NAME() AS database_name, CAST(SERVERPROPERTY('ProductVersion') AS varchar(40)) AS server_version, CAST(SERVERPROPERTY('Edition') AS varchar(80)) AS edition; SELECT compatibility_level,collation_name FROM sys.databases WHERE name=DB_NAME();"
 ```
 
-## Cleanup and reconciliation — PASS (T08–T09)
+### Cleanup and reconciliation — PASS (T08–T09)
 
 Before Stop-Process -Id 15092, Get-CimInstance Win32_Process confirmed the exact selected Java executable, packaged-host command line and creation timestamp. Wait-Process followed; a subsequent Get-Process check confirmed **PID 15092 absent**. No unrelated process or SQL Server service was stopped.
 
 Updated feature status/tasks, plan/runbook, README usage and project status records. Reviewed code, new files, local documentation links, POM/XML and whitespace; git diff --check passed. Generated logs/artifacts are ignored, no files staged or committed. F001 resources and test-host sources/configuration are unchanged.
 
-## Behavioral execution — NOT RUN
+### Behavioral execution — NOT RUN
 
 - **AC01:** create, host audit/commit and persisted exact reads.
 - **AC02:** live invalid/boundary input execution.
@@ -116,15 +132,15 @@ Updated feature status/tasks, plan/runbook, README usage and project status reco
 
 Implementation paths were reviewed statically; build/startup/read-only inspection does not execute these behaviors. No environmental blocker remains for the authorized verification. Production administration still requires concrete host authorization/durable same-transaction audit, appropriate isolated behavioral evidence, production dependency alignment and future publication/capability checks. Published-workflow execution with nonselectable types is deferred until workflow execution exists.
 
-## Revision 2 relocation and fresh verification — PASS (T10/T11)
+### Revision 2 relocation and fresh verification — PASS (T10/T11)
 
 Executed on **2026-10-25** after the owner authorized package alignment. This section is fresh evidence for revision 2; the revision 1 results and documentation-preparation history above remain historical.
 
-### Baseline and preservation
+#### Baseline and preservation
 
 HEAD remained `cbea3a40d5c9d0cc728b02f6ab0b09eedbe58ba5`. The worktree already contained the uncommitted revision 1 implementation, POM and documentation changes, revision 2 guidance, and a staged new docs/package-structure.md. Those changes were preserved; no index changes, reset or commit were made. Baseline source copies, process records, logs and metadata exports for this run are under ignored `workflow-test-host/target/f002-revision2-verification/`.
 
-### Relocation review
+#### Relocation review
 
 Moved all **14** existing source files using the exact package-guide assignments:
 
@@ -141,7 +157,7 @@ Source-body comparison against the saved pre-relocation files found every body u
 
 The obsolete source files no longer exist at their original paths. Removed only their **15 generated class files** (including the nested exception category) from the two obsolete package directories under workflow-core/target/classes, after checking absolute paths stayed within that generated target. This prevented stale bytecode from producing duplicate beans/entities in the new artifact; historical logs and other generated evidence were preserved. JAR inspection found exactly the relocated classes and **zero obsolete-package class entries**.
 
-### Build
+#### Build
 
 Toolchain: Windows 11 amd64, Corretto **21.0.13+10-LTS**, Maven wrapper selecting **3.10.0**, compiler release **17**. Dependencies remain the revision 1 baseline: Boot 3.4.5, Hibernate 6.6.13.Final, Liquibase 4.29.2, JDBC/native authentication 12.8.1. No POM change was needed for relocation.
 
@@ -161,7 +177,7 @@ Packaged host SHA-256:
 
 `507A8E742356357586945210F40311BFE6B6D8B00570A89F35153846F196CEE7`.
 
-### Fresh startup and wiring
+#### Fresh startup and wiring
 
 Confirmed no WORKFLOW_TEST_DB_URL, SPRING_DATASOURCE_URL, Spring config/profile or Java option overrides. Existing host target remained **localhost:1433/apolo_workflow_dev**, Windows native authentication, JPA **ddl-auto=validate**. No host configuration was changed.
 
@@ -173,7 +189,7 @@ Started only PID **23164**, created **19:23:32** local, using selected JDK bin/j
 
 Logs confirmed **1 JPA repository interface**, mapped **core.entity.tasktype.TaskTypeEntity** to workflow_task_type, completed EntityManagerFactory initialization with validation enabled, and explicitly autowired **jpaTaskTypeCatalog** to **taskTypeRepository** and **jpaSharedEM_AWC_entityManagerFactory**. Startup completed at **19:23:43.198+02:00** in **9.693 seconds**, port 8080. Stderr was empty. This is new revision 2 discovery/wiring/validation evidence, not reliance on the earlier run.
 
-### Read-only database comparison
+#### Read-only database comparison
 
 Before/after commands reused the existing ignored F001 catalog inspection SQL; both exited 0:
 
@@ -191,7 +207,7 @@ Exactly one dbo.DATABASECHANGELOG row per existing identity, author **workflow-e
 
 Lock ID 1 before/after: **LOCKED=false, LOCKGRANTED=null, LOCKEDBY=null**. Applied migrations and database objects were not changed.
 
-### Cleanup, handoff and gaps
+#### Cleanup, handoff and gaps
 
 Verified PID 23164's Java executable, exact packaged-host command and creation time using Get-CimInstance before Stop-Process -Id 23164 and Wait-Process. A later Get-Process query confirmed **PID 23164 absent**. No unrelated process or SQL Server service was stopped.
 
@@ -199,11 +215,11 @@ T10/T11 are complete; current feature/index/usage documentation was reconciled. 
 
 **No revision 2 verification blocker remains.** AC01–AC09 CRUD, boundary, paging, no-op, race and audit/transaction rollback execution remain **NOT RUN**. Production authorization/durable host audit and compatibility gates remain as recorded for revision 1. Relocation/startup evidence does not establish behavioral or production acceptance.
 
-## Revision 3 concrete service and fresh verification — PASS (T12/T13)
+### Revision 3 concrete service and fresh verification — PASS (T12/T13)
 
 Executed **2026-10-25** after the owner supplied the updated concrete-service convention during revision 2 handoff. This section adds fresh revision 3 evidence; historical revision 1/2 results and convention-preparation records remain intact. All work remains uncommitted, including the preserved pre-existing staged package guide and other user changes.
 
-### Implementation and static review
+#### Implementation and static review
 
 Consolidated the former TaskTypeCatalog interface and JpaTaskTypeCatalog into **core.service.tasktype.TaskTypeCatalogService**. Moved the complete public class/operation contract Javadoc onto the concrete service. Moved TaskTypeValidation and TaskTypePersistenceErrors beside it as package-private helpers. Removed the obsolete source interface and impl package; no compatibility facade or second implementation remains. DTO, exception, entity and repository assignments are unchanged.
 
@@ -211,7 +227,7 @@ Compared the prior implementation/helpers with the new sources, ignoring package
 
 Updated README usage to inject the concrete service and retained the host authorization, audit, commit and provisional-result requirements. No service interface/substitution abstraction was retained merely for injection. Removed the four obsolete generated service/interface/helper class files from verified paths within workflow-core/target/classes before packaging, so old bytecode could not leave duplicate beans. New JAR inspection found only TaskTypeCatalogService and its two helpers under service.tasktype, and zero old-interface/JpaTaskTypeCatalog/impl class entries.
 
-### Build — PASS
+#### Build — PASS
 
 Explicitly selected installed Corretto **JDK 21.0.13+10-LTS**, Maven wrapper selecting **3.10.0**, compiler release **17**, existing dependency versions unchanged. Commands:
 
@@ -229,7 +245,7 @@ Package exit **0**, **BUILD SUCCESS** at **19:28:18+02:00**, total **9.095 secon
 
 Logs/source snapshots/metadata are under ignored `workflow-test-host/target/f002-revision3-verification/`, separately from prior runs.
 
-### Fresh proxy/wiring/startup — PASS
+#### Fresh proxy/wiring/startup — PASS
 
 The existing Windows-authenticated target remained **localhost:1433/apolo_workflow_dev**, JPA **ddl-auto=validate**, with no datasource, transaction manager, migration or host configuration changes. Started PID **5132**, created **19:28:43** local, with selected JDK java.exe, hidden Start-Process, explicit repository working directory, PassThru and separate host.out.log/host.err.log under the revision 3 evidence directory. Exact arguments:
 
@@ -247,7 +263,7 @@ Fresh logs confirmed:
 
 These observations establish proxy construction and recognized transaction metadata, not execution of missing-transaction rejection, writes, concurrency or rollback.
 
-### Read-only metadata — PASS
+#### Read-only metadata — PASS
 
 Fresh before/after inspections both exited 0:
 
@@ -265,10 +281,19 @@ Existing dbo.DATABASECHANGELOG identities remain once each, author **workflow-en
 
 Lock ID 1 before/after: **LOCKED=false, LOCKGRANTED=null, LOCKEDBY=null**. No database object or applied migration was changed.
 
-### Cleanup and completion
+#### Cleanup and completion
 
 Verified PID 5132 executable, full command line and creation time before Stop-Process -Id 5132 and Wait-Process. Final Get-Process observation: **PID 5132 absent**; revision 2 PID 23164 remains absent. No unrelated process or SQL Server service was stopped.
 
 T12/T13 completed; revision 3 status, package guide, plan, README and indexes were reconciled. Source/new-file, local-link and whitespace inspection passed, including git diff --check. Index state remains as supplied; no staging or commit was performed. Generated artifacts/logs remain ignored.
 
 **No revision 3 blocker remains.** AC01–AC09 functional CRUD, input boundaries, paging, no-op, concurrent duplicate/stale updates and audit/transaction rollback remain **NOT RUN**. Production host authorization/durable audit and compatibility gates remain open. Successful proxy creation and startup do not establish those behaviors.
+
+
+## 5. Known Limitations
+
+Successful wiring and transaction metadata do not prove CRUD, paging, concurrent duplicate/stale updates, no-op handling or host audit rollback. Production authorization/durable audit and compatibility remain integration gates.
+
+## 6. Remaining Work
+
+No revision 3 code blocker is recorded. Execute outstanding behavioral acceptance only within a future authorized scope; integrate production host authorization/audit and compatibility before exposure.

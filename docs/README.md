@@ -16,7 +16,7 @@ The constitution is version **3.0.0**, established on **2026-10-24** and last am
 
 ## Document responsibilities
 
-The constitution defines constraints that all feature specifications must respect. The [consolidated design](architecture/workflow-engine-design.md) remains the detailed architectural baseline, with scoped superseding decisions from [database design v1.4](architecture/Workflow_Engine_Database_Design_v1.md) documented in [design sources](design-sources.md). Active engine designs live in `docs/architecture/`, including the proposed [workflow definition language](architecture/workflow-definition-language-design.md). Feature specifications will define exact behavior within those constraints. Plans describe implementation choices; tasks identify bounded changes; evidence records what was actually checked.
+The constitution defines constraints that all feature specifications must respect. The [consolidated design](architecture/workflow-engine-design.md) remains the detailed architectural baseline, with scoped superseding decisions from [database design v1.4](architecture/Workflow_Engine_Database_Design_v1.md) documented in [design sources](design-sources.md). Active engine designs live in `docs/architecture/`, including the proposed [workflow definition language](architecture/workflow-definition-language-design.md). Feature specifications will define exact behavior within those constraints. Plans describe the intended approach; tasks track execution; implementation records what was built and actually checked.
 
 The constraints register makes confirmed boundaries easy to reference. The assumptions register identifies expectations that need verification and keeps provisional business choices distinct from mandatory guarantees. Both derive from the existing design; they do not finalize its open contracts or change the constitution version.
 
@@ -47,7 +47,6 @@ workflow-engine/
         plan.md
         tasks.md
         implementation.md
-        evidence.md
         schemas/       # when machine-readable contracts are needed
         examples/      # when concrete contract examples are needed
 ```
@@ -56,4 +55,4 @@ workflow-engine/
 
 Build and local startup instructions remain in the [project README](../README.md). Current work follows the owner's **no-tests** instruction; see the [verification policy](specification-driven-development.md#verification-and-current-no-tests-policy).
 
-The owner selected [F003 — Core persistence model](features/F003-core-persistence-model/spec.md) as the next implementation feature on 2026-10-31. Its mapping/read foundation is IMPLEMENTED: static review, JDK 21 packaging and local nine-entity/nine-repository schema validation passed. Hydration and lookup/paging behavior remain NOT RUN; see its [evidence](features/F003-core-persistence-model/evidence.md). This is a preparatory step toward the minimal executable workflow, with no new service API or schema change. Proposed F004/F005 continue with minimal definition management and SINGLE execution respectively; their specifications remain future work.
+The owner selected [F003 — Core persistence model](features/F003-core-persistence-model/spec.md) as the next implementation feature on 2026-10-31. Its mapping/read foundation is IMPLEMENTED: static review, JDK 21 packaging and local nine-entity/nine-repository schema validation passed. Hydration and lookup/paging behavior remain NOT RUN; see its [evidence](features/F003-core-persistence-model/implementation.md#4-verification). This is a preparatory step toward the minimal executable workflow, with no new service API or schema change. Proposed F004/F005 continue with minimal definition management and SINGLE execution respectively; their specifications remain future work.

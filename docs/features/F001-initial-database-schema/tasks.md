@@ -1,6 +1,6 @@
 # F001 implementation tasks
 
-All implementation tasks completed on 2026-10-25; local verification passed within the specified schema-only scope. Follow [specification revision 1](spec.md) and record results in [evidence.md](evidence.md).
+All implementation tasks completed on 2026-10-25; local verification passed within the specified schema-only scope. Follow [specification revision 1](spec.md) and record results in [implementation.md](implementation.md#4-verification).
 
 - [x] **T01 — Confirm baseline and environment (R01–R07, R12).** Inspect Git state/instructions, source revision, masters, POMs and configuration. Compare current implementation with the schema contract. Record selected SQL Server/JDK/Liquibase versions and local target; do not overwrite unrelated work. Completion: prerequisites and any material discrepancy recorded. No dependency.
 - [x] **T02 — Author initial migration (R01–R06).** Add the single XML file, two stable changeset identities, pending-changeset collision preconditions, SQL Server compatibility check, conditional schema creation and the nine complete tables/constraints/indexes. Completion: static comparison against every contract entry, including the section 6 envelope, is documented. Depends on T01.

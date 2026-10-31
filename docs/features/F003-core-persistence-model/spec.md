@@ -1,6 +1,6 @@
 # F003 — Core persistence model
 
-**Status:** IMPLEMENTED revision 1. Static mapping review, JDK 21 packaging and local discovery/schema validation passed on 2026-10-31. Hydration, lookup/paging execution and runtime guarantees remain unverified; see [evidence](evidence.md).
+**Status:** IMPLEMENTED revision 1. Static mapping review, JDK 21 packaging and local discovery/schema validation passed on 2026-10-31. Hydration, lookup/paging execution and runtime guarantees remain unverified; see [evidence](implementation.md#4-verification).
 
 **Revision:** 1 — 2026-10-31. **Owner:** Workflow project owner. **Constitution:** [v3.0.0](../../constitution.md).
 
@@ -41,7 +41,7 @@ Excluded: entity creation/update APIs, application services, public read APIs, c
 - **F003-R07 — Legacy expression-policy storage.** Retain and map the existing required `expression_policy` column as `legacyExpressionPolicy`, read-only (`insertable=false`, `updatable=false`). It is an internal storage artifact, not a selectable policy or a field in workflow JSON. No default/sentinel or derivation algorithm is introduced. Definition insertion is unsupported by F003 and must wait for a separately specified forward migration or write-compatible transition in the definition-management feature.
 - **F003-R08 — Host and feature boundaries.** Keep the two modules, root scanning marker, existing transaction infrastructure and JPA schema validation. Internal repository reads may join an existing transaction or use a read-only transaction; no independent write transaction is added. F003 grants no authorization or receipt-replay capability. Preserve F002 behavior and its supported boundary.
 - **F003-R09 — No schema mutation.** Preserve F001 resources, changeset identities, CHECKs, indexes, collations and NO ACTION FKs. Add no migration, seed data, extra columns/tables or schema-generation fallback. If the current database differs from F001, report the discrepancy; do not repair it by modifying the applied changelog.
-- **F003-R10 — Honest verification and handoff.** Follow [verification.md](verification.md), the current no-tests policy and the later session's execution scope. Record implementation, build/static checks and any permitted startup/read-only inspection separately. Unperformed round-trip, concurrency and runtime behavior remain NOT RUN. Keep tasks, implementation and evidence records current.
+- **F003-R10 — Honest verification and handoff.** Follow [verification procedure](plan.md#verification-procedure), the current no-tests policy and the later session's execution scope. Record implementation, build/static checks and any permitted startup/read-only inspection separately. Unperformed round-trip, concurrency and runtime behavior remain NOT RUN. Keep tasks, implementation and evidence records current.
 
 ## Internal read and failure contract
 
@@ -64,7 +64,7 @@ History and receipts are read-only through this feature. Their intended append-o
 - **F003-AC09 (R02, R03, R09):** Review confirms that history ownership FKs, completion indexes and variable checks remain in the database and extensible category strings are not narrowed into speculative enums. Unknown closed-set values fail hydration instead of falling back.
 - **F003-AC10 (R10):** The later agent records the actual revision, files, checks, failures and remaining gaps, stops any verification process it started and separates mapping completion from runtime or production readiness.
 
-These are required properties, not permission to add/run automated tests or create database fixtures. [Evidence](evidence.md) distinguishes static coverage from execution of each scenario.
+These are required properties, not permission to add/run automated tests or create database fixtures. [Evidence](implementation.md#4-verification) distinguishes static coverage from execution of each scenario.
 
 ## Decisions and verification gates
 

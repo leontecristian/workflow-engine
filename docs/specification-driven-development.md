@@ -1,114 +1,94 @@
 # Specification-driven development
 
-This workflow operationalizes [constitution v3.0.0](constitution.md). It is a repository convention; it does not require installing a specification framework or code generator.
+This workflow operationalizes [constitution v3.0.0](constitution.md). Its purpose is to make behavior clear before implementation and leave a useful handover afterward. Keep documentation proportional to the change; the four files below are responsibilities, not a requirement for four lengthy reports.
+
+## Four-document standard and authority
+
+Substantive features use `docs/features/<feature-id>-<name>/`:
+
+- **`spec.md` — what and why.** Defines required behavior, scope and acceptance criteria.
+- **`plan.md` — how.** Defines the intended technical approach.
+- **`tasks.md` — execution.** Tracks ordered work and completion.
+- **`implementation.md` — actual results.** Records what exists, deviations, verification and remaining work; it is the handover for the next session.
+
+The specification governs behavior. A plan is an intention, a checked task records completion of its stated condition, and an implementation record describes observed reality. If implementation discovers a requirement change, update the specification and reconcile the plan and tasks before dependent work. Recording a deviation in implementation.md does not approve a new requirement.
+
+Do not repeat requirements, architecture or status narratives across files. Plans reference requirement IDs; tasks reference the relevant plan steps and requirements; implementation records reference completed tasks and acceptance scenarios. Keep execution status in tasks.md and actual verification results in implementation.md.
+
+Small fixes, simple repository changes and maintenance may use a concise change description with relevant verification instead of a new feature folder. Within a substantive feature, omit irrelevant sections and keep unchanged material linked. Add detail only where complexity, risk or handover needs justify it.
 
 ## 1. Specify the behavior
 
-Start a feature under `docs/features/<feature-id>-<name>/` when substantive work on that feature begins. Keep project-wide guidance directly in `docs/`. Give the feature a stable identifier and keep specification changes reviewable in Git. See the [feature guide](features/README.md).
+In spec.md, identify the feature, revision/date, status, owner and applicable constitution version. Describe the problem and intended outcome, scope, requirements, observable behavior and acceptance scenarios. Include business rules, inputs/results, errors, constraints and unresolved decisions where relevant.
 
-The `spec.md` should contain:
+Use stable requirement/scenario IDs for substantial behavior. Reference applicable [CON constraints](constraints.md), [ASM assumptions](assumptions.md) and [design sources](design-sources.md). Keep AGREED, PROPOSED, PROVISIONAL, OPEN and DEFERRED distinct; examples are not automatically contracts. An acceptance scenario describes a required property and does not authorize an automated test.
 
-- Feature identifier, status, owner, revision/date and constitution version.
-- Problem, actors, intended outcome and source-design references.
-- In-scope behavior and explicit exclusions.
-- Numbered requirements, such as `<feature-id>-R01`, written in observable terms.
-- Contracts: accepted inputs, outputs, lifecycle rules, failure behavior, authorization and compatibility.
-- Data ownership, transaction boundary, concurrency/idempotency and event implications where applicable.
-- Numbered acceptance scenarios linked to requirements, covering success, rejection, boundaries and failure paths.
-- Open questions with status, owner and the point at which each must be resolved.
+Resolve material ambiguity before dependent implementation while continuing independent work. Choose routine engineering details within the agreed contract. Readiness requires clear affected contracts and acceptance criteria, not resolution of unrelated APOLO policies or later designer decisions.
 
-Reference applicable CON identifiers from [constraints](constraints.md) and ASM identifiers from [assumptions](assumptions.md). Record new feature-specific assumptions with their owner, verification point and impact if false; do not treat them as confirmed requirements.
+Feature-document statuses remain DRAFT, READY, IMPLEMENTED and SUPERSEDED. IMPLEMENTED means the specified code is present; it does not imply every behavior has been verified or that production acceptance is complete.
 
-Use Given/When/Then where it makes a scenario precise. An acceptance scenario describes required behavior; writing it does not authorize creating or running an automated test.
+## 2. Plan the implementation
 
-For definition languages or imports, add versioned schemas and representative valid/invalid examples. Mark examples normative only after the corresponding contract is settled. Future executable examples must obey the current execution policy.
+In plan.md, reference the specification revision and explain the technical approach, affected modules/packages, consequential decisions and any migrations. Include relevant integration boundaries, failure handling, compatibility and a concise verification procedure. Put intended checks here; actual commands, outcomes and gaps belong in implementation.md.
 
-## 2. Resolve material uncertainty
+Review only applicable constitutional concerns and record material findings or open gates. In particular, preserve core/host ownership, the shared transaction and migration boundary, version pinning and catalog compatibility, aggregate concurrency/idempotency, authorization/history/durable handoff, exact data and expression semantics, and platform compatibility. Refer to project guidance rather than copying the full architecture checklist into every feature. Follow the [package conventions](package-structure.md) and [coding standards](coding-standards.md).
 
-Distinguish a missing implementation choice from an undecided business or public contract. Choose ordinary implementation details within the agreed constraints. Escalate decisions that would change scope, ownership, observable semantics or compatibility.
+Resolve a conflict through a compliant design or the constitution's amendment process before dependent implementation. No additional approval ceremony is needed for ordinary choices within an agreed contract.
 
-Do not guess a value for an OPEN field just to complete code. Record an assumption as proposed until the relevant owner resolves it. Continue independent work where that uncertainty has no effect.
+## 3. Track execution
 
-A specification is ready for implementation when the affected behavior, contracts and acceptance criteria are clear; dependent open questions are resolved; and the constitution check is satisfied. Readiness does not require settling unrelated APOLO policies or later designer questions.
+Use tasks.md for ordered, actionable work. Each task states its dependencies, affected components and completion condition, with links or IDs to the relevant plan and requirements. Identify enabling tasks only when useful.
 
-Use feature-document statuses `DRAFT`, `READY`, `IMPLEMENTED` and `SUPERSEDED`. These are documentation statuses, separate from runtime workflow-definition lifecycles. `IMPLEMENTED` means the specified implementation is present; acceptance evidence and production readiness must still be reported separately.
+Keep progress accurate. A task is complete only when its stated condition is met; a recorded NOT RUN or BLOCKED check is not a PASS. Prefer a small usable slice over speculative infrastructure. Do not add unrelated functionality to make every check appear complete.
 
-## 3. Plan the implementation
+## 4. Record actual results and hand over
 
-Create `plan.md` for substantive features. Reference the exact specification revision and applicable constitution principles. Describe affected modules/packages, public contracts, persistence/migrations, host adapters, failure handling, compatibility and the chosen verification scope.
+Update implementation.md as work proceeds. A useful structure is:
 
-Record alternatives only when they explain a consequential choice. Include a constitution check with PASS, NOT APPLICABLE or OPEN for relevant principles and a short justification. Resolve violations through a design change or constitutional amendment before dependent implementation.
+```markdown
+# Implementation — <feature ID and name>
 
-For this project, explicitly inspect:
+## 1. Implementation Summary
+## 2. Components and Files Changed
+## 3. Technical Decisions and Deviations
+## 4. Verification
+## 5. Known Limitations
+## 6. Remaining Work
+```
 
-- Core/host dependency direction and public type independence.
-- One host persistence/transaction boundary and one production migration runner.
-- Workflow-version pinning, immutable publication, retained task codes and compatibility with pinned node contracts, including future starts of published workflows.
-- Multiple tasks per activity without parallel process branches, using the agreed SINGLE, ALL and fixed-task-list behavior; exact limits and runtime contracts still require specification.
-- APOLO-owned instance-ID associations, authorized engine API queries and optional engine correlation; atomic creation of required host links.
-- Pinned structured result contracts, authoritative completion history, authorized exact-activity retrieval, full-payload idempotency, same-transaction result visibility and operational retention (CON-13/ASM-10).
-- JSON execution-variable declarations, whole-value replacements, bounded read-only path navigation, exact-value evidence and scalar compatibility (CON-14/ASM-11).
-- Expression restrictions and fail-on-error routing.
-- Authorization, concurrency, idempotency, audit and durable event handoff.
-- Java target/runtime compatibility and consequences of the future APOLO source move.
+Use this structure proportionately; empty sections and repeated inventories are unnecessary. Record the applicable specification/code revision or worktree state, completed scope and task references, important implementation decisions and deviations. Explain what remains unfinished so a new Codex session can continue from the repository.
 
-## 4. Break the plan into traceable tasks
+The Verification section records:
 
-Use `tasks.md` for ordered, bounded implementation steps. Each task records its requirement IDs, dependencies, affected files/modules and completion condition. Explicitly identify enabling tasks such as build setup.
+- Checks actually performed, with relevant commands/manual actions, environment and artifacts.
+- Requirement/scenario coverage and PASS, FAIL, NOT RUN or BLOCKED outcomes with reasons.
+- Build results, behavioral observations and known verification gaps, clearly separated.
+- Process cleanup and outstanding integration or production gates when relevant.
 
-Prefer a small usable workflow slice over speculative infrastructure. Implement only the agreed scope. Include schema/document updates with the code they govern. New findings that change behavior require specification updates before proceeding with dependent implementation.
+Preserve relevant historical verification, including failed attempts, later corrections and revision boundaries. Clearly date historical observations; do not present them as fresh checks. A build or database connection does not prove rollback, concurrency, authorization, expression safety or recovery.
 
-Small maintenance changes, dependency configuration and documentation corrections may use a short specification/plan/task record in the change description instead of separate feature documents. They still need a clear purpose, applicable constraints and honest validation evidence.
+Before handoff, reconcile spec, plan, tasks, implementation, code and technical artifacts. A requirement-to-task-to-result link should be possible without reconstructing the chat. implementation.md records reality; it never silently becomes the specification.
 
-## 5. Record the actual implementation
+## Technical artifacts and project references
 
-For substantive features, maintain `implementation.md` alongside `spec.md`, `plan.md`, `tasks.md` and `evidence.md`. The filename is a repository convention, not a universally standardized SDD artifact. Here it is a continuously updated record of what has been built and how; the intended technical approach belongs in `plan.md`.
+Keep architecture, database and language designs at project level and link to them. Schemas, migrations, representative examples and focused technical contracts may exist where needed; they are technical deliverables, not additional mandatory process documents. Avoid duplicating their content across feature files.
 
-Record:
-
-- The specification revision and relevant code revision or working-tree state.
-- Implemented components, exact modules/packages and key files, linked to requirement and task IDs.
-- Actual implementation decisions and their rationale, including deviations from the plan.
-- Completed scope, partial work, remaining tasks, blockers and known limitations.
-- Links to verification results in `evidence.md`, keeping implementation completion separate from verified behavior.
-
-Update this record as implementation progresses so another session can continue from the repository. Keep task status in `tasks.md` and verification commands, observations and outcomes in `evidence.md`; link to them rather than duplicating their records. If an implementation finding changes an observable contract, update the specification before dependent code and reconcile the plan and tasks. Recording a decision here does not approve an unresolved requirement or replace acceptance evidence.
-
-## 6. Record evidence and reconcile the specification
-
-For substantive features, `evidence.md` records:
-
-- Specification revision and relevant code revision or working-tree state.
-- Environment, toolchain and the exact commands or manual actions performed.
-- Requirement/scenario IDs covered, observations and resulting artifacts.
-- PASS, FAIL, NOT RUN or BLOCKED for each planned check, with the reason.
-- Known gaps, unresolved integration risks and whether production acceptance remains outstanding.
-
-Mark an implementation task complete only when its stated completion condition is met. Do not describe an unexecuted check as passed or use a packaging result as proof of runtime semantics. A requirement-to-task-to-evidence link should be possible without reconstructing the conversation.
-
-Before closing work, reconcile the specification, plan, tasks, schema/examples, code, `implementation.md` and evidence. Record intentional behavior changes and migration/compatibility impact. A production release requires the mandatory behavioral guarantees to be supported by appropriate evidence.
+Do not create a separate evidence.md or verification.md for routine feature tracking. Actual evidence belongs in implementation.md; planned verification belongs in plan.md. Existing detailed runbooks may be retained inside plans, and historical evidence may be retained inside implementation records without shortening away facts. Raw logs/generated artifacts remain outside commits under the existing ignore policy.
 
 ## Verification and current no-tests policy
 
-The owner has repeatedly instructed **no tests**. During current development, do not create or run automated tests unless the owner changes that instruction. Preserve existing test sources. This applies even where older design documents describe future required test layers.
+The owner's current instruction remains **do not create or run automated tests unless explicitly authorized**. Preserve existing test sources. Document acceptance scenarios and mark unperformed checks NOT RUN; this policy does not waive required production guarantees.
 
-For an authorized build, use JDK 21 and skip both test compilation and execution:
+For authorized implementation builds, select JDK 21 and use the root wrapper:
 
 ```powershell
 ./mvnw.cmd -Dmaven.test.skip=true package
 ```
 
-Use document review, static inspection and appropriate build checks within the task's scope. Run application/database checks when authorized by the task. Starting the test host invokes Liquibase and may modify the development database; it is not equivalent to compilation. Stop processes started for temporary verification when finished unless the user asks to keep them running, and report their final state.
+Do not build for documentation-only changes; inspect content, links and whitespace. Run application/database checks only within the task's scope. Host startup runs Liquibase and can modify the development database. Record and stop temporary processes you start unless asked to leave them running, after checking their identities. Report final process state.
 
-Keep acceptance scenarios and required evidence in specifications even when execution is deferred. Mark checks NOT RUN, including the reason. The current instruction does not remove the architecture's production requirements for rollback, concurrency, idempotency, expression restrictions, authorization and durable recovery. Do not claim those guarantees are verified or production-ready from a build or connection check. Resolve the verification scope with the owner when production acceptance becomes the task.
+Keep implementation completion and verified behavior separate. Required rollback, concurrency, idempotency, expression restrictions, authorization and durable recovery need appropriate evidence before production acceptance.
 
-## First specification priorities
+## Feature navigation
 
-1. **Workflow Definition v1:** node/transition semantics, typed inputs/variables, synchronous service bindings, errors, lifecycle, publication validation and execution bounds (O1/O6).
-2. **Expression rules within Workflow Definition v1:** supported scalar and JSON path syntax/encodings, nullability, date/time rules, deterministic inputs, read-only allowlist, traversal/resource bounds and errors (O6/ASM-11).
-3. **Task catalog and human-node contracts:** [F002](features/F002-task-type-catalog/spec.md) now specifies core catalog creation, reads, bounded listing and versioned metadata/selectability updates, including permanent codes and host transaction/audit integration. Import, node-owned outcomes/inputs and deployed-host capabilities remain separate contracts (O2). Specify exact contracts and verification for the agreed SINGLE, ALL and fixed task list; task-type business versions and publication lifecycle are superseded.
-4. **Initial database schema and command integration:** [F001](features/F001-initial-database-schema/spec.md) now specifies the schema-only Liquibase slice from [database design v1.4](architecture/Workflow_Engine_Database_Design_v1.md), including authorized local startup and database/changelog inspection. Specify runtime command integration separately before implementing it. Cover selected numeric JPA versions, early aggregate claims/final version capture, proposed physical constraints, optional business correlation, APOLO-owned associations, completion-record uniqueness/lookup, transaction participation, idempotency fingerprint/receipt rules, event handoff and audit (Q11/O7/O9).
-5. **Structured task submissions:** specify node-declared result schema and limits, exact JSON normalization, authoritative TASK_COMPLETED evidence, authorized exact-task/activity APIs, same-transaction downstream reads, rollback, retention and compatibility (CON-13/ASM-10). Acceptance scenarios must include mixed per-item decisions without inventing host aggregation policy, draft saving or implicit result-to-variable propagation.
-6. **JSON execution variables:** specify pinned declarations/validation, JSON column/type constraints, explicit start/service/command bindings, whole-value replacement, read/path APIs, canonicalization, evidence budgets and scalar compatibility (CON-14/ASM-11). Verify persistence dirty tracking, stale replacements, transaction visibility and expression restrictions; indexed JSON search needs separate justification.
-
-These are planned artifacts, not a mandated implementation sequence. Apply the [source precedence](design-sources.md) when older architecture examples conflict with the selected database design changes. Exact schemas, interfaces, endpoints and unresolved physical details require specification; selected numeric JPA mapping does not establish verified host behavior. Decision Definition v1 and decision-table artifacts remain deferred.
+Use the [feature index](features/README.md) for current delivery status and sequencing. Specifications link to the relevant [design sources](design-sources.md); this guide does not duplicate the roadmap or change the constitution and architectural constraints.
