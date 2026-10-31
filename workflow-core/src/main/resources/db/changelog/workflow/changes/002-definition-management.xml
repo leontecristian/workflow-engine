@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd"
+                   logicalFilePath="db/changelog/workflow/changes/002-definition-management.xml">
+    <changeSet id="f004-001-drop-legacy-expression-policy" author="workflow-engine">
+        <preConditions onFail="HALT" onError="HALT"
+                       onFailMessage="F004 requires SQL Server, the legacy expression_policy column and an empty workflow_definition_version table. Populated legacy definitions require a separately specified data-preserving conversion.">
+            <dbms type="mssql"/>
+            <tableExists schemaName="wf" tableName="workflow_definition_version"/>
+            <columnExists schemaName="wf" tableName="workflow_definition_version" columnName="expression_policy"/>
+            <sqlCheck expectedResult="0">SELECT COUNT_BIG(*) FROM wf.workflow_definition_version</sqlCheck>
+        </preConditions>
+        <dropColumn schemaName="wf" tableName="workflow_definition_version" columnName="expression_policy"/>
+    </changeSet>
+</databaseChangeLog>

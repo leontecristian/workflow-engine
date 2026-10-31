@@ -12,7 +12,7 @@ import lombok.Getter;
 import org.hibernate.annotations.FractionalSeconds;
 import org.hibernate.annotations.Nationalized;
 
-/** Internal persistence state; not a supported host API. No mutation contract is provided. */
+/** Internal definition-family persistence state; mutations are coordinated by the administration service. */
 @Entity
 @Table(name = "workflow_definition", schema = "wf")
 @Getter
@@ -48,6 +48,19 @@ public class WorkflowDefinitionEntity {
     private Long lockVersion;
 
     protected WorkflowDefinitionEntity() {
+    }
+
+    public WorkflowDefinitionEntity(String workflowKey, String name, String description,
+                                    LocalDateTime time, String actor) {
+        this.workflowKey = java.util.Objects.requireNonNull(workflowKey);
+        replaceMetadata(name, description);
+        this.createdAt = java.util.Objects.requireNonNull(time);
+        this.createdBy = java.util.Objects.requireNonNull(actor);
+    }
+
+    public void replaceMetadata(String name, String description) {
+        this.catalogName = java.util.Objects.requireNonNull(name);
+        this.catalogDescription = description;
     }
 
 }

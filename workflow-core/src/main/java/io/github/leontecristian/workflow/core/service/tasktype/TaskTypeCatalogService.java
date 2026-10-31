@@ -86,6 +86,26 @@ public class TaskTypeCatalogService {
         }
     }
 
+    /**
+     * Definition publication only: holds the catalog row stable until the host transaction ends.
+     * Acquire after the definition-version read/check; no authoring selectability rule is applied
+     * to later runtime starts or ordinary exact catalog reads.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Optional<TaskTypeView> findByCodeForPublication(String code) {
+        TaskTypeValidation.code(code);
+        try {
+            return repository.findByCodeForPublication(code).map(entity -> {
+                // A prior ordinary read may already have this row in the host persistence context.
+                // Refresh under the held lock so selectability reflects the locked database row.
+                entityManager.refresh(entity, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+                return entity.snapshot();
+            });
+        } catch (PersistenceException | DataAccessException failure) {
+            throw TaskTypePersistenceErrors.translate(failure, false);
+        }
+    }
+
     /** Bounded ascending-ID page; continue with the same filter and returned nextAfterId. */
     public TaskTypePage list(TaskTypeQuery query) {
         TaskTypeValidation.require(query != null, "query");

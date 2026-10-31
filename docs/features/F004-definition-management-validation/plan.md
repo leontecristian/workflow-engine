@@ -1,6 +1,6 @@
 # F004 implementation plan
 
-Applies to [specification revision 1](spec.md). Implementation NOT STARTED. The current session prepares four documents only; the later Codex agent implements and verifies the feature.
+Applies to [specification revision 1](spec.md). Implemented after the owner's subsequent authorization; execution status is in [tasks.md](tasks.md) and actual checks/gaps in [implementation.md](implementation.md).
 
 ## Approach and components
 
@@ -38,6 +38,8 @@ No core controller, runtime command service, fixture runner, production audit ad
 ## Dependency and schema decisions
 
 Retain current Java 17/JDK 21 and parent-managed Spring/Jackson/Hibernate versions unless compatibility evidence requires a focused change. Draft 2020-12 is selected by the language; NetworkNT's Jackson 2 line is a candidate, not a preapproved dependency/version. During implementation inspect local dependencies and official provider documentation, select a compatible exact version and record its effective dependency tree and configuration. Do not upgrade the host's Jackson globally just to satisfy a transitive version without assessment. No schema validator dependency is added by this documentation work.
+
+Implementation selection: NetworkNT 1.5.9 with the existing managed Jackson 2.18.3. Use the bundled closed schema with local fragment references, an external loader that throws, strict types and no default application. Structural validation uses fail-fast provider output to bound provider diagnostic allocation; the separate unsupported-feature scan and graph checks accumulate independent bounded errors. The parser has depth 64, numeric-token length 128 and an early 4 MiB UTF-8 document ceiling; further storage/designer/text limits follow the spec. Exact numeric nodes retain coefficient/exponent spelling without forcing BigDecimal's exponent width. No generic evaluation counters or full-language validator are introduced by this minimal slice.
 
 The runtime schema artifact must use local bundled references only, disable external resolution/network access, reject unknown executable fields and preserve designer values. The minimal contract contains no embedded data schemas, so F004 must not accidentally claim the full L11 profile, format assertions or expression engine is implemented. Author-facing numeric/text/byte limits stay those selected in the spec; additional internal parser/validator controls are bounded engineering choices to verify and document.
 

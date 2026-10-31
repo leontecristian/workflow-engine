@@ -15,7 +15,7 @@ The initial nine-table workflow schema is implemented by [F001](docs/features/F0
 
 [F003 — Core persistence model](docs/features/F003-core-persistence-model/spec.md) is IMPLEMENTED at revision 1; see its [evidence](docs/features/F003-core-persistence-model/implementation.md#4-verification) for static/build/startup results and unperformed behavioral checks. Its [plan](docs/features/F003-core-persistence-model/plan.md) and [tasks](docs/features/F003-core-persistence-model/tasks.md) cover the eight remaining entity mappings, established value types and narrow internal read repositories before definition management and runtime execution. F003 adds eight entity mappings, nine enums, two composite IDs and eight internal read repositories; it introduces no schema change or generic CRUD service.
 
-[F004 — Definition management and validation](docs/features/F004-definition-management-validation/spec.md) is READY for a later implementation session. Its four documents specify draft/import/edit/read operations, minimal SINGLE publication validation, immutable publication/retirement and a gated legacy-column migration. Implementation has not started; F005 runtime execution remains later work.
+[F004 — Definition management and validation](docs/features/F004-definition-management-validation/spec.md) is IMPLEMENTED at revision 1; see its [implementation record](docs/features/F004-definition-management-validation/implementation.md) for package, local migration/restart/bootstrap results and behavioral gaps. Its four documents specify draft/import/edit/read operations, minimal SINGLE publication validation, immutable publication/retirement and a gated legacy-column migration. F004 is implemented within that subset; lifecycle/validation/concurrency behavior remains NOT RUN, and F005 runtime execution remains later work.
 
 ## Project constitution and specifications
 
@@ -86,6 +86,14 @@ Report success to the external caller
 ```
 
 Writes require an existing transaction; core never commits independently. Results remain provisional until host commit. Audit failure or a catalog error must roll back the transaction; never catch a flush failure and continue it. A no-op has equal snapshots without a forced version increment and need not create a change audit; any attempt audit follows host policy. Reads join a current transaction or open a read-only one. This example defines the integration shape, not an implemented audit/security adapter. Management audit belongs to the host, outside workflow history and command receipts.
+
+### Definition administration
+
+Inject `WorkflowDefinitionService` from `service.definition`, using immutable contracts from `dto.definition` and errors from `exception.definition`. It supplies draft import/replacement, family metadata updates, validation, publication/retirement, exact reads/export and bounded version-summary pages. Versions are supplied explicitly in JSON; publication supports only the minimal START → HUMAN_TASK (SINGLE) → END subset. See the [F004 contract](docs/features/F004-definition-management-validation/spec.md) and [verification gaps](docs/features/F004-definition-management-validation/implementation.md#4-verification).
+
+The host authenticates/authorizes each operation, constructs the trusted `DefinitionManagementContext`, opens the transaction for mutations, persists durable audit from changed before/after summaries and commits before reporting success. Audit failure rolls back the change. A normal failed-validation report can be committed as authoring evidence; a technical failure aborts the transaction. Publication requires one real host `DefinitionCapabilityProvider`; absence produces unavailable-capability diagnostics, with no permissive fallback or seeded registration. Capability declarations never execute business functions during validation.
+
+The F004 forward migration requires an empty legacy definition-version table and removes only `expression_policy`; populated environments halt pending a separately specified conversion. It supersedes F003's legacy field and read-only definition surface. No workflow execution is provided.
 
 ### Persistence and module integration
 

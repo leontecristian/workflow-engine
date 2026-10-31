@@ -19,7 +19,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Nationalized;
 import org.hibernate.type.SqlTypes;
 
-/** Internal persistence state; not a supported host API. No mutation contract is provided. */
+/** Internal version persistence state; controlled mutations require the administration transaction. */
 @Entity
 @Table(name = "workflow_definition_version", schema = "wf")
 @Getter
@@ -38,9 +38,6 @@ public class WorkflowDefinitionVersionEntity {
 
     @Column(name = "schema_version", nullable = false)
     private Short schemaVersion;
-
-    @Column(name = "expression_policy", nullable = false, length = 100, insertable = false, updatable = false)
-    private String legacyExpressionPolicy;
 
     @Nationalized
     @JdbcTypeCode(SqlTypes.LONG32NVARCHAR)
@@ -134,6 +131,80 @@ public class WorkflowDefinitionVersionEntity {
     private Long lockVersion;
 
     protected WorkflowDefinitionVersionEntity() {
+    }
+
+    public WorkflowDefinitionVersionEntity(Long definitionId, int version, String document, byte[] hash,
+                                           String algorithm, LocalDateTime time, String actor) {
+        if (definitionId == null || definitionId <= 0 || version <= 0) throw new IllegalArgumentException("Invalid definition identity");
+        this.definitionId = definitionId;
+        this.version = version;
+        this.schemaVersion = 1;
+        this.status = DefinitionStatus.DRAFT;
+        this.contentRevision = 1L;
+        this.createdAt = java.util.Objects.requireNonNull(time);
+        this.createdBy = java.util.Objects.requireNonNull(actor);
+        content(document, hash, algorithm, time, actor);
+    }
+
+    private void content(String document, byte[] hash, String algorithm, LocalDateTime time, String actor) {
+        if (hash == null || hash.length != 32) throw new IllegalArgumentException("Expected SHA-256 hash");
+        this.definitionJson = java.util.Objects.requireNonNull(document);
+        this.contentHash = hash.clone();
+        this.canonicalizationVersion = java.util.Objects.requireNonNull(algorithm);
+        this.updatedAt = java.util.Objects.requireNonNull(time);
+        this.updatedBy = java.util.Objects.requireNonNull(actor);
+    }
+
+    public void replaceDraft(String document, byte[] hash, String algorithm, LocalDateTime time, String actor) {
+        requireDraft();
+        content(document, hash, algorithm, time, actor);
+        this.contentRevision = Math.addExact(contentRevision, 1);
+        this.validationStatus = null;
+        this.validatedContentRevision = null;
+        this.validatedContentHash = null;
+        this.validationContextHash = null;
+        this.validationDetailsJson = null;
+        this.validatedAt = null;
+        this.validatedBy = null;
+    }
+
+    public void recordValidation(boolean valid, byte[] contextHash, String details, LocalDateTime time, String actor) {
+        requireDraft();
+        if (contextHash == null || contextHash.length != 32) throw new IllegalArgumentException("Expected context hash");
+        this.validationStatus = valid ? DefinitionValidationStatus.PASSED : DefinitionValidationStatus.FAILED;
+        this.validatedContentRevision = contentRevision;
+        this.validatedContentHash = contentHash.clone();
+        this.validationContextHash = contextHash.clone();
+        this.validationDetailsJson = java.util.Objects.requireNonNull(details);
+        this.validatedAt = java.util.Objects.requireNonNull(time);
+        this.validatedBy = java.util.Objects.requireNonNull(actor);
+        this.updatedAt = time;
+        this.updatedBy = actor;
+    }
+
+    public void publish(LocalDateTime time, String actor) {
+        requireDraft();
+        if (validationStatus != DefinitionValidationStatus.PASSED
+                || !contentRevision.equals(validatedContentRevision)
+                || !java.util.Arrays.equals(contentHash, validatedContentHash)) throw new IllegalStateException("Current validation required");
+        this.status = DefinitionStatus.PUBLISHED;
+        this.publishedAt = java.util.Objects.requireNonNull(time);
+        this.publishedBy = java.util.Objects.requireNonNull(actor);
+        this.updatedAt = time;
+        this.updatedBy = actor;
+    }
+
+    public void retire(LocalDateTime time, String actor) {
+        if (status != DefinitionStatus.PUBLISHED) throw new IllegalStateException("Published version required");
+        this.status = DefinitionStatus.RETIRED;
+        this.retiredAt = java.util.Objects.requireNonNull(time);
+        this.retiredBy = java.util.Objects.requireNonNull(actor);
+        this.updatedAt = time;
+        this.updatedBy = actor;
+    }
+
+    private void requireDraft() {
+        if (status != DefinitionStatus.DRAFT) throw new IllegalStateException("Draft required");
     }
 
     public byte[] getContentHash() {

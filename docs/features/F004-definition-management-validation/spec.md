@@ -1,6 +1,6 @@
 # F004 — Definition management and validation
 
-**Status:** READY for implementation; implementation NOT STARTED. **Revision:** 1 — 2026-10-31. **Owner:** Workflow project owner. **Constitution:** [v3.0.0](../../constitution.md).
+**Status:** IMPLEMENTED revision 1; package, local migration/restart and bootstrap checks passed. Behavioral acceptance remains NOT RUN; see [implementation.md](implementation.md#4-verification). **Revision:** 1 — 2026-10-31. **Owner:** Workflow project owner. **Constitution:** [v3.0.0](../../constitution.md).
 
 ## Outcome and scope
 
@@ -147,4 +147,4 @@ The empty-table gate avoids silently reinterpreting old independent-policy defin
 - **AC09 (R09):** Exact reads include disabled-family task references and retired versions without dropping data; pages are owner/status-filtered, bounded, stable-order summaries with correct continuation. Host authorization precedes reads and returned values expose no mutable provider objects.
 - **AC10 (R10–11):** On an empty-version F001/F003 database, the new migration removes only the legacy column and repeat startup does not reapply it. F001 checksums/catalog/runtime schema remain intact. A populated legacy version table blocks migration without modifying rows. Record what was actually verified and all remaining gaps.
 
-No application/migration execution is authorized by this documentation preparation. The next agent implements the selected contract and records acceptance evidence within its own authorized scope. Validator dependency/annotation choices are implementation verification work; full-language validation and populated legacy-data conversion are explicitly outside this feature.
+The original documentation preparation authorized no application/migration execution. The owner subsequently authorized implementation, packaging, local migration/startup and read-only inspection; actual results and remaining behavioral gaps are in implementation.md. Full-language validation and populated legacy-data conversion remain outside this feature.
