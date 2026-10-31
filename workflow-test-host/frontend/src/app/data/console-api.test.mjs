@@ -54,10 +54,12 @@ test("query methods use explicit bounded cursors and encode identity segments", 
   await api.submissions("2", "9223372036854775807", 1);
   await api.lookupVersion("key with/&", "3");
   await api.outboxEvent("15:4");
+  await api.instanceGraph("9007199254740993");
   assert.match(calls[0], /afterSequence=9007199254740995/);
   assert.match(calls[1], /afterTaskId=9223372036854775807/);
   assert.match(calls[2], /key=key\+with%2F%26/);
   assert.match(calls[3], /events\/15%3A4$/);
+  assert.equal(calls[4], "/console/api/instances/9007199254740993/graph");
 });
 test("concurrent initialization shares one session request and 401 clears private command state", async (t) => {
   let sessionReads = 0;

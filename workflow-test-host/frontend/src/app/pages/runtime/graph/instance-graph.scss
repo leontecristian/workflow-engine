@@ -1,0 +1,136 @@
+:host {
+  display: block;
+}
+.graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  color: #59667c;
+  font-size: 12px;
+}
+.graph-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #98a2b3;
+}
+.dot.active {
+  background: #356ad9;
+}
+.dot.completed {
+  background: #35815e;
+}
+.graph-scroll {
+  overflow-x: auto;
+  margin: 10px 0;
+  border-radius: 12px;
+}
+svg {
+  display: block;
+  width: 100%;
+  min-width: 760px;
+}
+.edge {
+  stroke: #a5afbe;
+  fill: none;
+  stroke-width: 2;
+}
+.edge.traversed {
+  stroke: #35815e;
+}
+.edge text {
+  stroke: none;
+  fill: #69758a;
+  font: 11px sans-serif;
+}
+.node {
+  text-decoration: none;
+  cursor: pointer;
+}
+.node rect {
+  fill: #f6f7fa;
+  stroke: #bec6d1;
+  stroke-width: 1.5;
+}
+.node.active rect {
+  fill: #edf3ff;
+  stroke: #356ad9;
+  stroke-width: 2.5;
+}
+.node.completed rect {
+  fill: #eef8f2;
+  stroke: #35815e;
+}
+.node text {
+  fill: #43516a;
+  font-family: inherit;
+}
+.node .node-type {
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+.node .node-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+.node .node-state {
+  font-size: 12px;
+}
+.node.active .node-state {
+  fill: #2353b6;
+  font-weight: 600;
+}
+.node.completed .node-state {
+  fill: #266344;
+}
+.node:hover rect,
+.node:focus rect {
+  stroke: #254c9b;
+  stroke-width: 3;
+}
+.node:focus {
+  outline: none;
+}
+.graph-scroll:focus-visible,
+.graph-node-details a:focus-visible {
+  outline: 2px solid #356ad9;
+  outline-offset: 3px;
+}
+.graph-node-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.graph-node-details li {
+  flex: 1 1 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 16px;
+  background: #f8f9fc;
+  border-radius: 10px;
+  font-size: 12px;
+  color: #69758a;
+  overflow-wrap: anywhere;
+}
+.graph-node-details a {
+  color: #365fa7;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.node-key {
+  font-family: monospace;
+}
+.graph-note {
+  margin: 16px 0 0;
+  color: #69758a;
+  font-size: 11px;
+}

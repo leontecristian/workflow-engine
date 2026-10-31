@@ -1,6 +1,6 @@
 # F006 — Test-host workflow console
 
-**Status:** IMPLEMENTED revision 4; browser acceptance remains BLOCKED. See [actual verification and gaps](implementation.md). **Revision:** 4 — 2026-10-31. **Owner:** Workflow project owner. **Constitution:** [v3.0.0](../../constitution.md).
+**Status:** IMPLEMENTED revision 5; browser acceptance remains BLOCKED. See [actual verification and gaps](implementation.md). **Revision:** 5 — 2026-10-31. **Owner:** Workflow project owner. **Constitution:** [v3.0.0](../../constitution.md).
 
 ## Outcome and scope
 
@@ -92,6 +92,7 @@ Acceptance: **AC23** admin defaults to active records and can filter all persist
 | GET `/instances?status=&afterId=&limit=` | Admin: revision 4 bounded current-state summaries; ACTIVE by default, ALL removes the status filter. |
 | POST `/instances/start` | Admin: `{commandId, definitionVersionId, requestId, expectedRequestVersion}` → F005 WorkflowCommandResult. |
 | GET `/instances/{id}` | Admin or assigned reviewer: current F005 instance view; no implicit latest. |
+| GET `/instances/{id}/graph` | Same instance access policy: revision 5 pinned display graph plus its instance snapshot; no raw definition content. |
 | GET `/instances/{id}/tasks?afterId=&limit=` | Admin or assigned reviewer: stored task page, all states. |
 | GET `/tasks/mine?afterId=&limit=` | Either role: OPEN assignments for the authenticated actor only; no client assignee parameter. |
 | GET `/tasks/{id}` | Admin or that task's assigned reviewer: F005 task view. |
@@ -186,3 +187,17 @@ The F004 null-constraint-name fix also needs a controlled provider-error observa
 ## Readiness and remaining decisions
 
 No unresolved APOLO business requirement blocks this sandbox. The required F005 APIs are available and used without duplicating execution. The [plan](plan.md) records the pinned toolchain; the [handover](implementation.md) records actual checks and remaining browser acceptance. This local console does not choose the production designer's framework or graph library. A contract change must reconcile spec/plan/tasks before dependent implementation. F006 evidence can satisfy named F005 scenarios only when the observed scope matches; missing malformed-provider or production delivery checks stay explicit gaps.
+
+## Revision 5 — read-only instance graph (owner request)
+
+Add a read-only workflow graph to the existing instance detail page for administrator and stored-assignment-authorized reviewer access (CON-03/06/08, ASM-02/03). Display the exact pinned START → HUMAN_TASK(SINGLE) → END topology, irrespective of definition retirement or catalog selectability. This is runtime inspection, not a visual designer or additional execution-language support. Graphs support F005 ACTIVE/COMPLETED states; CANCELLED has no defined execution/evidence path in this slice and returns graph-unavailable HOST_CONFIGURATION while ordinary text inspection remains available.
+
+GET `/console/api/instances/{id}/graph` accepts no query parameters. Use the existing instance access policy first: anonymous requests retain JSON 401; an unrelated reviewer receives 404 without definition disclosure. Return `{instance, nodes, edges}`: instance is the existing detached instance view; ordered nodes contain `{key,name,type,state,activityId,taskId}` (nullable exact-string links), and edges `{key,from,to,outcome,traversed}` (nullable outcome). Only display metadata is projected from the pinned canonical document through public core services. Do not expose raw definition/designer/resolver/input content or relax management-version permissions. Preserve exact-string Long values, existing sanitized errors and read-only REQUIRED host transactions. No core API or migration changes.
+
+Read the instance first and use its lastHistorySequence as the immutable evidence watermark. Inspect at most 100 history summaries from the start, require a complete contiguous prefix through that watermark, and ignore later facts from a concurrent command. Larger watermarks return 422 LIMIT_EXCEEDED; missing/inconsistent pinned graph/evidence returns sanitized 500 HOST_CONFIGURATION rather than guessed states. This read does not claim a database-wide snapshot or acquire an aggregate write. Retained immutable history plus the initial committed instance snapshot supplies the projection.
+
+State rules: only ACTIVE/currentNodeKey is blue/current. A node is green/completed when a recorded TRANSITION_TAKEN leaves it; the END node becomes completed only with a matching INSTANCE_COMPLETED fact. Remaining nodes are gray/not reached; terminal instances never show a blue active node. Edges become traversed only from matching recorded transition facts. Recorded TASK_CREATED supplies the single human node's task/activity links; no synthetic IDs or lifecycle commands. Labels and state text accompany colors. Node links open the recorded task or ordered instance history; offer the recorded activity link separately. Use native Angular SVG/text bindings, keyboard-operable links, accessible names and a scrollable small-screen layout without a graph dependency/CDN or executable HTML.
+
+The page's existing Refresh action reloads graph and current metadata. Display metadata from the graph's included instance snapshot together with its highlighting. Graph failures show a local unavailable message while preserving ordinary instance details/tasks/history access. No automatic polling, editing, command/retry, data writes or browser parse/stringify of authoring documents.
+
+Acceptance: **AC27** topology follows pinned node/transition keys rather than document array order, active human is blue, departed start is green, future END gray; recorded completion renders all three green and terminal current position is distinguished from an active step. **AC28** authorized reviewer/admin can inspect the graph without gaining definition-management access; unrelated reviewers cannot; projected response excludes private definition fields and keeps large IDs exact. **AC29** retirement/selectability do not filter graph visibility, prefix-bounded evidence excludes later completion facts, and missing/inconsistent evidence fails visibly rather than inventing progress. **AC30** refresh, loading/failure fallback and node task/activity/history navigation preserve ordinary detail use; labels, keyboard operation and small-screen usability require browser verification separately from isolated tests/builds.

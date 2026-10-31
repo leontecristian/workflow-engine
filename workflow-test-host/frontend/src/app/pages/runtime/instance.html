@@ -43,3 +43,41 @@
     </div>
     <console-details [value]="detail()" /> </mat-card-content
 ></mat-card>
+
+<mat-card appearance="outlined">
+  <mat-card-header
+    ><div class="card-heading">
+      <div>
+        <div class="eyebrow">PINNED WORKFLOW</div>
+        <h2>Workflow graph</h2>
+        <p>
+          Current position and recorded progress for this instance's exact
+          definition version.
+        </p>
+      </div>
+    </div></mat-card-header
+  >
+  <mat-card-content>
+    @if (graph(); as model) {
+      <console-instance-graph [graph]="model" />
+    } @else if (graphError()) {
+    <div class="feedback feedback-warning" role="status">
+      <console-icon name="info" />
+      <div>
+        <strong>Workflow graph unavailable</strong>
+        <p>{{graphError()}}</p>
+      </div>
+    </div>
+    <p class="muted">
+      Instance details, tasks and ordered history remain available. Refresh to
+      try this read again.
+    </p>
+    } @else if (busy()) {
+    <p class="muted" role="status">Loading the pinned workflow graph…</p>
+    } @else {
+    <p class="muted">
+      No graph loaded. Refresh to read the instance and its pinned workflow.
+    </p>
+    }
+  </mat-card-content>
+</mat-card>

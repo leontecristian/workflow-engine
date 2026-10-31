@@ -130,6 +130,26 @@ export interface InstanceView extends InstanceSummary {
   endedBy: string | null;
   terminationReason: string | null;
 }
+export interface InstanceGraphNode {
+  key: string;
+  name: string;
+  type: "START" | "HUMAN_TASK" | "END";
+  state: "ACTIVE" | "COMPLETED" | "PENDING";
+  activityId: Decimal | null;
+  taskId: Decimal | null;
+}
+export interface InstanceGraphEdge {
+  key: string;
+  from: string;
+  to: string;
+  outcome: string | null;
+  traversed: boolean;
+}
+export interface InstanceGraph {
+  instance: InstanceView;
+  nodes: InstanceGraphNode[];
+  edges: InstanceGraphEdge[];
+}
 export interface TaskView {
   id: Decimal;
   activityId: Decimal;

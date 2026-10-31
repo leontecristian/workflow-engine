@@ -2,23 +2,22 @@ import { Component, DestroyRef, inject, signal } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router } from "@angular/router";
 import { ConsoleApi } from "../../data/console-api";
-import type { InstanceView } from "../../data/dtos";
+import type { InstanceView, InstanceGraph } from "../../data/dtos";
+import { InstanceGraphComponent } from "./graph/instance-graph";
 import { PAGE_IMPORTS } from "../../ui/page-imports";
-import { pageState } from "../../ui/page-state";
 @Component({
   selector: "console-instance",
   standalone: true,
-  imports: [...PAGE_IMPORTS],
+  imports: [...PAGE_IMPORTS, InstanceGraphComponent],
   templateUrl: "./instance.html",
 })
 export class InstancePage {
   api = inject(ConsoleApi);
   router = inject(Router);
-  private readonly state = pageState();
-  busy = this.state.busy;
-  error = this.state.error;
-  notice = this.state.notice;
-  run = this.state.run;
+  busy = signal(false);
+  error = signal("");
+  notice = signal("");
+  private readGeneration = 0;
   readonly meta = {
     title: "Workflow instance",
     eyebrow: "CURRENT RUNTIME STATE",
@@ -28,6 +27,8 @@ export class InstancePage {
   };
   id = "";
   detail = signal<InstanceView | null>(null);
+  graph = signal<InstanceGraph | null>(null);
+  graphError = signal("");
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   ngOnInit() {
@@ -40,9 +41,35 @@ export class InstancePage {
   }
   async load() {
     const id = this.id;
-    await this.run(async () => {
+    const generation = ++this.readGeneration;
+    const current = () =>
+      !this.destroyRef.destroyed &&
+      this.id === id &&
+      this.readGeneration === generation;
+    this.busy.set(true);
+    this.error.set("");
+    this.graph.set(null);
+    this.graphError.set("");
+    try {
       const d = await this.api.instance(id);
-      if (!this.destroyRef.destroyed && this.id === id) this.detail.set(d);
-    });
+      if (!current()) return;
+      this.detail.set(d);
+      try {
+        const graph = await this.api.instanceGraph(id);
+        if (!current()) return;
+        this.graph.set(graph);
+        this.detail.set(graph.instance);
+      } catch (error) {
+        if (current())
+          this.graphError.set(
+            error instanceof Error ? error.message : String(error),
+          );
+      }
+    } catch (error) {
+      if (current())
+        this.error.set(error instanceof Error ? error.message : String(error));
+    } finally {
+      if (current()) this.busy.set(false);
+    }
   }
 }

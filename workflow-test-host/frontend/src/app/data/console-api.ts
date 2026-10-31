@@ -14,6 +14,7 @@ import type {
   SandboxRequest,
   InstanceSummary,
   InstanceView,
+  InstanceGraph,
   TaskView,
   TaskContract,
   TaskSubmission,
@@ -171,6 +172,11 @@ export class ConsoleApi {
   }
   instance(id: string) {
     return this.transport.call<InstanceView>("/instances/" + segment(id));
+  }
+  instanceGraph(id: string) {
+    return this.transport.call<InstanceGraph>(
+      `/instances/${segment(id)}/graph`,
+    );
   }
   assignedTasks(cursor?: string, limit = 50) {
     return this.transport.call<Page<TaskView>>(

@@ -1,0 +1,105 @@
+<div class="graph-legend" aria-label="Workflow graph legend">
+  <span><i class="dot active"></i>Current step</span>
+  <span><i class="dot completed"></i>Completed</span>
+  <span><i class="dot pending"></i>Not reached</span>
+</div>
+<div
+  class="graph-scroll"
+  tabindex="0"
+  aria-label="Workflow graph. Scroll horizontally on smaller screens."
+>
+  <svg viewBox="0 0 920 210" role="group" aria-label="Pinned workflow graph">
+    <title>
+      Workflow {{graph().instance.definitionKey}} · version
+      {{graph().instance.definitionVersion}}
+    </title>
+    <desc>
+      Read-only execution graph. Each node names its recorded state. Select a
+      node to open its task or execution history.
+    </desc>
+    @for(edge of graph().edges;track edge.key){
+    <g class="edge" [class.traversed]="edge.traversed">
+      <title>
+        {{edge.key}}: {{edge.traversed ? 'Traversed' : 'Not traversed'}}
+      </title>
+      <line
+        [attr.x1]="edgeStart(edge.from) + 4"
+        y1="112"
+        [attr.x2]="edgeEnd(edge.to) - 8"
+        y2="112"
+      />
+      <path
+        [attr.d]="'M ' + (edgeEnd(edge.to)-16) + ' 106 L ' + (edgeEnd(edge.to)-8) + ' 112 L ' + (edgeEnd(edge.to)-16) + ' 118'"
+      />
+      @if(edge.outcome){
+      <text
+        [attr.x]="(edgeStart(edge.from)+edgeEnd(edge.to))/2"
+        y="44"
+        text-anchor="middle"
+      >
+        {{edge.outcome}}
+      </text>
+      }
+    </g>
+    } @for(node of graph().nodes;track node.key;let index=$index){
+    <a
+      [routerLink]="route(node)"
+      tabindex="0"
+      [attr.aria-label]="accessibleName(node)"
+      class="node"
+      [class.active]="node.state==='ACTIVE'"
+      [class.completed]="node.state==='COMPLETED'"
+    >
+      <title>{{node.name}} · {{node.key}} · {{label(node)}}</title>
+      <rect
+        [attr.x]="nodeX(index)"
+        y="60"
+        width="250"
+        height="104"
+        [attr.rx]="node.type==='HUMAN_TASK' ? 16 : 48"
+      />
+      <text
+        class="node-type"
+        [attr.x]="nodeX(index)+125"
+        y="85"
+        text-anchor="middle"
+      >
+        {{node.type === 'HUMAN_TASK' ? 'HUMAN TASK · SINGLE' : node.type}}
+      </text>
+      <text
+        class="node-name"
+        [attr.x]="nodeX(index)+125"
+        y="111"
+        text-anchor="middle"
+      >
+        {{shortName(node.name)}}
+      </text>
+      <text
+        class="node-state"
+        [attr.x]="nodeX(index)+125"
+        y="137"
+        text-anchor="middle"
+      >
+        {{label(node)}}
+      </text>
+    </a>
+    }
+  </svg>
+</div>
+<ol class="graph-node-details" aria-label="Workflow steps and recorded links">
+  @for(node of graph().nodes;track node.key){
+  <li>
+    <a [routerLink]="route(node)">{{node.name}}</a>
+    <span class="node-key">{{node.key}}</span>
+    <span>{{label(node)}}</span>
+    @if(node.activityId){<a [routerLink]="['/activity',node.activityId]"
+      >Activity #{{node.activityId}}</a
+    >}
+  </li>
+  }
+</ol>
+<p class="graph-note">
+  Recorded through history sequence
+  <code>{{graph().instance.lastHistorySequence}}</code>. Refresh to read the
+  latest state.
+</p>
