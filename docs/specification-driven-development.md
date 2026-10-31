@@ -1,6 +1,6 @@
 # Specification-driven development
 
-This workflow operationalizes [constitution v2.2.0](constitution.md). It is a repository convention; it does not require installing a specification framework or code generator.
+This workflow operationalizes [constitution v3.0.0](constitution.md). It is a repository convention; it does not require installing a specification framework or code generator.
 
 ## 1. Specify the behavior
 
@@ -44,7 +44,7 @@ For this project, explicitly inspect:
 - Core/host dependency direction and public type independence.
 - One host persistence/transaction boundary and one production migration runner.
 - Workflow-version pinning, immutable publication, retained task codes and compatibility with pinned node contracts, including future starts of published workflows.
-- Multiple tasks per activity without parallel process branches, keeping proposed completion semantics distinct from agreed scope.
+- Multiple tasks per activity without parallel process branches, using the agreed SINGLE, ALL and fixed-task-list behavior; exact limits and runtime contracts still require specification.
 - APOLO-owned instance-ID associations, authorized engine API queries and optional engine correlation; atomic creation of required host links.
 - Pinned structured result contracts, authoritative completion history, authorized exact-activity retrieval, full-payload idempotency, same-transaction result visibility and operational retention (CON-13/ASM-10).
 - JSON execution-variable declarations, whole-value replacements, bounded read-only path navigation, exact-value evidence and scalar compatibility (CON-14/ASM-11).
@@ -58,9 +58,23 @@ Use `tasks.md` for ordered, bounded implementation steps. Each task records its 
 
 Prefer a small usable workflow slice over speculative infrastructure. Implement only the agreed scope. Include schema/document updates with the code they govern. New findings that change behavior require specification updates before proceeding with dependent implementation.
 
-Small maintenance changes, dependency configuration and documentation corrections may use a short specification/plan/task record in the change description instead of four separate files. They still need a clear purpose, applicable constraints and honest validation evidence.
+Small maintenance changes, dependency configuration and documentation corrections may use a short specification/plan/task record in the change description instead of separate feature documents. They still need a clear purpose, applicable constraints and honest validation evidence.
 
-## 5. Record evidence and reconcile the specification
+## 5. Record the actual implementation
+
+For substantive features, maintain `implementation.md` alongside `spec.md`, `plan.md`, `tasks.md` and `evidence.md`. The filename is a repository convention, not a universally standardized SDD artifact. Here it is a continuously updated record of what has been built and how; the intended technical approach belongs in `plan.md`.
+
+Record:
+
+- The specification revision and relevant code revision or working-tree state.
+- Implemented components, exact modules/packages and key files, linked to requirement and task IDs.
+- Actual implementation decisions and their rationale, including deviations from the plan.
+- Completed scope, partial work, remaining tasks, blockers and known limitations.
+- Links to verification results in `evidence.md`, keeping implementation completion separate from verified behavior.
+
+Update this record as implementation progresses so another session can continue from the repository. Keep task status in `tasks.md` and verification commands, observations and outcomes in `evidence.md`; link to them rather than duplicating their records. If an implementation finding changes an observable contract, update the specification before dependent code and reconcile the plan and tasks. Recording a decision here does not approve an unresolved requirement or replace acceptance evidence.
+
+## 6. Record evidence and reconcile the specification
 
 For substantive features, `evidence.md` records:
 
@@ -72,7 +86,7 @@ For substantive features, `evidence.md` records:
 
 Mark an implementation task complete only when its stated completion condition is met. Do not describe an unexecuted check as passed or use a packaging result as proof of runtime semantics. A requirement-to-task-to-evidence link should be possible without reconstructing the conversation.
 
-Before closing work, reconcile the specification, schema/examples, implementation and evidence. Record intentional behavior changes and migration/compatibility impact. A production release requires the mandatory behavioral guarantees to be supported by appropriate evidence.
+Before closing work, reconcile the specification, plan, tasks, schema/examples, code, `implementation.md` and evidence. Record intentional behavior changes and migration/compatibility impact. A production release requires the mandatory behavioral guarantees to be supported by appropriate evidence.
 
 ## Verification and current no-tests policy
 
@@ -91,8 +105,8 @@ Keep acceptance scenarios and required evidence in specifications even when exec
 ## First specification priorities
 
 1. **Workflow Definition v1:** node/transition semantics, typed inputs/variables, synchronous service bindings, errors, lifecycle, publication validation and execution bounds (O1/O6).
-2. **Expression Policy v1:** supported scalar and JSON path syntax/encodings, nullability, date/time rules, deterministic inputs, read-only allowlist, traversal/resource bounds and errors (O6/ASM-11).
-3. **Task catalog and human-node contracts:** [F002](features/F002-task-type-catalog/spec.md) now specifies core catalog creation, reads, bounded listing and versioned metadata/selectability updates, including permanent codes and host transaction/audit integration. Import, node-owned outcomes/inputs and deployed-host capabilities remain separate contracts (O2). Specify collective completion behavior separately from the confirmed multiple-task scope; task-type business versions and publication lifecycle are superseded.
+2. **Expression rules within Workflow Definition v1:** supported scalar and JSON path syntax/encodings, nullability, date/time rules, deterministic inputs, read-only allowlist, traversal/resource bounds and errors (O6/ASM-11).
+3. **Task catalog and human-node contracts:** [F002](features/F002-task-type-catalog/spec.md) now specifies core catalog creation, reads, bounded listing and versioned metadata/selectability updates, including permanent codes and host transaction/audit integration. Import, node-owned outcomes/inputs and deployed-host capabilities remain separate contracts (O2). Specify exact contracts and verification for the agreed SINGLE, ALL and fixed task list; task-type business versions and publication lifecycle are superseded.
 4. **Initial database schema and command integration:** [F001](features/F001-initial-database-schema/spec.md) now specifies the schema-only Liquibase slice from [database design v1.4](architecture/Workflow_Engine_Database_Design_v1.md), including authorized local startup and database/changelog inspection. Specify runtime command integration separately before implementing it. Cover selected numeric JPA versions, early aggregate claims/final version capture, proposed physical constraints, optional business correlation, APOLO-owned associations, completion-record uniqueness/lookup, transaction participation, idempotency fingerprint/receipt rules, event handoff and audit (Q11/O7/O9).
 5. **Structured task submissions:** specify node-declared result schema and limits, exact JSON normalization, authoritative TASK_COMPLETED evidence, authorized exact-task/activity APIs, same-transaction downstream reads, rollback, retention and compatibility (CON-13/ASM-10). Acceptance scenarios must include mixed per-item decisions without inventing host aggregation policy, draft saving or implicit result-to-variable propagation.
 6. **JSON execution variables:** specify pinned declarations/validation, JSON column/type constraints, explicit start/service/command bindings, whole-value replacement, read/path APIs, canonicalization, evidence budgets and scalar compatibility (CON-14/ASM-11). Verify persistence dirty tracking, stale replacements, transaction visibility and expression restrictions; indexed JSON search needs separate justification.
