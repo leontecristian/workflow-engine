@@ -1,10 +1,10 @@
 # Assumptions and verification register
 
-**Version:** 2.2.0
+**Version:** 3.0.0
 
-**Recorded:** 2026-10-25
+**Recorded:** 2026-10-31
 
-**Applies to:** constitution v2.2.0 and planning for APOLO integration
+**Applies to:** constitution v3.0.0 and planning for APOLO integration
 
 An assumption is an expectation used for planning whose supporting evidence is incomplete. It must not be presented as a confirmed contract or an implemented guarantee. [Constraints](constraints.md) remain requirements even when the feasibility or mechanism for satisfying them needs verification.
 
@@ -172,9 +172,11 @@ The selected model adds JSON objects/arrays in workflow_variable.json_value whil
 
 ## Open decisions that must not be filled with assumptions
 
-- **O1/O6:** exact node/action bindings, JSON encodings, nullability, precision, date/time semantics, expression allowlist, execution bounds and errors. The illustrative limit of 50 and decimal-as-string examples are not final selections.
+- **O1/O6:** exact node/action bindings, remaining numeric/time encoding and precision details, nested JSON numbers, initialization/read rules, expression allowlist, execution bounds and errors. L10 selects the value formats and missing/null/default rules in language design sections 10.2–10.3, including string-encoded LONG/DECIMAL and ISO dates/timestamps with explicit offsets. L16 selects an initial limit of 50 automatic steps per command and the other numeric values in language design section 14.2; exact counting rules, remaining aggregate/work budgets and capacity verification are still pending.
+- **Ordered routing — AGREED direction, specification pending:** the 2026-10-31 owner decision selects first-match evaluation in declared priority order, with a separate unconditional default and strict errors for evaluated conditions. Specify the exact order representation, serialization/designer preservation and diagnostics. Verify short-circuit behavior, fallback/error cases, publication validation of every condition and pinned-version compatibility before claiming execution support. Unreachable-route warnings remain an optional authoring proposal; complete static detection is not assumed.
 - **O2:** simple catalog administration, any import normalization, technical revision-token representation and API/provider schemas. The former task-type publication/import lifecycle is superseded; a checksum convention is not established merely by mentioning checksums.
-- **Task multiplicity:** multiple tasks per activity is agreed; proposed SINGLE/ALL semantics, fixed roster, bounds and exact node JSON require specification before dependent implementation. Do not promote them to confirmed APOLO business policy.
+- **Task multiplicity:** multiple tasks per activity and SINGLE behavior are agreed. SINGLE requires exactly one directly assigned task from a named resolver with explicit validated inputs; its accepted outcome resolves the activity and routes in the same transaction. ALL and the fixed task list are also agreed: collect every required contribution or resolve early on another permitted outcome, preserve earlier submissions, cancel open siblings, and apply first-successful-commit concurrency and atomic rollback. Numeric bounds, exact resolver/node JSON and errors still require specification; runtime behavior remains to be verified. These generic rules do not select APOLO business approval policy.
+- **Submission contracts:** node-wide simple-input/result contracts, explicit empty input declarations and forbidden/optional/required result presence rules are agreed in language design section 15.4. Top-level result null is rejected; nested nulls follow the schema. Exact descriptors, schema profiles, start-input nesting and remaining optional-field defaults still require specification.
 - **Host associations:** APOLO ownership, instance-ID queries and optional engine correlation are selected. APOLO must specify its column/table shape, historical membership storage, authorization and start-time integration without making core depend on booking tables.
 - **Structured submissions:** result contract language/features and immutable reference resolution, payload/depth/collection/string limits, number and omitted/null/default rules, versioned canonicalization, public API/error shapes, bounded retrieval and prior-activity bindings remain specification gates. Define host business validation/aggregation and reviewer visibility without treating JSON as proof of membership or reviewed material. Draft/partial task saving is excluded.
 - **JSON variables:** exact declaration/schema, start/service/update bindings, authorized read projections, expression path syntax, full-value encoding/canonicalization, unset behavior and limits remain specification work. Whole-value replacement, SQL NULL for variable null and object/array roots are the selected initial shape. JSON-path search/indexing, patch/merge APIs and arbitrary Java-object serialization are not implied.

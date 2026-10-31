@@ -1,10 +1,10 @@
 # Project constraints
 
-**Version:** 2.2.0
+**Version:** 3.0.0
 
-**Recorded:** 2026-10-25
+**Recorded:** 2026-10-31
 
-**Applies to:** constitution v2.2.0 and the current separate-development phase
+**Applies to:** constitution v3.0.0 and the current separate-development phase
 
 Constraints are confirmed boundaries that specifications and implementations must satisfy. They are requirements, not evidence that the corresponding behavior already exists. This document makes the [constitution](constitution.md) operational without replacing the detailed [consolidated design](architecture/workflow-engine-design.md).
 
@@ -58,7 +58,9 @@ The engine's separate business_type/business_id fields are optional nonunique co
 
 ## CON-05 — Initial scope and delivery order
 
-Deliver a simple sandbox workflow, then one cross-team booking approval in APOLO, followed by the workflow designer. Initial execution uses START, HUMAN_TASK, SERVICE_TASK, DECISION and END, one active process position and multiple directly assigned tasks within an activity. Detailed completion rules, including proposed SINGLE/ALL policies and fixed rosters, require specification and do not establish APOLO approval policy.
+Deliver a simple sandbox workflow, then one cross-team booking approval in APOLO, followed by the workflow designer. Initial execution uses START, HUMAN_TASK, SERVICE_TASK, EXCLUSIVE_GATEWAY and END, one active process position and multiple directly assigned tasks within an activity. SINGLE is selected: a named resolver with declared validated inputs returns exactly one directly assigned task; invalid count or missing assignee fails entry. The accepted task outcome resolves the activity and follows its route within the same command transaction. ALL and the fixed task list are also agreed. Create the full bounded nonempty roster atomically; reject missing assignees and duplicate task keys. Audited reassignment preserves obligations; no additions, removals or waivers during an active review. Collect the configured contribution outcome from every task, or resolve immediately on another permitted outcome and cancel open siblings without changing prior submissions. The first decisive command that successfully commits under concurrency protection wins without implicit outcome priority; competing commands cannot overwrite it. Final or decisive submission, resolution, cancellations and synchronous progression roll back together on failure; prior committed contributions remain. Authorized successful retries retain receipt replay. Exact limits/API contracts remain open, and these rules do not establish APOLO approval policy.
+
+Use integer schemaVersion (initial 1), key/version fields and exactly one START node without startNodeKey. Start and human-task input contracts are explicit, with empty contracts rejecting additional input fields. Omitted guards means an empty list. Start authorization is optional via declared host guards, with no startPolicy.permission or mandatory start hook; absence of an authorization guard means no engine-side start authorization check. Human-task completion uses the same optional authorization-guard model. Language design section 12.1 defines nesting and descriptor notation under agreed L18; formal schemas, host APIs and remaining validation details still require specification.
 
 The simple persistent task catalog, task completion/cancellation, history, authorization and command reliability belong to initial scope. A business decision engine, decision tables and their storage/APIs/editor are optional later work and must not be dependencies of the first workflow.
 
@@ -104,9 +106,13 @@ APOLO resolves screens and handlers using the stable task code and retains suppo
 
 ## CON-09 — Strict inputs and restricted routing
 
-Use restricted SpEL over explicit validated `#facts` and `#vars`. Conditions return Boolean values. Exactly one matching predicate selects a route; no matches may use an explicit default. Multiple matches or evaluation/input errors fail the command.
+Use restricted SpEL over explicit validated `#facts` and `#vars`. Conditions return Boolean values. Evaluate non-default conditions in explicit declared priority order; the first true result selects a route and stops evaluation. Later conditions are not evaluated or recorded as false. If all conditions are false, use the separately identified unconditional default or fail if none exists. At most one default is allowed. Errors in evaluated conditions fail the command without fallback.
 
-Reject unsupported schema versions and semantics. Prevent type/constructor/bean access, general method invocation, assignment, mutation and arbitrary object access. Use an explicit syntax allowlist and bounded evaluation/input complexity. Expressions cannot fetch business data or read hidden time/random/global state.
+Validate all conditions' syntax and permitted features before publication. Preserve route order in the definition and expose it in the designer independently of diagram layout. Published order remains immutable and instances retain their pinned version. Exact notation and diagnostics remain specification work. This owner-selected revision of 2026-10-31 supersedes multiple-match rejection; it does not add a decision-table engine.
+
+Expression rules are centrally enforced and determined by the workflow-language version. Definitions have no independent expressionPolicy field; host configuration cannot replace those semantics. Engine upgrades preserve supported language versions or reject unsupported versions explicitly. Incompatible expression changes require a new language version. The legacy expression_policy database column requires separate persistence reconciliation, without rewriting applied migrations.
+
+Reject unsupported schema versions and semantics. Prevent type/constructor/bean access, general method invocation, assignment, mutation and arbitrary object access. Use explicit structural enforcement of the context's necessary syntax restrictions and bounded evaluation/input complexity. Expressions cannot fetch business data or read hidden time/random/global state. Within that controlled context, retain standard SpEL operator, precedence, short-circuit and null semantics; do not prohibit ordinary arithmetic by default. Decode declared workflow types before evaluation and reconcile exactness and missing-required-data checks with SpEL behavior. Context enforcement and upgrade compatibility require verification.
 
 Scalar types remain STRING, LONG, DECIMAL, BOOLEAN, DATE and DATETIME; execution variables also support JSON under CON-14. Preserve numeric precision and use explicit dates/unambiguous timestamps. Required inputs and declared service bindings must be validated. Exact encodings, nullability, limits and error codes remain to be specified.
 
@@ -114,7 +120,7 @@ Scalar types remain STRING, LONG, DECIMAL, BOOLEAN, DATE and DATETIME; execution
 
 ## CON-10 — Authorization and domain policy
 
-Obtain trusted identity from the host. Recheck authorization, assignment, state, version, inputs and guards during execution. Client-provided actor identity and arbitrary variable updates are not accepted; available-action queries are advisory.
+Obtain trusted identity from the host. For human-task completion, core executes the selected outcome's declared guards before accepting the submission, including authorization only when configured. Omission means no engine-side business-permission check. A declared guard must be registered and pass; denial or failure prevents completion and committed effects. Core rechecks assignment, state, version, declared outcome, comments, inputs/results and guards, then applies completion policy. Outcomes have no dedicated permission field; an authorization guard may bind a fixed permission argument through literal/value. Client-provided actor identity and arbitrary variable updates are not accepted; available-action queries are advisory.
 
 APOLO enforces no self-approval, country/business access and audited reassignment/overrides. Harmless booking edits may proceed; material changes invalidate review and require resubmission. APOLO defines materiality and owns booking rules, forms, approver sources and outcomes. The engine must not invent overbooking, routing or alternative-resource policy.
 
@@ -142,7 +148,7 @@ For temporary authorized runtime verification, stop processes afterward unless a
 
 ## CON-13 — Structured task submissions
 
-- Keep status, configured outcome, comment, scalar inputs and structured result distinct. The pinned human node declares result forbidden/optional/required and its embedded or immutable versioned contract. Preserve simple completions without optional results. No task-type business versions are introduced.
+- Keep status, configured outcome, comment, scalar inputs and structured result distinct. Each pinned human node explicitly declares one simple-input contract and one result contract shared by all outcomes; outcome-specific overrides are excluded initially. Permissions, guards and comment requirements belong to individual outcomes. Use inputContract: [] for no additional simple inputs. A forbidden result must be absent, an optional result may be absent, and a required result must be present. Any supplied result must be a valid object; reject top-level null and validate nested nulls against the schema. Preserve simple completions without results. No task-type business versions are introduced.
 - Validate bounded JSON object structure (including nested objects/arrays) in core, and business membership, completeness, permissions and reviewed material through configured host validation after the early instance claim and before acceptance/effects. Reject duplicate keys, unsupported values and lossy conversions. Exact schema features, bounds, null/default and number handling remain specification gates.
 - Store one authoritative immutable accepted submission in TASK_COMPLETED.details_json for each completed task, with required task/activity references and outcome agreement. Open/cancelled tasks have no successful submission. The proposed schema enforces at most one completion with a filtered unique task index; the executor enforces cross-table existence/state consistency. No separate result table/column is selected.
 - Expose authorized exact-task/activity completion APIs. Distinguish an open task from a completed task with no optional result; a missing required event is an integrity error. Respect sibling-review visibility, repeated activation identity and bounded retrieval. Hosts must not depend on arbitrary history parsing.

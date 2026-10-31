@@ -4,9 +4,9 @@
 
 | Document field | Value |
 | --- | --- |
-| Version | 0.8 — restored concrete engine design and complete proposed workflow example |
+| Version | 0.9 — ordered first-match workflow routing |
 | Status | Authoritative architecture baseline; exact contracts still require specification |
-| Date | 2026-10-24 |
+| Date | 2026-10-31 |
 | Initial host application | APOLO |
 | Development model | Initially separate workflow-core/workflow-test-host project; workflow-core later joins APOLO's Maven module structure |
 | Persistence target | Microsoft SQL Server through JPA persistence inside workflow-core |
@@ -20,7 +20,9 @@ This document consolidates the [original technical design](../../../apolo-docs/w
 
 Revision 0.8 restores compatible detail that was compressed during consolidation. The [original-design reconciliation](../../../apolo-docs/workflow-engine/architecture/original-design-reconciliation.md) accounts for all 51 original sections. The complete example in section 7.4 is a **proposed design illustration**, not a finalized schema or implemented engine. This restoration preserves F4/F5 and O1/O2/O6; it does not approve the remaining JSON contracts or APOLO business policies.
 
-**Status convention:** This is the authoritative architecture document for the decisions confirmed on 2026-10-24. **AGREED** identifies confirmed direction; **PROPOSED** identifies illustrative contracts; **PROVISIONAL** identifies tentative preferences; **OPEN** identifies unresolved engine/integration details; **DEFERRED — APOLO** identifies business or infrastructure decisions owned by APOLO. The decision register in section 22 is the status reference. Exact names, interfaces, JSON fields, tables, limits, and API paths remain proposed unless stated otherwise.
+Revision 0.9 records the owner's 2026-10-31 selection of ordered first-match workflow routing in section 7.3 and centrally enforced expression rules tied to the workflow-language version in section 5.3. These replace rejection of overlapping conditions and independent expression-policy selection. Exact JSON notation and legacy persistence reconciliation remain open. See constitution C08 and the source-precedence record for these revisions and the retained database-design amendments.
+
+**Status convention:** This is the authoritative architecture document for the decisions confirmed on 2026-10-24 and the explicitly recorded later amendments. **AGREED** identifies confirmed direction; **PROPOSED** identifies illustrative contracts; **PROVISIONAL** identifies tentative preferences; **OPEN** identifies unresolved engine/integration details; **DEFERRED — APOLO** identifies business or infrastructure decisions owned by APOLO. The decision register in section 22 is the status reference. Exact names, interfaces, JSON fields, tables, limits, and API paths remain proposed unless stated otherwise.
 
 **AGREED platform baseline:** Java 17 compilation target and JDK 21 runtime, confirmed by the project owner. APOLO's Java 17 POM settings are current and correct. The compiler JDK/toolchain is a separate setting to verify; this document does not claim a Java 21 compilation target. Other framework and dependency versions require verification against the application.
 
@@ -72,13 +74,13 @@ Workflow execution is the primary deliverable. Supporting expressions are limite
 | Restricted expression evaluation | Supporting capability within the first stage | Evaluate simple workflow predicates against explicit inputs | Boolean routing result |
 | Business decision engine | Optional later extension; not implemented in the first stage | Evaluate reusable business rules and decision tables independently of a workflow | approvalLevel = PARTNER |
 
-The first workflow release must build, start, publish definitions and run processes without a business decision library, decision-definition database tables or decision-management APIs. Its DECISION node is a routing node: it can select an outgoing transition using restricted expressions without a separate business decision engine.
+The first workflow release must build, start, publish definitions and run processes without a business decision library, decision-definition database tables or decision-management APIs. Its EXCLUSIVE_GATEWAY node is a routing node: it can select an outgoing transition using restricted expressions without a separate business decision engine.
 
 If the optional decision engine is introduced later, it should remain usable outside workflows and return business values that workflows map to transitions. That remains a future design direction, not an initial implementation requirement.
 
 ### 1.2 Initial scope
 
-The initial workflow release includes immutable JSON workflow definitions; explicit START, HUMAN_TASK, SERVICE_TASK, DECISION and END nodes; simple expression-based routing; one directly assigned task per activity; a persistent versioned task-type registry; JPA relational runtime storage; authorization hooks; transactional business actions; durable event handoff; command idempotency; audit history; and a sandbox.
+The initial workflow release includes immutable JSON workflow definitions; explicit START, HUMAN_TASK, SERVICE_TASK, EXCLUSIVE_GATEWAY and END nodes; simple expression-based routing; one directly assigned task per activity; a persistent versioned task-type registry; JPA relational runtime storage; optional authorization guards; transactional business actions; durable event handoff; command idempotency; audit history; and a sandbox.
 
 Restricted SpEL uses explicit #facts and #vars inputs. Guards remain registered host checks. No decision-table evaluator, FIRST/UNIQUE table policies, separate decision-definition lifecycle, standalone decision simulation or decision-table editor is implemented in this stage.
 
@@ -95,7 +97,7 @@ Do not create placeholder decision modules, tables or administration endpoints s
 ### 1.4 Changes from earlier direction
 
 - **Workflow first:** the earlier plan to deliver expressions, rules and workflow as three initial capabilities is superseded.
-- **Routing remains in scope:** the DECISION node uses workflow expressions initially. It is not synonymous with a standalone decision engine.
+- **Routing remains in scope:** the EXCLUSIVE_GATEWAY node uses workflow expressions initially. It is not synonymous with a standalone decision engine.
 - **Optional business decisions later:** business-value outputs, FIRST/UNIQUE policies and exact pinned decision versions remain design guidance only for that later component.
 - **Initial definitions are workflows:** decision JSON schemas, storage, APIs, simulation and editor are deferred with the optional component.
 - **Standalone development first, APOLO module later:** the test host exercises core while development is separate; core will later move into APOLO's source tree as a sibling module of backend. A permanently separate artifact publishing lifecycle is not required.
@@ -236,7 +238,7 @@ A sibling Maven aggregator used during separate development does not make APOLO'
 
 **Initial supporting scope:** implement the restricted evaluation needed for workflow routing. General typed-value and standalone decision examples below are proposed extension contracts; they do not require a standalone expression product before workflow delivery.
 
-**AGREED — O6:** use a small, strict Workflow Definition v1 and Expression Policy v1: five explicit node types, explicit transitions, declared and validated inputs/output bindings, scalar typed values and restricted Boolean routing expressions. Reject unsupported schema versions and semantic features. Arbitrary object-valued variables and broad scripting are outside the initial contract. The exact schema fields, encodings, operator allowlist, numeric limits and error-code catalog still require specification; agreement on this scope does not mean those artifacts already exist.
+**AGREED — O6:** use a small, strict Workflow Definition v1 including its expression rules: five explicit node types, explicit transitions, declared and validated inputs/output bindings, scalar typed values and restricted Boolean routing expressions. Reject unsupported schema versions and semantic features. Arbitrary object-valued variables and broad scripting are outside the initial contract. The exact schema fields, encodings, operator allowlist, numeric limits and error-code catalog still require specification; agreement on this scope does not mean those artifacts already exist.
 
 ### 5.1 Contract
 
@@ -275,15 +277,19 @@ O6 confirms these initial scalar types and precision requirements. Dates must be
 
 Missing required facts, disallowed null values, invalid conversions, and non-Boolean condition results are errors. A false condition means the business predicate evaluated successfully and did not match.
 
-### 5.3 Restricted SpEL execution policy
+### 5.3 Restricted SpEL execution rules
 
 Use `SimpleEvaluationContext` as the starting point. Spring documents that it supports a restricted subset and excludes Java type, constructor, and bean references, with explicit choices for property and method access. It is not a complete application security policy by itself. [R3](#r3-restricted-spel-context)
 
-The project must additionally enforce a versioned expression policy:
+**AGREED — revised 2026-10-31:** the engine centrally enforces expression rules as part of each workflow-language version. Definitions do not declare an independent `expressionPolicy`, and host configuration cannot select different expression semantics for the same language version. Incompatible rule changes require a new language version. An engine must preserve the rules of a supported version or reject that version explicitly.
+
+**Owner clarification — 31 October 2026 (L12):** retain standard SpEL syntax and operator, precedence, short-circuit and null semantics within the supported read-only context. Do not design a second expression language or exclude ordinary arithmetic by default. Decode supplied facts/variables into their declared types, preserve exact numeric values and missing-required-data errors, and require actual Boolean routing results. Necessary access/resource restrictions remain; specify and verify how context configuration and typed conversion satisfy those boundaries without silently changing supported SpEL semantics. Language-version compatibility also applies across Spring upgrades.
+
+The rules must enforce the following restrictions:
 
 - Expose only validated scalar values and bounded, immutable data structures. Never expose application services, persistence entities, class loaders, or arbitrary object graphs.
 - Disable assignment, mutation, automatic collection growth, and general method invocation. Use narrowly defined read-only accessors; do not rely on arbitrary Java getters being harmless.
-- Reject unsupported syntax before publication. Define an allowlist of operators and AST constructs rather than trying to blacklist a few dangerous strings.
+- Reject syntax outside the controlled context before publication. Enforce necessary access/resource restrictions structurally through supported AST constructs, rather than blacklisting a few strings or independently redefining ordinary SpEL operators.
 - Impose limits on expression length, AST complexity, input size, and total evaluations per command. Table-size limits belong to the optional later decision component. Initially exclude potentially costly features such as unrestricted regular-expression matching and collection traversal.
 - Return stable error codes without exposing internal objects, secrets, or stack traces to the caller.
 
@@ -293,7 +299,7 @@ A wall-clock timeout alone is not a guarantee that in-process computation stops 
 
 Parse through the supported SpEL parser; do not implement a second expression language. SpEL distinguishes parsing failures from evaluation failures, which should be translated into distinct domain errors. [R4](#r4-spel-evaluation)
 
-Reuse parsed expressions within one command or evaluation request. Do not start with an unbounded global cache. A bounded cache may be introduced after measurement, keyed by expression source, policy version, and relevant compilation configuration; never cache mutable evaluation contexts or previous input values.
+Reuse parsed expressions within one command or evaluation request. Do not start with an unbounded global cache. A bounded cache may be introduced after measurement, keyed by expression source, workflow-language version and relevant compilation configuration; never cache mutable evaluation contexts or previous input values.
 
 Do not allow hidden reads of the current time, random values, or mutable application globals. When a decision needs a date or timestamp, supply it explicitly as a fact so the evaluated inputs can be explained later.
 
@@ -464,7 +470,7 @@ The same versioned JSON contract is used by import/export, the future TypeScript
 | `START` | Explicit entry point for an instance |
 | `HUMAN_TASK` | Create an activity with one directly assigned task; wait for a supported outcome |
 | `SERVICE_TASK` | Invoke a registered synchronous host action with declared inputs/outputs in the enclosing transaction |
-| `DECISION` | Initially evaluate workflow predicates and select a route; pinned business decisions require the optional later extension |
+| `EXCLUSIVE_GATEWAY` | Evaluate Boolean conditions on outgoing transitions in priority order and select one route; no node-level calculation or business-result output |
 | `END` | Complete the instance with a defined result |
 
 **PROPOSED graph constraints:** one start node with no incoming transition; at least one end node with no outgoing transitions; all executable nodes reachable from start. Human-task outcomes select explicit outgoing transitions. These exact constraints and start/end semantics must be formalized in Workflow Definition v1.
@@ -479,7 +485,7 @@ Starting an instance resolves an eligible published version once and pins it. St
 
 A **guard** determines whether a requested operation is permitted and returns structured reasons when it is blocked. A **decision** chooses an outcome after valid inputs have been supplied. A **business action** performs an explicitly registered, synchronous domain operation.
 
-Named guards, actions, assignment resolvers, and permissions are extension references, not arbitrary executable Java stored in JSON. Definitions cannot instantiate classes or access Spring beans by expression.
+Named guards, actions and assignment resolvers are extension references, not arbitrary executable Java stored in JSON. Start and human-task outcome authorization are optional through registered guards with fixed permission inputs; neither requires a mandatory authorization hook. Definitions cannot instantiate classes or access Spring beans by expression.
 
 Available-action queries are advisory. Execution must recheck state, version, authorization, assignment, inputs, and guards inside the command's transactional path.
 
@@ -487,7 +493,7 @@ Available-action queries are advisory. Execution must recheck state, version, au
 
 Preserve technical keys independently of names, translated labels and graph coordinates. Display labels do not select transitions. Published documents remain immutable even when a proposed change affects only a label or layout; edit a new draft version.
 
-**Proposed transition contract:** key, source node, target node and optional display metadata; a human-task transition additionally identifies a supported outcome and may require a host permission, named guards and a comment. A decision transition carries a Boolean predicate or an explicit default marker. START/SERVICE_TASK success edges are automatic. Actions execute in SERVICE_TASK nodes and event delivery is governed by section 13, not executable transition hooks.
+**Proposed transition contract:** key, source node, target node and optional display metadata; a human-task transition identifies an outcome declared by its pinned node. Guards and comment requirements belong to that outcome; permission identifiers do not. The engine executes the selected outcome's guards before accepting completion; authorization is checked only when a guard is declared for it. A decision transition carries a Boolean predicate or an explicit default marker. START/SERVICE_TASK success edges are automatic. Actions execute in SERVICE_TASK nodes and event delivery is governed by section 13, not executable transition hooks.
 
 Distinguish the task outcome from the edge identity: both manager and partner tasks can produce `APPROVE`, while the complete example uses distinct `MANAGER_APPROVE` and `PARTNER_APPROVE` transition keys. Definition-wide edge-key uniqueness is the example's proposal; the final key scope must be specified. A command must resolve an edge belonging to the instance's current node and active task, rather than accepting an arbitrary destination node.
 
@@ -507,7 +513,9 @@ Only expose reasons/details the caller is authorized to see. A guard denial mean
 
 ### 7.3 Routing alternatives
 
-For initial expression-based routing, evaluate all non-default outgoing predicates. Exactly one true result selects that transition. Zero matches use an optional default; zero matches without a default and multiple matches are errors. An evaluation error must fail the command, never fall through to a default. This graph-routing rule does not require a decision-table engine or its UNIQUE hit policy.
+**AGREED — revised 2026-10-31:** evaluate non-default outgoing conditions in the explicit priority order declared by the workflow definition. Select the first Boolean true result and stop; later conditions are not evaluated and must not be reported as false. Overlapping conditions are allowed and resolved by order. If all conditions are false, take the separately identified unconditional default, if present; otherwise fail the command. At most one default is allowed. A failure in an evaluated condition, including missing required values, invalid conversions or non-Boolean results, fails the command and never falls through to a later route or default.
+
+Validate all conditions' syntax and permitted features before publication. Preserve evaluation order through serialization and designer editing; diagram layout must not change priority. Published order is immutable and instances retain their pinned definition version. The gateway's conditional routes use their relative order in the top-level transitions array; the default is considered only after all conditions are false, regardless of its position. Language design section 12.1.16 defines the JSON fields. Diagnostic contracts remain specification work. Warnings for obvious unreachable routes are optional future authoring aids, not a promise of complete static overlap detection. This replaces the earlier exactly-one-match rule and does not require the deferred decision-table engine or selectable FIRST/UNIQUE policies.
 
 **Optional later decision-table routing:** only when the deferred business decision component is implemented, evaluate its pinned definition and map a business output to a transition owned by the current node:
 
@@ -530,7 +538,7 @@ The workflow engine validates the mapping and the transition's source. An unknow
 
 ### 7.4 Complete proposed workflow example
 
-**PROPOSED illustration — not a published specification or executable fixture.** This replaces the original section 38 example with the current five-node model. The JSON is complete for the illustrated graph, but its field names, binding notation, schema/policy identifiers, validation details and host contracts still require Workflow Definition v1, Expression Policy v1 and registry specifications. `schemaVersion: 1` below is a proposed label, not evidence that a v1 schema exists.
+**PROPOSED illustration — not a published specification or executable fixture.** This replaces the original section 38 example with the current five-node model. The owner selected integer `schemaVersion: 1` and a single START entry without startNodeKey on 31 October 2026; this does not mean a formal v1 schema exists. Remaining notation and host contracts still require specification. The later database and [language-design decisions](workflow-definition-language-design.md#154-agreed-decisions-and-remaining-details) take precedence over older task-contract illustrations here.
 
 The scenario is a synthetic **sandbox planning review**, preserving the original example's explanatory purpose. It does not select planning as the first APOLO integration: that remains cross-team booking approval. Manager/partner routing, sample thresholds and the adjustment loop are fixtures, not confirmed APOLO business policy. In particular, same-instance resubmission remains PROVISIONAL under O3 and is shown only to explain possible re-entry semantics.
 
@@ -552,12 +560,12 @@ There is one directly assigned active human task at a time. The adjustment cycle
 
 #### Proposed notation used in this example
 
-- `startNodeKey` and `startPolicy` describe the entry point and its host permission/guards. Drafting the business request occurs in the host before start; it is not a generic waiting STATE node.
+- The unique START node is the entry point. `startPolicy` describes explicit start inputs and optional guards. Start authorization is optional through a declared host guard, with no permission field or mandatory start hook. Drafting the business request occurs in the host before start; it is not a generic waiting STATE node.
 - `factProvider` is a logical host extension key. Only `CAPTURE_REVIEW` requests its listed `readFacts`; resolve these at each entry in the command transaction. They are trusted host projections, not client-supplied approval results.
 - `inputs` binds declared action inputs from named facts/variables or typed literals. These objects are binding metadata, not object-valued workflow variables. `outputs` maps action output names to declared variables. An empty object means that direction has no values. The action registry supplies matching input/output signatures, checked at publication and at runtime.
 - Snapshot variables have `nullable: false`; CAPTURE_REVIEW initializes them before any read. Absence before initialization is distinct from a permitted null value. Every successful waiting position in this example has a complete review snapshot.
-- Human-task `outcome` edges are linked to exact registry versions. `permission`, `guards` and `requiresComment` apply before task completion. Unspecified comment requirements are false for this illustration. The command envelope permits a comment, but its `input` object is empty for these sample outcomes; business form updates use the host endpoint.
-- START and successful SERVICE_TASK nodes have one unconditional edge. DECISION has one predicate and one default. No edge contains business actions or executable event hooks. Service output-validation failure fails the command; it does not take the success edge.
+- Human-task `outcome` edges are linked to exact registry versions. The engine executes declared outcome guards before task completion; authorization guards are optional and outcomes contain no dedicated `permission` field. Guards and comment requirements follow the pinned human-node contract. Unspecified comment requirements are false for this illustration. The command envelope permits a comment, but its `input` object is empty for these sample outcomes; business form updates use the host endpoint.
+- START and successful SERVICE_TASK nodes have one unconditional edge. EXCLUSIVE_GATEWAY has one predicate and one default. No edge contains business actions or executable event hooks. Service output-validation failure fails the command; it does not take the success edge.
 - END `result` is a business outcome distinct from instance lifecycle status. Publication state, database IDs, draft revisions and publication audit metadata live in the definition-management envelope and are omitted from the portable graph illustration.
 
 #### Complete definition
@@ -565,13 +573,11 @@ There is one directly assigned active human task at a time. The adjustment cycle
 ```json
 {
   "schemaVersion": 1,
-  "expressionPolicy": "restricted-v1",
   "key": "sandbox-planning-approval",
   "name": "Sandbox planning approval",
   "version": 1,
-  "startNodeKey": "START",
   "startPolicy": {
-    "permission": "PLANNING_SUBMIT",
+    "inputContract": [],
     "guards": ["planningComplete", "noBlockingConflicts"]
   },
   "factProvider": "sandboxPlanningFacts",
@@ -607,7 +613,7 @@ There is one directly assigned active human task at a time. The adjustment cycle
       "taskType": "sandbox.review", "taskTypeVersion": 1,
       "assignment": {"resolver": "sandboxManager"}
     },
-    {"key": "APPROVAL_ROUTE", "type": "DECISION", "name": "Partner review required?"},
+    {"key": "APPROVAL_ROUTE", "type": "EXCLUSIVE_GATEWAY", "name": "Partner review required?"},
     {
       "key": "PARTNER_REVIEW", "type": "HUMAN_TASK", "name": "Partner review",
       "taskType": "sandbox.review", "taskTypeVersion": 1,
@@ -651,16 +657,16 @@ There is one directly assigned active human task at a time. The adjustment cycle
     {"key": "OPEN_MANAGER_REVIEW", "from": "CAPTURE_REVIEW", "to": "MANAGER_REVIEW"},
     {
       "key": "MANAGER_APPROVE", "from": "MANAGER_REVIEW", "to": "APPROVAL_ROUTE",
-      "outcome": "APPROVE", "permission": "PLANNING_APPROVE",
+      "outcome": "APPROVE",
       "guards": ["noBlockingConflicts"]
     },
     {
       "key": "MANAGER_REJECT", "from": "MANAGER_REVIEW", "to": "FINALIZE_REJECTION",
-      "outcome": "REJECT", "permission": "PLANNING_APPROVE", "requiresComment": true
+      "outcome": "REJECT", "requiresComment": true
     },
     {
       "key": "MANAGER_REQUEST_CHANGES", "from": "MANAGER_REVIEW", "to": "REQUEST_ADJUSTMENT",
-      "outcome": "REQUEST_CHANGES", "permission": "PLANNING_APPROVE", "requiresComment": true
+      "outcome": "REQUEST_CHANGES", "requiresComment": true
     },
     {
       "key": "PARTNER_REQUIRED", "from": "APPROVAL_ROUTE", "to": "PARTNER_REVIEW",
@@ -669,26 +675,26 @@ There is one directly assigned active human task at a time. The adjustment cycle
     {"key": "DIRECT_APPROVAL", "from": "APPROVAL_ROUTE", "to": "FINALIZE_APPROVAL", "default": true},
     {
       "key": "PARTNER_APPROVE", "from": "PARTNER_REVIEW", "to": "FINALIZE_APPROVAL",
-      "outcome": "APPROVE", "permission": "PLANNING_PARTNER_APPROVE",
+      "outcome": "APPROVE",
       "guards": ["noBlockingConflicts"]
     },
     {
       "key": "PARTNER_REJECT", "from": "PARTNER_REVIEW", "to": "FINALIZE_REJECTION",
-      "outcome": "REJECT", "permission": "PLANNING_PARTNER_APPROVE", "requiresComment": true
+      "outcome": "REJECT", "requiresComment": true
     },
     {
       "key": "PARTNER_REQUEST_CHANGES", "from": "PARTNER_REVIEW", "to": "REQUEST_ADJUSTMENT",
-      "outcome": "REQUEST_CHANGES", "permission": "PLANNING_PARTNER_APPROVE", "requiresComment": true
+      "outcome": "REQUEST_CHANGES", "requiresComment": true
     },
     {"key": "OPEN_REQUESTER_REVISION", "from": "REQUEST_ADJUSTMENT", "to": "REQUESTER_REVISION"},
     {
       "key": "REQUESTER_RESUBMIT", "from": "REQUESTER_REVISION", "to": "CAPTURE_REVIEW",
-      "outcome": "RESUBMIT", "permission": "PLANNING_SUBMIT",
+      "outcome": "RESUBMIT",
       "guards": ["planningComplete", "noBlockingConflicts"]
     },
     {
       "key": "REQUESTER_CANCEL", "from": "REQUESTER_REVISION", "to": "FINALIZE_CANCELLATION",
-      "outcome": "CANCEL", "permission": "PLANNING_CANCEL", "requiresComment": true
+      "outcome": "CANCEL", "requiresComment": true
     },
     {"key": "APPROVAL_RECORDED", "from": "FINALIZE_APPROVAL", "to": "APPROVED"},
     {"key": "REJECTION_RECORDED", "from": "FINALIZE_REJECTION", "to": "REJECTED"},
@@ -722,7 +728,7 @@ The following are **proposed companion contracts**, not implementations or a fin
 - `sandboxPlanningFacts` reads the host business object using the trusted business reference and supplies currentBudget/approvalThreshold as DECIMAL and riskLevel as STRING. It validates the sample's accepted risk values HIGH/LOW and supplies all required facts. A missing/invalid fact fails; it is not treated as a default-route signal.
 - `capturePlanningReview` accepts `(budget: DECIMAL, threshold: DECIMAL, risk: STRING)` and returns the same typed output names after validation. In this sample it also marks the host request UNDER_REVIEW within the command transaction. The engine writes only the three declared output bindings. Current review values can be refreshed on resubmission, while prior snapshot evidence remains in history.
 - `setPlanningOutcome` accepts one STRING outcome from the declared sample set CHANGES_REQUESTED/APPROVED/REJECTED/CANCELLED, returns no outputs and applies the corresponding domain update in the same transaction. It verifies the appropriate domain state/version so unrelated business edits cannot bypass consistency checks. Neither the endpoint nor another action repeats its effect.
-- `sandboxManager`, `sandboxPartner` and `sandboxRequester` resolve one direct assignee each. A missing resolver/eligible assignee fails the command. Host authorization checks business access and no self-approval on review tasks; resubmission is performed by the requester. Exact permission identifiers above are sandbox identifiers, not verified APOLO permissions.
+- `sandboxManager`, `sandboxPartner` and `sandboxRequester` resolve one direct assignee each. A missing resolver/eligible assignee fails the command. APOLO owns business access and no-self-approval policy; resubmission is performed by the requester. This older example declares no start authorization guard and therefore performs no engine-side start authorization check. This older example also declares no outcome authorization guards: it illustrates workflow checks, not a production permission policy. The complete booking example in the language design shows explicit optional authorization guards.
 - `planningComplete` and `noBlockingConflicts` are host guard implementations with structured denial reasons. The host owns their business logic. Core knows only their logical keys.
 - Core records workflow/task/transition events through its neutral durable event-recorder contract. The host actions own any planning-domain event records, such as planning approved, using the same transaction. Host delivery handles notifications after commit; there are no broker destinations or notification calls in the definition.
 
@@ -731,8 +737,8 @@ The following are **proposed companion contracts**, not implementations or a fin
 #### Worked command sequence and failure behavior
 
 1. The requester saves the domain draft and submits through the host endpoint. A start command has a unique command ID and trusted actor/business reference. After start authorization/guards, CAPTURE_REVIEW reads and validates facts, records the snapshot and opens a manager task. Instance, domain update, task, history, durable handoff and receipt commit together.
-2. With LOW risk, budget 480000 and threshold 500000, manager APPROVE selects DIRECT_APPROVAL and executes FINALIZE_APPROVAL before ending. With budget 520000 or HIGH risk, it opens PARTNER_REVIEW instead. The OR expression collapses the original two table rows that had the same partner outcome, avoiding two matching outgoing predicates. A later routing table with different prioritized outputs cannot be mechanically converted this way.
-3. Partner APPROVE executes the same FINALIZE_APPROVAL service. A rejected review uses FINALIZE_REJECTION; a change request records the domain change through REQUEST_ADJUSTMENT and opens the requester task. Required comments and permissions are enforced before closing the review task.
+2. With LOW risk, budget 480000 and threshold 500000, manager APPROVE selects DIRECT_APPROVAL and executes FINALIZE_APPROVAL before ending. With budget 520000 or HIGH risk, it opens PARTNER_REVIEW instead. The OR expression combines the original two table rows that had the same partner outcome into one condition. This example has one conditional route and a default. Definitions with several conditions must preserve their explicit priority order under section 7.3.
+3. Partner APPROVE executes the same FINALIZE_APPROVAL service. A rejected review uses FINALIZE_REJECTION; a change request records the domain change through REQUEST_ADJUSTMENT and opens the requester task. Required comments and declared guards are enforced before closing the review task. Business-permission checks require an authorization guard or host endpoint policy.
 4. In the illustrative adjustment variant, REQUESTER_RESUBMIT refreshes the snapshot and creates a new manager activity/task; earlier activities remain closed and visible. REQUESTER_CANCEL completes the requester task with its CANCEL outcome, updates the domain and ends the instance with result CANCELLED. This outcome is not an implicit administrative task-cancellation operation.
 5. Each mutation uses its command ID and expected concurrency token. An identical retry returns the committed result without another task/action/event handoff; a changed request with the same ID conflicts. Tokens, request fingerprints and HTTP encodings remain to be specified.
 6. If approval finalization, output validation, assignment, persistence flush or durable recording fails, roll back the whole command. The prior review task remains open and no successful receipt/transition is committed. Invalid predicates never take the default edge. Required evidence for these behaviors is still pending implementation; this document does not execute a workflow or tests.
@@ -743,7 +749,7 @@ An example history for the partner path would show start and snapshot capture, m
 
 Automatic routing must be bounded and recorded. Under the agreed synchronous service-task model, a command resolves start/service/decision nodes until a human task or end node is reached. A successful command cannot leave an instance stranded in a decision node.
 
-Reject automatic-only cycles at publication and impose a per-command step limit; 50 remains a proposed starting value. Exceeding the limit fails and rolls back the command. Finalize the cycle-validation algorithm, exact limit and error codes in the specification.
+Reject automatic-only cycles at publication and impose a per-command limit of 50 automatic steps, selected under L16 on 31 October 2026. Count each visit to START, SERVICE_TASK (including its action), EXCLUSIVE_GATEWAY or END as one step. HUMAN_TASK and transitions cost zero; entering a human task pauses progression. Each command has a fresh allowance, and a nonfinal ALL contribution uses none. Allow the 50th step, but fail before executing a 51st and roll back the entire command, including service changes and any triggering task completion; earlier successful commands remain committed. Language design section 14.2 defines the counting examples and boundary rules. The cycle-validation algorithm, error codes and verification against representative workflows remain specification work.
 
 ## 8. Workflow data and extension contracts
 
@@ -772,7 +778,7 @@ For example, snapshot a sandbox budget of 520000 and threshold of 500000 at subm
 | `WorkflowGuard` | Check business preconditions and return structured blocking reasons |
 | `WorkflowAction` | Perform allowed domain changes in the enclosing transaction |
 | `AssignmentResolver` | Resolve one direct assignee for the initial task activity |
-| `WorkflowAuthorization` | Check host permissions and access to the business object |
+| Authorization guard (for example, `hasAuthorisation`) | Optional registered host guard for start or a human outcome; receives trusted context and declared inputs. When present it must pass. No mandatory WorkflowAuthorization completion hook is required. |
 | `WorkflowDataProvider` | Prepare explicitly declared facts before expression evaluation |
 | `WorkflowEventRecorder` | Persist a durable event handoff in the transaction |
 
@@ -808,13 +814,13 @@ The first vertical slice uses one activity with one assigned task and `SINGLE` c
 
 ### 9.2 Collective approval extension
 
-`ALL`, `ANY`, and `QUORUM` are a bounded extension of the task model, not a prerequisite for the first executable slice. Introduce them when the first APOLO process needs them, with explicit answers for rejection precedence, quorum calculation, reassignment, abstention, and cancellation of remaining work.
+The 31 October 2026 owner decision selects `SINGLE`, `ALL` and a fixed task list; see [language design sections 9.2–9.3](workflow-definition-language-design.md#92-creating-and-assigning-review-tasks). `ALL` collects one configured outcome from every required task, or resolves early on another permitted outcome and cancels open siblings. The first decisive command that successfully commits wins without implicit outcome priority. Submission, resolution, cancellations and synchronous progression share one transaction; failure preserves earlier committed contributions. Audited reassignment preserves the fixed obligations. Exact limits and runtime contracts remain specification work. `ANY`, `QUORUM`, abstention and dynamic task lists remain outside the initial scope.
 
 A group of candidate users for one claimable task is different from separate required approvals. The schema and UI must not confuse these concepts. Unsupported completion policies must fail validation rather than degrade to `SINGLE`.
 
 ### 9.3 Task lifecycle
 
-**AGREED initial scope:** one directly assigned approver, task completion, cancellation, and history. Approve, reject, and request-changes are outcomes, not separate lifecycle statuses. `OPEN`, `COMPLETED`, and `CANCELLED` are the proposed status encoding. Claim/release, candidate groups, delegation, expiration, timers, and collective approval are deferred. A due date, if included, is metadata and does not trigger automatic expiration.
+**AGREED initial scope:** directly assigned tasks with the selected SINGLE/ALL policies and fixed task list, task completion, cancellation, and history. Approve, reject, and request-changes are outcomes, not separate lifecycle statuses. `OPEN`, `COMPLETED`, and `CANCELLED` are the proposed status encoding. Claim/release, candidate groups, general delegation, expiration, timers, and collective policies beyond SINGLE/ALL are deferred. A due date, if included, is metadata and does not trigger automatic expiration.
 
 For a human task, execution requires host business authorization and direct assignment, unless the host explicitly grants an audited override. APOLO enforces no self-approval and country/business access checks, with audited reassignment and administrator overrides. The engine exposes neutral authorization contracts and records the trusted actor; country rules are not hard-coded. Resolver failure or an empty required assignment is a visible error.
 
@@ -863,11 +869,11 @@ Do not conflate:
 | Version | Meaning |
 | --- | --- |
 | Library release | Version of the Java implementation |
-| JSON `schemaVersion` | Version of the definition language |
+| JSON `schemaVersion` | Version of the definition language, including its expression rules |
 | Definition `version` | Immutable revision of a particular workflow or decision |
 | Draft revision / row version | Concurrency token for an editable record |
 
-Maintain an expression-policy identifier in publication metadata so audit records can identify the evaluation restrictions used. An engine upgrade can still affect behavior; regression testing of published examples is required before claiming compatibility.
+Record the workflow-language version and relevant engine/validator implementation identity in publication and audit metadata. The language version determines the expression rules; there is no independently selected expression-policy version. Engine upgrades must preserve those rules for supported versions. Compatibility evidence is required before claiming support, subject to the project's current verification instructions. The existing F001 `expression_policy` column requires separately specified persistence reconciliation; do not alter applied changesets or imply that a schema migration has already occurred.
 
 ### 10.2 Lifecycle
 
@@ -906,7 +912,7 @@ The complete published document, including any embedded `designer` metadata, is 
 
 1. Parse JSON with duplicate-property detection; validate the schema version and supported fields/types.
 2. Check document/key identity, unique node keys and the selected transition-key scope; resolve all source/target references.
-3. Validate the selected entry/end constraints, reachability, human outcomes, decision defaults and node-specific properties. The complete example proposes one unconditional success edge for START/SERVICE_TASK and at most one default edge for DECISION; exact cardinalities remain specification work.
+3. Validate the selected entry/end constraints, reachability, human outcomes, decision defaults and node-specific properties. The complete example proposes one unconditional success edge for START/SERVICE_TASK and at most one default edge for EXCLUSIVE_GATEWAY; exact cardinalities remain specification work.
 4. Detect automatic-only cycles and validate execution-bound configuration. Loops passing through a human task require new activity semantics and are distinct from automatic cycles.
 5. Check declared variable types, input/output bindings, initialization before required reads where determinable, and permitted variable writers.
 6. Parse routing expressions and enforce the policy allowlist/limits; validate expected Boolean results and resolvable variable references.
@@ -1105,7 +1111,6 @@ Illustrative properties, to be formalized during implementation:
 workflow.enabled=true
 workflow.persistence.schema=wf
 workflow.execution.max-automatic-steps=50
-workflow.expression.policy=restricted-v1
 ```
 
 HTTP controllers initially live in the sandbox and APOLO integration packages, delegating to shared application services. A reusable web-adapter artifact can be extracted when both hosts demonstrate a genuinely common contract.
@@ -1140,9 +1145,9 @@ visual editor <-> TypeScript definition model <-> canonical workflow JSON
                -> workflow codec -> typed Java definition -> engine
 ```
 
-Keep visual and JSON modes synchronized against that one contract. Until edited JSON parses and validates sufficiently for a graph, show the error and preserve the draft text rather than silently replacing it with an older graph. START/END use entry/terminal shapes, HUMAN_TASK a review node, SERVICE_TASK an action node and DECISION a routing node; transitions remain edges. These visual choices are proposals, not a selected graph library.
+Keep visual and JSON modes synchronized against that one contract. Until edited JSON parses and validates sufficiently for a graph, show the error and preserve the draft text rather than silently replacing it with an older graph. START/END use entry/terminal shapes, HUMAN_TASK a review node, SERVICE_TASK an action node and EXCLUSIVE_GATEWAY a routing node; transitions remain edges. These visual choices are proposals, not a selected graph library.
 
-Node properties expose supported task-type versions, direct assignment resolution, service inputs/outputs and terminal result as appropriate to the node type. Human edges expose outcomes, permissions, guards and comment requirements; decision edges expose a predicate/default. Do not restore transition actions or a decision-table panel to initial scope. Type/variable declarations supply editor choices; backend errors identify the relevant field/node/edge. Optional layout coordinates are keyed by stable node keys and never affect routing.
+Node properties expose supported task-type versions, direct assignment resolution, service inputs/outputs and terminal result as appropriate to the node type. Human nodes expose outcomes, guards and comment requirements; their transitions select routes and contain no permission identifiers; decision edges expose conditions, explicit evaluation priority and a separately identified unconditional default. Authors must be able to inspect and deliberately change priority. Do not restore transition actions or a decision-table panel to initial scope. Type/variable declarations supply editor choices; backend errors identify the relevant field/node/edge. Optional layout coordinates are keyed by stable node keys and never affect routing.
 
 ### 15.3 Host connectivity and security
 
@@ -1385,7 +1390,7 @@ The destination and dependency direction are agreed. Timing, final coordinates, 
 
 ### 20.1 Required test layers
 
-Use pure Java tests for workflow graph and predicate-routing semantics; expression-policy tests against the chosen SpEL baseline; SQL Server integration tests for persistence and transactions; Spring context tests for host integration; and, at the later designer milestone, frontend round-trip/validation tests. Build to Java 17 compatibility and run the sandbox and integration checks on JDK 21.
+Use pure Java tests for workflow graph and predicate-routing semantics; expression-rule tests against the chosen SpEL baseline; SQL Server integration tests for persistence and transactions; Spring context tests for host integration; and, at the later designer milestone, frontend round-trip/validation tests. Build to Java 17 compatibility and run the sandbox and integration checks on JDK 21.
 
 A simplified in-memory repository is useful for fast engine tests, but it is not evidence that SQL Server concurrency or rollback behavior is correct. Run persistence tests against an isolated real SQL Server fixture.
 
@@ -1397,7 +1402,7 @@ A simplified in-memory repository is useful for fast engine tests, but it is not
 | Failure handling | Missing facts, type errors, and expression errors do not become false or default approval |
 | Expression restrictions | Type access, constructor calls, bean access, mutation, method invocation, and disallowed costly constructs are rejected |
 | Precision | Decimal thresholds and large identifiers survive workflow JSON/backend round trips; editor round trips are tested at the later designer milestone |
-| Routing | Exactly one matching workflow predicate selects a route; zero matches use an explicit default if present; multiple matches/errors fail |
+| Routing | First true condition in declared priority order selects a route and stops evaluation; all false uses the explicit default or fails if absent; evaluated-condition errors fail without fallback; publication validates every condition |
 | Completion | Both direct approval and partner approval perform the same required business finalization |
 | Review invalidation | Material-change approval invalidation is enforced by the APOLO integration; same-instance resubmission tests await confirmation of the provisional flow |
 | Publication | Invalid graphs, unresolved extensions, unsupported decision-table references and duplicate keys rejected |
@@ -1416,7 +1421,7 @@ A simplified in-memory repository is useful for fast engine tests, but it is not
 
 If the optional business decision engine is introduced, add FIRST/UNIQUE policy, output mapping, independent evaluation and pinned-definition tests at that time. They are not initial workflow acceptance criteria.
 
-Additional collective-approval tests become mandatory before enabling `ALL`, `ANY`, or `QUORUM`.
+Document verification scenarios for the agreed `ALL` behavior before implementation, including fixed obligations, concurrent submissions and rollback. The current owner instruction prohibits adding or running automated tests unless changed; unperformed checks remain NOT RUN. `ANY` and `QUORUM` remain deferred.
 
 ### 20.3 First end-to-end success criterion
 
@@ -1428,7 +1433,7 @@ No business decision engine, decision table or full graphical editor is required
 
 | Milestone | Deliverable and exit condition |
 | --- | --- |
-| 0 — Workflow contracts and compatibility | Formalize agreed O1/O2/O6 in Workflow Definition v1, Expression Policy v1 and registry contracts, with schemas/examples; verify O7 against the host's Java 17 target/JDK 21 baseline |
+| 0 — Workflow contracts and compatibility | Formalize agreed O1/O2/O6 in Workflow Definition v1 (including expression rules) and registry contracts, with schemas/examples; verify O7 against the host's Java 17 target/JDK 21 baseline |
 | 1 — Working workflow in the sandbox | Five node types, one directly assigned task, registry/API/import, simple restricted routing, JPA/SQL Server persistence, audit, atomic commands, concurrency, idempotency and durable handoff |
 | 2 — Early APOLO integration | Cross-team booking approval through its domain endpoint; host authorization, registry compatibility, dependency alignment and shared-transaction rollback |
 | 3 — Workflow designer | Graph/JSON editing, registered task types, routing expressions, validation and controlled publication; no decision-table editor required |
@@ -1437,7 +1442,7 @@ No business decision engine, decision table or full graphical editor is required
 
 Do not insert a standalone expression product or business decision engine ahead of the first working workflow. Implement and test the restricted expression support as part of the workflow slice. The optional business decision component has no committed delivery milestone and must not block sandbox, APOLO integration or workflow designer work.
 
-Timers, collective approvals and advanced orchestration remain separate deferred capabilities. Authorization, concurrency, atomicity and durable handoff remain mandatory.
+Timers, collective approvals and advanced orchestration remain separate deferred capabilities. Concurrency, atomicity and durable handoff remain mandatory. Start/outcome authorization is optional through declared guards; host query and receipt-access controls still apply.
 
 ## 22. Decision register and open items
 
@@ -1453,7 +1458,7 @@ The Q identifiers trace the decision questionnaire; F1/F2/F3 reconcile the devel
 | Q4–Q5 | Human tasks in the first working workflow; one direct assignee per activity; completion, cancellation and history; other task capabilities deferred |
 | Q6 | Persistent versioned task-type registry with host compatibility checks before publication |
 | Q7 | Visual designer after the first successful APOLO integration |
-| Q8 | Explicit START, HUMAN_TASK, SERVICE_TASK, DECISION and END nodes |
+| Q8 | Explicit START, HUMAN_TASK, SERVICE_TASK, EXCLUSIVE_GATEWAY and END nodes |
 | Q9 | #facts/#vars workflow expressions initially; business-value outputs and FIRST/UNIQUE retained only for the optional later decision component (F3) |
 | Q10 | DRAFT/PUBLISHED/RETIRED; validation results tied to exact draft revisions |
 | Q11 | Atomic domain/workflow changes, concurrency protection, command idempotency, durable event handoff |
@@ -1477,6 +1482,8 @@ The sibling Maven workspace remains optional during separate development. The tw
 
 ### 22.2 Review outcomes, remaining specifications and ownership
 
+**Owner amendment — 2026-10-31:** O6 routing now uses ordered first-match selection as specified in section 7.3 and constitution C08. This supersedes the earlier multiple-match error rule. Exact route-order notation, expression diagnostics and optional authoring warnings remain specification work. Other unresolved contracts keep their recorded status.
+
 | ID | Status / owner | Question and required decision point |
 | --- | --- | --- |
 | O1 | AGREED — engine contract; specification pending | Synchronous registered SERVICE_TASK actions in the enclosing transaction, declared/validated inputs and outputs, rollback on failure, no automatic business-command retries. Workflow business actions live in service nodes, not transitions; each effect has one owner. Continue automatic nodes to a human task/end with a step limit. Specify bindings, limits and error codes before implementation. |
@@ -1497,7 +1504,7 @@ No migration of existing APOLO runtime instances, automatic replacement of exist
 
 ### 22.3 Next implementation artifacts
 
-Create **Workflow Definition v1**, the workflow-required **Expression Policy v1** and registry API/import/capability contracts, with schemas and executable examples/tests. O1/O2/O6 direction is agreed; formalize its remaining exact fields, encodings, limits and interfaces before implementation. O7 remains pending verification; no compiler JDK, concurrency-token mapping or effective dependency versions are newly confirmed. APOLO concerns remain deferred, including the provisional O3 resubmission preference. **Decision Definition v1**, decision-table fixtures and their schemas remain deferred. These are planned artifacts, not files created by this update.
+Create **Workflow Definition v1**, including its expression rules, and registry API/import/capability contracts, with schemas and executable examples/tests. O1/O2/O6 direction is agreed; formalize its remaining exact fields, encodings, limits and interfaces before implementation. O7 remains pending verification; no compiler JDK, concurrency-token mapping or effective dependency versions are newly confirmed. APOLO concerns remain deferred, including the provisional O3 resubmission preference. **Decision Definition v1**, decision-table fixtures and their schemas remain deferred. These are planned artifacts, not files created by this update.
 
 ## 23. Technical references
 

@@ -12,7 +12,7 @@ Read these documents in order:
 6. [Coding standards](coding-standards.md): practical clean-code guidance for Java, Spring, JPA and Lombok, applied during implementation and review.
 7. [Package structure](package-structure.md): agreed technical-layer-first Java hierarchy, dependency boundaries and exact F002 package assignments.
 
-The constitution is version **2.2.0**, established on **2026-10-24** and amended on **2026-10-25** to incorporate database design v1.4, including structured task submissions and JSON execution variables, and the project owner's subsequent decisions. It codifies the agreed direction; it does not establish that the planned engine has been implemented.
+The constitution is version **3.0.0**, established on **2026-10-24** and last amended on **2026-10-31** to select ordered first-match routing. It retains the earlier database design v1.4 amendments for structured task submissions and JSON execution variables. It codifies the agreed direction; it does not establish that the planned engine has been implemented. Existing F001/F002 records retain their historical constitution baselines; this routing amendment does not change their schema or catalog contracts.
 
 ## Document responsibilities
 
@@ -51,6 +51,6 @@ workflow-engine/
         examples/      # when concrete contract examples are needed
 ```
 
-[F001 — Initial database schema with Liquibase](features/F001-initial-database-schema/spec.md) is IMPLEMENTED with local schema and restart verification recorded in its evidence document. [F002 — Task type catalog management](features/F002-task-type-catalog/spec.md) is IMPLEMENTED at revision 3 with the layer-first structure and concrete TaskTypeCatalogService. Fresh build/proxy/startup/read-only checks passed, separately from retained revision 1/2 evidence; CRUD, concurrency and audit-rollback execution remain NOT RUN. The generic folder above describes the convention. Remaining contracts include Workflow Definition v1 and lifecycle, Expression Policy v1, human-node/host-capability contracts, structured task submissions, JSON execution variables and runtime command integration.
+[F001 — Initial database schema with Liquibase](features/F001-initial-database-schema/spec.md) is IMPLEMENTED with local schema and restart verification recorded in its evidence document. [F002 — Task type catalog management](features/F002-task-type-catalog/spec.md) is IMPLEMENTED at revision 3 with the layer-first structure and concrete TaskTypeCatalogService. Fresh build/proxy/startup/read-only checks passed, separately from retained revision 1/2 evidence; CRUD, concurrency and audit-rollback execution remain NOT RUN. The generic folder above describes the convention. Remaining contracts include Workflow Definition v1 and lifecycle, expression rules for Workflow Definition v1, human-node/host-capability contracts, structured task submissions, JSON execution variables and runtime command integration.
 
 Build and local startup instructions remain in the [project README](../README.md). Current work follows the owner's **no-tests** instruction; see the [verification policy](specification-driven-development.md#verification-and-current-no-tests-policy).
