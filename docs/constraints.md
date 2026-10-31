@@ -6,9 +6,9 @@
 
 **Applies to:** constitution v2.2.0 and the current separate-development phase
 
-Constraints are confirmed boundaries that specifications and implementations must satisfy. They are requirements, not evidence that the corresponding behavior already exists. This document makes the [constitution](constitution.md) operational without replacing the detailed [consolidated design](../../apolo-docs/workflow-engine/architecture/workflow-engine-design.md).
+Constraints are confirmed boundaries that specifications and implementations must satisfy. They are requirements, not evidence that the corresponding behavior already exists. This document makes the [constitution](constitution.md) operational without replacing the detailed [consolidated design](architecture/workflow-engine-design.md).
 
-References below identify constitution principles and sections/decision IDs in the consolidated design, with scoped superseding decisions from [database design v1.4](../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md) as recorded in [design sources](design-sources.md). Unverified expectations belong in [assumptions.md](assumptions.md). Exact schemas, interfaces, limits and physical mappings remain specification work where the design has not finalized them.
+References below identify constitution principles and sections/decision IDs in the consolidated design, with scoped superseding decisions from [database design v1.4](architecture/Workflow_Engine_Database_Design_v1.md) as recorded in [design sources](design-sources.md). Unverified expectations belong in [assumptions.md](assumptions.md). Exact schemas, interfaces, limits and physical mappings remain specification work where the design has not finalized them.
 
 ## CON-01 — Platform and dependency boundaries
 

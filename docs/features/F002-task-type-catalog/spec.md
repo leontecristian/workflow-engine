@@ -12,7 +12,7 @@
 
 Provide a core Java service that lets a trusted host create, find, list and update task types. Each type has a permanent code, editable descriptive metadata, an authoring-selectability flag and an optimistic-lock token. This is the first persistence/service slice above F001; it does not execute tasks.
 
-Authority: [database design v1.4, section 8.1](../../../../apolo-docs/workflow-engine/architecture/Workflow_Engine_Database_Design_v1.md#81-task-type-catalog), at `apolo-docs` commit `c32ffb07cc9f4f2f3d1d7bf087455c1af13acbc3`; [F001 schema contract](../F001-initial-database-schema/schema-contract.md); [source precedence](../../design-sources.md); CON-01/02/03/04/08/10/12. The operation names, validation rules, pagination and host transaction contract below are selected for F002, not claims of pre-existing APIs.
+Authority: [database design v1.4, section 8.1](../../architecture/Workflow_Engine_Database_Design_v1.md#81-task-type-catalog), at `apolo-docs` commit `c32ffb07cc9f4f2f3d1d7bf087455c1af13acbc3`; [F001 schema contract](../F001-initial-database-schema/schema-contract.md); [source precedence](../../design-sources.md); CON-01/02/03/04/08/10/12. The operation names, validation rules, pagination and host transaction contract below are selected for F002, not claims of pre-existing APIs.
 
 Initially prepared as documentation only, F002 is implemented through revision 3, including the owner's concrete-service convention and fresh wiring/proxy verification. Historical checks and behavioral gaps remain explicit in [evidence.md](evidence.md). Follow [plan.md](plan.md), [tasks.md](tasks.md) and [verification.md](verification.md).
 
