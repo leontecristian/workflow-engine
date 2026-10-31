@@ -21,7 +21,7 @@ The initial nine-table workflow schema is implemented by [F001](docs/features/F0
 
 [F005 — Minimal SINGLE workflow execution](docs/features/F005-minimal-single-workflow-execution/spec.md) has its core implementation in place: exact-version start, one directly assigned task, completion to END, early instance claims, command replay, history, bounded reads and required durable host event handoff. JDK 21 packaging and infrastructure bootstrap passed. T11 manual acceptance remains open/BLOCKED pending real host adapters and behavioral evidence; see its [handover](docs/features/F005-minimal-single-workflow-execution/implementation.md).
 
-[F006 — Test-host definition console](docs/features/F006-test-host-definition-console/spec.md) is READY for implementation. Its four documents specify a small Angular application inside the test host, authenticated management endpoints, host audit and manual F002/F004 verification. The console is not implemented yet; current build/start commands below remain unchanged. Runtime UI/endpoints are outside its current scope.
+[F006 — Test-host workflow console](docs/features/F006-test-host-definition-console/spec.md) adds an opt-in Angular console for catalog/definition management and F005 SINGLE execution, with separate administrator/reviewer accounts, persisted sandbox requests, transactional audit/outbox and explicit local inbox delivery. See its [handover](docs/features/F006-test-host-definition-console/implementation.md) for actual acceptance results and remaining gaps.
 
 Start with the [documentation guide](docs/README.md), [project constitution](docs/constitution.md) and [specification-driven development workflow](docs/specification-driven-development.md). They capture the agreed architecture, specification and evidence requirements, current no-tests policy and remaining decisions traced to the [design sources](docs/design-sources.md).
 
@@ -134,3 +134,57 @@ Add this include to APOLO's existing Liquibase master at the appropriate positio
 APOLO remains the single production migration owner. Core ships no global application properties, Liquibase runner or Boot executable. Its public integration interfaces must use workflow-owned or standard Java types, without exposing APOLO entities or security/messaging-provider types.
 
 Preserve the workflow changelog classpath paths and already-applied changeset identities when moving the source module. Retain APOLO's existing entity/repository packages when adding workflow registration to its shared persistence context.
+
+## Local workflow console (F006)
+
+The console is a development tool. Its writes persist in the configured database; it has no reset/delete endpoint. Startup applies the five host-only F006 changesets even when the console is disabled, but creates no catalog, accounts or sandbox records. Never include the test-host master in APOLO production migrations.
+
+Toolchain: JDK 21 compiling Java 17 bytecode; Angular 21.2.25, CLI/build 21.2.29, TypeScript 5.9.3, RxJS 7.8.2, Node 22.22.0, npm 10.9.4. See the [official Angular compatibility table](https://angular.dev/reference/versions). The profile installs pinned Node/npm locally under `workflow-test-host/target/frontend`; global Node is unnecessary for packaging.
+
+From the repository root, with JAVA_HOME pointing to an installed JDK 21:
+
+```powershell
+& "$env:JAVA_HOME/bin/java.exe" -version
+./mvnw.cmd '-Dmaven.test.skip=true' package
+./mvnw.cmd '-Dmaven.test.skip=true' -Pconsole-ui package
+```
+
+The first command builds the ordinary backend without Node and removes any stale packaged console assets. The opt-in profile runs `npm ci`/production build and packages `/console/` assets. Generated assets/dependencies stay ignored. Rebuild with the profile before launching the UI after an ordinary package build.
+
+Configure two distinct stable actor references and passwords externally. There are no defaults. This PowerShell example prompts for passwords rather than putting them in shell history:
+
+```powershell
+$env:WORKFLOW_CONSOLE_ENABLED = 'true'
+$env:WORKFLOW_CONSOLE_ADMIN_USERNAME = Read-Host 'Administrator username'
+$env:WORKFLOW_CONSOLE_ADMIN_PASSWORD = (New-Object PSCredential('console', (Read-Host 'Administrator password' -AsSecureString))).GetNetworkCredential().Password
+$env:WORKFLOW_CONSOLE_REVIEWER_USERNAME = Read-Host 'Reviewer username'
+$env:WORKFLOW_CONSOLE_REVIEWER_PASSWORD = (New-Object PSCredential('console', (Read-Host 'Reviewer password' -AsSecureString))).GetNetworkCredential().Password
+& "$env:JAVA_HOME/bin/java.exe" '-Djava.library.path=workflow-test-host/target/native' -jar workflow-test-host/target/workflow-test-host-0.0.1-SNAPSHOT.jar --server.port=8080
+```
+
+Open `http://127.0.0.1:8080/console/`. Enabled mode binds loopback and rejects a non-loopback server.address. Use separate browser profiles/private sessions for the two accounts. Session login/logout and CSRF protect mutations; usernames/time/roles come from the server. Clear the password environment variables after stopping the host. Default disabled mode returns 404 for all console routes/assets and registers no sandbox adapters.
+
+For IntelliJ, select **Workflow console (local)** from the shared `.run` configurations. It runs the host main class using `corretto-21`, the repository working directory and the native DLL directory. It loads `.local/workflow-console.properties`, which is ignored and must contain your local console/account settings; passwords never belong in the shared run configuration. Build with `-Pconsole-ui` before the first launch and after an ordinary Maven package removes UI assets. IntelliJ's Run/Stop controls then manage the host process directly.
+
+Administrator walkthrough:
+
+1. Open Task types and explicitly create the prefilled `SANDBOX_REVIEW` entry as selectable. Capabilities and catalog selectability are separate prerequisites; no startup seed supplies the entry.
+2. Import the [F004 example](docs/features/F004-definition-management-validation/spec.md#supported-publication-contract), choosing a fresh key and explicit version. Browse the family/version, edit raw text, save, validate and publish. Export downloads exact canonical JSON. Validation does not save unsaved edits. Published/retired content is read-only; family metadata is separate.
+3. Create a named sandbox request. Enter its definition family ID, load published versions and choose the exact version; use the unlinked request ID/token, then start. The host links the allocated instance before resolving its task to the configured reviewer. Inspect the instance, tasks, history, audit and pending events.
+4. In the reviewer session, open My tasks, inspect the pinned outcome/comment requirements, and complete. Inspect the completed instance and authoritative submission. An administrator cannot bypass the stored assignment.
+5. Command recovery retains the original UUID/body/token in memory. Retry submits that exact command; Find result only looks up its receipt. Original replay snapshots are distinct from current instance state. Copy/download the envelope before a full reload and paste it to recover; it may contain a private comment. Logout/account changes clear the buffer. Nothing is stored in localStorage.
+6. As administrator, dispatch pending events to the durable local inbox and deliberately redeliver one. Inbox duplicate suppression is a local sink guarantee, not distributed exactly-once messaging. There is no scheduled dispatcher.
+
+Startup-only settings, all under `workflow.console`: `capabilities=sample` (default) provides the real sandbox resolver/task support; `none` removes that support while retaining durable recording. `fail-audit`, `fail-start-link`, `fail-event-recording`, and `fail-runtime-after-result` default false and require enabled local mode. They deliberately abort their specified transactions; the capabilities page displays the active settings. Change them only by restarting, and restore normal settings after verification. Changing a reviewer username never reassigns stored tasks. Disabling catalog selectability does not disable published execution; retiring a version prevents new starts while pinned instances and successful receipt replay remain usable.
+
+Isolated tests, separately from packaging:
+
+```powershell
+./mvnw.cmd '-Dtest=*UnitTest' '-Dsurefire.failIfNoSpecifiedTests=false' test
+# With Node 22.22.0/npm 10.9.4 selected:
+cd workflow-test-host/frontend
+npm ci
+npm run test:unit
+```
+
+Surefire includes only `*UnitTest.java`. The preserved `WorkflowTestHostApplicationTests` requires a database and is excluded; do not run it without explicit authorization. Frontend tests use Node's built-in runner with no host/browser/database. Manual acceptance and retained development records are documented in the [F006 handover](docs/features/F006-test-host-definition-console/implementation.md); unit/build success does not establish transaction or concurrency acceptance.

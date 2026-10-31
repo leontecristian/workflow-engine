@@ -1,18 +1,22 @@
 # Plan — F006 Test-host workflow console
 
-Implements [specification revision 3](spec.md), retaining revision 2's execution scope and allowing isolated unit tests under the clarified owner policy. Track progress in [tasks.md](tasks.md) and actual evidence in [implementation.md](implementation.md). No implementation is claimed.
+Implements [specification revision 3](spec.md), retaining revision 2's execution scope and allowing isolated unit tests under the clarified owner policy. Track progress in [tasks.md](tasks.md) and actual evidence in [implementation.md](implementation.md).
 
 ## 1. Baseline, dependency and toolchain (R01, R09–10)
 
 Read repository guidance, F002/F004/F005 contracts and actual source. Preserve other-agent work. F005 owns execution; wait for its required APIs rather than inventing stub implementations in the host. Management infrastructure can progress independently, but runtime compilation/acceptance is a dependency gate. Reconcile material API differences before dependent code.
 
-Retain two Maven modules and core's ordinary JAR. Angular lives at `workflow-test-host/frontend/` with package.json/package-lock.json. Select/pin a supported Angular/Node/npm combination from official compatibility sources during implementation; record versions/URLs. Use standalone components, hash routing and plain CSS, adding focused unit-test support where needed rather than unused generated tests. This documentation revision requires no build/database action.
+Retain two Maven modules and core's ordinary JAR. Angular lives at `workflow-test-host/frontend/` with package.json/package-lock.json. Select/pin a supported Angular/Node/npm combination from official compatibility sources during implementation; record versions/URLs. Use standalone components, hash routing and plain CSS, adding focused unit-test support where needed rather than unused generated tests. Packaging and the manual development-database walkthrough are authorized by the implementation request; database integration tests remain separately restricted.
 
 ## 2. Core read addition and host packages (R03, R08, R15)
 
 F006's only core addition is DefinitionQuery/DefinitionPage in dto.definition, WorkflowDefinitionService.listDefinitions and its internal bounded repository query. Use validated ascending ID/limit+1 pagination with no version JSON or unbounded load. Execution and runtime reads use F005 public services/DTOs/exceptions; no host imports of core entities/repositories/helpers.
 
+Observed provider compatibility correction: preserve the existing JSON `nvarchar(max)` columns but bind using standard JDBC NVARCHAR rather than Hibernate's internal LONG32NVARCHAR code. The first real draft import failed on a nullable validation JSON parameter with JDBC type 4002. Apply the same binding correction consistently to the established JSON mappings; no migration/schema identity or value contract changes. Actual observations are recorded in implementation.md.
+
 Under `io.github.leontecristian.workflow.testhost`, assign:
+
+Implementation keeps the small management transaction methods together in `service.definition.ConsoleManagement`, and serializes the supported detached core DTOs through the private Long-aware codec rather than adding mirrored wire DTOs. Host-owned records live in dto.audit/runtime/sandbox/event. Unneeded packages/classes from the initial inventory are not created. This changes no HTTP value/authorization contract and exposes no persistence entity.
 
 | Package | Responsibility |
 | --- | --- |
@@ -87,6 +91,8 @@ Keep attempted UUID/payload/original token in memory. A transport failure displa
 Use separate authenticated browser sessions for admin/reviewer; no actor selector. Safely render all text, preserve unsaved edits/errors, and do not store credentials/documents in localStorage. Failed validation, failed execution and unknown transport outcomes have distinct displays.
 
 ## 8. Packaging, verification and handover (R09–10)
+
+Selected implementation toolchain: Angular 21.2.25, Angular CLI/build 21.2.29, TypeScript 5.9.3, RxJS 7.8.2, Node 22.22.0 and npm 10.9.4. These satisfy the [official Angular compatibility table](https://angular.dev/reference/versions). The opt-in profile uses frontend-maven-plugin 1.15.1 and installs Node/npm under the host's ignored target directory. A private host JSON codec maps Long values to strings without changing core serialization. Host stores use JdbcTemplate with the existing JpaTransactionManager; no second datasource or transaction manager is introduced.
 
 Use opt-in Maven console-ui profile: npm ci, npm run build, copy generated assets into target/classes/static/console before packaging. Pin plugins/toolchain. Ordinary Maven builds require no Node and must remove stale console assets from prior profile builds. Keep generated files out of tracked src/main/resources; ignore node_modules/.angular/dist. README covers two-account settings, failure flags, native SQL Server launch and manual use.
 

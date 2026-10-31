@@ -67,7 +67,7 @@ public class WorkflowHistoryEntity {
     private Short detailsSchemaVersion;
 
     @Nationalized
-    @JdbcTypeCode(SqlTypes.LONG32NVARCHAR)
+    @JdbcTypeCode(SqlTypes.NVARCHAR)
     @Column(name = "details_json", nullable = false, columnDefinition = "nvarchar(max)")
     private String detailsJson;
 

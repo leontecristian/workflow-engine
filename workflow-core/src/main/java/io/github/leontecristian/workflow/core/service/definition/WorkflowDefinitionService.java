@@ -15,6 +15,8 @@ import io.github.leontecristian.workflow.core.dto.definition.DefinitionCheckResu
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionVersionQuery;
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionVersionPage;
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionStatus;
+import io.github.leontecristian.workflow.core.dto.definition.DefinitionQuery;
+import io.github.leontecristian.workflow.core.dto.definition.DefinitionPage;
 import io.github.leontecristian.workflow.core.entity.definition.WorkflowDefinitionEntity;
 import io.github.leontecristian.workflow.core.entity.definition.WorkflowDefinitionVersionEntity;
 import io.github.leontecristian.workflow.core.repository.definition.WorkflowDefinitionRepository;
@@ -187,6 +189,17 @@ public class WorkflowDefinitionService {
     public Optional<DefinitionView> findDefinition(long definitionId) {
         DefinitionInputs.require(definitionId > 0);
         return storage(() -> definitions.findById(definitionId).map(DefinitionViews::family));
+    }
+
+    /** Bounded family metadata only; includes families with versions in every lifecycle. */
+    public DefinitionPage listDefinitions(DefinitionQuery query) {
+        DefinitionInputs.require(query != null && query.afterId() >= 0 && query.limit() >= 1 && query.limit() <= 100);
+        return storage(() -> {
+            var matches = definitions.findPage(query.afterId(), PageRequest.of(0, query.limit() + 1));
+            var items = matches.stream().limit(query.limit()).map(DefinitionViews::family).toList();
+            Long next = matches.size() > query.limit() ? items.get(items.size() - 1).id() : null;
+            return new DefinitionPage(items, next);
+        });
     }
 
     public Optional<DefinitionVersionView> findVersion(long versionId) {

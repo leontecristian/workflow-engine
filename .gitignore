@@ -31,3 +31,9 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# F006 generated console assets and local toolchains
+/.local/
+workflow-test-host/frontend/node_modules/
+workflow-test-host/frontend/.angular/
+workflow-test-host/frontend/dist/

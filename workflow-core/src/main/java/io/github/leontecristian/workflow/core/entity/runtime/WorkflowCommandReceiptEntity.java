@@ -58,7 +58,7 @@ public class WorkflowCommandReceiptEntity {
     private Short resultSchemaVersion;
 
     @Nationalized
-    @JdbcTypeCode(SqlTypes.LONG32NVARCHAR)
+    @JdbcTypeCode(SqlTypes.NVARCHAR)
     @Column(name = "result_json", nullable = false, columnDefinition = "nvarchar(max)")
     private String resultJson;
 

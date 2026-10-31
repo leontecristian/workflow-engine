@@ -18,6 +18,13 @@
     </properties>
 
     <dependencies>
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-security</artifactId></dependency>
+        <dependency><groupId>org.springframework</groupId><artifactId>spring-jdbc</artifactId></dependency>
+        <dependency><groupId>org.springframework</groupId><artifactId>spring-tx</artifactId></dependency>
+        <dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-core</artifactId></dependency>
+        <dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-databind</artifactId></dependency>
+        <dependency><groupId>com.fasterxml.jackson.datatype</groupId><artifactId>jackson-datatype-jsr310</artifactId></dependency>
+        <dependency><groupId>com.fasterxml.jackson.datatype</groupId><artifactId>jackson-datatype-jdk8</artifactId></dependency>
         <dependency>
             <groupId>io.github.leontecristian</groupId>
             <artifactId>workflow-core</artifactId>
@@ -54,6 +61,16 @@
     <build>
         <plugins>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId><artifactId>maven-antrun-plugin</artifactId><version>3.1.0</version>
+                <executions><execution><id>remove-stale-console-assets</id><phase>initialize</phase><goals><goal>run</goal></goals>
+                    <configuration><target><delete dir="${project.build.outputDirectory}/static/console"/></target></configuration>
+                </execution></executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId>
+                <configuration><includes><include>**/*UnitTest.java</include></includes></configuration>
+            </plugin>
+            <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
@@ -61,6 +78,26 @@
     </build>
 
     <profiles>
+        <profile>
+            <id>console-ui</id>
+            <build><plugins>
+                <plugin>
+                    <groupId>com.github.eirslett</groupId><artifactId>frontend-maven-plugin</artifactId><version>1.15.1</version>
+                    <configuration><workingDirectory>frontend</workingDirectory><installDirectory>${project.build.directory}/frontend</installDirectory></configuration>
+                    <executions>
+                        <execution><id>install-console-node</id><phase>generate-resources</phase><goals><goal>install-node-and-npm</goal></goals><configuration><nodeVersion>v22.22.0</nodeVersion><npmVersion>10.9.4</npmVersion></configuration></execution>
+                        <execution><id>console-npm-ci</id><phase>generate-resources</phase><goals><goal>npm</goal></goals><configuration><arguments>ci --no-audit --no-fund</arguments></configuration></execution>
+                        <execution><id>console-build</id><phase>generate-resources</phase><goals><goal>npm</goal></goals><configuration><arguments>run build</arguments></configuration></execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId><artifactId>maven-resources-plugin</artifactId>
+                    <executions><execution><id>copy-console-assets</id><phase>process-resources</phase><goals><goal>copy-resources</goal></goals>
+                        <configuration><outputDirectory>${project.build.outputDirectory}/static/console</outputDirectory><resources><resource><directory>frontend/dist/console/browser</directory><filtering>false</filtering></resource></resources></configuration>
+                    </execution></executions>
+                </plugin>
+            </plugins></build>
+        </profile>
         <profile>
             <id>windows-native-auth</id>
             <activation>

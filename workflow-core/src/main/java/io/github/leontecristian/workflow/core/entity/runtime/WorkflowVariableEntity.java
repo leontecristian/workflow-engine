@@ -53,7 +53,7 @@ public class WorkflowVariableEntity {
     private OffsetDateTime datetimeValue;
 
     @Nationalized
-    @JdbcTypeCode(SqlTypes.LONG32NVARCHAR)
+    @JdbcTypeCode(SqlTypes.NVARCHAR)
     @Column(name = "json_value", columnDefinition = "nvarchar(max)")
     private String jsonValue;
 

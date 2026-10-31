@@ -3,5 +3,6 @@
                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
     <include file="db/changelog/workflow/workflow-master.xml" relativeToChangelogFile="false"/>
-    <!-- Future sample-domain migrations belong to this host, outside the workflow master. -->
+    <include file="changes/001-console-management-audit.xml" relativeToChangelogFile="true"/>
+    <include file="changes/002-console-runtime-sandbox.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

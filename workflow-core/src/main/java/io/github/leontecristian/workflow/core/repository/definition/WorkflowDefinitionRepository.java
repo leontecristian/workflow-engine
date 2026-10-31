@@ -14,6 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true, propagation = Propagation.REQUIRED)
 public interface WorkflowDefinitionRepository extends Repository<WorkflowDefinitionEntity, Long> {
 
+    @org.springframework.data.jpa.repository.Query("select d from WorkflowDefinitionEntity d where d.id > :afterId order by d.id asc")
+    java.util.List<WorkflowDefinitionEntity> findPage(@org.springframework.data.repository.query.Param("afterId") long afterId,
+                                                    org.springframework.data.domain.Pageable pageable);
+
     Optional<WorkflowDefinitionEntity> findById(Long id);
 
     Optional<WorkflowDefinitionEntity> findByWorkflowKey(String workflowKey);

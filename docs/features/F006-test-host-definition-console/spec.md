@@ -1,6 +1,6 @@
 # F006 — Test-host workflow console
 
-**Status:** READY for implementation after the required F005 APIs are available. **Revision:** 3 — 2026-10-31. **Owner:** Workflow project owner. **Constitution:** [v3.0.0](../../constitution.md).
+**Status:** IMPLEMENTED — code present; browser acceptance remains BLOCKED. See [actual verification and gaps](implementation.md). **Revision:** 3 — 2026-10-31. **Owner:** Workflow project owner. **Constitution:** [v3.0.0](../../constitution.md).
 
 ## Outcome and scope
 
@@ -172,4 +172,4 @@ The F004 null-constraint-name fix also needs a controlled provider-error observa
 
 ## Readiness and remaining decisions
 
-No unresolved APOLO business requirement blocks this sandbox. Runtime tasks require the specified F005 APIs to be implemented; reconcile actual signatures without bypassing core or duplicating its algorithms. During implementation, pin an Angular/Node/npm combination using official compatibility documentation and a lockfile. This local console does not choose the production designer's framework or graph library. A contract change must reconcile spec/plan/tasks before dependent implementation. F006 evidence can satisfy named F005 scenarios only when the observed scope matches; missing malformed-provider, exact SQL race or production delivery checks stay explicit gaps.
+No unresolved APOLO business requirement blocks this sandbox. The required F005 APIs are available and used without duplicating execution. The [plan](plan.md) records the pinned toolchain; the [handover](implementation.md) records actual checks and remaining browser acceptance. This local console does not choose the production designer's framework or graph library. A contract change must reconcile spec/plan/tasks before dependent implementation. F006 evidence can satisfy named F005 scenarios only when the observed scope matches; missing malformed-provider or production delivery checks stay explicit gaps.

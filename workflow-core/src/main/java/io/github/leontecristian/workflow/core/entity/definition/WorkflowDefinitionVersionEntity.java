@@ -40,7 +40,7 @@ public class WorkflowDefinitionVersionEntity {
     private Short schemaVersion;
 
     @Nationalized
-    @JdbcTypeCode(SqlTypes.LONG32NVARCHAR)
+    @JdbcTypeCode(SqlTypes.NVARCHAR)
     @Column(name = "definition_json", nullable = false, columnDefinition = "nvarchar(max)")
     private String definitionJson;
 
@@ -95,7 +95,7 @@ public class WorkflowDefinitionVersionEntity {
     private byte[] validationContextHash;
 
     @Nationalized
-    @JdbcTypeCode(SqlTypes.LONG32NVARCHAR)
+    @JdbcTypeCode(SqlTypes.NVARCHAR)
     @Column(name = "validation_details_json", columnDefinition = "nvarchar(max)")
     private String validationDetailsJson;
 
