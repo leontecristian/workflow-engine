@@ -139,7 +139,7 @@ Preserve the workflow changelog classpath paths and already-applied changeset id
 
 The console is a development tool. Its writes persist in the configured database; it has no reset/delete endpoint. Startup applies the five host-only F006 changesets even when the console is disabled, but creates no catalog, accounts or sandbox records. Never include the test-host master in APOLO production migrations.
 
-Toolchain: JDK 21 compiling Java 17 bytecode; Angular 21.2.25, CLI/build 21.2.29, TypeScript 5.9.3, RxJS 7.8.2, Node 22.22.0, npm 10.9.4. See the [official Angular compatibility table](https://angular.dev/reference/versions). The profile installs pinned Node/npm locally under `workflow-test-host/target/frontend`; global Node is unnecessary for packaging.
+Toolchain: JDK 21 compiling Java 17 bytecode; Angular 21.2.25, Material/CDK 21.2.14, CLI/build 21.2.29, TypeScript 5.9.3, RxJS 7.8.2, Node 22.22.0, npm 10.9.4. See the [official Angular compatibility table](https://angular.dev/reference/versions). The profile installs pinned Node/npm locally under `workflow-test-host/target/frontend`; global Node is unnecessary for packaging.
 
 From the repository root, with JAVA_HOME pointing to an installed JDK 21:
 
@@ -150,6 +150,8 @@ From the repository root, with JAVA_HOME pointing to an installed JDK 21:
 ```
 
 The first command builds the ordinary backend without Node and removes any stale packaged console assets. The opt-in profile runs `npm ci`/production build and packages `/console/` assets. Generated assets/dependencies stay ignored. Rebuild with the profile before launching the UI after an ordinary package build.
+
+The UI uses Angular Material tables, forms and responsive navigation with a local theme. The production build checks that CSS loads through an ordinary stylesheet link under the existing CSP. Critical-CSS inlining is intentionally disabled because its generated inline `onload` handler would be blocked. Hard-refresh the console after deploying new assets.
 
 Configure two distinct stable actor references and passwords externally. There are no defaults. This PowerShell example prompts for passwords rather than putting them in shell history:
 
@@ -167,6 +169,8 @@ Open `http://127.0.0.1:8080/console/`. Enabled mode binds loopback and rejects a
 For IntelliJ, select **Workflow console (local)** from the shared `.run` configurations. It runs the host main class using `corretto-21`, the repository working directory and the native DLL directory. It loads `.local/workflow-console.properties`, which is ignored and must contain your local console/account settings; passwords never belong in the shared run configuration. Build with `-Pconsole-ui` before the first launch and after an ordinary Maven package removes UI assets. IntelliJ's Run/Stop controls then manage the host process directly.
 
 Administrator walkthrough:
+
+Open **Instances** (administrator only), or `/console/#/instances`, to monitor persisted workflows. It defaults to **Running (ACTIVE)**, including workflows waiting for a human task. Filter Completed, Cancelled or All statuses; each row shows the pinned workflow/version, current step, start time/actor and result. Inspect an instance or open its Tasks/History directly. **Refresh instances** reloads the first page using the selected filter; refresh is manual. Page controls fetch bounded results without claiming a global total. Cancelled is a read filter, not a cancellation command.
 
 1. Open Task types and explicitly create the prefilled `SANDBOX_REVIEW` entry as selectable. Capabilities and catalog selectability are separate prerequisites; no startup seed supplies the entry.
 2. Import the [F004 example](docs/features/F004-definition-management-validation/spec.md#supported-publication-contract), choosing a fresh key and explicit version. Browse the family/version, edit raw text, save, validate and publish. Export downloads exact canonical JSON. Validation does not save unsaved edits. Published/retired content is read-only; family metadata is separate.

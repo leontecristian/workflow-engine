@@ -1,0 +1,17 @@
+<console-page-header [meta]="meta" [admin]="api.admin" /><console-feedback
+  [busy]="busy()"
+  [error]="error()"
+  [notice]="notice()"
+/>
+<mat-card appearance="outlined"
+  ><mat-card-header
+    ><h2>
+      {{meta.title}} <span class="muted">#{{sequence}}</span>
+    </h2></mat-card-header
+  ><mat-card-content
+    ><console-details [value]="detail()?.summary" />@if(detail()?.detailsJson){
+    <h3>Exact persisted evidence</h3>
+    <pre>{{detail()?.detailsJson}}</pre>
+    }</mat-card-content
+  ></mat-card
+>

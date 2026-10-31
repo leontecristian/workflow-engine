@@ -1,6 +1,9 @@
 package io.github.leontecristian.workflow.core.service.runtime;
 
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceQuery;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceSummary;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstancePage;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowActivityView;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistorySummary;
@@ -55,6 +58,17 @@ public class WorkflowRuntimeQueryService {
     public Optional<WorkflowInstanceView> findInstance(long id) {
         RuntimeInputs.id(id);
         return RuntimePersistenceErrors.call(() -> instances.findById(id).map(entity -> RuntimeViews.instance(entity, pins.identity(entity))));
+    }
+    /**
+     * Host-authorized monitoring metadata only. Does not load or validate each instance's pinned evidence;
+     * callers use findInstance for that detail boundary. No lifecycle/selectability eligibility checks.
+     */
+    public WorkflowInstancePage listInstances(WorkflowInstanceQuery query) {
+        RuntimeInputs.require(query != null, Category.INVALID_INPUT);
+        RuntimeInputs.page(query.afterId(), query.limit());
+        return RuntimePersistenceErrors.call(() -> page(instances.findSummaryPage(query.status(), query.afterId(),
+                PageRequest.of(0, query.limit() + 1)), query.limit(), RuntimeViews::instanceSummary,
+                WorkflowInstanceSummary::id, WorkflowInstancePage::new));
     }
     public Optional<WorkflowActivityView> findActivity(long id) {
         RuntimeInputs.id(id);

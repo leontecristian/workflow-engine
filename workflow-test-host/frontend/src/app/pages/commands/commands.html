@@ -1,0 +1,154 @@
+<console-page-header [meta]="meta" [admin]="api.admin" /><console-feedback
+  [busy]="busy()"
+  [error]="error()"
+  [notice]="notice()"
+/>
+
+<div class="hint-box recovery-hint">
+  <console-icon name="shield" />
+  <p>
+    Retry keeps the original UUID, payload and token. Find result performs a
+    replay-only lookup. Results below describe the original command, not current
+    instance state.
+  </p>
+</div>
+<div class="two-column">
+  <mat-card appearance="outlined"
+    ><mat-card-header><h2>Original command</h2></mat-card-header
+    ><mat-card-content>
+      <mat-form-field appearance="outline" class="full-width"
+        ><mat-label>Buffered command</mat-label
+        ><mat-select
+          [ngModel]="commands.buffer.command?.body?.['commandId']"
+          (ngModelChange)="selectCommand($event)"
+          >@for(c of commands.buffer.entries;track
+          c.body['commandId']){<mat-option [value]="c.body['commandId']"
+            >{{c.kind}} · {{c.body['commandId']}}</mat-option
+          >}</mat-select
+        ></mat-form-field
+      >
+      @if(commands.buffer.command){<console-details
+        [value]="commands.buffer.command.body"
+      />
+      <p class="field-note">
+        Original instance token:
+        <code
+          >{{commands.buffer.command.expectedToken ?? 'Not applicable to
+          start'}}</code
+        >
+      </p>
+      }@else{
+      <div class="empty-state small">
+        <console-icon name="replay" />
+        <h3>No command buffered</h3>
+        <p>Start or complete a workflow, or restore a saved envelope below.</p>
+      </div>
+      }
+      <div class="actions spaced">
+        <button
+          mat-flat-button
+          (click)="retry(true)"
+          [disabled]="busy() || !commands.buffer.command"
+        >
+          <console-icon name="search" /> Find result</button
+        ><button
+          mat-stroked-button
+          (click)="retry(false)"
+          [disabled]="busy() || !commands.buffer.command"
+        >
+          <console-icon name="replay" /> Retry original
+        </button>
+      </div>
+      <div class="actions secondary-actions">
+        <button
+          mat-button
+          (click)="copyEnvelope()"
+          [disabled]="busy() || !commands.buffer.command"
+        >
+          Copy envelope</button
+        ><button
+          mat-button
+          (click)="downloadEnvelope()"
+          [disabled]="busy() || !commands.buffer.command"
+        >
+          Download</button
+        ><button
+          mat-button
+          class="danger-action"
+          (click)="clearCommand()"
+          [disabled]="busy()"
+        >
+          Clear all
+        </button>
+      </div>
+      <p class="field-note">
+        Buffers stay in this page session and are cleared on logout. Exported
+        envelopes may contain private comments.
+      </p>
+    </mat-card-content></mat-card
+  ><mat-card appearance="outlined"
+    ><mat-card-header><h2>Original result / recovery</h2></mat-card-header
+    ><mat-card-content>
+      @if(result()){<console-status
+        [value]="result()?.outcome"
+      />@if(result()?.message){
+      <p class="field-note">{{result()?.message}}</p>
+      }@if(commandExecution()){<console-details
+        [value]="commandExecution()?.instance"
+      />
+      <div class="actions spaced">
+        <a
+          mat-stroked-button
+          [routerLink]="['/instance',commandExecution()!.instance.id]"
+          >Read current instance</a
+        ><a mat-button [routerLink]="['/task',commandExecution()!.task.id]"
+          >Current task / submission</a
+        ><a
+          mat-button
+          [routerLink]="['/history',commandExecution()!.instance.id]"
+          >Current history</a
+        >
+      </div>
+      }<mat-expansion-panel class="evidence-panel"
+        ><mat-expansion-panel-header
+          ><mat-panel-title
+            >Full original result</mat-panel-title
+          ></mat-expansion-panel-header
+        >
+        <pre>{{result() | json}}</pre></mat-expansion-panel
+      >}@else{
+      <div class="empty-state small">
+        <console-icon name="history" />
+        <h3>No result selected</h3>
+        <p>
+          Use Find result to look up a receipt without executing a new command.
+        </p>
+      </div>
+      }
+    </mat-card-content></mat-card
+  >
+</div>
+<mat-expansion-panel class="restore-panel"
+  ><mat-expansion-panel-header
+    ><mat-panel-title
+      ><console-icon name="upload" /> Restore a saved command
+      envelope</mat-panel-title
+    ><mat-panel-description
+      >Recover after a full page reload</mat-panel-description
+    ></mat-expansion-panel-header
+  ><mat-form-field appearance="outline" class="full-width code-field"
+    ><mat-label>Original command envelope</mat-label
+    ><textarea
+      matInput
+      [(ngModel)]="envelope"
+      rows="8"
+      spellcheck="false"
+    ></textarea></mat-form-field
+  ><button
+    mat-stroked-button
+    (click)="restoreEnvelope()"
+    [disabled]="busy() || !envelope"
+  >
+    Restore envelope
+  </button></mat-expansion-panel
+>

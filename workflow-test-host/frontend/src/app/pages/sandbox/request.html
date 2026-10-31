@@ -1,0 +1,24 @@
+<console-page-header [meta]="meta" [admin]="api.admin" /><console-feedback
+  [busy]="busy()"
+  [error]="error()"
+  [notice]="notice()"
+/>
+<mat-card appearance="outlined"
+  ><mat-card-header><h2>Request #{{id}}</h2></mat-card-header
+  ><mat-card-content
+    ><console-details [value]="detail()" />
+    <div class="actions spaced">
+      <button
+        mat-flat-button
+        (click)="selectRequest(detail())"
+        [disabled]="busy()"
+      >
+        Use in start form <console-icon name="chevron" /></button
+      >@if(detail()?.instanceId){<a
+        mat-stroked-button
+        [routerLink]="['/instance',detail()?.instanceId]"
+        >Open linked instance</a
+      >}
+    </div></mat-card-content
+  ></mat-card
+>

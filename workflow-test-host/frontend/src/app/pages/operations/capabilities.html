@@ -1,0 +1,30 @@
+<console-page-header [meta]="meta" [admin]="api.admin" /><console-feedback
+  [busy]="busy()"
+  [error]="error()"
+  [notice]="notice()"
+/>
+<mat-card appearance="outlined"
+  ><mat-card-header
+    ><div class="card-heading">
+      <h2>Installed sandbox support</h2>
+      <console-status [value]="detail()?.mode" /></div></mat-card-header
+  ><mat-card-content
+    ><console-details [value]="detail()" />
+    <h3>Startup failure settings</h3>
+    <div class="settings-grid">
+      @for(flag of detail()?.failureFlags | keyvalue;track flag.key){
+      <div>
+        <span>{{flag.key}}</span
+        ><console-status [value]="flag.value ? 'ACTIVE' : 'OFF'" />
+      </div>
+      }
+    </div>
+    <div class="hint-box">
+      <console-icon name="info" />
+      <p>
+        These settings are fixed at startup. Changing the reviewer does not
+        reassign existing tasks.
+      </p>
+    </div></mat-card-content
+  ></mat-card
+>

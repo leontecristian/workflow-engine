@@ -1,6 +1,6 @@
 # F006 — Test-host workflow console
 
-**Status:** IMPLEMENTED — code present; browser acceptance remains BLOCKED. See [actual verification and gaps](implementation.md). **Revision:** 3 — 2026-10-31. **Owner:** Workflow project owner. **Constitution:** [v3.0.0](../../constitution.md).
+**Status:** IMPLEMENTED revision 4; browser acceptance remains BLOCKED. See [actual verification and gaps](implementation.md). **Revision:** 4 — 2026-10-31. **Owner:** Workflow project owner. **Constitution:** [v3.0.0](../../constitution.md).
 
 ## Outcome and scope
 
@@ -8,7 +8,7 @@ Provide a small Angular application in `workflow-test-host` and host-owned HTTP 
 
 [F005](../F005-minimal-single-workflow-execution/spec.md) owns execution semantics and is a dependency of the execution portion of F006. F006 supplies real development-host adapters, HTTP transaction boundaries and pages; it must not duplicate the engine. Management/UI infrastructure can progress independently, but the feature is not complete without the execution slice. Excluded: visual designer, ALL, cancellation/reassignment, variables/results/expressions/service tasks, production APOLO adapters, external messaging integrations and background dispatch schedules. Revision 3 retains revision 2's functional scope and adopts the owner's clarified policy: isolated unit tests are allowed; creating/running database integration tests requires explicit authorization.
 
-Authority: [F002](../F002-task-type-catalog/spec.md), [F004](../F004-definition-management-validation/spec.md), [F005](../F005-minimal-single-workflow-execution/spec.md), [package structure](../../package-structure.md), [source precedence](../../design-sources.md). Apply CON-01–12 and ASM-01–05/08. Existing lifecycle, canonicalization, execution, error and transaction contracts remain authoritative. The bounded family read below is the sole additional core API owned by F006; runtime reads/commands use F005.
+Authority: [F002](../F002-task-type-catalog/spec.md), [F004](../F004-definition-management-validation/spec.md), [F005](../F005-minimal-single-workflow-execution/spec.md), [package structure](../../package-structure.md), [source precedence](../../design-sources.md). Apply CON-01–12 and ASM-01–05/08. Existing lifecycle, canonicalization, execution, error and transaction contracts remain authoritative. Additional core APIs owned by F006 are the bounded family read and revision 4's bounded instance-summary read; runtime commands and exact reads use F005.
 
 ## Requirements
 
@@ -74,11 +74,22 @@ Add `WorkflowDefinitionService.listDefinitions(DefinitionQuery(afterId, limit))`
 
 ## Runtime HTTP contract
 
+### Revision 4 — instance monitoring (owner request)
+
+Add an administrator-only **Instances** page at `/console/#/instances`. Default to Running (`ACTIVE`), with explicit `COMPLETED`, `CANCELLED` and `ALL` filters. Show exact instance ID, pinned workflow key/version, stored status, current node, start time/actor and result. Provide explicit refresh, bounded page controls and links to instance details, tasks and ordered history. No fabricated totals, inferred execution progress, automatic mutation/retry or execution controls. `CANCELLED` is an established persisted state exposed for read compatibility; no cancellation command is implemented.
+
+Add `WorkflowRuntimeQueryService.listInstances(WorkflowInstanceQuery(status, afterId, limit))` returning immutable `WorkflowInstancePage(items: List<WorkflowInstanceSummary>, nextAfterId: Long?)`. No-argument query defaults to ACTIVE/0/50; nullable status means all established states. Validate cursor >=0 and limit 1–100 with F005 INVALID_INPUT. Use one ascending-ID scalar query joining definition identity, with strict id > cursor and limit+1. Return summary fields only: id, definitionVersionId, definitionKey, definitionVersion, status, currentNodeKey, resultKey, businessType/businessId, startedAt/startedBy, endedAt, lastHistorySequence and lockVersion. Times are detached UTC Instants. No document/history/submission/receipt payloads or per-row pin lookups. Summary identity comes from indexed immutable definition metadata; exact `findInstance` remains the pinned-evidence-checked detail read. Apply the existing 1 MiB UTF-8/UTF-16 page bound, exact Long encoding and read-only REQUIRED boundary. No schema/index changes.
+
+GET `/console/api/instances?status=&afterId=&limit=` requires CONSOLE_ADMIN; omitted status is ACTIVE, explicit ALL removes the status predicate. Unknown/case-mismatched/empty status or unsupported/duplicate query parameters return 400. Anonymous access returns JSON 401, reviewer access 403; no global list is exposed through a reviewer page. Retired versions and nonselectable task types remain visible. Continuation is exclusive and nullable; empty pages are successful. Refresh restarts pagination under the selected filter. Concurrent changes do not provide a stable snapshot or a global total.
+
+Acceptance: **AC23** admin defaults to active records and can filter all persisted states; **AC24** limit/cursor traversal has no skips/duplicates in a static dataset and preserves Long precision; **AC25** anonymous/reviewer/invalid-filter attempts disclose no list; **AC26** detail/task/history navigation and refresh preserve existing read authorization and perform no workflow writes. Isolated tests do not prove the database query; record manual read-only observations separately. Existing uncommitted Material refinement work must be preserved.
+
 | Method and path | Request / result and authorization |
 | --- | --- |
 | POST `/sandbox-requests` | Admin: `{name}` → SandboxRequest; explicit persistent creation, not an automatic seed. |
 | GET `/sandbox-requests?afterId=&limit=` | Admin: bounded persisted request summaries, including linked instance ID and request lockVersion. |
 | GET `/sandbox-requests/{id}` | Admin: exact request; absent is 404. |
+| GET `/instances?status=&afterId=&limit=` | Admin: revision 4 bounded current-state summaries; ACTIVE by default, ALL removes the status filter. |
 | POST `/instances/start` | Admin: `{commandId, definitionVersionId, requestId, expectedRequestVersion}` → F005 WorkflowCommandResult. |
 | GET `/instances/{id}` | Admin or assigned reviewer: current F005 instance view; no implicit latest. |
 | GET `/instances/{id}/tasks?afterId=&limit=` | Admin or assigned reviewer: stored task page, all states. |
@@ -113,7 +124,7 @@ Persist audit with the same datasource/transaction manager as core. An insert/se
 
 ### Sandbox request and start identity
 
-Persist host-owned `wf_test.sandbox_request` rows with immutable name/creator/time, nullable workflow instance link and numeric request lockVersion. Creation is an admin action; name uses F004's name bounds. No edits/deletes/reset, business approval rules or core FK are introduced. List requests to discover their instances; do not add a generic core listInstances API solely for this page.
+Persist host-owned `wf_test.sandbox_request` rows with immutable name/creator/time, nullable workflow instance link and numeric request lockVersion. Creation is an admin action; name uses F004's name bounds. No edits/deletes/reset, business approval rules or core FK are introduced. List requests to discover their links. Revision 4 separately authorizes the bounded administrator instance-summary overview; no generic CRUD service is introduced.
 
 Start maps requestId to businessType=`SANDBOX_REQUEST`, businessId=its decimal ID. Derive HostStartIntent version `wf-test-start-v1` and SHA-256 of canonical UTF-8 JSON `{"expectedRequestVersion":"<decimal>","requestId":"<decimal>"}`, with literal sorted field names/no whitespace; no callback identity supplied by clients. Both fields are canonical nonnegative/positive decimal Long strings. Authorize the request but do not reject its now-linked state before receipt lookup. The StartLinkAction atomically sets instance_id and advances request lockVersion only where id matches, instance_id IS NULL and lock_version equals expectedRequestVersion. A zero-row update is a sandbox conflict and rolls back the whole start. The resolver observes that new link before assignment. Concurrent distinct starts for one request cannot both commit; identical replay keeps the original link/token/result. No host row is prelocked before F005's definition eligibility lock; use the callback's conditional update for consistent lock ordering.
 
@@ -128,6 +139,8 @@ The explicit dispatcher uses a **new host request transaction after workflow com
 Startup-only `workflow.console.fail-start-link`, `workflow.console.fail-event-recording` and `workflow.console.fail-runtime-after-result` default false. Respectively throw after the link update, after outbox batch insertion, or after core returns a new result but before facade commit. All are gated to the enabled loopback console, displayed to the administrator, and never request-controlled. They establish rollback observations; a replay does not invoke link/recorder or trigger the after-result failure for a new command. Do not add generic exception/SQL injection endpoints.
 
 ## Pages and interaction
+
+The owner's subsequent UI refinement selects Angular Material components for the test-host console: responsive navigation, form fields, cards, tables, expansion panels and loading indicators. Use readable scalar metadata as the default presentation with exact JSON/evidence still available explicitly. The workflow document remains a plain text editor. Build output must load styles under the existing CSP without inline event handlers; presentation changes do not relax security or change F004/F005 behavior.
 
 - **Definitions:** persisted family page and Next control, family details/metadata editor, version page/status filter, exact key/version lookup, and Import action.
 - **Version:** identity/status/revisions, JSON text editor or read-only document, explicit Save/Validate/Publish/Retire/Export actions, structured latest/stored validation diagnostics and a collapsible sanitized HTTP response. New responses must not leave an old PASSED label attached to edited content. Unsaved text requires an explicit save before validation/publication; the UI never silently saves it.

@@ -10,9 +10,12 @@ import static io.github.leontecristian.workflow.testhost.service.console.Console
 import static io.github.leontecristian.workflow.testhost.service.console.ConsoleWire.uuid;
 
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmission;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistorySummary;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceQuery;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceSummary;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
@@ -148,6 +151,34 @@ public class ConsoleRuntimeController {
         map.put("found", result != null);
         map.put("result", result);
         return map;
+    }
+
+    @GetMapping("/instances")
+    @PreAuthorize("hasRole('CONSOLE_ADMIN')")
+    public ResponseEntity<String> instances(HttpServletRequest r) {
+        query(r, "status", "afterId", "limit");
+        String requested = r.getParameter("status");
+        InstanceStatus status = InstanceStatus.ACTIVE;
+        if ("ALL".equals(requested)) status = null;
+        else if (requested != null) {
+            try {
+                status = InstanceStatus.valueOf(requested);
+            } catch (IllegalArgumentException invalid) {
+                throw ConsoleException.invalid();
+            }
+        }
+        var page =
+                reads.listInstances(
+                        new WorkflowInstanceQuery(
+                                status,
+                                after(r.getParameter("afterId")),
+                                limit(r.getParameter("limit"))));
+        return wire.response(
+                wire.page(
+                        page.items(),
+                        page.nextAfterId(),
+                        "nextAfterId",
+                        WorkflowInstanceSummary::id));
     }
 
     @GetMapping("/instances/{id}")

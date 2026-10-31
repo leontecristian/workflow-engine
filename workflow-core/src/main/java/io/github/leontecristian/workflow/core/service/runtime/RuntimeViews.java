@@ -2,6 +2,7 @@ package io.github.leontecristian.workflow.core.service.runtime;
 
 import io.github.leontecristian.workflow.core.dto.definition.document.ExecutableDefinition;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceSummary;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowActivityView;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistorySummary;
@@ -10,6 +11,7 @@ import io.github.leontecristian.workflow.core.entity.runtime.WorkflowActivityEnt
 import io.github.leontecristian.workflow.core.entity.runtime.WorkflowTaskEntity;
 import io.github.leontecristian.workflow.core.entity.runtime.WorkflowHistoryEntity;
 import io.github.leontecristian.workflow.core.repository.runtime.RuntimeHistoryRow;
+import io.github.leontecristian.workflow.core.repository.runtime.RuntimeInstanceRow;
 import io.github.leontecristian.workflow.core.repository.runtime.RuntimeTaskRow;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -18,6 +20,12 @@ import java.time.ZoneOffset;
 final class RuntimeViews {
     private RuntimeViews() { }
     static Instant instant(LocalDateTime time) { return time == null ? null : time.toInstant(ZoneOffset.UTC); }
+    static WorkflowInstanceSummary instanceSummary(RuntimeInstanceRow row) {
+        return new WorkflowInstanceSummary(row.getId(), row.getDefinitionVersionId(), row.getDefinitionKey(),
+                row.getDefinitionVersion(), row.getStatus(), row.getCurrentNodeKey(), row.getResultKey(),
+                row.getBusinessType(), row.getBusinessId(), instant(row.getStartedAt()), row.getStartedBy(),
+                instant(row.getEndedAt()), row.getLastHistorySequence(), row.getLockVersion());
+    }
     static WorkflowInstanceView instance(WorkflowInstanceEntity entity, ExecutableDefinition definition) {
         return instance(entity, definition.key(), definition.version(), definition.contentHash());
     }

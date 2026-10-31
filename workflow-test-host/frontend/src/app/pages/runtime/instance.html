@@ -1,0 +1,45 @@
+<console-page-header [meta]="meta" [admin]="api.admin" /><console-feedback
+  [busy]="busy()"
+  [error]="error()"
+  [notice]="notice()"
+/>
+
+<mat-card appearance="outlined"
+  ><mat-card-header
+    ><div class="card-heading">
+      <div>
+        <div class="eyebrow">INSTANCE #{{id}}</div>
+        <h2>{{detail()?.definitionKey}}</h2>
+        <p>Pinned to definition version {{detail()?.definitionVersion}}.</p>
+      </div>
+      <console-status [value]="detail()?.status" /></div></mat-card-header
+  ><mat-card-content>
+    <div class="metric-strip">
+      <div>
+        <span>Current position</span
+        ><strong>{{detail()?.currentNodeKey}}</strong>
+      </div>
+      <div>
+        <span>Result</span
+        ><strong>{{detail()?.resultKey || 'Not finished'}}</strong>
+      </div>
+      <div>
+        <span>Instance token</span
+        ><strong class="monospace">{{detail()?.lockVersion}}</strong>
+      </div>
+      <div>
+        <span>Last history sequence</span
+        ><strong class="monospace">{{detail()?.lastHistorySequence}}</strong>
+      </div>
+    </div>
+    <div class="actions">
+      <a mat-flat-button [routerLink]="['/instance-tasks',id]"
+        ><console-icon name="tasks" /> Tasks</a
+      ><a mat-stroked-button [routerLink]="['/history',id]"
+        ><console-icon name="history" /> Ordered history</a
+      ><button mat-button (click)="load()" [disabled]="busy()">
+        <console-icon name="refresh" /> Refresh current state
+      </button>
+    </div>
+    <console-details [value]="detail()" /> </mat-card-content
+></mat-card>

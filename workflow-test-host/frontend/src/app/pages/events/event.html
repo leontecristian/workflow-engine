@@ -1,0 +1,23 @@
+<console-page-header [meta]="meta" [admin]="api.admin" /><console-feedback
+  [busy]="busy()"
+  [error]="error()"
+  [notice]="notice()"
+/>
+<mat-card appearance="outlined"
+  ><mat-card-header
+    ><div class="card-heading">
+      <h2>Event {{detail()?.eventId}}</h2>
+      <console-status
+        [value]="detail()?.deliveredAt ? 'DELIVERED' : 'PENDING'"
+      /></div></mat-card-header
+  ><mat-card-content
+    ><console-details [value]="detail()" />
+    <div class="actions spaced">
+      <button mat-stroked-button (click)="redeliver()" [disabled]="busy()">
+        <console-icon name="replay" /> Redeliver locally</button
+      ><a mat-button [routerLink]="['/inbox-event',id]">Inspect inbox event</a>
+    </div>
+    <h3>Immutable event payload</h3>
+    <pre>{{detail()?.eventJson}}</pre>
+  </mat-card-content></mat-card
+>

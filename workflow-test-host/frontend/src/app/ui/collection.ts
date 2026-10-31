@@ -1,0 +1,23 @@
+import { Component, input, output } from "@angular/core";
+import { ConsoleIcon } from "./icon";
+import { ConsoleRecords } from "./records";
+import { ConsolePagination } from "./pagination";
+@Component({
+  selector: "console-collection",
+  standalone: true,
+  imports: [ConsoleIcon, ConsoleRecords, ConsolePagination],
+  templateUrl: "./collection.html",
+})
+export class ConsoleCollection {
+  rows = input<any[]>([]);
+  kind = input("");
+  label = input("Records");
+  icon = input("layers");
+  size = input(50);
+  next = input<string | null>(null);
+  busy = input(false);
+  reload = output<void>();
+  advance = output<void>();
+  sizeChange = output<number>();
+  inspect = output<any>();
+}

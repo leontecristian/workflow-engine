@@ -3,12 +3,35 @@
   "version": 1,
   "projects": {
     "console": {
-      "projectType": "application", "root": "", "sourceRoot": "src",
-      "architect": { "build": { "builder": "@angular/build:application", "options": {
-        "browser": "src/main.ts", "index": "src/index.html", "tsConfig": "tsconfig.json",
-        "outputPath": "dist/console", "baseHref": "/console/", "styles": ["src/styles.css"],
-        "outputHashing": "all", "budgets": [{"type":"initial","maximumWarning":"700kB","maximumError":"1MB"}]
-      } } }
+      "projectType": "application",
+      "root": "",
+      "sourceRoot": "src",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "src/main.ts",
+            "index": "src/index.html",
+            "tsConfig": "tsconfig.json",
+            "outputPath": "dist/console",
+            "baseHref": "/console/",
+            "styles": ["src/styles.scss"],
+            "optimization": {
+              "scripts": true,
+              "styles": { "minify": true, "inlineCritical": false },
+              "fonts": false
+            },
+            "outputHashing": "all",
+            "budgets": [
+              {
+                "type": "initial",
+                "maximumWarning": "900kB",
+                "maximumError": "1MB"
+              }
+            ]
+          }
+        }
+      }
     }
   },
   "cli": { "analytics": false }

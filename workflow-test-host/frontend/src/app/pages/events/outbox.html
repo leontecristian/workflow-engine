@@ -1,0 +1,46 @@
+<console-page-header [meta]="meta" [admin]="api.admin" /><console-feedback
+  [busy]="busy()"
+  [error]="error()"
+  [notice]="notice()"
+/>
+<mat-card appearance="outlined"
+  ><mat-card-header
+    ><div class="card-heading">
+      <div>
+        <h2>Workflow event outbox</h2>
+        <p>
+          Durable events are dispatched locally on request. Redelivery never
+          executes a workflow command.
+        </p>
+      </div>
+      <button mat-flat-button (click)="dispatch()" [disabled]="busy()">
+        <console-icon name="events" /> Dispatch up to {{pageSize}}
+      </button>
+    </div></mat-card-header
+  ><mat-card-content
+    ><div class="filter-row">
+      <mat-form-field
+        appearance="outline"
+        class="compact-field"
+        subscriptSizing="dynamic"
+        ><mat-label>Delivery status</mat-label
+        ><mat-select [(ngModel)]="filter" (selectionChange)="load()"
+          ><mat-option value="ALL">All events</mat-option
+          ><mat-option value="PENDING">Pending</mat-option
+          ><mat-option value="DELIVERED">Delivered</mat-option></mat-select
+        ></mat-form-field
+      >
+    </div>
+    <console-collection
+      [rows]="rows()"
+      kind="events"
+      label="Event outbox"
+      icon="events"
+      [busy]="busy()"
+      [size]="pageSize"
+      [next]="next"
+      (sizeChange)="pageSize=$event;load()"
+      (reload)="load()"
+      (advance)="nextPage()"
+      (inspect)="open($event)" /></mat-card-content
+></mat-card>

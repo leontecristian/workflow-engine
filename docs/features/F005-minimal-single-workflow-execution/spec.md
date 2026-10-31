@@ -113,6 +113,7 @@ Views expose the corresponding F001 runtime columns with Java UTC Instants and e
 `WorkflowRuntimeQueryService` operations:
 
 - `findInstance(id)`, `findActivity(id)`, `findTask(id)` → Optional detached view.
+- Owner-requested monitoring extension in [F006 revision 4](../F006-test-host-definition-console/spec.md#revision-4--instance-monitoring-owner-request): `listInstances(WorkflowInstanceQuery(status, afterId, limit))` → immutable WorkflowInstancePage of WorkflowInstanceSummary, with nullable status meaning all states and no-argument query ACTIVE/0/50. Scalar summaries join immutable definition identity without loading pinned history/documents; exact findInstance retains pin verification. Existing page bounds/errors/host authorization apply. No execution, lifecycle, migration or receipt contract changes.
 - `listTasks(instanceId, afterId, limit)` → all task states owned by that instance, ascending task ID; no task-result payloads.
 - `listAssignedTasks(assignedUserRef, afterId, limit)` → stored OPEN assignments only, ascending task ID; host must authorize the requested assignee.
 - `listHistory(instanceId, afterSequence, limit)` → envelope summaries in sequence order, no details payload; `findHistoryEvent(instanceId, sequence)` → exact envelope/details string.

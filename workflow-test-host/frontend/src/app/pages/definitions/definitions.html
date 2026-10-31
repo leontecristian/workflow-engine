@@ -1,0 +1,136 @@
+<console-page-header [meta]="meta" [admin]="api.admin" /><console-feedback
+  [busy]="busy()"
+  [error]="error()"
+  [notice]="notice()"
+/>
+
+<mat-card appearance="outlined" class="library-card">
+  <mat-card-header
+    ><div class="card-heading">
+      <div>
+        <div class="eyebrow">LIBRARY</div>
+        <h2>
+          Workflow definitions
+          <span class="count-badge">{{ rows().length }} on this page</span>
+        </h2>
+        <p>Browse workflow families and inspect their explicit versions.</p>
+      </div>
+      <span class="section-symbol"><console-icon name="workflow" /></span></div
+  ></mat-card-header>
+  <mat-card-content
+    ><console-collection
+      [rows]="rows()"
+      kind="definitions"
+      label="Definitions"
+      icon="workflow"
+      [busy]="busy()"
+      [size]="pageSize"
+      [next]="next"
+      (sizeChange)="pageSize=$event;load()"
+      (reload)="load()"
+      (advance)="nextPage()"
+      (inspect)="open($event)"
+  /></mat-card-content>
+</mat-card>
+<div class="authoring-grid">
+  <mat-card appearance="outlined" class="import-card">
+    <mat-card-header
+      ><div class="card-heading">
+        <div>
+          <div class="eyebrow">AUTHORING</div>
+          <h2>Import a definition</h2>
+          <p>
+            Upload a JSON file or paste its original text. Existing versions are
+            never overwritten.
+          </p>
+        </div>
+        <console-icon name="upload" /></div
+    ></mat-card-header>
+    <mat-card-content>
+      <div class="upload-bar">
+        <input
+          #workflowFile
+          type="file"
+          tabindex="-1"
+          accept=".json,application/json"
+          (change)="upload($event)"
+          class="visually-hidden"
+        /><button
+          mat-stroked-button
+          (click)="workflowFile.click()"
+          [disabled]="busy()"
+        >
+          <console-icon name="file" /> Choose JSON file</button
+        ><span>UTF-8 JSON · up to 4 MiB</span>
+      </div>
+      <mat-form-field
+        appearance="outline"
+        class="full-width code-field"
+        subscriptSizing="dynamic"
+        ><mat-label>Workflow JSON</mat-label
+        ><textarea
+          matInput
+          [(ngModel)]="document"
+          aria-label="Raw workflow JSON"
+          rows="10"
+          spellcheck="false"
+          placeholder="Paste a definition with an explicit key and version…"
+        ></textarea>
+      </mat-form-field>
+      <div class="form-footer">
+        <span class="muted"
+          ><console-icon name="shield" /> Text is preserved exactly before
+          saving.</span
+        ><button
+          mat-flat-button
+          (click)="importDraft()"
+          [disabled]="busy() || !document"
+        >
+          <console-icon name="plus" /> Import draft
+        </button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+  <mat-card appearance="outlined" class="lookup-card">
+    <mat-card-header
+      ><div class="card-heading">
+        <div>
+          <div class="eyebrow">QUICK LOOKUP</div>
+          <h2>Find an exact version</h2>
+          <p>
+            Open a draft, published, or retired version by its permanent
+            identity.
+          </p>
+        </div>
+      </div></mat-card-header
+    >
+    <mat-card-content>
+      <mat-form-field appearance="outline" class="full-width"
+        ><mat-label>Workflow key</mat-label
+        ><input
+          matInput
+          [(ngModel)]="lookupKey"
+          placeholder="e.g. sandbox.singleReview"
+      /></mat-form-field>
+      <mat-form-field appearance="outline" class="full-width"
+        ><mat-label>Version</mat-label
+        ><input matInput [(ngModel)]="lookupVersion" inputmode="numeric"
+      /></mat-form-field>
+      <button
+        mat-stroked-button
+        class="full-width"
+        (click)="lookup()"
+        [disabled]="busy() || !lookupKey || !lookupVersion"
+      >
+        <console-icon name="search" /> Find version
+      </button>
+      <div class="hint-box">
+        <console-icon name="info" />
+        <p>
+          Each workflow family can have multiple versions. Publication freezes
+          the version's content.
+        </p>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

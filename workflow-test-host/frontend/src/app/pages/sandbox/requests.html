@@ -1,0 +1,107 @@
+<console-page-header [meta]="meta" [admin]="api.admin" /><console-feedback
+  [busy]="busy()"
+  [error]="error()"
+  [notice]="notice()"
+/>
+
+<div class="two-column">
+  <mat-card appearance="outlined"
+    ><mat-card-header
+      ><div>
+        <div class="eyebrow">STEP 1</div>
+        <h2>Create a sandbox request</h2>
+        <p>A retained host record links to the instance when start commits.</p>
+      </div></mat-card-header
+    ><mat-card-content
+      ><mat-form-field appearance="outline" class="full-width"
+        ><mat-label>Request name</mat-label
+        ><input
+          matInput
+          [(ngModel)]="name"
+          placeholder="Give this manual run a meaningful name" /></mat-form-field
+      ><button mat-stroked-button (click)="createRequest()" [disabled]="busy()">
+        <console-icon name="plus" /> Create request
+      </button></mat-card-content
+    ></mat-card
+  >
+  <mat-card appearance="outlined"
+    ><mat-card-header
+      ><div>
+        <div class="eyebrow">STEP 2</div>
+        <h2>Start a published workflow</h2>
+        <p>Choose an exact version and the original request token.</p>
+      </div></mat-card-header
+    ><mat-card-content>
+      <div class="inline-form">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic"
+          ><mat-label>Definition family ID</mat-label
+          ><input
+            matInput
+            [(ngModel)]="familyId"
+            inputmode="numeric" /></mat-form-field
+        ><button
+          mat-stroked-button
+          (click)="loadPublished()"
+          [disabled]="busy()"
+        >
+          Load versions
+        </button>
+      </div>
+      <mat-form-field appearance="outline" class="full-width spaced"
+        ><mat-label>Published version</mat-label
+        ><mat-select [(ngModel)]="versionId"
+          ><mat-option value="">Choose a version</mat-option>@for(v of
+          publishedRows();track v.id){<mat-option [value]="v.id"
+            >{{v.key}} · v{{v.version}} · #{{v.id}}</mat-option
+          >}</mat-select
+        ></mat-form-field
+      >
+      @if(publishedNext){<button
+        mat-button
+        (click)="loadPublished(true)"
+        [disabled]="busy()"
+      >
+        Next version page <console-icon name="chevron" /></button
+      >}
+      <div class="form-grid">
+        <mat-form-field appearance="outline"
+          ><mat-label>Request ID</mat-label
+          ><input
+            matInput
+            [(ngModel)]="requestId"
+            inputmode="numeric" /></mat-form-field
+        ><mat-form-field appearance="outline"
+          ><mat-label>Expected request version</mat-label
+          ><input matInput [(ngModel)]="requestToken" inputmode="numeric"
+        /></mat-form-field>
+      </div>
+      <button
+        mat-flat-button
+        (click)="start()"
+        [disabled]="busy() || !versionId"
+      >
+        <console-icon name="start" /> Start new command
+      </button>
+      <p class="field-note">
+        A deliberate new action gets a new UUID. Original requests stay in
+        Command recovery.
+      </p>
+    </mat-card-content></mat-card
+  >
+</div>
+<mat-card appearance="outlined"
+  ><mat-card-header><h2>Sandbox requests</h2></mat-card-header
+  ><mat-card-content
+    ><console-collection
+      [rows]="rows()"
+      kind="requests"
+      label="Requests & start"
+      icon="start"
+      [busy]="busy()"
+      [size]="pageSize"
+      [next]="next"
+      (sizeChange)="pageSize=$event;load()"
+      (reload)="load()"
+      (advance)="nextPage()"
+      (inspect)="open($event)" /></mat-card-content
+></mat-card>

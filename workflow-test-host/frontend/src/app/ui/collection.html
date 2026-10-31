@@ -1,0 +1,27 @@
+<console-pagination
+  [size]="size()"
+  [next]="next()"
+  [busy]="busy()"
+  (reload)="reload.emit()"
+  (advance)="advance.emit()"
+  (sizeChange)="sizeChange.emit($event)"
+/>
+@if(rows().length){<console-records
+  [rows]="rows()"
+  [kind]="kind()"
+  [label]="label()"
+  [disabled]="busy()"
+  (inspect)="inspect.emit($event)"
+/>}@else{
+<div class="empty-state">
+  <span class="empty-icon"><console-icon [name]="icon()" /></span>
+  <h3>
+    {{kind() === 'my-tasks' ? 'No open tasks assigned to you' : 'No records on
+    this page'}}
+  </h3>
+  <p>
+    {{busy() ? 'Loading the latest records…' : 'Records will appear here when
+    they are available. Refresh to check again.'}}
+  </p>
+</div>
+}

@@ -1,0 +1,91 @@
+<console-page-header [meta]="meta" [admin]="api.admin" /><console-feedback
+  [busy]="busy()"
+  [error]="error()"
+  [notice]="notice()"
+/>
+
+<div class="two-column">
+  <mat-card appearance="outlined"
+    ><mat-card-header
+      ><div>
+        <div class="eyebrow">TASK CATALOG</div>
+        <h2>{{editing ? 'Edit task type' : 'Create a task type'}}</h2>
+        <p>
+          The code is permanent. Metadata and authoring selectability can
+          change.
+        </p>
+      </div></mat-card-header
+    ><mat-card-content>
+      <mat-form-field appearance="outline" class="full-width"
+        ><mat-label>Permanent code</mat-label
+        ><input matInput [(ngModel)]="code" [readOnly]="!!editing"
+      /></mat-form-field>
+      <mat-form-field appearance="outline" class="full-width"
+        ><mat-label>Name</mat-label><input matInput [(ngModel)]="name"
+      /></mat-form-field>
+      <mat-form-field appearance="outline" class="full-width"
+        ><mat-label>Description</mat-label
+        ><textarea matInput [(ngModel)]="description" rows="3"></textarea>
+      </mat-form-field>
+      <mat-checkbox [(ngModel)]="selectable"
+        >Selectable for new authoring</mat-checkbox
+      >
+      <div class="actions spaced">
+        <button mat-flat-button (click)="saveCatalog()" [disabled]="busy()">
+          Save task type</button
+        ><button mat-button (click)="editing = null" [disabled]="busy()">
+          New entry
+        </button>
+      </div>
+    </mat-card-content></mat-card
+  >
+  <mat-card appearance="outlined" class="guidance-card"
+    ><mat-card-content
+      ><span class="section-symbol"><console-icon name="catalog" /></span>
+      <h2>A retained catalog</h2>
+      <p>
+        Disabling authoring selectability does not stop published workflows or
+        their pinned instances.
+      </p>
+      <div class="hint-box">
+        <console-icon name="info" />
+        <p>
+          Catalog entries and executable host capabilities are separate
+          prerequisites. Inspect Capabilities for the installed sandbox support.
+        </p>
+      </div></mat-card-content
+    ></mat-card
+  >
+</div>
+<mat-card appearance="outlined"
+  ><mat-card-header
+    ><div class="card-heading">
+      <h2>Task types</h2>
+      <mat-form-field
+        appearance="outline"
+        subscriptSizing="dynamic"
+        class="compact-field"
+        ><mat-label>Authoring</mat-label
+        ><mat-select [(ngModel)]="filter" (selectionChange)="load()"
+          ><mat-option value="ALL">All entries</mat-option
+          ><mat-option value="SELECTABLE">Selectable</mat-option
+          ><mat-option value="NONSELECTABLE"
+            >Not selectable</mat-option
+          ></mat-select
+        ></mat-form-field
+      >
+    </div></mat-card-header
+  ><mat-card-content
+    ><console-collection
+      [rows]="rows()"
+      kind="catalog"
+      label="Task types"
+      icon="catalog"
+      [busy]="busy()"
+      [size]="pageSize"
+      [next]="next"
+      (sizeChange)="pageSize=$event;load()"
+      (reload)="load()"
+      (advance)="nextPage()"
+      (inspect)="open($event)" /></mat-card-content
+></mat-card>
