@@ -15,7 +15,7 @@ import lombok.Getter;
 import org.hibernate.annotations.FractionalSeconds;
 import org.hibernate.annotations.Nationalized;
 
-/** Internal persistence state; not a supported host API. No mutation contract is provided. */
+/** Internal runtime persistence; controlled changes belong to the host-coordinated execution service. */
 @Entity
 @Table(name = "workflow_activity", schema = "wf")
 @Getter
@@ -77,6 +77,23 @@ public class WorkflowActivityEntity {
     private String closureReason;
 
     protected WorkflowActivityEntity() {
+    }
+
+    public WorkflowActivityEntity(long instanceId, String nodeKey, long activationSequence,
+                                  long taskTypeId, String reviewRevisionRef, LocalDateTime enteredAt) {
+        if (instanceId <= 0 || activationSequence <= 0 || taskTypeId <= 0) throw new IllegalArgumentException("Invalid activity identity");
+        this.instanceId = instanceId; this.nodeKey = java.util.Objects.requireNonNull(nodeKey);
+        this.activationSequence = activationSequence; this.taskTypeId = taskTypeId;
+        this.completionPolicy = CompletionPolicy.SINGLE; this.requiredTaskCount = 1;
+        this.reviewRevisionRef = reviewRevisionRef; this.status = ActivityStatus.ACTIVE;
+        this.enteredAt = java.util.Objects.requireNonNull(enteredAt);
+    }
+
+    public void complete(String outcome, LocalDateTime time, String actor) {
+        if (status != ActivityStatus.ACTIVE || completionPolicy != CompletionPolicy.SINGLE || time.isBefore(enteredAt))
+            throw new IllegalStateException("Active SINGLE activity required");
+        status = ActivityStatus.COMPLETED; outcomeKey = java.util.Objects.requireNonNull(outcome);
+        closedAt = time; closedBy = java.util.Objects.requireNonNull(actor); closureReason = "TASK_OUTCOME";
     }
 
 }

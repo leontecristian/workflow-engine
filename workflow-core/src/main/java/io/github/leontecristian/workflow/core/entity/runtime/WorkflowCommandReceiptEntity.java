@@ -16,7 +16,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Nationalized;
 import org.hibernate.type.SqlTypes;
 
-/** Internal persistence state; not a supported host API. No mutation contract is provided. */
+/** Internal insert-only runtime evidence; no supported host mutation or deletion API. */
 @Entity
 @Table(name = "workflow_command_receipt", schema = "wf")
 @Getter
@@ -63,6 +63,18 @@ public class WorkflowCommandReceiptEntity {
     private String resultJson;
 
     protected WorkflowCommandReceiptEntity() {
+    }
+
+    public WorkflowCommandReceiptEntity(UUID commandId, long instanceId, String operation,
+            ActorKind actorKind, String actorRef, byte[] fingerprint, String fingerprintVersion,
+            LocalDateTime time, String resultJson) {
+        if (instanceId <= 0 || fingerprint == null || fingerprint.length != 32) throw new IllegalArgumentException("Invalid receipt");
+        this.commandId = java.util.Objects.requireNonNull(commandId); this.instanceId = instanceId;
+        this.operationType = java.util.Objects.requireNonNull(operation); this.actorKind = java.util.Objects.requireNonNull(actorKind);
+        this.actorRef = java.util.Objects.requireNonNull(actorRef); this.requestFingerprint = fingerprint.clone();
+        this.fingerprintVersion = java.util.Objects.requireNonNull(fingerprintVersion);
+        this.recordedAt = java.util.Objects.requireNonNull(time); this.resultSchemaVersion = 1;
+        this.resultJson = java.util.Objects.requireNonNull(resultJson);
     }
 
     public byte[] getRequestFingerprint() {

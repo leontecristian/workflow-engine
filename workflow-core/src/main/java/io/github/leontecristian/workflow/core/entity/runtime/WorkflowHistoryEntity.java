@@ -15,7 +15,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Nationalized;
 import org.hibernate.type.SqlTypes;
 
-/** Internal persistence state; not a supported host API. No mutation contract is provided. */
+/** Internal insert-only runtime evidence; no supported host mutation or deletion API. */
 @Entity
 @Table(name = "workflow_history", schema = "wf")
 @Getter
@@ -72,6 +72,18 @@ public class WorkflowHistoryEntity {
     private String detailsJson;
 
     protected WorkflowHistoryEntity() {
+    }
+
+    /** Insert-only fact; there is no history mutation or deletion API. */
+    public WorkflowHistoryEntity(io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistorySummary fact, String details) {
+        this.id = new WorkflowHistoryId(fact.instanceId(), fact.historySequence());
+        this.eventType = java.util.Objects.requireNonNull(fact.eventType());
+        this.commandId = java.util.Objects.requireNonNull(fact.commandId()); this.correlationId = fact.correlationId();
+        this.actorKind = java.util.Objects.requireNonNull(fact.actorKind()); this.actorRef = java.util.Objects.requireNonNull(fact.actorRef());
+        this.occurredAt = LocalDateTime.ofInstant(fact.occurredAt(), java.time.ZoneOffset.UTC);
+        this.activityId = fact.activityId(); this.taskId = fact.taskId();
+        this.sourceNodeKey = fact.sourceNodeKey(); this.targetNodeKey = fact.targetNodeKey(); this.transitionKey = fact.transitionKey();
+        this.detailsSchemaVersion = fact.detailsSchemaVersion(); this.detailsJson = java.util.Objects.requireNonNull(details);
     }
 
 }

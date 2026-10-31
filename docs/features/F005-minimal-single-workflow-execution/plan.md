@@ -29,6 +29,8 @@ The start eligibility lock is held until host completion, orders against F004 re
 
 Resolve task catalog with documented F002 exact lookup including disabled rows. F004's publication lock/selectability operation is not the runtime lookup. Snapshot real executable resolver IDs once, reject duplicates and ensure host capability consistency at command time. Missing runtime dependencies should fail commands, not prevent management-only bootstrap. F006 validation fixtures alone must fail runtime resolver availability.
 
+Implementation refinement: add a read-only definition identity projection for current instance views, separate from executable-model loading. This keeps stored CANCELLED/ALL values readable without treating those aggregates as executable by F005. The immutable INSTANCE_STARTED fact retains the pinned hash; command loading and current instance identity reads compare that fact with the exact version identity, without adding a physical instance hash column.
+
 ## 3. Commands, normalization and replay (R06–07, R11)
 
 Implement immutable API records and strict bounds first. Centralize UTC conversion and identifier/comment validation without modifying host-global ObjectMapper/Hibernate settings. Start/complete command shapes cannot carry variables/results/guards. Validate the host callback/intent pairing before any invocation.
@@ -55,6 +57,8 @@ Build one immutable WorkflowEvent per committed history fact using deterministic
 
 Runtime query service maps immutable scalar views under read-only REQUIRED. Add SQL-bounded ownership joins for instance tasks and assigned OPEN tasks; use limit+1 cursor queries. History lists return envelopes, exact reads return bounded details. Dedicated task/activity submission readers validate the TASK_COMPLETED schema and owner/state agreement. Keep same-transaction visibility and no implicit latest-review lookup. Apply page count/byte limits and continuation after the last emitted item; fail if a single item cannot fit. Do not use total-count scans or load full histories into memory.
 
+Review refinement: both task-page queries select a scalar RuntimeTaskRow including activity-owned instance/type IDs, avoiding per-item activity queries. Assigned-task filtering combines BIN2 equality with SQL Server DATALENGTH equal to the validated Java reference's UTF-16 byte count before pagination. LEN is unsuitable because it discards trailing spaces; no reference is trimmed or normalized.
+
 ## 6. Verification and handover (R12)
 
 Review contract/DDL compatibility, state invariants, receipt equality and call/flush/lock ordering before packaging. Select installed JDK 21 explicitly and run `./mvnw.cmd '-Dmaven.test.skip=true' package`. Do not generate/run automated tests or an automatic scenario harness. Static walkthroughs and compilation are not behavioral PASS results.
@@ -65,4 +69,4 @@ When manual runtime verification is authorized and real adapters exist, record i
 
 Durable-record insertion/rollback is not evidence of eventual delivery/recovery. Actual host dispatch/restart/at-least-once obligations remain explicit production gates. Do not create automated tests, alter applied schema/checksums, clear data or start a database merely to complete a checklist. Keep raw logs under ignored target, stop only owned processes after identity checks, and record retained records and process state.
 
-Finish by reconciling spec/plan/tasks/implementation and navigation, checking relative links and whitespace. No build/startup is needed for this documentation-preparation change. Commit/push only on request. F006 stays a separate management console until a later request explicitly adds runtime pages/endpoints and real sandbox adapters.
+Finish by reconciling spec/plan/tasks/implementation and navigation, checking relative links and whitespace. The historical documentation-preparation task required no build/startup; the later implementation request authorizes its scoped verification. Commit/push only on request. F006's currently specified host adapters/pages/endpoints remain a separate implementation; F005 adds none of them and does not infer their behavioral acceptance from documents.

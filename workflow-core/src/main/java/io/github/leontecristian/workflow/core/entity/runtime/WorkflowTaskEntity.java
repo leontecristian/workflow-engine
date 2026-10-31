@@ -15,7 +15,7 @@ import lombok.Getter;
 import org.hibernate.annotations.FractionalSeconds;
 import org.hibernate.annotations.Nationalized;
 
-/** Internal persistence state; not a supported host API. No mutation contract is provided. */
+/** Internal runtime persistence; controlled changes belong to the host-coordinated execution service. */
 @Entity
 @Table(name = "workflow_task", schema = "wf")
 @Getter
@@ -67,6 +67,20 @@ public class WorkflowTaskEntity {
     private TaskClosureReason closureReason;
 
     protected WorkflowTaskEntity() {
+    }
+
+    public WorkflowTaskEntity(long activityId, String taskKey, String assignee, LocalDateTime time) {
+        if (activityId <= 0) throw new IllegalArgumentException("Invalid activity identity");
+        this.activityId = activityId; this.taskKey = java.util.Objects.requireNonNull(taskKey);
+        this.assignedUserRef = java.util.Objects.requireNonNull(assignee);
+        this.createdAt = java.util.Objects.requireNonNull(time); this.status = TaskStatus.OPEN;
+    }
+
+    public void complete(String outcome, LocalDateTime time, String actor) {
+        if (status != TaskStatus.OPEN || time.isBefore(createdAt) || !assignedUserRef.equals(actor))
+            throw new IllegalStateException("Assigned OPEN task required");
+        status = TaskStatus.COMPLETED; outcomeKey = java.util.Objects.requireNonNull(outcome);
+        closedAt = time; closedBy = actor; closureReason = TaskClosureReason.TASK_OUTCOME;
     }
 
 }

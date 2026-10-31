@@ -15,7 +15,7 @@ import lombok.Getter;
 import org.hibernate.annotations.FractionalSeconds;
 import org.hibernate.annotations.Nationalized;
 
-/** Internal persistence state; not a supported host API. No mutation contract is provided. */
+/** Internal runtime persistence; controlled changes belong to the host-coordinated execution service. */
 @Entity
 @Table(name = "workflow_instance", schema = "wf")
 @Getter
@@ -76,6 +76,37 @@ public class WorkflowInstanceEntity {
     private Long lockVersion;
 
     protected WorkflowInstanceEntity() {
+    }
+
+    public WorkflowInstanceEntity(long definitionVersionId, String businessType, String businessId,
+                                  String startKey, LocalDateTime time, String actor) {
+        if (definitionVersionId <= 0 || (businessType == null) != (businessId == null)) throw new IllegalArgumentException("Invalid instance identity");
+        this.definitionVersionId = definitionVersionId;
+        this.businessType = businessType; this.businessId = businessId;
+        this.currentNodeKey = java.util.Objects.requireNonNull(startKey);
+        this.status = InstanceStatus.ACTIVE; this.lastHistorySequence = 0L;
+        this.startedAt = java.util.Objects.requireNonNull(time); this.startedBy = java.util.Objects.requireNonNull(actor);
+    }
+
+    /** A real dirty managed write, flushed by the command before any child mutation or host effect. */
+    public long reserveHistorySequence() {
+        if (status != InstanceStatus.ACTIVE) throw new IllegalStateException("Active instance required");
+        lastHistorySequence = Math.addExact(lastHistorySequence, 1);
+        return lastHistorySequence;
+    }
+
+    public void waitAt(String humanKey, long finalSequence) {
+        if (status != InstanceStatus.ACTIVE || lastHistorySequence != 0 || finalSequence != 4)
+            throw new IllegalStateException("New SINGLE instance required");
+        currentNodeKey = java.util.Objects.requireNonNull(humanKey); lastHistorySequence = finalSequence;
+    }
+
+    public void complete(String endKey, String result, long finalSequence, LocalDateTime time, String actor) {
+        if (status != InstanceStatus.ACTIVE || finalSequence <= lastHistorySequence || time.isBefore(startedAt))
+            throw new IllegalStateException("Invalid completion");
+        currentNodeKey = java.util.Objects.requireNonNull(endKey); resultKey = java.util.Objects.requireNonNull(result);
+        status = InstanceStatus.COMPLETED; endedAt = time; endedBy = java.util.Objects.requireNonNull(actor);
+        lastHistorySequence = finalSequence;
     }
 
 }

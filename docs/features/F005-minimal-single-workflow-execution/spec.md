@@ -1,6 +1,6 @@
 # F005 — Minimal SINGLE workflow execution
 
-**Status:** READY for implementation. **Revision:** 1 — 2026-10-31. **Owner:** Workflow project owner. **Constitution:** [v3.0.0](../../constitution.md).
+**Status:** IMPLEMENTED (core); manual acceptance remains BLOCKED with T11 open. Package/artifact/bootstrap checks passed; AC01–AC13 behavioral execution is NOT RUN. See [implementation.md](implementation.md#4-verification). **Revision:** 1 — 2026-10-31. **Owner:** Workflow project owner. **Constitution:** [v3.0.0](../../constitution.md).
 
 ## Outcome and scope
 
@@ -10,7 +10,7 @@ Build on [F004](../F004-definition-management-validation/spec.md), [F003 mapping
 
 Included: start, complete, exact/bounded runtime reads, host assignment and start-link extension contracts, aggregate concurrency, idempotent replay, history and durable-event recorder contract. This selects exact APIs/normalization for this small slice; it does not freeze the future full runtime API.
 
-Excluded: ALL/multiple tasks, cancellation, reassignment, variables, nonempty scalar inputs, structured results, guards/expressions, service tasks/gateways, scheduling, business decision engine, production APOLO adapters, REST/UI and automated tests. Existing CANCELLED/ALL storage values remain readable but F005 does not expose commands to create them. F006's definition console remains independent; runtime endpoints/pages require an explicit later extension, not incidental implementation here.
+Excluded: ALL/multiple tasks, cancellation, reassignment, variables, nonempty scalar inputs, structured results, guards/expressions, service tasks/gateways, scheduling, business decision engine, production APOLO adapters, REST/UI and automated tests. Existing CANCELLED/ALL storage values remain readable but F005 does not expose commands to create them. F006 remains independent; its separately specified host adapters/endpoints/pages are not implemented by this F005 task.
 
 ## Requirements
 

@@ -19,6 +19,19 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true, propagation = Propagation.REQUIRED)
 public interface WorkflowHistoryRepository extends Repository<WorkflowHistoryEntity, WorkflowHistoryId> {
 
+    @Query("""
+            select h.id.instanceId as instanceId, h.id.sequenceNumber as historySequence,
+                h.eventType as eventType, h.commandId as commandId, h.correlationId as correlationId,
+                h.actorKind as actorKind, h.actorRef as actorRef, h.occurredAt as occurredAt,
+                h.activityId as activityId, h.taskId as taskId, h.sourceNodeKey as sourceNodeKey,
+                h.targetNodeKey as targetNodeKey, h.transitionKey as transitionKey,
+                h.detailsSchemaVersion as detailsSchemaVersion
+            from WorkflowHistoryEntity h where h.id.instanceId = :instanceId
+              and h.id.sequenceNumber > :afterSequence order by h.id.sequenceNumber asc
+            """)
+    List<RuntimeHistoryRow> findSummaryPage(
+            @Param("instanceId") Long instanceId, @Param("afterSequence") long afterSequence, Pageable pageable);
+
     Optional<WorkflowHistoryEntity> findById(WorkflowHistoryId id);
 
     @Query("""

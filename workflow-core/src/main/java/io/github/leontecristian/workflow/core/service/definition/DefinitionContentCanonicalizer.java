@@ -29,7 +29,8 @@ public final class DefinitionContentCanonicalizer {
 
     public static String hex(byte[] bytes) { return bytes == null ? null : HexFormat.of().formatHex(bytes); }
 
-    static String canonical(JsonNode node) {
+    /** Internal core codec reuse; not a host serialization policy. */
+    public static String canonical(JsonNode node) {
         StringBuilder out = new StringBuilder();
         append(node, out);
         return out.toString();

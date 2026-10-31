@@ -18,6 +18,41 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true, propagation = Propagation.REQUIRED)
 public interface WorkflowTaskRepository extends Repository<WorkflowTaskEntity, Long> {
 
+    String TASK_PAGE_SELECT = """
+            select t.id as id, t.activityId as activityId, a.instanceId as instanceId,
+                a.taskTypeId as taskTypeId, t.taskKey as taskKey, t.assignedUserRef as assignedUserRef,
+                t.status as status, t.outcomeKey as outcomeKey, t.createdAt as createdAt,
+                t.dueAt as dueAt, t.closedAt as closedAt, t.closedBy as closedBy,
+                t.closureReason as closureReason
+            from WorkflowTaskEntity t join WorkflowActivityEntity a on a.id = t.activityId
+            """;
+
+    @Query(TASK_PAGE_SELECT + """
+            where a.instanceId = :instanceId and t.id > :afterId order by t.id asc
+            """)
+    List<RuntimeTaskRow> findByInstancePage(@Param("instanceId") Long instanceId,
+                                               @Param("afterId") long afterId, Pageable pageable);
+
+    // SQL Server equality pads trailing spaces, including under BIN2. The byte count is
+    // derived from validated UTF-16 input, not the driver's VARCHAR/NVARCHAR parameter binding.
+    @Query(TASK_PAGE_SELECT + """
+            where t.assignedUserRef = :assignee
+              and function('datalength', t.assignedUserRef) = :assigneeBytes
+              and t.status = io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.OPEN
+              and t.id > :afterId order by t.id asc
+            """)
+    List<RuntimeTaskRow> findAssignedPage(@Param("assignee") String assignee,
+                                             @Param("assigneeBytes") int assigneeBytes,
+                                             @Param("afterId") long afterId, Pageable pageable);
+
+    @Query("""
+            select t from WorkflowTaskEntity t where t.activityId = :activityId
+              and t.status = io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.COMPLETED
+              and t.id > :afterId order by t.id asc
+            """)
+    List<WorkflowTaskEntity> findCompletedPage(@Param("activityId") Long activityId,
+                                              @Param("afterId") long afterId, Pageable pageable);
+
     Optional<WorkflowTaskEntity> findById(Long id);
 
     @Query("""
