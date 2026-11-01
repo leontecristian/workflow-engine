@@ -66,6 +66,26 @@ test("successful draft save adopts token and clears stale validation without par
   assert.equal(page.validationReport(), null);
   assert.equal(page.dirty, false);
 });
+test("version load and reload display formatted JSON without unsaved changes", async (t) => {
+  const stored = '{"key":"review","version":9007199254740993}';
+  const { page } = component(t, VersionPage, {
+    async version() {
+      return { summary: { status: "DRAFT", lockVersion: "7" }, documentJson: stored };
+    },
+  });
+  page.id = "9";
+  await page.load();
+  assert.equal(page.document, '{\n  "key": "review",\n  "version": 9007199254740993\n}');
+  assert.equal(page.dirty, false);
+  assert.equal(page.detail().documentJson, stored);
+  page.document = "unsaved edit";
+  page.dirty = true;
+  await page.load();
+  assert.match(page.document, /\n  "key": "review"/);
+  assert.equal(page.dirty, false);
+  assert.equal(page.error(), "");
+});
+
 test("explicit editor reload requires confirmation when dirty", async (t) => {
   const { page } = component(t, VersionPage);
   let loads = 0;
@@ -120,7 +140,7 @@ test("out-of-order detail response cannot overwrite a later route identity", asy
       version(id) {
         return id === "1"
           ? new Promise((r) => (release = r))
-          : Promise.resolve({ summary: { id }, documentJson: "new" });
+          : Promise.resolve({ summary: { id }, documentJson: '"new"' });
       },
     },
     routeAt({ id: "1" }),
@@ -128,8 +148,8 @@ test("out-of-order detail response cannot overwrite a later route identity", asy
   page.ngOnInit();
   route.paramMap.next(router.convertToParamMap({ id: "2" }));
   await tick();
-  release({ summary: { id: "1" }, documentJson: "old" });
+  release({ summary: { id: "1" }, documentJson: '"old"' });
   await tick();
   assert.equal(page.detail().summary.id, "2");
-  assert.equal(page.document, "new");
+  assert.equal(page.document, '"new"');
 });

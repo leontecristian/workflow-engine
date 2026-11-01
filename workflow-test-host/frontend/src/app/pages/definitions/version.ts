@@ -54,7 +54,7 @@ export class VersionPage {
       const d = await this.api.version(id);
       if (this.destroyRef.destroyed || this.id !== id) return;
       this.detail.set(d);
-      this.document = d.documentJson;
+      this.document = prettyDocument(d.documentJson);
       this.dirty = false;
     });
   }
