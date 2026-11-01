@@ -37,3 +37,4 @@ build/
 workflow-test-host/frontend/node_modules/
 workflow-test-host/frontend/.angular/
 workflow-test-host/frontend/dist/
+/.codex/

@@ -16,9 +16,9 @@
 
 > **Design direction:** Develop separately from APOLO for now, then move workflow-core into APOLO's source/module structure as a sibling of backend. Backend depends on core's ordinary library JAR; core retains its business-independent boundary while joining APOLO's build and release lifecycle. Deliver workflow execution first, using restricted expressions for simple routing. A reusable business decision engine is an optional later capability.
 
-This document consolidates the [original technical design](../../../apolo-docs/workflow-engine/archive/original-technical-design.md) and subsequent [development discussion](../../../apolo-docs/workflow-engine/archive/development-discussion.md). It supersedes earlier suggestions that APOLO must supply the expression evaluator or that every business decision must return a workflow transition key.
+This document consolidates the [original technical design](../archive/original-technical-design.md) and subsequent [development discussion](../archive/development-discussion.md). It supersedes earlier suggestions that APOLO must supply the expression evaluator or that every business decision must return a workflow transition key.
 
-Revision 0.8 restores compatible detail that was compressed during consolidation. The [original-design reconciliation](../../../apolo-docs/workflow-engine/architecture/original-design-reconciliation.md) accounts for all 51 original sections. The complete example in section 7.4 is a **proposed design illustration**, not a finalized schema or implemented engine. This restoration preserves F4/F5 and O1/O2/O6; it does not approve the remaining JSON contracts or APOLO business policies.
+Revision 0.8 restores compatible detail that was compressed during consolidation. The [original-design reconciliation](../archive/original-design-reconciliation.md) accounts for all 51 original sections. The complete example in section 7.4 is a **proposed design illustration**, not a finalized schema or implemented engine. This restoration preserves F4/F5 and O1/O2/O6; it does not approve the remaining JSON contracts or APOLO business policies.
 
 Revision 0.9 records the owner's 2026-10-31 selection of ordered first-match workflow routing in section 7.3 and centrally enforced expression rules tied to the workflow-language version in section 5.3. These replace rejection of overlapping conditions and independent expression-policy selection. Exact JSON notation and legacy persistence reconciliation remain open. See constitution C08 and the source-precedence record for these revisions and the retained database-design amendments.
 
@@ -1266,7 +1266,7 @@ workflow-engine/
             └── examples/
 ```
 
-This tree combines existing modules/governance documents with planned feature folders, an optional workspace file and the later designer. The agreed source-repository layout nests feature work under `docs/features/`. Active engine designs live under `docs/architecture/` and are linked from `design-sources.md`; supporting APOLO documentation and historical discussions remain in the sibling `apolo-docs` repository. Maintain one authoritative copy of each design. Business-decision artifacts are deferred. The root POM aggregates exactly `workflow-core` and `workflow-test-host`; the designer builds separately. Proposed JSON in section 7.4 does not establish implemented workflow behavior or a finalized schema.
+This tree combines existing modules/governance documents with planned feature folders, an optional workspace file and the later designer. The agreed source-repository layout nests feature work under `docs/features/`. Active engine designs live under `docs/architecture/` and are linked from `design-sources.md`; supporting APOLO documentation lives under `docs/integrations/apolo/`, and historical discussions under `docs/archive/`. Maintain one authoritative copy of each design. Business-decision artifacts are deferred. The root POM aggregates exactly `workflow-core` and `workflow-test-host`; the designer builds separately. Proposed JSON in section 7.4 does not establish implemented workflow behavior or a finalized schema.
 
 The eventual source/module destination is:
 
@@ -1283,7 +1283,7 @@ Keep one authoritative copy of core after the move. `workflow-test-host` remains
 
 `README.md` is the entry point. This design document records architecture; specifications define exact contracts; decision records preserve choices and reasons; evidence records distinguish observed behavior from pending checks. Do not copy the complete architecture into every file. The current owner instruction is no automated tests; acceptance requirements remain documented and unperformed checks are marked NOT RUN.
 
-Root `AGENTS.md` records module boundaries, safe build commands, the no-tests instruction, security invariants, definition-version rules and specification/evidence discipline. Keep affected schemas/examples consistent when their contracts change. Treat proposed design changes as proposals until reviewed; generated code must not silently redefine execution semantics.
+Root `AGENTS.md` records module boundaries, safe build commands, the current verification policy, security invariants, definition-version rules and specification/evidence discipline. Keep affected schemas/examples consistent when their contracts change. Treat proposed design changes as proposals until reviewed; generated code must not silently redefine execution semantics.
 
 Use a private, appropriately owned repository for work-related material, with organizational approval for its location and access. Do not commit credentials, production data, or unapproved proprietary material. This document does not select a public license or establish ownership rights.
 
@@ -1431,24 +1431,19 @@ No business decision engine, decision table or full graphical editor is required
 
 ## 21. Delivery roadmap
 
-| Milestone | Deliverable and exit condition |
-| --- | --- |
-| 0 — Workflow contracts and compatibility | Formalize agreed O1/O2/O6 in Workflow Definition v1 (including expression rules) and registry contracts, with schemas/examples; verify O7 against the host's Java 17 target/JDK 21 baseline |
-| 1 — Working workflow in the sandbox | Five node types, one directly assigned task, registry/API/import, simple restricted routing, JPA/SQL Server persistence, audit, atomic commands, concurrency, idempotency and durable handoff |
-| 2 — Early APOLO integration | Cross-team booking approval through its domain endpoint; host authorization, registry compatibility, dependency alignment and shared-transaction rollback |
-| 3 — Workflow designer | Graph/JSON editing, registered task types, routing expressions, validation and controlled publication; no decision-table editor required |
-| 4 — Release hardening | Operational/recovery tests, migrations, compatibility and fixed artifacts; reliability is mandatory for any earlier production deployment |
-| Optional later — Business decisions | Only when justified: Decision Definition v1, standalone rules/table engine, FIRST/UNIQUE, storage/APIs/simulation, workflow adapter and optional decision editor |
+The [project roadmap](../roadmap.md) is the maintained delivery plan, including current implementation status, acceptance gaps, proposed engine increments, dependencies and milestone exit conditions. The [feature index](../features/README.md) links to the actual specifications and evidence. This section preserves the architectural sequence without maintaining a second status table.
+
+Deliver a working sandbox, then one APOLO cross-team booking integration, then the graphical workflow designer. Release hardening applies throughout; reliability is mandatory before any production deployment. Contracts are specified incrementally before dependent implementation, with host compatibility verified for the target environment.
 
 Do not insert a standalone expression product or business decision engine ahead of the first working workflow. Implement and test the restricted expression support as part of the workflow slice. The optional business decision component has no committed delivery milestone and must not block sandbox, APOLO integration or workflow designer work.
 
-Timers, collective approvals and advanced orchestration remain separate deferred capabilities. Concurrency, atomicity and durable handoff remain mandatory. Start/outcome authorization is optional through declared guards; host query and receipt-access controls still apply.
+ALL collective review is agreed V1 scope under the later constitution and language decisions; it is not implemented by the minimal SINGLE baseline. Timers, advanced collective policies and advanced orchestration remain deferred. Concurrency, atomicity and durable handoff remain mandatory. Start/outcome authorization is optional through declared guards; host query and receipt-access controls still apply.
 
 ## 22. Decision register and open items
 
 ### 22.1 Confirmed decisions — 2026-10-24
 
-The Q identifiers trace the decision questionnaire; F1/F2/F3 reconcile the development discussion, F4 records the two-module decision, and F5 records separate development followed by source integration into APOLO. Later Java clarification takes precedence over the earlier Java 21 compilation statement. The supplied discussion body matches the preserved [development discussion](../../../apolo-docs/workflow-engine/archive/development-discussion.md); its earlier alternatives do not reopen decisions already confirmed here.
+The Q identifiers trace the decision questionnaire; F1/F2/F3 reconcile the development discussion, F4 records the two-module decision, and F5 records separate development followed by source integration into APOLO. Later Java clarification takes precedence over the earlier Java 21 compilation statement. The supplied discussion body matches the preserved [development discussion](../archive/development-discussion.md); its earlier alternatives do not reopen decisions already confirmed here.
 
 | Question | AGREED decision |
 | --- | --- |

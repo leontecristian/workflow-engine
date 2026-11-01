@@ -77,7 +77,7 @@ Do not create a separate evidence.md or verification.md for routine feature trac
 
 ## Verification and current no-tests policy
 
-The owner's current instruction remains **do not create or run automated tests unless explicitly authorized**. Preserve existing test sources. Document acceptance scenarios and mark unperformed checks NOT RUN; this policy does not waive required production guarantees.
+**Owner clarification — 2026-10-31:** isolated unit tests may be created and run. Database integration tests require explicit user authorization, including SQL Server, embedded databases, Testcontainers and database-backed Spring contexts. This supersedes older blanket no-tests wording; the section anchor is retained for existing references. Follow [AGENTS.md](../AGENTS.md) for test selection and JDK requirements, and preserve historical evidence and existing test sources. Document acceptance scenarios and mark unperformed checks NOT RUN; this policy does not waive required production guarantees.
 
 For authorized implementation builds, select JDK 21 and use the root wrapper:
 
@@ -91,4 +91,4 @@ Keep implementation completion and verified behavior separate. Required rollback
 
 ## Feature navigation
 
-Use the [feature index](features/README.md) for current delivery status and sequencing. Specifications link to the relevant [design sources](design-sources.md); this guide does not duplicate the roadmap or change the constitution and architectural constraints.
+Use the [roadmap](roadmap.md) for delivery sequencing and milestone exits, and the [feature index](features/README.md) for specified-feature status. Specifications link to the relevant [design sources](design-sources.md); this guide does not duplicate the roadmap or change the constitution and architectural constraints.

@@ -8,9 +8,9 @@
 
 An assumption is an expectation used for planning whose supporting evidence is incomplete. It must not be presented as a confirmed contract or an implemented guarantee. [Constraints](constraints.md) remain requirements even when the feasibility or mechanism for satisfying them needs verification.
 
-The items below derive from the [consolidated design](architecture/workflow-engine-design.md), particularly O3/O7–O11, the [development plan](../../apolo-docs/workflow-engine/development/independent-development-plan.md), the [technical summary](../../apolo-docs/workflow-engine/reference/apolo-technical-summary.md) and the scoped superseding decisions in [database design v1.4](architecture/Workflow_Engine_Database_Design_v1.md). See [design sources](design-sources.md) for precedence. Owners identify responsible roles, not newly assigned individuals or delivery dates.
+The items below derive from the [consolidated design](architecture/workflow-engine-design.md), particularly O3/O7–O11, the development plan now consolidated into the [roadmap](roadmap.md), the [technical summary](integrations/apolo/apolo-technical-summary.md) and the scoped superseding decisions in [database design v1.4](architecture/Workflow_Engine_Database_Design_v1.md). See [design sources](design-sources.md) for precedence. Owners identify responsible roles, not newly assigned individuals or delivery dates.
 
-No item is marked verified merely because it is plausible. Follow the [current no-tests policy](specification-driven-development.md#verification-and-current-no-tests-policy); required evidence listed here is a future verification obligation, not authorization to execute tests now.
+No item is marked verified merely because it is plausible. Follow the [current verification policy](specification-driven-development.md#verification-and-current-no-tests-policy): isolated unit tests are allowed, but required database evidence is not authorization to add or run database integration tests.
 
 ## ASM-01 — A compatible shared dependency baseline can be established
 
@@ -189,4 +189,4 @@ The selected model adds JSON objects/arrays in workflow_variable.json_value whil
 
 Feature specifications and plans should cite the ASM identifiers they depend on. At the stated decision point, record the evidence, date, relevant environment/revision and resulting status: VERIFIED for the demonstrated scope, REJECTED or SUPERSEDED. A local verification must not be generalized to APOLO production without evidence.
 
-If an assumption fails, update affected specifications/tasks and explain the impact. Changes to confirmed principles still follow the [constitution's amendment rules](constitution.md#governance-and-amendments). Keep required but unperformed checks visible under the current no-tests instruction.
+If an assumption fails, update affected specifications/tasks and explain the impact. Changes to confirmed principles still follow the [constitution's amendment rules](constitution.md#governance-and-amendments). Keep required but unperformed checks visible under the current verification policy.

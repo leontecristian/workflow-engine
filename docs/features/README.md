@@ -2,6 +2,8 @@
 
 This folder contains specifications and delivery records for individual features. Project-wide principles, constraints, assumptions and development guidance live in the parent [docs folder](../README.md).
 
+The [project roadmap](../roadmap.md) owns delivery sequencing, proposed future increments and milestone exit conditions. This index tracks specified features; roadmap proposals are not READY specifications.
+
 Substantive features use four process documents. Keep each proportionate to the work; small maintenance changes may use a concise change record. Schemas, examples and focused technical contracts are additional deliverables only when needed. Architecture stays at project level.
 
 Create a feature folder when substantive specification work begins:

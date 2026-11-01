@@ -2,6 +2,8 @@
 
 This folder governs development of the workflow project through specifications that define observable behavior before implementation.
 
+Start with the [roadmap](roadmap.md) for delivery priorities, dependencies and milestone exit conditions, and the [feature index](features/README.md) for implementation status. Detailed acceptance evidence stays in each feature's implementation record.
+
 Read these documents in order:
 
 1. [Project constitution](constitution.md): enduring architectural principles, required guarantees, scope and amendment rules.
@@ -30,6 +32,7 @@ Project-wide guidance lives in `docs/`. Individual feature specifications live i
 workflow-engine/
   docs/
     README.md
+    roadmap.md
     constitution.md
     constraints.md
     assumptions.md
@@ -40,6 +43,9 @@ workflow-engine/
       workflow-engine-design.md
       Workflow_Engine_Database_Design_v1.md
       workflow-definition-language-design.md
+    integrations/
+      apolo/         # business requirements and host references
+    archive/         # historical discussions and design provenance
     features/
       README.md
       <feature-id>-<name>/
@@ -51,10 +57,6 @@ workflow-engine/
         examples/      # when concrete contract examples are needed
 ```
 
-[F001 — Initial database schema with Liquibase](features/F001-initial-database-schema/spec.md) is IMPLEMENTED with local schema and restart verification recorded in its evidence document. [F002 — Task type catalog management](features/F002-task-type-catalog/spec.md) is IMPLEMENTED at revision 3 with the layer-first structure and concrete TaskTypeCatalogService. Fresh build/proxy/startup/read-only checks passed, separately from retained revision 1/2 evidence; CRUD, concurrency and audit-rollback execution remain NOT RUN. The generic folder above describes the convention. Remaining contracts include Workflow Definition v1 and lifecycle, expression rules for Workflow Definition v1, human-node/host-capability contracts, structured task submissions, JSON execution variables and runtime command integration.
+F001–F006 are implemented within their documented scopes, including minimal SINGLE execution and the revision 5 console. Implementation does not imply complete acceptance: F005 T11 and F006 browser/live-check gaps remain open. Use the [feature index](features/README.md) and linked handovers for current details, rather than treating architecture examples as delivered capabilities.
 
-Build and local startup instructions remain in the [project README](../README.md). Current work follows the owner's **no-tests** instruction; see the [verification policy](specification-driven-development.md#verification-and-current-no-tests-policy).
-
-[F006 — Test-host definition console](features/F006-test-host-definition-console/spec.md) is READY for implementation. The owner selected Angular pages and host management endpoints for manual F002/F004 testing, with real transaction/audit observations. Its [handover](features/F006-test-host-definition-console/implementation.md) records documentation preparation only. Manual verification does not authorize automated tests. [F005 — Minimal SINGLE workflow execution](features/F005-minimal-single-workflow-execution/spec.md) is also READY, with separate [execution tasks](features/F005-minimal-single-workflow-execution/tasks.md) and [handover](features/F005-minimal-single-workflow-execution/implementation.md); neither feature is implemented yet.
-
-The owner selected [F003 — Core persistence model](features/F003-core-persistence-model/spec.md) as a preparatory feature on 2026-10-31. Its mapping/read foundation is IMPLEMENTED: static review, JDK 21 packaging and local nine-entity/nine-repository schema validation passed. Hydration and lookup/paging behavior remain NOT RUN; see its [evidence](features/F003-core-persistence-model/implementation.md#4-verification). [F004 — Definition management and validation](features/F004-definition-management-validation/spec.md) is IMPLEMENTED for minimal SINGLE validation and explicit version numbers; package, local migration/restart and bootstrap passed, while behavioral scenarios remain NOT RUN in its implementation record. F005 core execution is implemented; packaging/artifact/bootstrap checks passed, while T11 manual acceptance remains open/BLOCKED pending real runtime adapters and observed behavioral evidence.
+Build and local startup instructions remain in the [project README](../README.md). Isolated unit tests are allowed; database integration tests require explicit authorization under [AGENTS.md](../AGENTS.md). See the [verification policy](specification-driven-development.md#verification-and-current-no-tests-policy).

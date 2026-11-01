@@ -17,7 +17,7 @@ References below identify constitution principles and sections/decision IDs in t
 - Each module declares the dependencies its code directly uses. Version management must not introduce APOLO's complete application dependency stack into core.
 - Verify compatibility against APOLO's effective build before integration. Standalone versions and a successful local build do not establish host compatibility.
 
-**Trace:** C03/C10; design sections 3–4; Q2/O7; [technical summary](../../apolo-docs/workflow-engine/reference/apolo-technical-summary.md).
+**Trace:** C03/C10; design sections 3–4; Q2/O7; [technical summary](integrations/apolo/apolo-technical-summary.md).
 
 ## CON-02 — Two modules and the eventual source move
 
@@ -124,7 +124,7 @@ Obtain trusted identity from the host. For human-task completion, core executes 
 
 APOLO enforces no self-approval, country/business access and audited reassignment/overrides. Harmless booking edits may proceed; material changes invalidate review and require resubmission. APOLO defines materiality and owns booking rules, forms, approver sources and outcomes. The engine must not invent overbooking, routing or alternative-resource policy.
 
-**Trace:** C09; design sections 8–9 and 17; Q17/Q18/O3–O5/O8; [booking analysis](../../apolo-docs/workflow-engine/requirements/booking-business-analysis.md).
+**Trace:** C09; design sections 8–9 and 17; Q17/Q18/O3–O5/O8; [booking analysis](integrations/apolo/booking-business-analysis.md).
 
 ## CON-11 — Designer and preview integrity
 
@@ -134,13 +134,13 @@ Backend validation and execution are authoritative; the frontend does not execut
 
 Predicate preview is side-effect-free evaluation of supplied facts. Real sandbox commands execute actions and transactions; they must not be labelled a dry run merely because rollback is possible. Isolate development actors and seed data from production configuration.
 
-**Trace:** C02/C07–C09; design sections 15–17; later designer acceptance criteria in [approval capability](../../apolo-docs/workflow-engine/requirements/approval-capability.md).
+**Trace:** C02/C07–C09; design sections 15–17; later designer acceptance criteria in [approval capability](integrations/apolo/approval-capability.md).
 
 ## CON-12 — Specification and verification discipline
 
 Specify substantial behavior and its acceptance criteria before implementing dependent code or schema. Trace implementation tasks and evidence to requirements. Resolve relevant open contracts; do not promote illustrative examples into approved behavior.
 
-Follow the owner's current no-tests instruction: do not create or run automated tests unless that instruction changes. Authorized packaging uses `-Dmaven.test.skip=true`. Acceptance scenarios may still be documented; mark unperformed checks NOT RUN. This working policy does not establish production readiness or waive mandatory behavioral guarantees.
+Follow the owner's 2026-10-31 clarification in [AGENTS.md](../AGENTS.md): isolated unit tests are allowed; database integration tests require explicit authorization. This supersedes older blanket no-tests wording without changing acceptance requirements. Packaging without test execution uses `-Dmaven.test.skip=true`. Mark unperformed checks NOT RUN. This working policy does not establish production readiness or waive mandatory behavioral guarantees.
 
 For temporary authorized runtime verification, stop processes afterward unless asked to leave them running. Record what was actually verified, the environment and remaining gaps.
 

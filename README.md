@@ -1,5 +1,7 @@
 # Workflow engine
 
+See the [project roadmap](docs/roadmap.md) for current priorities and the path from the F006 sandbox to APOLO integration and the designer. The [feature index](docs/features/README.md) tracks delivery status and links to acceptance evidence.
+
 Two Maven modules, targeting Java 17 and intended to run on JDK 21:
 
 - `workflow-core`: ordinary library JAR. Owns workflow entities, repositories, services, restricted expressions, integration interfaces/configuration and workflow changelog resources as they are implemented.
@@ -19,11 +21,11 @@ The initial nine-table workflow schema is implemented by [F001](docs/features/F0
 
 ## Project constitution and specifications
 
-[F005 — Minimal SINGLE workflow execution](docs/features/F005-minimal-single-workflow-execution/spec.md) has its core implementation in place: exact-version start, one directly assigned task, completion to END, early instance claims, command replay, history, bounded reads and required durable host event handoff. JDK 21 packaging and infrastructure bootstrap passed. T11 manual acceptance remains open/BLOCKED pending real host adapters and behavioral evidence; see its [handover](docs/features/F005-minimal-single-workflow-execution/implementation.md).
+[F005 — Minimal SINGLE workflow execution](docs/features/F005-minimal-single-workflow-execution/spec.md) has its core implementation in place: exact-version start, one directly assigned task, completion to END, early instance claims, command replay, history, bounded reads and required durable host event handoff. F006 now supplies real sandbox adapters and local behavioral observations. Original T11 acceptance remains open pending explicit evidence mapping and remaining checks; see the [F005 handover](docs/features/F005-minimal-single-workflow-execution/implementation.md) and [roadmap](docs/roadmap.md).
 
 [F006 — Test-host workflow console](docs/features/F006-test-host-definition-console/spec.md) adds an opt-in Angular console for catalog/definition management and F005 SINGLE execution, with separate administrator/reviewer accounts, persisted sandbox requests, transactional audit/outbox and explicit local inbox delivery. See its [handover](docs/features/F006-test-host-definition-console/implementation.md) for actual acceptance results and remaining gaps.
 
-Start with the [documentation guide](docs/README.md), [project constitution](docs/constitution.md) and [specification-driven development workflow](docs/specification-driven-development.md). They capture the agreed architecture, specification and evidence requirements, current no-tests policy and remaining decisions traced to the [design sources](docs/design-sources.md).
+Start with the [documentation guide](docs/README.md), [project constitution](docs/constitution.md) and [specification-driven development workflow](docs/specification-driven-development.md). They capture the agreed architecture, specification and evidence requirements, current verification policy and remaining decisions traced to the [design sources](docs/design-sources.md). Isolated unit tests are allowed; database integration tests require explicit authorization under [AGENTS.md](AGENTS.md).
 
 Project-wide guidance lives in `docs/`; individual feature specifications, plans, tasks and implementation/verification records belong in [docs/features/](docs/features/README.md).
 

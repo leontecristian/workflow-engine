@@ -2,6 +2,8 @@
 
 Updated **2026-10-31** for [constitution v3.0.0](constitution.md).
 
+**Documentation consolidation — 2026-11-01:** the [roadmap](roadmap.md) is the current delivery plan; the [feature index](features/README.md) and feature handovers record implementation and acceptance status. APOLO requirements/references and historical discussions now live in this repository. Dated entries below preserve their original preparation/implementation context; earlier READY or missing-adapter statements are not the current F005/F006 status. No acceptance gate is closed by this consolidation.
+
 ## Source documents
 
 **F006 revision 5 instance graph — 2026-10-31:** the [graph contract](features/F006-test-host-definition-console/spec.md#revision-5--read-only-instance-graph-owner-request) adds a host-authorized display projection of the pinned minimal graph and history-confirmed progress, plus an Angular SVG view. No core execution or migration changes. Isolated tests/build results and unperformed browser/live-provider checks are distinguished in the [handover](features/F006-test-host-definition-console/implementation.md).
@@ -20,17 +22,17 @@ Updated **2026-10-31** for [constitution v3.0.0](constitution.md).
 
 **Current delivery sequencing — owner decision, 2026-10-31:** after refining the language design, the owner selected [F003 — Core persistence model](features/F003-core-persistence-model/spec.md) as a preparatory feature before definition management and the first executable workflow. Its mapping/read foundation is now IMPLEMENTED, with static review, packaging and local discovery/schema validation recorded in [evidence](features/F003-core-persistence-model/implementation.md#4-verification); hydration and lookup/paging execution remain NOT RUN. F003 maps the remaining F001 tables and supplies narrow internal reads, with no service/write API or schema change. At the F003 baseline, expression_policy was retained as read-only storage; F004 now supersedes that mapping with its gated forward migration and administration contract. This sequencing does not alter the language's minimal executable milestone. Earlier references below to F003 or to a revision not starting implementation describe their historical context.
 
-The active engine architecture, database and workflow definition language designs live in this repository under `docs/architecture/`. Supporting APOLO requirements, reference material and historical discussions remain in the sibling `apolo-docs` repository; links to those documents require the sibling checkout layout. The design relocation preserves source identity, historical commit references and decision precedence.
+The active engine architecture, database and workflow definition language designs live under `docs/architecture/`. Supporting APOLO requirements and references live under `docs/integrations/apolo/`; historical discussions and reconciliation live under `docs/archive/`. The relocation preserves source identity, historical `apolo-docs` commit references and decision precedence without requiring a sibling checkout for these documents.
 
 - [Consolidated design](architecture/workflow-engine-design.md): authoritative detailed architecture and section 22 decision register. The constitution was established from v0.7; v0.8 restored concrete design detail and a complete proposed example. Version 0.9 records the owner-selected ordered first-match routing revision without finalizing the remaining JSON contracts.
 - [Database design v1.4](architecture/Workflow_Engine_Database_Design_v1.md): persistence design and owner decisions recorded on 24–25 October 2026. Sections 1 and 21 distinguish selected changes from proposed completion rules, physical details and verification gates. The v1.2 baseline was documentation-repository commit `f7e85c9` and v1.3 was `fe73107`; the 2.2.0 amendment incorporates the subsequent owner-selected JSON-variable revision. This records source identity, not a claim that the v1.4 edit is committed or implemented.
 - [Workflow definition language design](architecture/workflow-definition-language-design.md): design draft and input for later specification work; exact language contracts remain proposals unless explicitly identified as established decisions.
-- [Original-design reconciliation](../../apolo-docs/workflow-engine/architecture/original-design-reconciliation.md): section-by-section account of retained, restored, adapted and deferred original ideas, including the updated five-node workflow example.
-- [Approval capability](../../apolo-docs/workflow-engine/requirements/approval-capability.md): capability scope and milestone acceptance expectations.
-- [Separate development plan](../../apolo-docs/workflow-engine/development/independent-development-plan.md): specification priorities, two-module delivery and APOLO integration sequence.
-- [APOLO technical summary](../../apolo-docs/workflow-engine/reference/apolo-technical-summary.md): platform baseline and effective-build verification obligations.
-- [Booking business analysis](../../apolo-docs/workflow-engine/requirements/booking-business-analysis.md): business ownership, confirmed policies and provisional/deferred decisions.
-- [Design workspace overview](../../apolo-docs/workflow-engine/README.md): current scope and reading order.
+- [Original-design reconciliation](archive/original-design-reconciliation.md): section-by-section account of retained, restored, adapted and deferred original ideas, including the updated five-node workflow example.
+- [Approval capability](integrations/apolo/approval-capability.md): capability scope and milestone acceptance expectations.
+- [Project roadmap](roadmap.md): current delivery priorities, implementation/acceptance distinction, proposed engine increments and APOLO integration sequence; supersedes the separate development plan.
+- [APOLO technical summary](integrations/apolo/apolo-technical-summary.md): platform baseline and effective-build verification obligations.
+- [Booking business analysis](integrations/apolo/booking-business-analysis.md): business ownership, confirmed policies and provisional/deferred decisions.
+- [Documentation guide](README.md): current document responsibilities and reading order.
 
 The original 1.0.0 baseline used the working-tree documents available on 24 October 2026. The 2.0.0 amendment incorporated database design v1.2; 2.1.0 added structured submissions from v1.3; 2.2.0 adds JSON execution variables from v1.4. This source record does not approve every proposed contract. Archived discussions explain history and do not override active decisions.
 
@@ -47,7 +49,7 @@ The owner's decisions recorded in database design v1.4 (including retained earli
 
 The consolidated design remains the detailed source for unaffected architecture. Older text on the superseded topics must not be used to implement the previous contracts. Dependent specifications must cite this precedence and the database design; unresolved proposals are not finalized by the amendment. Initial schema design changes are not migrations of an applied schema: preserve existing changesets and specify a separate forward migration if needed. APOLO owns migrations for host associations.
 
-The owner's later instructions and completed project changes additionally establish the current local SQL Server connection, Windows authentication setup, Lombok alignment and no-tests development policy. These operational details do not settle the remaining APOLO production integration questions.
+The owner's later instructions and completed project changes additionally establish the local SQL Server connection, Windows authentication setup, Lombok alignment and verification policy. The 2026-10-31 clarification in [AGENTS.md](../AGENTS.md) permits isolated unit tests while requiring explicit authorization for database integration tests; it supersedes older blanket no-tests wording. These operational details do not settle the remaining APOLO production integration questions.
 
 ### Scoped precedence for the 3.0.0 routing amendment
 
