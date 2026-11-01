@@ -1,4 +1,11 @@
 package io.github.leontecristian.workflow.core.service.runtime;
+import io.github.leontecristian.workflow.core.dto.runtime.ActivityStatus;
+import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
+import io.github.leontecristian.workflow.core.dto.runtime.CompletionPolicy;
+import io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus;
+import io.github.leontecristian.workflow.core.dto.runtime.StartInputs;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskClosureReason;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -80,12 +87,21 @@ public class RuntimeJson {
         try { return mapper.readTree(source); }
         catch (IOException failure) { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION, failure); }
     }
+    String fingerprintVersion(StartInputs inputs) {
+        return inputs.values().isEmpty() ? FINGERPRINT_VERSION : "wf-runtime-request-v2";
+    }
     byte[] fingerprint(StartWorkflow command, WorkflowCommandContext context) {
+        return fingerprint(command,StartInputs.empty(),context);
+    }
+    byte[] fingerprint(StartWorkflow command, StartInputs inputs, WorkflowCommandContext context) {
         ObjectNode request = object(); request.put("definitionVersionId", Long.toString(command.definitionVersionId()));
         request.put("businessType", command.businessType()); request.put("businessId", command.businessId());
         if (command.hostStartIntent() == null) request.putNull("hostStartIntent");
         else request.set("hostStartIntent", mapper.valueToTree(command.hostStartIntent()));
-        return fingerprint(WorkflowOperation.START_WORKFLOW, context, request);
+        if (!inputs.values().isEmpty()) {
+            var raw=object(); inputs.values().forEach((k,v) -> raw.set(k,RuntimeScalarBindings.token(v))); request.set("inputs",raw);
+        }
+        return fingerprint(WorkflowOperation.START_WORKFLOW, context, request,fingerprintVersion(inputs));
     }
     byte[] fingerprint(CompleteWorkflowTask command, WorkflowCommandContext context) {
         ObjectNode request = object(); request.put("instanceId", Long.toString(command.instanceId()));
@@ -94,7 +110,10 @@ public class RuntimeJson {
         return fingerprint(WorkflowOperation.COMPLETE_TASK, context, request);
     }
     private byte[] fingerprint(WorkflowOperation operation, WorkflowCommandContext context, ObjectNode request) {
-        ObjectNode root = object(); root.put("version", FINGERPRINT_VERSION); root.put("operation", operation.name());
+        return fingerprint(operation,context,request,FINGERPRINT_VERSION);
+    }
+    private byte[] fingerprint(WorkflowOperation operation,WorkflowCommandContext context,ObjectNode request,String version) {
+        ObjectNode root = object(); root.put("version", version); root.put("operation", operation.name());
         root.put("actorKind", context.actorKind().name()); root.put("actorRef", context.actorRef()); root.set("request", request);
         return hash(DefinitionContentCanonicalizer.canonical(root));
     }
@@ -103,7 +122,8 @@ public class RuntimeJson {
         if (receipt == null) return Optional.empty();
         RuntimeInputs.require(receipt.getActorKind() == context.actorKind() && java.util.Objects.equals(receipt.getActorRef(), context.actorRef())
                 && operation.name().equals(receipt.getOperationType()), Category.COMMAND_ID_CONFLICT);
-        RuntimeInputs.require(FINGERPRINT_VERSION.equals(receipt.getFingerprintVersion()) && Short.valueOf((short) 1).equals(receipt.getResultSchemaVersion()),
+        RuntimeInputs.require((FINGERPRINT_VERSION.equals(receipt.getFingerprintVersion()) || "wf-runtime-request-v2".equals(receipt.getFingerprintVersion()))
+                && (Short.valueOf((short)1).equals(receipt.getResultSchemaVersion()) || Short.valueOf((short)2).equals(receipt.getResultSchemaVersion())),
                 Category.UNSUPPORTED_VERSION);
         RuntimeInputs.require(Arrays.equals(receipt.getRequestFingerprint(), fingerprint), Category.COMMAND_ID_CONFLICT);
         JsonNode stored = tree(receipt.getResultJson());
@@ -117,12 +137,13 @@ public class RuntimeJson {
     private void verifyResult(WorkflowExecutionResult result, UUID commandId, WorkflowOperation operation, WorkflowCommandReceiptEntity receipt) {
         RuntimeInputs.require(result != null && commandId.equals(result.commandId()) && result.operation() == operation
                 && result.instance() != null && result.activity() != null && result.task() != null, Category.HOST_CONFIGURATION);
+        boolean extended=receipt.getResultSchemaVersion()==2;
         var instance = result.instance(); var activity = result.activity(); var task = result.task();
         RuntimeInputs.require(instance.id() == receipt.getInstanceId() && instance.id() > 0 && instance.definitionVersionId() > 0 && instance.lockVersion() >= 0
                 && activity.instanceId() == instance.id() && task.instanceId() == instance.id() && task.activityId() == activity.id()
                 && task.taskTypeId() == activity.taskTypeId() && instance.lastHistorySequence() == result.lastHistorySequence()
-                && result.firstHistorySequence() == (operation == WorkflowOperation.START_WORKFLOW ? 1 : 5)
-                && result.lastHistorySequence() == (operation == WorkflowOperation.START_WORKFLOW ? 4 : 8)
+                && (extended ? (operation==WorkflowOperation.START_WORKFLOW ? result.firstHistorySequence()==1 : result.firstHistorySequence()>1) : result.firstHistorySequence() == (operation == WorkflowOperation.START_WORKFLOW ? 1 : 5))
+                && (extended ? result.firstHistorySequence()>0 && result.lastHistorySequence()>=result.firstHistorySequence() && result.lastHistorySequence()-result.firstHistorySequence()<6000 : result.lastHistorySequence() == (operation == WorkflowOperation.START_WORKFLOW ? 4 : 8))
                 && instance.definitionHash() != null && instance.definitionHash().matches("[0-9a-f]{64}")
                 && RuntimeInputs.key(instance.definitionKey()) && instance.definitionVersion() > 0
                 && task.id() > 0 && activity.id() > 0, Category.HOST_CONFIGURATION);
@@ -130,17 +151,18 @@ public class RuntimeJson {
                 && RuntimeInputs.text(instance.startedBy(), 200, 200, true) && instance.terminationReason() == null
                 && ((instance.businessType() == null && instance.businessId() == null)
                     || (RuntimeInputs.key(instance.businessType()) && RuntimeInputs.text(instance.businessId(), 200, 200, true)))
-                && RuntimeInputs.key(activity.nodeKey()) && activity.activationSequence() == 3 && activity.taskTypeId() > 0
-                && activity.completionPolicy() == io.github.leontecristian.workflow.core.dto.runtime.CompletionPolicy.SINGLE
+                && RuntimeInputs.key(activity.nodeKey()) && (extended ? activity.activationSequence()>0 && activity.activationSequence()<=result.lastHistorySequence()
+                    && (operation==WorkflowOperation.START_WORKFLOW ? activity.activationSequence()>=result.firstHistorySequence() : activity.activationSequence()<result.firstHistorySequence()) : activity.activationSequence() == 3) && activity.taskTypeId() > 0
+                && activity.completionPolicy() == CompletionPolicy.SINGLE
                 && activity.requiredTaskCount() == 1 && activity.contributionOutcomeKey() == null
                 && (activity.reviewRevisionRef() == null || RuntimeInputs.text(activity.reviewRevisionRef(), 200, 200, true))
                 && instance.startedAt().equals(activity.enteredAt()) && activity.enteredAt().equals(task.createdAt())
                 && RuntimeInputs.key(task.taskKey()) && RuntimeInputs.text(task.assignedUserRef(), 200, 200, true) && task.dueAt() == null,
                 Category.HOST_CONFIGURATION);
         if (operation == WorkflowOperation.START_WORKFLOW) {
-            RuntimeInputs.require(instance.status() == io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus.ACTIVE
-                    && activity.status() == io.github.leontecristian.workflow.core.dto.runtime.ActivityStatus.ACTIVE
-                    && task.status() == io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.OPEN
+            RuntimeInputs.require(instance.status() == InstanceStatus.ACTIVE
+                    && activity.status() == ActivityStatus.ACTIVE
+                    && task.status() == TaskStatus.OPEN
                     && instance.currentNodeKey().equals(activity.nodeKey()) && instance.resultKey() == null
                     && instance.endedAt() == null && instance.endedBy() == null && activity.outcomeKey() == null
                     && activity.closedAt() == null && activity.closedBy() == null && activity.closureReason() == null
@@ -148,16 +170,16 @@ public class RuntimeJson {
                     && instance.startedBy().equals(receipt.getActorRef()) && instance.startedAt().equals(RuntimeViews.instant(receipt.getRecordedAt())),
                     Category.HOST_CONFIGURATION);
         } else {
-            RuntimeInputs.require(instance.status() == io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus.COMPLETED
-                    && activity.status() == io.github.leontecristian.workflow.core.dto.runtime.ActivityStatus.COMPLETED
-                    && task.status() == io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.COMPLETED
+            RuntimeInputs.require(instance.status() == InstanceStatus.COMPLETED
+                    && activity.status() == ActivityStatus.COMPLETED
+                    && task.status() == TaskStatus.COMPLETED
                     && RuntimeInputs.key(instance.resultKey()) && validTime(instance.endedAt()) && !instance.endedAt().isBefore(instance.startedAt())
                     && instance.endedAt().equals(activity.closedAt()) && activity.closedAt().equals(task.closedAt())
-                    && receipt.getActorKind() == io.github.leontecristian.workflow.core.dto.runtime.ActorKind.USER
+                    && receipt.getActorKind() == ActorKind.USER
                     && receipt.getActorRef().equals(instance.endedBy()) && receipt.getActorRef().equals(activity.closedBy())
                     && receipt.getActorRef().equals(task.closedBy()) && receipt.getActorRef().equals(task.assignedUserRef())
                     && "TASK_OUTCOME".equals(activity.closureReason())
-                    && task.closureReason() == io.github.leontecristian.workflow.core.dto.runtime.TaskClosureReason.TASK_OUTCOME
+                    && task.closureReason() == TaskClosureReason.TASK_OUTCOME
                     && RuntimeInputs.key(task.outcomeKey()) && task.outcomeKey().equals(activity.outcomeKey())
                     && instance.endedAt().equals(RuntimeViews.instant(receipt.getRecordedAt())), Category.HOST_CONFIGURATION);
         }

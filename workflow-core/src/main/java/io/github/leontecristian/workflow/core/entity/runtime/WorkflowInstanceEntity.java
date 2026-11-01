@@ -96,7 +96,7 @@ public class WorkflowInstanceEntity {
     }
 
     public void waitAt(String humanKey, long finalSequence) {
-        if (status != InstanceStatus.ACTIVE || lastHistorySequence != 0 || finalSequence != 4)
+        if (status != InstanceStatus.ACTIVE || lastHistorySequence != 0 || finalSequence < 4)
             throw new IllegalStateException("New SINGLE instance required");
         currentNodeKey = java.util.Objects.requireNonNull(humanKey); lastHistorySequence = finalSequence;
     }

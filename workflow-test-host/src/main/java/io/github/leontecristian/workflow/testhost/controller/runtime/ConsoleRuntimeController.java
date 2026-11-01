@@ -1,4 +1,9 @@
 package io.github.leontecristian.workflow.testhost.controller.runtime;
+import io.github.leontecristian.workflow.core.dto.runtime.BooleanLiteral;
+import io.github.leontecristian.workflow.core.dto.runtime.NullLiteral;
+import io.github.leontecristian.workflow.core.dto.runtime.ScalarLiteral;
+import io.github.leontecristian.workflow.core.dto.runtime.StartInputs;
+import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
 
 import static io.github.leontecristian.workflow.testhost.service.console.ConsoleWire.after;
 import static io.github.leontecristian.workflow.testhost.service.console.ConsoleWire.decimal;
@@ -53,6 +58,7 @@ public class ConsoleRuntimeController {
     private final ConsoleRuntimeTransaction transactions;
     private final ConsoleContext context;
     private final ConsoleWire wire;
+    private final io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxServiceEffectStore effects;
 
     public ConsoleRuntimeController(
             WorkflowRuntimeQueryService reads,
@@ -61,7 +67,8 @@ public class ConsoleRuntimeController {
             ConsoleRuntimeCoordinator commands,
             ConsoleRuntimeTransaction transactions,
             ConsoleContext context,
-            ConsoleWire wire) {
+            ConsoleWire wire, io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxServiceEffectStore effects) {
+        this.effects=effects;
         this.reads = reads;
         this.definitions = definitions;
         this.access = access;
@@ -74,18 +81,60 @@ public class ConsoleRuntimeController {
     private SandboxStart startBody(HttpServletRequest r) {
         var b =
                 wire.body(
-                        r,
+                        r, 256*1024,
                         "commandId",
                         "definitionVersionId",
                         "requestId",
-                        "expectedRequestVersion");
+                        "expectedRequestVersion", "inputs");
         return new SandboxStart(
                 uuid(b),
                 id(b, "definitionVersionId", false),
                 id(b, "requestId", false),
-                id(b, "expectedRequestVersion", true));
+                id(b, "expectedRequestVersion", true), inputs(b));
     }
 
+    private StartInputs inputs(com.fasterxml.jackson.databind.JsonNode body) {
+        if (!body.has("inputs")) return StartInputs.empty();
+        var n=body.get("inputs");
+        if (!n.isObject()) throw ConsoleException.invalid();
+        if (n.size()>100) throw new ConsoleException(422,"LIMIT_EXCEEDED");
+        var values=new java.util.HashMap<String,ScalarLiteral>();
+        n.fields().forEachRemaining(e -> {
+            var v=e.getValue(); ScalarLiteral token;
+            if(v.isNull()) token=NullLiteral.INSTANCE;
+            else if(v.isBoolean()) token=new BooleanLiteral(v.booleanValue());
+            else if(v.isTextual()) token=new TextLiteral(v.textValue());
+            else throw ConsoleException.invalid();
+            values.put(e.getKey(),token);
+        });
+        return new StartInputs(values);
+    }
+    @GetMapping("/instances/{id}/variables")
+    public ResponseEntity<String> variables(@PathVariable String id,HttpServletRequest r) {
+        query(r,"afterKey","limit","expectedLockVersion"); long key=decimal(id,false); access.instance(key);
+        var page=reads.listVariables(key,r.getParameter("afterKey"),limit(r.getParameter("limit")),
+                r.getParameter("expectedLockVersion")==null ? null : decimal(r.getParameter("expectedLockVersion"),true));
+        var items=new java.util.ArrayList<Map<String,Object>>();
+        for(var v:page.items()) {
+            Map<String,Object> item=new LinkedHashMap<>(); item.put("key",v.key()); item.put("type",v.type()); item.put("initialized",v.initialized());
+            Object value=null;
+            if(v.value()!=null) {
+                if(v.value().value() instanceof TextLiteral t) value=t.value();
+                else if(v.value().value() instanceof BooleanLiteral t) value=t.value();
+            }
+            item.put("value",value); items.add(item);
+        }
+        Map<String,Object> result=new LinkedHashMap<>(); result.put("instanceId",page.instanceId()); result.put("lockVersion",page.lockVersion());
+        result.put("items",items); result.put("nextAfterKey",page.nextAfterKey()); return wire.response(result);
+    }
+    @GetMapping("/instances/{id}/service-effects")
+    @PreAuthorize("hasRole('CONSOLE_ADMIN')")
+    public ResponseEntity<String> effects(@PathVariable String id,HttpServletRequest r) {
+        query(r,"afterId","limit"); long key=decimal(id,false); access.instance(key);
+        int count=limit(r.getParameter("limit")); var rows=effects.page(key,after(r.getParameter("afterId")),count+1);
+        Long next=rows.size()>count ? rows.get(count-1).id() : null;
+        return wire.response(wire.page(rows.subList(0,Math.min(count,rows.size())),next,"nextAfterId",io.github.leontecristian.workflow.testhost.dto.sandbox.SandboxServiceEffect::id));
+    }
     @PostMapping("/instances/start")
     @PreAuthorize("hasRole('CONSOLE_ADMIN')")
     public ResponseEntity<String> start(HttpServletRequest r) {

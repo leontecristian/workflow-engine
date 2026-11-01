@@ -1,6 +1,6 @@
 # Plan — F006 Test-host workflow console
 
-Implements [specification revision 5](spec.md), retaining revision 4 monitoring and adding the owner-requested read-only pinned instance graph. Track progress in [tasks.md](tasks.md) and actual evidence in [implementation.md](implementation.md).
+Implements [specification revision 6](spec.md), retaining earlier monitoring and extending the read-only pinned instance graph to bounded general topologies. Track progress in [tasks.md](tasks.md) and actual evidence in [implementation.md](implementation.md).
 
 ## 1. Baseline, dependency and toolchain (R01, R09–10)
 
@@ -128,3 +128,10 @@ Implement spec AC27–30 with `dto.runtime.InstanceGraphView` (immutable nested 
 Add typed graph DTO/API methods in frontend `app/data`; colocate the standalone SVG component, template, scoped styles and isolated tests under `app/pages/runtime/graph`. Integrate its independent loading/error state into InstancePage; retain current details on graph failure and replace displayed metadata with the graph's snapshot on success. Keep the existing Material theme, explicit refresh, exact IDs and accessible state labels/links. No graph package, CDN or DOM HTML injection.
 
 Run isolated host tests with mocked public core services, real access-policy logic/private codec and no context/database; cover authorization-before-definition, projection privacy, scrambled definition arrays, pinned retirement, history cutoff/completeness, terminal states and wire IDs. Run isolated frontend component/page/API tests for rendering state/navigation data, refresh/failure and stale routes; inspect SVG accessibility bindings. Build on verified JDK 21 with tests skipped and run pinned Node/npm unit/production/CSP checks. Do not start a host or contact the database for this increment; record real browser/API/database checks NOT RUN and preserve existing acceptance gaps.
+## Revision 6 - general graph viewer
+
+Implement G01-G04/AC31-AC34 in the existing host service.runtime.ConsoleInstanceGraph and dto.runtime.InstanceGraphView boundary, retaining the enabled-only controller and existing wire envelope. Replay a paginated contiguous history prefix against an edge map and one recorded process position; associate activity/task summaries at that position without per-row entity/detail reads. Bound nodes/edges/history and final response bytes before returning the allowlisted projection. Core execution, migrations and APIs remain unchanged.
+
+In frontend app/pages/runtime/graph, add a focused pure graph-layout.ts helper for deterministic layered positions and forward/same-column/back/self edge paths. InstanceGraphComponent owns zoom/reset signals and renders dynamic SVG dimensions with existing exact-ID navigation; app/data/dtos.ts permits plain node type labels. Keep existing instance page loading/refresh/fallback behavior. No dependency or graph framework is needed.
+
+Planned verification: selected host graph/security unit suites; isolated frontend topology/layout/component regressions; JDK 21 Java-17 backend and opt-in console packaging with CSP check. Cover service chains before/after completion, branches/cycles/revisits, multi-task/latest-activation links, 100+ row paging/gaps/watermarks, private-field exclusion and legacy graph behavior. Actual browser/live-provider observations are separate. Do not restart another session's running backend or alter its database to verify this read-only change.

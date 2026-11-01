@@ -218,7 +218,7 @@ class ConsoleInstanceGraphUnitTest {
     @Test
     void historyWorkIsBoundedBeforeDefinitionRead() {
         when(context.admin()).thenReturn(true);
-        when(reads.findInstance(ID)).thenReturn(Optional.of(instance(InstanceStatus.ACTIVE, 101)));
+        when(reads.findInstance(ID)).thenReturn(Optional.of(instance(InstanceStatus.ACTIVE, 12_001)));
         assertEquals(422, assertThrows(ConsoleException.class, () -> graphs.find(ID)).status());
         verifyNoInteractions(definitions);
     }
@@ -233,16 +233,8 @@ class ConsoleInstanceGraphUnitTest {
                                 new DefinitionVersionView(
                                         pinned.summary(), "invalid stored JSON", null)));
         assertEquals(500, assertThrows(ConsoleException.class, () -> graphs.find(ID)).status());
-        when(definitions.findVersion(7))
-                .thenReturn(
-                        Optional.of(
-                                new DefinitionVersionView(
-                                        pinned.summary(),
-                                        DOCUMENT.replace("SINGLE", "ALL"),
-                                        null)));
-        assertEquals(
-                "HOST_CONFIGURATION",
-                assertThrows(ConsoleException.class, () -> graphs.find(ID)).code());
+        when(definitions.findVersion(7)).thenReturn(Optional.of(new DefinitionVersionView(pinned.summary(), DOCUMENT.replace("SINGLE", "ALL"), null)));
+        assertEquals(State.ACTIVE, graphs.find(ID).nodes().get(1).state());
         when(definitions.findVersion(7)).thenReturn(Optional.of(pinned));
         when(pinned.summary().contentHash()).thenReturn("different-hash");
         assertEquals(

@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router } from "@angular/router";
 import { ConsoleApi } from "../../data/console-api";
 import { CommandRecovery } from "../../data/command-recovery";
-import { exactDecimal } from "../../command-buffer";
+import { exactDecimal, parseScalarInputs } from "../../command-buffer";
 import type { VersionSummary, SandboxRequest } from "../../data/dtos";
 import { PAGE_IMPORTS } from "../../ui/page-imports";
 import { pageState } from "../../ui/page-state";
@@ -36,6 +36,7 @@ export class RequestsPage {
   versionId = "";
   requestId = "";
   requestToken = "0";
+  inputsText = "{}";
   publishedRows = signal<VersionSummary[]>([]);
   publishedNext: string | null = null;
   commands = inject(CommandRecovery);
@@ -81,6 +82,7 @@ export class RequestsPage {
       this.commands.buffer.remember({
         kind: "start",
         body: {
+          inputs: parseScalarInputs(this.inputsText),
           commandId: crypto.randomUUID(),
           definitionVersionId: exactDecimal(this.versionId),
           requestId: exactDecimal(this.requestId),

@@ -102,7 +102,10 @@ public class ConsoleWire {
     }
 
     public JsonNode body(HttpServletRequest request, String... fields) {
-        JsonNode node = tree(raw(request, 16 * 1024));
+        return body(request,16*1024,fields);
+    }
+    public JsonNode body(HttpServletRequest request,int limit,String... fields) {
+        JsonNode node = tree(raw(request, limit));
         if (!node.isObject()) throw ConsoleException.invalid();
         Set<String> allowed = Set.of(fields);
         node.fieldNames()

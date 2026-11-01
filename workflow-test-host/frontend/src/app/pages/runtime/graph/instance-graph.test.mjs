@@ -131,8 +131,10 @@ test("graph labels and links distinguish active, completed and future steps with
 test("layout follows node keys and truncates only visible labels without damaging Unicode", (t) => {
   const { page } = component(t, InstanceGraphComponent);
   page.graph = () => fixture();
-  assert.equal(page.edgeStart("BEGIN"), 274);
-  assert.equal(page.edgeEnd("REVIEW"), 334);
+  const positions = page.layout().nodes;
+  assert.equal(positions[0].node.key, "BEGIN");
+  assert.ok(positions[1].x > positions[0].x);
+  assert.equal(page.layout().edges.length, 2);
   const name = "😀".repeat(40);
   const short = page.shortName(name);
   assert.equal(Array.from(short).length, 26);

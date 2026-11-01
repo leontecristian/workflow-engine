@@ -1,8 +1,25 @@
 package io.github.leontecristian.workflow.core.dto.definition.document;
 import java.util.List;
+import java.util.Map;
+import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
+import io.github.leontecristian.workflow.core.dto.runtime.ScalarLiteral;
 /** Internal validated subset; canonical source is retained separately, including all designer values. */
-public record MinimalWorkflowDefinition(Node start, Human human, Node end, List<Transition> transitions) {
-    public MinimalWorkflowDefinition { transitions = List.copyOf(transitions); }
+public record MinimalWorkflowDefinition(Node start, Human human, Node end, List<Transition> transitions,
+        Map<String,Input> inputs, Map<String,ActionField> variables, Map<String,Binding> initialize,
+        Map<String,Service> services) {
+    public MinimalWorkflowDefinition {
+        transitions = List.copyOf(transitions); inputs=Map.copyOf(inputs); variables=Map.copyOf(variables);
+        initialize=Map.copyOf(initialize); services=Map.copyOf(services);
+    }
+    public MinimalWorkflowDefinition(Node start, Human human, Node end, List<Transition> transitions) {
+        this(start,human,end,transitions,Map.of(),Map.of(),Map.of(),Map.of());
+    }
+    public boolean extended() { return !inputs.isEmpty() || !variables.isEmpty() || !initialize.isEmpty() || !services.isEmpty(); }
+    public record Input(ActionField field, ScalarLiteral defaultValue) {}
+    public record Binding(String source, String key, ScalarLiteral value) {}
+    public record Service(String key, String action, Map<String,Binding> inputs, Map<String,Binding> outputs, int sourceIndex) {
+        public Service { inputs=Map.copyOf(inputs); outputs=Map.copyOf(outputs); }
+    }
     public record Node(String key, String type, String name, String result) {}
     public record Assignment(String resolver) {}
     public record Outcome(String key, String label, boolean requiresComment) {}

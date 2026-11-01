@@ -15,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true, propagation = Propagation.REQUIRED)
 public interface WorkflowVariableRepository extends Repository<WorkflowVariableEntity, WorkflowVariableId> {
 
+    @org.springframework.data.jpa.repository.Query("select v from WorkflowVariableEntity v where v.id.instanceId=:instanceId order by v.id.variableKey")
+    java.util.List<WorkflowVariableEntity> findByInstanceId(@org.springframework.data.repository.query.Param("instanceId") long instanceId, org.springframework.data.domain.Pageable pageable);
     Optional<WorkflowVariableEntity> findById(WorkflowVariableId id);
 
 }

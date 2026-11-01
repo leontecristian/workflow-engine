@@ -25,9 +25,11 @@ public class DefinitionValidationService {
     private final DefinitionCapabilityProvider provider;
     private final ObjectMapper json = new ObjectMapper();
     private final MinimalDefinitionLoader loader;
+    private final io.github.leontecristian.workflow.core.service.runtime.ServiceActionRegistry actions;
 
     public DefinitionValidationService(TaskTypeCatalogService catalog, ObjectProvider<DefinitionCapabilityProvider> providers,
-                                       MinimalDefinitionLoader loader) {
+                                       MinimalDefinitionLoader loader, io.github.leontecristian.workflow.core.service.runtime.ServiceActionRegistry actions) {
+        this.actions=actions;
         this.catalog = catalog;
         this.loader = loader;
         List<DefinitionCapabilityProvider> registered = providers.stream().toList();
@@ -42,7 +44,15 @@ public class DefinitionValidationService {
         MinimalWorkflowDefinition model = loader.model(document, diagnostics);
         DefinitionCapabilities capabilities = snapshot();
         ObjectNode provenance = json.createObjectNode();
-        provenance.put("validator", IDENTIFIER); provenance.put("structuralSchemaHash", loader.schemaDigest());
+        boolean extended=MinimalDefinitionLoader.extended(document.tree());
+        provenance.put("validator", extended ? "wf-scalar-service-validator-v1" : IDENTIFIER); provenance.put("structuralSchemaHash", loader.schemaDigest(extended));
+        if (model!=null && extended) {
+            ServiceBindingValidation.check(model,actions,diagnostics);
+            var refs=provenance.putArray("actions");
+            model.services().values().stream().map(n -> n.action()).distinct().sorted().forEach(id -> {
+                var descriptor=actions.descriptor(id); if (descriptor!=null) refs.add(json.valueToTree(descriptor));
+            });
+        }
         provenance.put("schemaVersion", 1); provenance.put("canonicalization", DefinitionContentCanonicalizer.IDENTIFIER);
         provenance.putNull("task"); provenance.putNull("assignmentCapability"); provenance.putNull("taskCapability");
         if (model != null) {

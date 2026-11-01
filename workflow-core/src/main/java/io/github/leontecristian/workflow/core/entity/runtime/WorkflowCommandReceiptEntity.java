@@ -68,12 +68,17 @@ public class WorkflowCommandReceiptEntity {
     public WorkflowCommandReceiptEntity(UUID commandId, long instanceId, String operation,
             ActorKind actorKind, String actorRef, byte[] fingerprint, String fingerprintVersion,
             LocalDateTime time, String resultJson) {
+        this(commandId,instanceId,operation,actorKind,actorRef,fingerprint,fingerprintVersion,time,resultJson,(short)1);
+    }
+    public WorkflowCommandReceiptEntity(UUID commandId,long instanceId,String operation,ActorKind actorKind,String actorRef,
+            byte[] fingerprint,String fingerprintVersion,LocalDateTime time,String resultJson,short schemaVersion) {
+        if (schemaVersion!=1 && schemaVersion!=2) throw new IllegalArgumentException("Unsupported receipt schema");
         if (instanceId <= 0 || fingerprint == null || fingerprint.length != 32) throw new IllegalArgumentException("Invalid receipt");
         this.commandId = java.util.Objects.requireNonNull(commandId); this.instanceId = instanceId;
         this.operationType = java.util.Objects.requireNonNull(operation); this.actorKind = java.util.Objects.requireNonNull(actorKind);
         this.actorRef = java.util.Objects.requireNonNull(actorRef); this.requestFingerprint = fingerprint.clone();
         this.fingerprintVersion = java.util.Objects.requireNonNull(fingerprintVersion);
-        this.recordedAt = java.util.Objects.requireNonNull(time); this.resultSchemaVersion = 1;
+        this.recordedAt = java.util.Objects.requireNonNull(time); this.resultSchemaVersion = schemaVersion;
         this.resultJson = java.util.Objects.requireNonNull(resultJson);
     }
 

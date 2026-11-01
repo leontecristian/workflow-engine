@@ -2,6 +2,8 @@
 
 **Status:** IMPLEMENTED (core); manual acceptance remains BLOCKED with T11 open. Package/artifact/bootstrap checks passed; AC01–AC13 behavioral execution is NOT RUN. See [implementation.md](implementation.md#4-verification). **Revision:** 1 — 2026-10-31. **Owner:** Workflow project owner. **Constitution:** [v3.0.0](../../constitution.md).
 
+**Successor scope (2026-11-01):** [F007 revision 2](../F007-typed-bindings-service-tasks/spec.md) extends this baseline with bounded scalar bindings/service chains and console support. Its [implementation record](../F007-typed-bindings-service-tasks/implementation.md) separates isolated verification from open runtime acceptance; this feature's original revision and historical evidence are unchanged.
+
 ## Outcome and scope
 
 Execute the exact F004 publication subset: `START → HUMAN_TASK (SINGLE) → END`. A trusted host starts a specific published version, core creates one directly assigned task, and the assigned user submits the sole declared outcome to complete the instance. Persist relational state, immutable accepted submission/history, successful-command receipts and transactional event handoff.

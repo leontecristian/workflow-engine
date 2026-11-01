@@ -137,6 +137,8 @@ The standalone build baseline is evidence about this project, not proof of APOLO
 
 Specifications MUST identify evidence for their acceptance criteria. Build success, host startup and a database connection are distinct checks; none proves rollback, concurrency, expression restrictions or recovery by itself. Record unverified guarantees openly. Follow the current owner-directed verification scope described in the [development workflow](specification-driven-development.md#verification-and-current-no-tests-policy).
 
+**Implementation evidence update (2026-11-01):** [F007](features/F007-typed-bindings-service-tasks/implementation.md) implements the selected scalar/service subset under C06/C08 with isolated unit/build evidence. Runtime/provider/browser acceptance remains open; no architectural principle or production readiness claim changes.
+
 ## Governance and amendments
 
 The project owner decides changes to constitutional principles and disputed scope. Contributors may resolve ordinary implementation details within those principles and record the rationale in the feature plan. No new approval ceremony is required for routine compliant work.

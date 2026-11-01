@@ -1,0 +1,539 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:workflow:scalar-service-v1",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "key": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "startPolicy": {
+      "type": "object",
+      "properties": {
+        "inputContract": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+              },
+              "type": {
+                "enum": [
+                  "STRING",
+                  "LONG",
+                  "DECIMAL",
+                  "BOOLEAN",
+                  "DATE",
+                  "DATETIME"
+                ]
+              },
+              "nullable": {
+                "type": "boolean"
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 2000
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "default": {
+                "type": [
+                  "string",
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "key",
+              "type",
+              "nullable",
+              "required"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "guards": {
+          "type": "array",
+          "maxItems": 0
+        },
+        "initialize": {
+          "type": "object",
+          "maxProperties": 100,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+          },
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "const": "startInput"
+                  },
+                  "key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+                  }
+                },
+                "required": [
+                  "source",
+                  "key"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "const": "literal"
+                  },
+                  "value": {
+                    "type": [
+                      "string",
+                      "boolean",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "source",
+                  "value"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "inputContract"
+      ],
+      "additionalProperties": false
+    },
+    "variables": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+          },
+          "type": {
+            "enum": [
+              "STRING",
+              "LONG",
+              "DECIMAL",
+              "BOOLEAN",
+              "DATE",
+              "DATETIME"
+            ]
+          },
+          "nullable": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "key",
+          "type",
+          "nullable"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 200,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/start"
+          },
+          {
+            "$ref": "#/$defs/human"
+          },
+          {
+            "$ref": "#/$defs/end"
+          },
+          {
+            "$ref": "#/$defs/service"
+          }
+        ]
+      }
+    },
+    "transitions": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 500,
+      "items": {
+        "$ref": "#/$defs/transition"
+      }
+    },
+    "designer": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "key",
+    "version",
+    "name",
+    "startPolicy",
+    "variables",
+    "nodes",
+    "transitions"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "start": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "type": {
+          "const": "START"
+        }
+      },
+      "required": [
+        "key",
+        "type",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "end": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "type": {
+          "const": "END"
+        },
+        "result": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+        }
+      },
+      "required": [
+        "key",
+        "type",
+        "name",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "human": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "type": {
+          "const": "HUMAN_TASK"
+        },
+        "taskType": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+        },
+        "assignment": {
+          "type": "object",
+          "properties": {
+            "resolver": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "inputs": {
+              "type": "object",
+              "properties": {},
+              "required": [],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "resolver",
+            "inputs"
+          ],
+          "additionalProperties": false
+        },
+        "completion": {
+          "type": "object",
+          "properties": {
+            "policy": {
+              "const": "SINGLE"
+            }
+          },
+          "required": [
+            "policy"
+          ],
+          "additionalProperties": false
+        },
+        "inputContract": {
+          "type": "array",
+          "maxItems": 0
+        },
+        "resultContract": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "const": "FORBIDDEN"
+            }
+          },
+          "required": [
+            "mode"
+          ],
+          "additionalProperties": false
+        },
+        "outcomes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "requiresComment": {
+                "type": "boolean"
+              },
+              "guards": {
+                "type": "array",
+                "maxItems": 0
+              }
+            },
+            "required": [
+              "key",
+              "label",
+              "requiresComment"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "key",
+        "type",
+        "name",
+        "taskType",
+        "assignment",
+        "completion",
+        "inputContract",
+        "resultContract",
+        "outcomes"
+      ],
+      "additionalProperties": false
+    },
+    "transition": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+        },
+        "from": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+        },
+        "to": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+        },
+        "outcome": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+        }
+      },
+      "required": [
+        "key",
+        "from",
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "type": {
+          "const": "SERVICE_TASK"
+        },
+        "action": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+        },
+        "inputs": {
+          "type": "object",
+          "maxProperties": 100,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+          },
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "const": "variable"
+                  },
+                  "key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+                  }
+                },
+                "required": [
+                  "source",
+                  "key"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "maxProperties": 100,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+          },
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "const": "variable"
+                  },
+                  "key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+                  }
+                },
+                "required": [
+                  "source",
+                  "key"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "const": "actionOutput"
+                  },
+                  "key": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+                  }
+                },
+                "required": [
+                  "source",
+                  "key"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "key",
+        "type",
+        "name",
+        "action",
+        "inputs",
+        "outputs"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

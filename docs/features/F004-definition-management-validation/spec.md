@@ -2,6 +2,8 @@
 
 **Status:** IMPLEMENTED revision 1; package, local migration/restart and bootstrap checks passed. Behavioral acceptance remains NOT RUN; see [implementation.md](implementation.md#4-verification). **Revision:** 1 — 2026-10-31. **Owner:** Workflow project owner. **Constitution:** [v3.0.0](../../constitution.md).
 
+**Successor scope (2026-11-01):** [F007 revision 2](../F007-typed-bindings-service-tasks/spec.md) extends this baseline with bounded scalar bindings/service chains and console support. Its [implementation record](../F007-typed-bindings-service-tasks/implementation.md) separates isolated verification from open runtime acceptance; this feature's original revision and historical evidence are unchanged.
+
 ## Outcome and scope
 
 Provide a trusted core Java API to create/import and edit workflow drafts, inspect/export definitions, validate the supported document contract, publish immutable versions and retire them. Build on F003's persistence mappings. The owner selected **minimal SINGLE workflow validation** and **explicit version numbers in portable JSON** on 2026-10-31. This feature prepares definitions for F005; it does not execute workflows.

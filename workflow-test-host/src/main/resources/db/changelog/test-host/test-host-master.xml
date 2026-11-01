@@ -5,4 +5,5 @@
     <include file="db/changelog/workflow/workflow-master.xml" relativeToChangelogFile="false"/>
     <include file="changes/001-console-management-audit.xml" relativeToChangelogFile="true"/>
     <include file="changes/002-console-runtime-sandbox.xml" relativeToChangelogFile="true"/>
+    <include file="changes/003-console-service-effects.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

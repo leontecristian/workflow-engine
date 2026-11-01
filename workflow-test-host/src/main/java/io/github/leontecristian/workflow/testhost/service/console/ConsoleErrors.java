@@ -62,7 +62,7 @@ public class ConsoleErrors {
                                         COMMAND_ID_CONFLICT,
                                         INVALID_STATE ->
                                 409;
-                        case LIMIT_EXCEEDED -> 422;
+                        case LIMIT_EXCEEDED, UNINITIALIZED_VARIABLE -> 422;
                         default -> 500;
                     };
         } else if (failure instanceof WorkflowDefinitionException e) {

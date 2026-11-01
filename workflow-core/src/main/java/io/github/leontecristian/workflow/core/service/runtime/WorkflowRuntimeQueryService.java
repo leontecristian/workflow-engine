@@ -1,4 +1,6 @@
 package io.github.leontecristian.workflow.core.service.runtime;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowVariablePage;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowVariableView;
 
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceQuery;
@@ -51,9 +53,35 @@ public class WorkflowRuntimeQueryService {
     private final WorkflowHistoryRepository history;
     private final RuntimeDefinitionPins pins;
     private final RuntimeJson json;
+    private final RuntimeVariables variables;
     public WorkflowRuntimeQueryService(WorkflowInstanceRepository instances, WorkflowActivityRepository activities,
-            WorkflowTaskRepository tasks, WorkflowHistoryRepository history, RuntimeDefinitionPins pins, RuntimeJson json) {
+            WorkflowTaskRepository tasks, WorkflowHistoryRepository history, RuntimeDefinitionPins pins, RuntimeJson json, RuntimeVariables variables) {
+        this.variables=variables;
         this.instances = instances; this.activities = activities; this.tasks = tasks; this.history = history; this.pins = pins; this.json = json;
+    }
+    public WorkflowVariablePage listVariables(long instanceId,String afterKey,int limit,Long expectedLockVersion) {
+        RuntimeInputs.id(instanceId); RuntimeInputs.require(limit>=1 && limit<=100 && (afterKey==null || (RuntimeInputs.key(afterKey) && expectedLockVersion!=null))
+                && (expectedLockVersion==null || expectedLockVersion>=0),Category.INVALID_INPUT);
+        long before=instances.readLockVersion(instanceId).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
+        RuntimeInputs.require(expectedLockVersion==null || expectedLockVersion==before,Category.STALE_VERSION);
+        var instance=instances.findById(instanceId).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
+        var model=pins.load(instance).model();
+        RuntimeInputs.require(afterKey==null || model.variables().containsKey(afterKey),Category.INVALID_INPUT);
+        var values=variables.read(instanceId,model);
+        var keys=model.variables().keySet().stream().sorted().filter(k -> afterKey==null || k.compareTo(afterKey)>0).toList();
+        var items=new ArrayList<WorkflowVariableView>();
+        String next=null;
+        for(int i=0;i<Math.min(keys.size(),limit);i++) {
+            String k=keys.get(i); var value=values.get(k);
+            items.add(new WorkflowVariableView(k,model.variables().get(k).type(),value!=null,value));
+            next=i+1<keys.size() ? k : null;
+            if(!RuntimeJson.fits(json.encode(new WorkflowVariablePage(instanceId,before,items,next)),1024*1024)) {
+                items.remove(items.size()-1); RuntimeInputs.require(!items.isEmpty(),Category.LIMIT_EXCEEDED); next=items.get(items.size()-1).key(); break;
+            }
+        }
+        long after=instances.readLockVersion(instanceId).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
+        RuntimeInputs.require(before==after,Category.STALE_VERSION);
+        return new WorkflowVariablePage(instanceId,before,items,next);
     }
     public Optional<WorkflowInstanceView> findInstance(long id) {
         RuntimeInputs.id(id);

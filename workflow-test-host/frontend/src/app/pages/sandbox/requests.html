@@ -75,6 +75,11 @@
           ><input matInput [(ngModel)]="requestToken" inputmode="numeric"
         /></mat-form-field>
       </div>
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Scalar start inputs (JSON object)</mat-label>
+        <textarea matInput [(ngModel)]="inputsText" rows="4" spellcheck="false"></textarea>
+        <mat-hint>Use strings for numbers and dates, true/false for Boolean, null for explicit null. Omit absent keys.</mat-hint>
+      </mat-form-field>
       <button
         mat-flat-button
         (click)="start()"

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd"
+ logicalFilePath="db/changelog/test-host/changes/003-console-service-effects.xml">
+ <changeSet id="f007-001-create-service-effect" author="workflow-test-host">
+  <preConditions onFail="HALT" onError="HALT"><dbms type="mssql"/></preConditions>
+  <sql dbms="mssql" splitStatements="true"><![CDATA[
+CREATE TABLE wf_test.service_effect (
+ id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+ request_id BIGINT NOT NULL,
+ instance_id BIGINT NOT NULL,
+ command_id UNIQUEIDENTIFIER NOT NULL,
+ node_key VARCHAR(100) COLLATE Latin1_General_100_BIN2 NOT NULL,
+ quantity BIGINT NOT NULL,
+ actor_ref NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
+ occurred_at DATETIME2(7) NOT NULL,
+ CONSTRAINT fk_console_effect_request FOREIGN KEY(request_id) REFERENCES wf_test.sandbox_request(id) ON DELETE NO ACTION,
+ CONSTRAINT ck_console_effect_instance CHECK(instance_id>0),
+ CONSTRAINT uq_console_effect_command_node UNIQUE(command_id,node_key)
+);
+CREATE INDEX ix_console_effect_instance ON wf_test.service_effect(instance_id,id);
+  ]]></sql>
+ </changeSet>
+</databaseChangeLog>

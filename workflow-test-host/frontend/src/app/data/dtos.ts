@@ -133,7 +133,7 @@ export interface InstanceView extends InstanceSummary {
 export interface InstanceGraphNode {
   key: string;
   name: string;
-  type: "START" | "HUMAN_TASK" | "END";
+  type: string;
   state: "ACTIVE" | "COMPLETED" | "PENDING";
   activityId: Decimal | null;
   taskId: Decimal | null;
@@ -281,4 +281,14 @@ export interface DispatchResult {
 export interface DeliveryResult {
   eventId: string;
   duplicate: boolean;
+}
+
+export interface VariablePage {
+  instanceId: Decimal; lockVersion: Decimal;
+  items: { key:string; type:string; initialized:boolean; value:string|boolean|null }[];
+  nextAfterKey: string|null;
+}
+export interface ServiceEffect {
+  id:Decimal; requestId:Decimal; instanceId:Decimal; commandId:string; nodeKey:string;
+  quantity:string; actorRef:string; occurredAt:string;
 }

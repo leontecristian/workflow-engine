@@ -39,6 +39,7 @@ public class ConsoleRuntimeTransaction {
         var result =
                 execution.start(
                         command.core(),
+                        command.inputs(),
                         context,
                         allocated -> {
                             requests.link(
@@ -79,7 +80,7 @@ public class ConsoleRuntimeTransaction {
     @Transactional(readOnly = true)
     public Optional<WorkflowCommandResult> replayStart(
             SandboxStart command, WorkflowCommandContext context) {
-        return execution.findReplay(command.core(), context);
+        return execution.findReplay(command.core(), command.inputs(), context);
     }
 
     @Transactional(readOnly = true)

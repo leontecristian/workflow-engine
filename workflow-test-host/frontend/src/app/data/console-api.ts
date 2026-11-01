@@ -173,6 +173,15 @@ export class ConsoleApi {
   instance(id: string) {
     return this.transport.call<InstanceView>("/instances/" + segment(id));
   }
+  variables(id:string, afterKey?:string, expectedLockVersion?:string) {
+    const params=new URLSearchParams({limit:"50"});
+    if(afterKey) params.set("afterKey",afterKey);
+    if(expectedLockVersion) params.set("expectedLockVersion",expectedLockVersion);
+    return this.transport.call<import("./dtos").VariablePage>("/instances/"+segment(id)+"/variables?"+params);
+  }
+  serviceEffects(id:string,cursor?:string) {
+    return this.transport.call<Page<import("./dtos").ServiceEffect>>("/instances/"+segment(id)+"/service-effects"+pageQuery(cursor,50));
+  }
   instanceGraph(id: string) {
     return this.transport.call<InstanceGraph>(
       `/instances/${segment(id)}/graph`,

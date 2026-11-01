@@ -1,30 +1,32 @@
-import { Component, input } from "@angular/core";
+import { Component, computed, input, signal } from "@angular/core";
+import { MatButtonModule } from "@angular/material/button";
+import { layoutGraph } from "./graph-layout";
 import { RouterLink } from "@angular/router";
 import type { InstanceGraph, InstanceGraphNode } from "../../../data/dtos";
 
 @Component({
   selector: "console-instance-graph",
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, MatButtonModule],
   templateUrl: "./instance-graph.html",
   styleUrl: "./instance-graph.scss",
 })
 export class InstanceGraphComponent {
   graph = input.required<InstanceGraph>();
 
-  nodeX(index: number): number {
-    return 24 + index * 310;
+  layout = computed(() => layoutGraph(this.graph()));
+  zoom = signal(1);
+  changeZoom(delta: number) {
+    this.zoom.update(value => Math.min(2, Math.max(0.25, Math.round((value + delta) * 100) / 100)));
   }
-  edgeStart(key: string): number {
-    return this.nodeX(this.graph().nodes.findIndex((n) => n.key === key)) + 250;
-  }
-  edgeEnd(key: string): number {
-    return this.nodeX(this.graph().nodes.findIndex((n) => n.key === key));
-  }
+  zoomPercent() { return Math.round(this.zoom() * 100); }
+  arrowId(traversed: boolean) { return "workflow-" + this.graph().instance.id + (traversed ? "-visited" : "-pending"); }
+  arrow(traversed: boolean) { return "url(#" + this.arrowId(traversed) + ")"; }
+  nodeType(node: InstanceGraphNode): string { return this.shortName(node.type.replaceAll("_", " ")); }
   route(node: InstanceGraphNode): string[] {
     return node.taskId
       ? ["/task", node.taskId]
-      : ["/history", this.graph().instance.id];
+      : node.activityId ? ["/activity", node.activityId] : ["/history", this.graph().instance.id];
   }
   label(node: InstanceGraphNode): string {
     if (node.state === "ACTIVE") return "Current step";
@@ -40,6 +42,6 @@ export class InstanceGraphComponent {
     return points.length > 26 ? points.slice(0, 25).join("") + "…" : name;
   }
   accessibleName(node: InstanceGraphNode): string {
-    return `${node.name} (${node.key}), ${this.label(node)}. Open ${node.taskId ? "task" : "history"}.`;
+    return `${node.name} (${node.key}, ${node.type}), ${this.label(node)}. Open ${node.taskId ? "task" : node.activityId ? "activity" : "history"}.`;
   }
 }

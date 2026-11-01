@@ -19,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true, propagation = Propagation.REQUIRED)
 public interface WorkflowInstanceRepository extends Repository<WorkflowInstanceEntity, Long> {
 
+    @Query("select i.lockVersion from WorkflowInstanceEntity i where i.id=:id")
+    Optional<Long> readLockVersion(@Param("id") long id);
     Optional<WorkflowInstanceEntity> findById(Long id);
 
     @Query("""

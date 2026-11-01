@@ -1,6 +1,18 @@
+export type ScalarInputs = Readonly<Record<string, string | boolean | null>>;
+export type CommandBody = Readonly<{
+  commandId: string;
+  definitionVersionId?: string;
+  requestId?: string;
+  expectedRequestVersion?: string;
+  instanceId?: string;
+  taskId?: string;
+  outcomeKey?: string;
+  comment?: string | null;
+  inputs?: ScalarInputs;
+}>;
 export type Envelope = Readonly<{
   kind: "start" | "complete";
-  body: Readonly<Record<string, string | null>>;
+  body: CommandBody;
   expectedToken: string | null;
 }>;
 const decimal = /^(0|[1-9][0-9]*)$/;
@@ -68,10 +80,14 @@ export function freezeEnvelope(input: unknown): Envelope {
         "requestId",
       ]
     : ["commandId", "comment", "instanceId", "outcomeKey", "taskId"];
+  if (start && Object.hasOwn(body, "inputs")) expected.push("inputs");
   if (Object.keys(body).sort().join() !== expected.sort().join())
     throw new Error("Invalid command fields");
+  if (start && Object.hasOwn(body, "inputs")) {
+    (body as Record<string, unknown>)["inputs"] = freezeInputs((body as Record<string, unknown>)["inputs"]);
+  }
   for (const [key, value] of Object.entries(body))
-    if (typeof value !== "string" && !(key === "comment" && value === null))
+    if (key !== "inputs" && (typeof value !== "string" && !(key === "comment" && value === null)))
       throw new Error("Invalid command value");
   if (
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
@@ -93,7 +109,7 @@ export function freezeEnvelope(input: unknown): Envelope {
   }
   return Object.freeze({
     kind: start ? "start" : "complete",
-    body: Object.freeze(body),
+    body: Object.freeze(body) as unknown as CommandBody,
     expectedToken: obj["expectedToken"] as string | null,
   });
 }
@@ -114,9 +130,7 @@ export class CommandBuffer {
       previous &&
       (previous.kind !== frozen.kind ||
         previous.expectedToken !== frozen.expectedToken ||
-        Object.keys(previous.body).some(
-          (key) => previous.body[key] !== frozen.body[key],
-        ))
+        commandIdentity(previous.body) !== commandIdentity(frozen.body))
     )
       throw new Error(
         "This UUID already has a different original request in the command buffer",
@@ -134,7 +148,7 @@ export class CommandBuffer {
     this.entries = [];
   }
   restore(text: string): Envelope {
-    return this.remember(JSON.parse(text));
+    return this.remember(parseExactJson(text));
   }
   export(): string {
     return JSON.stringify(this.command, null, 2);
@@ -145,7 +159,7 @@ export function commandRequest(
   replay: boolean,
 ): {
   path: string;
-  body: Readonly<Record<string, string | null>>;
+  body: Readonly<Record<string, unknown>>;
   token: string | null;
 } {
   if (envelope.kind === "start")
@@ -162,4 +176,40 @@ export function commandRequest(
     body: replay ? envelope.body : body,
     token: envelope.expectedToken,
   };
+}
+
+export function freezeInputs(value: unknown): ScalarInputs {
+  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length > 100) throw new Error("Inputs must be a scalar object");
+  const result: Record<string,string|boolean|null> = Object.create(null);
+  for (const [key, token] of Object.entries(value)) {
+    if (!/^[A-Za-z][A-Za-z0-9._-]{0,99}$/.test(key) || !(token === null || typeof token === "boolean" || typeof token === "string")) throw new Error("Use exact strings, booleans or null for inputs");
+    result[key] = token;
+  }
+  return Object.freeze(result);
+}
+export function parseScalarInputs(text: string): ScalarInputs { return freezeInputs(parseExactJson(text)); }
+// Reject duplicate properties before JSON.parse can discard them.
+function parseExactJson(text: string): unknown {
+  const tokens = text.match(/"(?:\\.|[^"\\])*"|[{}\[\],:]|true|false|null|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g) || [];
+  const stack: (Set<string> | null)[] = [];
+  for (let i=0;i<tokens.length;i++) {
+    const t=tokens[i];
+    if(t==="{") stack.push(new Set());
+    else if(t==="[") stack.push(null);
+    else if(t==="}" || t==="]") stack.pop();
+    else if(t.startsWith('"') && tokens[i+1]===":") {
+      const key=JSON.parse(t), current=stack[stack.length-1];
+      if(current?.has(key)) throw new Error("Duplicate JSON property");
+      current?.add(key);
+    }
+  }
+  return JSON.parse(text);
+}
+function commandIdentity(body: Envelope["body"]): string {
+  const copy: Record<string,unknown> = {...body};
+  if (body.inputs) {
+    if(Object.keys(body.inputs).length===0) delete copy["inputs"];
+    else copy["inputs"] = Object.fromEntries(Object.entries(body.inputs).sort(([a],[b])=>a.localeCompare(b)));
+  }
+  return JSON.stringify(Object.fromEntries(Object.entries(copy).sort(([a],[b])=>a.localeCompare(b))));
 }

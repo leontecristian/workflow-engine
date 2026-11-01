@@ -1,5 +1,21 @@
 # Implementation — F006 Test-host workflow console
 
+## Revision 6 general graph delivery - 2026-11-01
+
+Implemented the bounded general viewer specified in revision 6 (G01-G04, AC31-AC34). `ConsoleInstanceGraph` now projects up to 200 nodes/500 transitions from the exact pinned definition, including service/custom types, branches, merges, loops and repeated visits. It validates contiguous history through the initial watermark (up to 12,000 facts), checks recorded transition continuity and derives latest activity/task links without per-row detail reads. Multiple tasks link to their activity. Authorization, private-field exclusion and the 1 MiB response bound remain enforced. ACTIVE/COMPLETED are supported; cancellation evidence remains outside this increment. No execution capabilities, command contracts, schemas or migrations changed for this viewer extension.
+
+The Angular viewer uses a deterministic bounded layout with directional routes, edge labels, zoom/reset and two-axis scrolling. Node types remain plain labels; current position takes precedence when revisiting completed nodes. Exact task/activity/history destinations are preserved. README and feature navigation describe these bounds. Earlier owner acceptance, including F007 T09 closure, remains unchanged; it does not constitute browser acceptance of this new renderer.
+
+Verification performed with JDK 21.0.13 and the repository-pinned Node toolchain:
+
+- PASS: `./mvnw.cmd -pl workflow-core,workflow-test-host -am '-Dtest=ConsoleInstanceGraphUnitTest,ConsoleGeneralGraphUnitTest,ConsoleRuntimeUnitTest,ConsoleInstancesUnitTest' '-Dsurefire.failIfNoSpecifiedTests=false' test` - 23 isolated backend tests, no failures/errors/skips. Covers F007 five-node progress, custom/branch/loop topology, repeated activity/task links, pagination/watermark consistency, malformed evidence, bounds, privacy, authorization and legacy behavior. Earlier development runs exposed outdated three-node expectations and two new fixture issues (Mockito restubbing and an undersized response-bound fixture); these were corrected before the passing run.
+- PASS: from `workflow-test-host/frontend`, `../target/frontend/node/node.exe --experimental-strip-types --test unit/*.test.mjs src/app/**/*.test.mjs` - all 60 isolated frontend tests. Includes deterministic layout, cycles/disconnected nodes, maximum graph bounds, malformed identities/endpoints, exact navigation and zoom limits.
+- PASS: `../target/frontend/node/node.exe node_modules/@angular/cli/bin/ng.js build` and `../target/frontend/node/node.exe scripts/check-build.mjs`. Production initial bundle is 903.40 kB, exceeding the existing 900 kB warning budget by 3.40 kB, below the unchanged 1 MB error budget. CSP asset checks pass.
+- PASS: root `./mvnw.cmd -Pconsole-ui '-Dmaven.test.skip=true' '-Dskip.npm=true' package`, packaging the freshly built console without repeating tests or dependency installation.
+- PASS: final source/document review and `git diff --check`, including new source/document whitespace and local link checks.
+
+NOT RUN for this revision: browser visual/keyboard/narrow-window walkthrough, live graph HTTP calls, database/provider/transaction checks and migrations. Unit/build results do not close those acceptance gaps or any historical gaps. No host, frontend server or other runtime process was started, restarted or stopped for this increment; restart the existing host to load the changed backend and packaged assets, then refresh the instance page. Unrelated work remains preserved. Changes are uncommitted; no push.
+
 ## Owner browser acceptance progress — 2026-11-01
 
 The owner completed the six-point baseline walkthrough from the roadmap discussion on 2026-11-01. This update records owner-reported results and supplied screenshots, not a new agent-run build, browser session or database check. The deployed commit/artifact hash was not supplied. Historical BLOCKED/NOT RUN entries below retain their original context; the browser walkthrough is complete, while full acceptance/evidence reconciliation remains outstanding.
@@ -216,6 +232,12 @@ PASS: pinned Node 22.22.0, isolated `node --experimental-strip-types --test unit
 Both raw workflow JSON fields now use a selector stronger than Material input typography: Cascadia Code with Consolas/Courier New/monospace fallbacks, 14px size, 1.6 line height and normal letter spacing. This is a display-only change; no external font is downloaded.
 
 PASS: pinned frontend `npm run build` including production CSP checks; `git diff --check`. NOT RUN: live browser font/layout verification. No tests were added for this CSS-only change. No host/database process was started or restarted; use the existing Build console launch step and refresh to serve the updated assets. Changes are uncommitted.
+
+## Maintenance - 2026-11-01: format version JSON on load
+
+The version editor applies the existing lossless pretty formatter to the loaded document on initial load and reload, including reload after lifecycle actions. Automatic formatting leaves dirty=false and does not change stored JSON or trigger a save. Explicit Pretty print remains available after editing.
+
+PASS: 9 isolated definition-page/formatter tests, including load/reload formatting without unsaved changes, exact large-number preservation and stale-route response protection. The first run found a pre-existing route-test fixture containing non-JSON text; corrected that fixture to valid JSON and reran successfully. Frontend production build/CSP checks and final whitespace review passed. Browser/live-host verification NOT RUN; no database access or host restart. Changes are uncommitted.
 
 ## Maintenance - 2026-11-01: separate Angular development server
 

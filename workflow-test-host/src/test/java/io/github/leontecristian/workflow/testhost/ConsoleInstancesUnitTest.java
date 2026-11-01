@@ -33,7 +33,7 @@ import java.util.List;
 class ConsoleInstancesUnitTest {
     private final WorkflowRuntimeQueryService reads = mock(WorkflowRuntimeQueryService.class);
     private final ConsoleRuntimeController controller =
-            new ConsoleRuntimeController(reads, null, null, null, null, null, new ConsoleWire());
+            new ConsoleRuntimeController(reads, null, null, null, null, null, new ConsoleWire(), null);
 
     @AfterEach
     void cleanup() {

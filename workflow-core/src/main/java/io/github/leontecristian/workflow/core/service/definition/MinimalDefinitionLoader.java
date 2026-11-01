@@ -27,6 +27,8 @@ public class MinimalDefinitionLoader {
     private final ObjectMapper json = new ObjectMapper();
     private final JsonSchema schema;
     private final String schemaDigest;
+    private final JsonSchema extendedSchema;
+    private final String extendedDigest;
 
     public MinimalDefinitionLoader() {
         try (InputStream input = getClass().getResourceAsStream("/schemas/workflow-definition/minimal-v1.schema.json")) {
@@ -41,13 +43,28 @@ public class MinimalDefinitionLoader {
             this.schema = factory.getSchema(json.readTree(bytes), SchemaValidatorsConfig.builder()
                     .failFast(true).pathType(PathType.JSON_POINTER).typeLoose(false).build());
             schema.initializeValidators();
+            try (InputStream extended = getClass().getResourceAsStream("/schemas/workflow-definition/scalar-service-v1.schema.json")) {
+                if (extended == null) throw new IllegalStateException("Missing extended schema");
+                byte[] content = extended.readAllBytes();
+                extendedDigest = DefinitionContentCanonicalizer.hex(DefinitionContentCanonicalizer.hash(new String(content, java.nio.charset.StandardCharsets.UTF_8)));
+                extendedSchema = factory.getSchema(json.readTree(content), SchemaValidatorsConfig.builder().failFast(true)
+                        .pathType(PathType.JSON_POINTER).typeLoose(false).build());
+                extendedSchema.initializeValidators();
+            }
         } catch (IOException failure) { throw new IllegalStateException("Cannot load bundled definition schema", failure); }
     }
 
     String schemaDigest() { return schemaDigest; }
+    String schemaDigest(boolean extended) { return extended ? extendedDigest : schemaDigest; }
+    static boolean extended(JsonNode root) {
+        return root.path("variables").size()>0 || root.path("startPolicy").path("inputContract").size()>0
+                || root.path("startPolicy").path("initialize").size()>0
+                || java.util.stream.StreamSupport.stream(root.path("nodes").spliterator(),false).anyMatch(n -> "SERVICE_TASK".equals(n.path("type").asText()));
+    }
 
     MinimalWorkflowDefinition model(DefinitionDocumentCodec.Document document, DefinitionDiagnostics diagnostics) {
-        unsupported(document.tree(), "", diagnostics);
+        boolean extended = extended(document.tree());
+        unsupported(document.tree(), "", diagnostics, extended);
         // Designer data is opaque. Avoid asking the structural validator to interpret arbitrary numeric values.
         ObjectNode validationTree = document.tree().deepCopy();
         if (validationTree.has("designer") && validationTree.get("designer").isObject()) validationTree.set("designer", json.createObjectNode());
@@ -55,17 +72,24 @@ public class MinimalDefinitionLoader {
         validationTree.put("schemaVersion", 1); validationTree.put("version", document.version());
         Set<com.networknt.schema.ValidationMessage> errors;
         try {
-            errors = schema.validate(validationTree);
+            errors = (extended ? extendedSchema : schema).validate(validationTree);
         } catch (RuntimeException failure) {
             // The default provider output converts fail-fast assertions into returned messages.
             // Other failures are infrastructure failures, never evidence that this document is invalid.
             throw new WorkflowDefinitionException(WorkflowDefinitionException.Category.HOST_CONFIGURATION, failure);
         }
         for (var error : errors) {
-            diagnostics.error(error.getType().equals("additionalProperties") ? "UNKNOWN_FIELD" : "INVALID_STRUCTURE",
-                    DiagnosticStage.STRUCTURE, "Document does not match the supported structure.", error.getInstanceLocation().toString());
+            String pointer=error.getInstanceLocation().toString();
+            String code=error.getType().equals("additionalProperties") ? "UNKNOWN_FIELD" : "INVALID_STRUCTURE";
+            if (extended) {
+                if(pointer.startsWith("/variables")) code="INVALID_VARIABLE";
+                else if(pointer.startsWith("/startPolicy/inputContract")) code="INVALID_INPUT_CONTRACT";
+                else if(pointer.startsWith("/startPolicy/initialize") || pointer.contains("/inputs") || pointer.contains("/outputs")) code="INVALID_BINDING";
+                else if(pointer.endsWith("/action")) code="ACTION_CONTRACT";
+            }
+            diagnostics.error(code,DiagnosticStage.STRUCTURE,"Document does not match the supported structure.",pointer);
         }
-        return errors.isEmpty() ? graph(document.tree(), diagnostics) : null;
+        return errors.isEmpty() ? (extended ? ScalarDefinitionModel.load(document.tree(), diagnostics) : graph(document.tree(), diagnostics)) : null;
 
     }
 
@@ -109,22 +133,22 @@ public class MinimalDefinitionLoader {
                 new MinimalWorkflowDefinition.Node(endKey, "END", end.get("name").textValue(), end.get("result").textValue()), transitions);
     }
 
-    private void unsupported(JsonNode node, String pointer, DefinitionDiagnostics diagnostics) {
+    private void unsupported(JsonNode node, String pointer, DefinitionDiagnostics diagnostics, boolean extended) {
         if (!node.isContainerNode()) return;
         if (node.isObject()) {
             node.fields().forEachRemaining(entry -> {
                 String field = entry.getKey(); JsonNode value = entry.getValue();
                 if (field.equals("designer")) return;
-                boolean unsupported = (Set.of("variables", "inputContract", "guards").contains(field) && value.isArray() && !value.isEmpty())
-                        || (Set.of("inputs", "initialize").contains(field) && value.isObject() && !value.isEmpty())
+                boolean unsupported = ((field.equals("guards") || (!extended && Set.of("variables", "inputContract").contains(field))) && value.isArray() && !value.isEmpty())
+                        || (!extended && Set.of("inputs", "initialize").contains(field) && value.isObject() && !value.isEmpty())
                         || (field.equals("policy") && value.isTextual() && !value.textValue().equals("SINGLE"))
                         || (field.equals("mode") && value.isTextual() && !value.textValue().equals("FORBIDDEN"))
-                        || (field.equals("type") && value.isTextual() && Set.of("SERVICE_TASK", "EXCLUSIVE_GATEWAY", "DECISION", "PARALLEL_GATEWAY", "INCLUSIVE_GATEWAY").contains(value.textValue()))
-                        || Set.of("condition", "default", "expressionPolicy").contains(field);
+                        || (field.equals("type") && value.isTextual() && Set.of("EXCLUSIVE_GATEWAY", "DECISION", "PARALLEL_GATEWAY", "INCLUSIVE_GATEWAY").contains(value.textValue()))
+                        || (Set.of("condition", "expressionPolicy").contains(field) || (!extended && field.equals("default")));
                 String path = pointer + "/" + field.replace("~", "~0").replace("/", "~1");
                 if (unsupported) diagnostics.error("UNSUPPORTED_FEATURE", DiagnosticStage.CONTRACT, "Recognized feature is not implemented by this publication subset.", path);
-                unsupported(value, path, diagnostics);
+                unsupported(value, path, diagnostics, extended);
             });
-        } else for (int i = 0; i < node.size(); i++) unsupported(node.get(i), pointer + "/" + i, diagnostics);
+        } else for (int i = 0; i < node.size(); i++) unsupported(node.get(i), pointer + "/" + i, diagnostics, extended);
     }
 }

@@ -24,10 +24,12 @@ public class WorkflowDefinitionRuntimeReader {
     private final DefinitionDocumentCodec codec;
     private final MinimalDefinitionLoader loader;
     private final DefinitionValidationService capabilities;
+    private final io.github.leontecristian.workflow.core.service.runtime.ServiceActionRegistry actions;
 
     public WorkflowDefinitionRuntimeReader(WorkflowDefinitionRepository families,
             WorkflowDefinitionVersionRepository versions, EntityManager entityManager,
-            DefinitionDocumentCodec codec, MinimalDefinitionLoader loader, DefinitionValidationService capabilities) {
+            DefinitionDocumentCodec codec, MinimalDefinitionLoader loader, DefinitionValidationService capabilities, io.github.leontecristian.workflow.core.service.runtime.ServiceActionRegistry actions) {
+        this.actions=actions;
         this.families = families; this.versions = versions; this.entityManager = entityManager;
         this.codec = codec; this.loader = loader; this.capabilities = capabilities;
     }
@@ -57,6 +59,9 @@ public class WorkflowDefinitionRuntimeReader {
     }
 
     public void requireCapabilities(ExecutableDefinition definition, boolean starting) {
+        var diagnostics=new DefinitionDiagnostics();
+        ServiceBindingValidation.check(definition.model(),actions,diagnostics);
+        if (diagnostics.failed()) throw corrupt();
         var snapshot = capabilities.snapshot();
         var human = definition.model().human();
         if (snapshot == null || snapshot.taskTypes().stream().noneMatch(c -> c.taskType().equals(human.taskType())

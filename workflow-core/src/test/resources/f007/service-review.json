@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "key": "sandbox.serviceReview",
+  "version": 1,
+  "name": "Quantity service review",
+  "startPolicy": {
+    "inputContract": [{"key":"quantity","type":"LONG","required":true,"nullable":false}],
+    "initialize": {"quantity":{"source":"startInput","key":"quantity"}}
+  },
+  "variables": [
+    {"key":"quantity","type":"LONG","nullable":false},
+    {"key":"recordedQuantity","type":"LONG","nullable":false}
+  ],
+  "nodes": [
+    {"key":"BEGIN","type":"START","name":"Start"},
+    {"key":"BEFORE","type":"SERVICE_TASK","name":"Record submitted quantity","action":"sandbox.recordQuantity",
+     "inputs":{"quantity":{"source":"variable","key":"quantity"}},
+     "outputs":{"recordedQuantity":{"source":"actionOutput","key":"recordedQuantity"}}},
+    {"key":"REVIEW","type":"HUMAN_TASK","name":"Review","taskType":"SANDBOX_REVIEW",
+     "assignment":{"resolver":"sandbox.singleReviewer","inputs":{}},"completion":{"policy":"SINGLE"},
+     "inputContract":[],"resultContract":{"mode":"FORBIDDEN"},
+     "outcomes":[{"key":"COMPLETE","label":"Complete","requiresComment":false}]},
+    {"key":"AFTER","type":"SERVICE_TASK","name":"Record accepted quantity","action":"sandbox.recordQuantity",
+     "inputs":{"quantity":{"source":"variable","key":"recordedQuantity"}},
+     "outputs":{"recordedQuantity":{"source":"actionOutput","key":"recordedQuantity"}}},
+    {"key":"DONE","type":"END","name":"Done","result":"COMPLETED"}
+  ],
+  "transitions": [
+    {"key":"beginService","from":"BEGIN","to":"BEFORE"},
+    {"key":"beginReview","from":"BEFORE","to":"REVIEW"},
+    {"key":"finishReview","from":"REVIEW","to":"AFTER","outcome":"COMPLETE"},
+    {"key":"finishService","from":"AFTER","to":"DONE"}
+  ]
+}
