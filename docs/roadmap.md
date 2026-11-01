@@ -13,7 +13,7 @@ The agreed delivery direction is **working sandbox → first APOLO booking integ
 | F001–F003: schema, task catalog and persistence | Implemented within their feature scopes | Local migration/build/discovery evidence exists. Some catalog mutation, concurrency, hydration and paging scenarios remain unverified in the original records; later evidence must be matched explicitly. |
 | F004: definition management | Implemented for the minimal SINGLE language subset | Draft import/edit/validation, publication and retirement exist. F006 adds management API/database observations; these do not automatically close every F004 scenario. |
 | F005: minimal execution | Core implemented | Exact-version `START → HUMAN_TASK (SINGLE) → END`, assignment, completion, history, receipt replay and durable recorder integration exist. Original T11 acceptance remains open. |
-| F006: development console | Revision 5 implemented; acceptance incomplete | Management/execution pages, real sandbox adapters, local audit/outbox/inbox, instance monitor and read-only graph exist. Browser acceptance and revision 5 live checks remain outstanding. |
+| F006: development console | Revision 5 implemented; six-point browser walkthrough complete; full acceptance incomplete | Owner confirmed all six walkthrough points on 2026-11-01, including graph, command recovery, local dispatch/redelivery and logout clearing. Full scenario/evidence reconciliation and uncovered technical checks remain; see the handover. |
 
 See the [feature index](features/README.md) and [F006 handover](features/F006-test-host-definition-console/implementation.md) for revision-specific results. IMPLEMENTED means code exists, not that all acceptance or production gates passed. Historical BLOCKED entries describe the environment at the time; they do not establish that the same blocker still exists today.
 
@@ -22,6 +22,8 @@ The broader language is not implemented by the three-node sandbox. In particular
 ## 2. Immediate priority: accept the existing baseline
 
 Complete this work under the existing features rather than creating a new capability merely to close evidence gaps.
+
+**Progress — 2026-11-01:** the owner completed all six browser walkthrough points, including two-tab editing, two-account completion, instance graph inspection, exported-command recovery/replay, local event delivery/duplicate suppression and logout clearing. See [the recorded observations](features/F006-test-host-definition-console/implementation.md#owner-browser-acceptance-progress--2026-11-01). The next action is to reconcile these and the earlier API/database evidence against the full feature scenarios, identifying only uncovered checks; the walkthrough does not automatically close every task below.
 
 1. **F006 browser acceptance:** finish T08/T09/T12/T13 against the intended packaged revision, covering administrator/reviewer navigation, two-tab conflicts and unsaved text, command recovery, instance monitoring, graph refresh/failure behavior, keyboard use and responsive layout. Cover the remaining portions of AC01–AC30 as applicable; preserve API-only and isolated-test results as such.
 2. **Revision 5 live acceptance:** verify the graph endpoint, pinned-version/history display and authorization using the real host. Confirm the running artifact actually includes revision 5 before relying on it.

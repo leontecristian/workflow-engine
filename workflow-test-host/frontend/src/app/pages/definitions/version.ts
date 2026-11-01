@@ -2,7 +2,7 @@ import { Component, DestroyRef, inject, signal } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router } from "@angular/router";
 import { ConsoleApi } from "../../data/console-api";
-import { rawDocument } from "../../command-buffer";
+import { prettyDocument, rawDocument } from "../../command-buffer";
 import type {
   VersionDetails,
   DefinitionChange,
@@ -69,6 +69,19 @@ export class VersionPage {
       ).report;
     } catch {
       return null;
+    }
+  }
+  prettyPrint(): void {
+    this.error.set("");
+    this.notice.set("");
+    try {
+      const formatted = prettyDocument(this.document);
+      if (formatted !== this.document) {
+        this.document = formatted;
+        if (this.detail()?.summary.status === "DRAFT") this.dirty = true;
+      }
+    } catch {
+      this.error.set("Cannot pretty print invalid JSON. Fix the document and try again.");
     }
   }
   async saveDocument() {

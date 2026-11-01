@@ -52,6 +52,11 @@
     </mat-form-field>
     <div class="actions document-actions">
       <button
+        mat-stroked-button
+        (click)="prettyPrint()"
+        [disabled]="busy() || !detail()"
+      >Pretty print</button>
+      <button
         mat-flat-button
         (click)="saveDocument()"
         [disabled]="busy() || detail()?.summary?.status !== 'DRAFT'"
