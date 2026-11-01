@@ -8,6 +8,7 @@
     "npm": "10.9.4"
   },
   "scripts": {
+    "start": "ng serve",
     "build": "ng build && node scripts/check-build.mjs",
     "test:unit": "node --experimental-strip-types --test unit/*.test.mjs src/app/**/*.test.mjs"
   },

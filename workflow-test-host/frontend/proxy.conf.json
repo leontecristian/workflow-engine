@@ -1,0 +1,14 @@
+{
+  "/console/api/**": {
+    "target": "http://127.0.0.1:8080"
+  },
+  "/console/login": {
+    "target": "http://127.0.0.1:8080"
+  },
+  "/console/logout": {
+    "target": "http://127.0.0.1:8080"
+  },
+  "/error": {
+    "target": "http://127.0.0.1:8080"
+  }
+}

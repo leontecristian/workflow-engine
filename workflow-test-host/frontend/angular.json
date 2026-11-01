@@ -29,6 +29,23 @@
                 "maximumError": "1MB"
               }
             ]
+          },
+          "configurations": {
+            "development": {
+              "optimization": false,
+              "sourceMap": true,
+              "outputHashing": "none"
+            }
+          }
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "options": {
+            "buildTarget": "console:build:development",
+            "host": "127.0.0.1",
+            "port": 4200,
+            "servePath": "/console",
+            "proxyConfig": "proxy.conf.json"
           }
         }
       }
