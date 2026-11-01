@@ -828,7 +828,7 @@ These are acceptance requirements for implementation. No engine/database executi
 | JSON compatibility and ownership | Old scalar definitions/rows remain valid; unsupported codec/expression versions fail. JSON booking IDs do not override host membership/authorization or mutate a frozen review; current execution data cannot rewrite task results. |
 | Durability and commit | Event handoff and receipts survive committed process restart; outer commit failure never reports success. |
 
-The original architecture contains a no-automated-tests instruction alongside required verification layers. This design defines the required evidence without changing that execution policy. The project owner must settle how the repeatable SQL Server concurrency, rollback and recovery evidence will be produced before production approval.
+The original architecture recorded a no-automated-tests instruction. The owner's 2026-11-01 policy in [AGENTS.md](../../AGENTS.md) supersedes that restriction for isolated unit tests and guarded integration tests on `localhost:1433/apolo_workflow_test`. Use that environment for repeatable SQL Server evidence; concurrency, rollback and recovery still require scenario-specific passing results before production approval.
 
 ## 21 Decisions before implementation approval
 

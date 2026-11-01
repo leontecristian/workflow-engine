@@ -59,4 +59,4 @@ workflow-engine/
 
 F001–F006 are implemented within their documented scopes, including minimal SINGLE execution and the revision 5 console. Implementation does not imply complete acceptance: F005 T11 and F006 browser/live-check gaps remain open. Use the [feature index](features/README.md) and linked handovers for current details, rather than treating architecture examples as delivered capabilities.
 
-Build and local startup instructions remain in the [project README](../README.md). Isolated unit tests are allowed; database integration tests require explicit authorization under [AGENTS.md](../AGENTS.md). See the [verification policy](specification-driven-development.md#verification-and-current-no-tests-policy).
+Build and local startup instructions remain in the [project README](../README.md). Isolated unit tests and integration tests on the dedicated local `apolo_workflow_test` database are authorized under [AGENTS.md](../AGENTS.md); see [database testing](testing/database-integration-tests.md). Other targets require task-specific authorization. See the [verification policy](specification-driven-development.md#verification-and-current-no-tests-policy).

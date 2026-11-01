@@ -1281,7 +1281,7 @@ apolo/
 
 Keep one authoritative copy of core after the move. `workflow-test-host` remains a development convenience with no production dependency from backend. Whether it moves into APOLO as an optional development module or remains outside the normal APOLO build is open; neither choice permits a second maintained copy of core. The designer's placement and frontend build remain separate decisions.
 
-`README.md` is the entry point. This design document records architecture; specifications define exact contracts; decision records preserve choices and reasons; evidence records distinguish observed behavior from pending checks. Do not copy the complete architecture into every file. The current owner instruction is no automated tests; acceptance requirements remain documented and unperformed checks are marked NOT RUN.
+`README.md` is the entry point. This design document records architecture; specifications define exact contracts; decision records preserve choices and reasons; evidence records distinguish observed behavior from pending checks. Do not copy the complete architecture into every file. The current verification policy in [AGENTS.md](../../AGENTS.md) authorizes isolated unit tests and integration tests on the dedicated local `apolo_workflow_test` database. Other targets require task-specific authorization; acceptance requirements remain documented and unperformed checks are marked NOT RUN.
 
 Root `AGENTS.md` records module boundaries, safe build commands, the current verification policy, security invariants, definition-version rules and specification/evidence discipline. Keep affected schemas/examples consistent when their contracts change. Treat proposed design changes as proposals until reviewed; generated code must not silently redefine execution semantics.
 
@@ -1421,7 +1421,7 @@ A simplified in-memory repository is useful for fast engine tests, but it is not
 
 If the optional business decision engine is introduced, add FIRST/UNIQUE policy, output mapping, independent evaluation and pinned-definition tests at that time. They are not initial workflow acceptance criteria.
 
-Document verification scenarios for the agreed `ALL` behavior before implementation, including fixed obligations, concurrent submissions and rollback. The current owner instruction prohibits adding or running automated tests unless changed; unperformed checks remain NOT RUN. `ANY` and `QUORUM` remain deferred.
+Document verification scenarios for the agreed `ALL` behavior before implementation, including fixed obligations, concurrent submissions and rollback. Apply the current testing policy in [AGENTS.md](../../AGENTS.md), including standing authorization for the dedicated local `apolo_workflow_test` database; unperformed checks remain NOT RUN. `ANY` and `QUORUM` remain deferred.
 
 ### 20.3 First end-to-end success criterion
 

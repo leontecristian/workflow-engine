@@ -140,7 +140,7 @@ Predicate preview is side-effect-free evaluation of supplied facts. Real sandbox
 
 Specify substantial behavior and its acceptance criteria before implementing dependent code or schema. Trace implementation tasks and evidence to requirements. Resolve relevant open contracts; do not promote illustrative examples into approved behavior.
 
-Follow the owner's 2026-10-31 clarification in [AGENTS.md](../AGENTS.md): isolated unit tests are allowed; database integration tests require explicit authorization. This supersedes older blanket no-tests wording without changing acceptance requirements. Packaging without test execution uses `-Dmaven.test.skip=true`. Mark unperformed checks NOT RUN. This working policy does not establish production readiness or waive mandatory behavioral guarantees.
+Follow the owner's 2026-11-01 clarification in [AGENTS.md](../AGENTS.md): isolated unit tests and database integration tests against `localhost:1433/apolo_workflow_test` are authorized, including project migrations and test-owned fixture cleanup. Other targets require task-specific authorization. Protect shared development data and unrelated processes. This supersedes older testing restrictions without changing acceptance requirements. Packaging without test execution uses `-Dmaven.test.skip=true`. Mark unperformed checks NOT RUN. This working policy does not establish production readiness or waive mandatory behavioral guarantees.
 
 For temporary authorized runtime verification, stop processes afterward unless asked to leave them running. Record what was actually verified, the environment and remaining gaps.
 

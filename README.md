@@ -25,7 +25,7 @@ The initial nine-table workflow schema is implemented by [F001](docs/features/F0
 
 [F006 — Test-host workflow console](docs/features/F006-test-host-definition-console/spec.md) adds an opt-in Angular console for catalog/definition management and F005 SINGLE execution, with separate administrator/reviewer accounts, persisted sandbox requests, transactional audit/outbox and explicit local inbox delivery. See its [handover](docs/features/F006-test-host-definition-console/implementation.md) for actual acceptance results and remaining gaps.
 
-Start with the [documentation guide](docs/README.md), [project constitution](docs/constitution.md) and [specification-driven development workflow](docs/specification-driven-development.md). They capture the agreed architecture, specification and evidence requirements, current verification policy and remaining decisions traced to the [design sources](docs/design-sources.md). Isolated unit tests are allowed; database integration tests require explicit authorization under [AGENTS.md](AGENTS.md).
+Start with the [documentation guide](docs/README.md), [project constitution](docs/constitution.md) and [specification-driven development workflow](docs/specification-driven-development.md). They capture the agreed architecture, specification and evidence requirements, current verification policy and remaining decisions traced to the [design sources](docs/design-sources.md). Isolated unit tests and database integration tests against the dedicated local `apolo_workflow_test` database are authorized under [AGENTS.md](AGENTS.md). Other database targets retain task-specific authorization requirements.
 
 Project-wide guidance lives in `docs/`; individual feature specifications, plans, tasks and implementation/verification records belong in [docs/features/](docs/features/README.md).
 
@@ -42,7 +42,7 @@ This compiles and packages production code without compiling or running tests. O
 - `workflow-core/target/workflow-core-0.0.1-SNAPSHOT.jar`
 - `workflow-test-host/target/workflow-test-host-0.0.1-SNAPSHOT.jar`
 
-Only the host JAR is executable. The pre-existing context test was relocated with the host; no new tests were added.
+Only the host JAR is executable. The host also contains an opt-in, guarded SQL Server integration suite; see [database integration testing](docs/testing/database-integration-tests.md).
 
 ## Run the development host
 
@@ -202,4 +202,16 @@ npm ci
 npm run test:unit
 ```
 
-Surefire includes only `*UnitTest.java`. The preserved `WorkflowTestHostApplicationTests` requires a database and is excluded; do not run it without explicit authorization. Frontend tests use Node's built-in runner with no host/browser/database. Manual acceptance and retained development records are documented in the [F006 handover](docs/features/F006-test-host-definition-console/implementation.md); unit/build success does not establish transaction or concurrency acceptance.
+Surefire includes only `*UnitTest.java` in both modules. The preserved `WorkflowTestHostApplicationTests` now uses the guarded test database configuration and runs only in the opt-in Failsafe suite alongside `*IT.java`. Frontend tests use Node's built-in runner with no host/browser/database. Manual acceptance and retained development records are documented in the [F006 handover](docs/features/F006-test-host-definition-console/implementation.md); unit/build success does not establish transaction or concurrency acceptance.
+
+## Database integration tests
+
+The dedicated SQL Server database is `localhost:1433/apolo_workflow_test`, using Windows authentication. It is separate from the normal host's `apolo_workflow_dev`. With JDK 21 selected, run from the repository root:
+
+```powershell
+./mvnw.cmd -B -ntp -Pintegration-tests verify
+```
+
+This runs unit tests, applies real migrations to the test database, validates JPA mappings and runs the host integration suite without opening an HTTP port. The profile supplies the native authentication DLL path. Default `test`/`verify` runs remain unit-only. Reports are in `workflow-test-host/target/failsafe-reports`.
+
+The test base refuses alternate datasource/migration URLs before startup and checks the database catalog on each connection. Test fixtures use unique identifiers and clean up only their own rows. Do not run builds in another agent's active checkout or run competing suites against the same test database. See [setup, policy and recorded evidence](docs/testing/database-integration-tests.md).

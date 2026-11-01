@@ -51,7 +51,7 @@ Use structural denials plus restrictive context/accessors; disable auto-growth a
 | AC13 | Graph validity, mandatory-human dominance, cycles/reachability/default rules. | Publication accepts valid branches and rejects invalid graphs with located diagnostics. |
 | AC14 | Frontend evidence/recovery/session and graph fallback. | Packaged browser navigation, roles, selected route/result and exact input. |
 
-Inspect discovery and select isolated suites explicitly. Do not use a database Spring context for expression tests. After implementation, build with JDK 21/Java 17 and package the console through the existing profile. Database integration tests require explicit authorization; scenarios alone do not grant it. Manual runtime checks need authorized scope, independent persisted observations and genuinely overlapping requests. Stop identified temporary processes afterward unless the user requests otherwise.
+Inspect discovery and select isolated suites explicitly. Do not use a database Spring context for expression tests. After implementation, build with JDK 21/Java 17 and package the console through the existing profile. Database integration tests on `localhost:1433/apolo_workflow_test` have standing authorization under AGENTS.md and must use the guarded host harness; other targets require task-specific authorization. Manual runtime checks need authorized scope, independent persisted observations and genuinely overlapping requests. Stop identified temporary processes afterward unless the user requests otherwise.
 
 ## 5. Storage and handover
 

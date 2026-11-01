@@ -10,7 +10,7 @@ An assumption is an expectation used for planning whose supporting evidence is i
 
 The items below derive from the [consolidated design](architecture/workflow-engine-design.md), particularly O3/O7–O11, the development plan now consolidated into the [roadmap](roadmap.md), the [technical summary](integrations/apolo/apolo-technical-summary.md) and the scoped superseding decisions in [database design v1.4](architecture/Workflow_Engine_Database_Design_v1.md). See [design sources](design-sources.md) for precedence. Owners identify responsible roles, not newly assigned individuals or delivery dates.
 
-No item is marked verified merely because it is plausible. Follow the [current verification policy](specification-driven-development.md#verification-and-current-no-tests-policy): isolated unit tests are allowed, but required database evidence is not authorization to add or run database integration tests.
+No item is marked verified merely because it is plausible. Follow the [current verification policy](specification-driven-development.md#verification-and-current-no-tests-policy): isolated unit tests and guarded database integration tests on `localhost:1433/apolo_workflow_test` are authorized; other targets require task-specific authorization. Required evidence is still distinct from a passing test result.
 
 ## ASM-01 — A compatible shared dependency baseline can be established
 

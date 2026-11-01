@@ -1,10 +1,9 @@
 package io.github.leontecristian.workflow.testhost;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
+import io.github.leontecristian.workflow.testhost.configuration.integration.DatabaseIntegrationTest;
 
-@SpringBootTest
-class WorkflowTestHostApplicationTests {
+class WorkflowTestHostApplicationTests extends DatabaseIntegrationTest {
 
     @Test
     void contextLoads() {

@@ -86,6 +86,6 @@ Preserve Java 17 APIs/bytecode, JDK 21 runtime, ordinary JAR packaging and neutr
 
 Update this document when a milestone or priority changes, and update the [feature index](features/README.md) when a feature is specified or delivered. Keep detailed tasks and actual verification in the owning feature documents. Do not copy historical status paragraphs into navigation pages.
 
-Use the owner clarification in [AGENTS.md](../AGENTS.md): isolated unit tests are allowed; database integration tests require explicit authorization. Runtime/database checks must be within the task's authorized scope. Documentation-only work uses content, link and whitespace checks, with no build or host startup.
+Use the owner clarification in [AGENTS.md](../AGENTS.md): isolated unit tests and integration tests on `localhost:1433/apolo_workflow_test` are authorized. Other database targets and runtime checks outside that harness require task-specific authorization. Documentation-only work uses content, link and whitespace checks, with no build or host startup.
 
 Historical context is retained in the [development discussion](archive/development-discussion.md). This consolidation preserves earlier evidence and source provenance; it supersedes the old development plan's obsolete delivery assumptions, not the governing architecture.
