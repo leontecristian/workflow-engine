@@ -547,11 +547,11 @@ table .mat-mdc-row:hover {
   font-size: 10px;
   color: #69758a;
 }
-.code-field textarea {
-  font:
-    12px/1.8 Consolas,
-    "Cascadia Code",
-    monospace;
+.mat-mdc-form-field.code-field textarea.mat-mdc-input-element {
+  font-family: "Cascadia Code", Consolas, "Courier New", monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  letter-spacing: normal;
   color: #5d6880;
   resize: vertical;
   tab-size: 2;

@@ -210,3 +210,9 @@ InstancePage loads ordinary details first, then the graph; on success it adopts 
 Added an explicit Pretty print button to the definition-version editor. It indents valid JSON with two spaces using whitespace-only formatting, retaining number literals, string escapes and property order. Invalid JSON shows an error without replacing editor text. Changed draft text is marked unsaved and still requires explicit saving; published/retired documents can be formatted locally without enabling writes.
 
 PASS: pinned Node 22.22.0, isolated `node --experimental-strip-types --test unit/pretty-document.test.mjs` (2 tests), frontend `npm run build` including Angular compilation and production CSP check, and `git diff --check`. The first ad hoc check failed because Windows command quoting stripped its quotes; the initial test fixture also had an invalid escape and was corrected before the final passing run. NOT RUN: browser interaction and live-host verification. No database accessed or host restarted. Frontend assets were built in `frontend/dist/console`; the running host still needs the updated assets deployed through the usual console build/launch workflow. Changes are uncommitted.
+
+## Maintenance - 2026-11-01: raw JSON editor typography
+
+Both raw workflow JSON fields now use a selector stronger than Material input typography: Cascadia Code with Consolas/Courier New/monospace fallbacks, 14px size, 1.6 line height and normal letter spacing. This is a display-only change; no external font is downloaded.
+
+PASS: pinned frontend `npm run build` including production CSP checks; `git diff --check`. NOT RUN: live browser font/layout verification. No tests were added for this CSS-only change. No host/database process was started or restarted; use the existing Build console launch step and refresh to serve the updated assets. Changes are uncommitted.
