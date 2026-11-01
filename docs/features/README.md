@@ -30,6 +30,8 @@ Follow the [specification-driven development workflow](../specification-driven-d
 
 ## Feature index
 
+[F008 — Restricted expressions and exclusive routing](F008-restricted-expressions-routing/spec.md) is **DRAFT revision 1**, dependent on F007. Its [plan](F008-restricted-expressions-routing/plan.md), [tasks](F008-restricted-expressions-routing/tasks.md) and [handover](F008-restricted-expressions-routing/implementation.md) track scalar first-match routing, expression safety and the G01–G03 readiness gates. No implementation or safety verification is claimed.
+
 | Feature | Status | Scope |
 | --- | --- | --- |
 | [F001 — Initial database schema with Liquibase](F001-initial-database-schema/spec.md) | IMPLEMENTED | Nine core tables; migration, catalog/tracking inspection and repeat-start verification completed locally on 2026-10-25. |
