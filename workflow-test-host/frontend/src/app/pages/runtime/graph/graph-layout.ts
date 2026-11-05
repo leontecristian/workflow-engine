@@ -22,7 +22,7 @@ const WIDTH = 250, HEIGHT = 104, COLUMN = 330, ROW = 170, MARGIN = 28;
 const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 
 /** Bounded, deterministic display layout. It never evaluates routing or changes execution state. */
-export function layoutGraph(graph: InstanceGraph): GraphLayout {
+export function layoutGraph(graph: Pick<InstanceGraph, "nodes" | "edges">): GraphLayout {
   if (!graph.nodes.length || graph.nodes.length > 200 || graph.edges.length > 500)
     throw new Error("Graph exceeds display bounds");
   const nodes = [...graph.nodes].sort((a, b) => compare(a.key, b.key));

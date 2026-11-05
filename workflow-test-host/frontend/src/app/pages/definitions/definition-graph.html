@@ -1,0 +1,80 @@
+@if(diagram()) {
+<div class="graph-controls" aria-label="Graph zoom controls">
+  <button mat-stroked-button type="button" (click)="changeZoom(-0.25)" [disabled]="zoom() <= 0.25" aria-label="Zoom out">&minus;</button>
+  <span aria-live="polite">{{zoomPercent()}}%</span>
+  <button mat-stroked-button type="button" (click)="changeZoom(0.25)" [disabled]="zoom() >= 2" aria-label="Zoom in">+</button>
+  <button mat-button type="button" (click)="zoom.set(defaultZoom)">Reset zoom</button>
+</div>
+<div class="graph-scroll" tabindex="0" aria-label="Workflow graph. Scroll horizontally or vertically to explore all steps.">
+  <svg [attr.viewBox]="'0 0 ' + diagram()!.layout.width + ' ' + diagram()!.layout.height"
+       [attr.width]="diagram()!.layout.width * zoom()" [attr.height]="diagram()!.layout.height * zoom()"
+       role="group" aria-label="Saved workflow definition diagram">
+    <title>Saved workflow definition</title>
+    <desc>Read-only saved definition topology. Arrows show direction. No execution state is displayed.</desc>
+    <defs>
+      <marker id="definition-pending" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="#a5afbe" />
+      </marker>
+    </defs>
+    @for(route of diagram()!.layout.edges; track route.edge.key){
+      @let edge = route.edge;
+      <g class="edge" role="button" tabindex="0"
+         [class.selected]="selectedTransition()?.key === edge.key"
+         [attr.aria-pressed]="selectedTransition()?.key === edge.key"
+         [attr.aria-label]="'Inspect transition ' + edge.key + ' from ' + edge.from + ' to ' + edge.to"
+         (click)="selectTransition(edge.key)"
+         (keydown.enter)="selectTransition(edge.key)"
+         (keydown.space)="$event.preventDefault(); selectTransition(edge.key)">
+        <title>{{edge.key}}: {{edge.from}} &rarr; {{edge.to}}. {{edge.outcome ? ' - ' + edge.outcome : ''}}</title>
+        <path [attr.d]="route.path" marker-end="url(#definition-pending)" />
+        <path class="edge-hit" [attr.d]="route.path" />
+        <text [attr.x]="route.labelX" [attr.y]="route.labelY" text-anchor="middle">{{shortName(edge.outcome || edge.key)}}</text>
+      </g>
+    }
+    @for(item of diagram()!.layout.nodes; track item.node.key){
+      @let node = item.node;
+      <g
+         role="button" tabindex="0"
+         [attr.aria-label]="'Inspect node ' + node.key"
+         [attr.aria-pressed]="selectedObject()?.kind === 'nodes' && selectedObject()?.key === node.key"
+         [class.selected]="selectedObject()?.kind === 'nodes' && selectedObject()?.key === node.key"
+         (click)="selectObject('nodes', node.key)"
+         (keydown.enter)="selectObject('nodes', node.key)"
+         (keydown.space)="$event.preventDefault(); selectObject('nodes', node.key)"
+         [attr.transform]="'translate(' + item.x + ' ' + item.y + ')'"
+         class="node">
+        <title>{{node.name}} &middot; {{node.key}} &middot; {{node.type}} &middot; {{shortName(node.key)}}</title>
+        <rect width="250" height="104" [attr.rx]="node.type==='START' || node.type==='END' ? 48 : node.type==='HUMAN_TASK' ? 16 : 8" />
+        <text class="node-type" x="125" y="25" text-anchor="middle">{{shortName(node.type.replaceAll('_', ' '))}}</text>
+        <text class="node-name" x="125" y="51" text-anchor="middle">{{shortName(node.name)}}</text>
+        <text class="node-state" x="125" y="77" text-anchor="middle">{{shortName(node.key)}}</text>
+      </g>
+    }
+  </svg>
+</div>
+<section class="transition-details" aria-live="polite" aria-label="Selected transition details">
+  @if(selectedTransition(); as transition) {
+    <h3>Transition {{transition.key}}</h3>
+    <p>{{transition.from}} &rarr; {{transition.to}}</p>
+    <p>Default route: {{transition.default ? 'Yes' : 'No'}}</p>
+    @if(transition.outcome) { <p>Outcome: {{transition.outcome}}</p> }
+    @if(transition.condition !== null) { <h4>Condition</h4><pre>{{transition.condition}}</pre> }
+    <button mat-button type="button" (click)="clearSelection()">Clear selection</button>
+  } @else { <p>Select an arrow or its label to inspect the saved transition.</p> }
+</section>
+@if(fragmentError()) { <p role="alert">{{fragmentError()}}</p> }
+@if(selectedObject(); as selected) {
+<section aria-label="Selected object JSON">
+  <h3>{{selected.kind === 'nodes' ? 'Node' : 'Transition'}} {{selected.key}} JSON</h3>
+  <label for="selected-object-json">Selected object JSON</label>
+  <textarea id="selected-object-json" class="object-json" matInput rows="14" spellcheck="false"
+    [(ngModel)]="fragmentText" [readOnly]="!editable()"></textarea>
+  @if(editable()) {
+    <p>Apply this piece to the full editor, then Save draft. Selecting another object replaces this text area without applying it.</p>
+    <button mat-stroked-button type="button" (click)="applyObject()">Apply to editor</button>
+  } @else { <p>This version is read-only.</p> }
+  <button mat-button type="button" (click)="clearSelection()">Clear selection</button>
+</section>
+}
+<ul aria-label="Definition steps">@for(node of diagram()!.graph.nodes; track node.key) {<li>{{node.name}} &middot; {{node.key}} &middot; {{node.type}}</li>}</ul>
+} @else {<p role="status">Diagram unavailable for this saved definition. Check its JSON topology and display limits (200 nodes, 500 transitions). You can still edit and validate the document.</p>}

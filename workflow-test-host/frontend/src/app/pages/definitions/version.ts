@@ -9,12 +9,14 @@ import type {
   DefinitionCheck,
   ValidationReport,
 } from "../../data/dtos";
+import { DefinitionGraphComponent } from "./definition-graph";
+import { applyFragment, type FragmentEdit } from "./definition-fragment";
 import { PAGE_IMPORTS } from "../../ui/page-imports";
 import { pageState } from "../../ui/page-state";
 @Component({
   selector: "console-version",
   standalone: true,
-  imports: [...PAGE_IMPORTS],
+  imports: [...PAGE_IMPORTS, DefinitionGraphComponent],
   templateUrl: "./version.html",
 })
 export class VersionPage {
@@ -35,6 +37,7 @@ export class VersionPage {
   id = "";
   detail = signal<VersionDetails | null>(null);
   document = "";
+  savedDocument = signal("");
   dirty = false;
   lastResponse = signal<DefinitionChange | DefinitionCheck | null>(null);
   private readonly route = inject(ActivatedRoute);
@@ -44,6 +47,7 @@ export class VersionPage {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((params) => {
         if (this.id !== params.get("id")) this.lastResponse.set(null);
+        this.savedDocument.set("");
         this.id = params.get("id")!;
         void this.load();
       });
@@ -55,6 +59,7 @@ export class VersionPage {
       if (this.destroyRef.destroyed || this.id !== id) return;
       this.detail.set(d);
       this.document = prettyDocument(d.documentJson);
+      this.savedDocument.set(this.document);
       this.dirty = false;
     });
   }
@@ -86,9 +91,10 @@ export class VersionPage {
   }
   async saveDocument() {
     await this.run(async () => {
+      const savedText = this.document;
       const r = await this.api.saveDocument(
         this.id,
-        rawDocument(this.document),
+        rawDocument(savedText),
         this.detail()!.summary.lockVersion,
       );
       this.detail.update((d) =>
@@ -101,13 +107,25 @@ export class VersionPage {
           : d,
       );
       this.lastResponse.set(r);
-      this.dirty = false;
+      this.savedDocument.set(savedText);
+      this.dirty = this.document !== savedText;
       this.notice.set("Draft saved");
     });
   }
   reloadEditor(): void {
     if (!this.dirty || confirm("Discard unsaved document text and reload?"))
       void this.load();
+  }
+  applySelectedObject(edit: FragmentEdit): void {
+    this.error.set("");
+    if (this.busy() || this.detail()?.summary.status !== "DRAFT") return;
+    try {
+      this.document = applyFragment(this.document, edit);
+      this.dirty = true;
+      this.notice.set("Selected JSON applied to the editor. Save draft to persist it.");
+    } catch (failure) {
+      this.error.set(failure instanceof Error ? failure.message : "Cannot apply the selected JSON.");
+    }
   }
   async lifecycle(action: "validate" | "publish" | "retire") {
     await this.run(async () => {

@@ -3,6 +3,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
+import * as jsonc from "jsonc-parser";
 import "@angular/compiler";
 import * as core from "@angular/core";
 import * as router from "@angular/router";
@@ -24,6 +25,7 @@ const modules = new Map(
     "@angular/common": common,
     "@angular/forms": forms,
     rxjs,
+    "jsonc-parser": jsonc,
   }),
 );
 for (const name of [

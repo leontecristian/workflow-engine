@@ -31,3 +31,12 @@ T08/T09 source is implemented and compiled, but their required browser behavior 
 - [x] **T19 - Revision 6 general graph projection (G01-G03; AC31-AC33).** Removed three-node/type/policy assumptions; page bounded history, validate recorded routes and derive latest activity/task links. Service/branch/loop/large-history and legacy/privacy/authorization unit cases pass in the selected 23-test backend suite. Live API/database acceptance remains NOT RUN.
 - [x] **T20 - Revision 6 graph rendering (G04; AC34).** Added deterministic general topology layout, dynamic SVG/edge routes, zoom/reset and bounded scrolling. Long/shuffled/branched/cyclic graph and exact-ID/accessibility regressions pass in the 60-test frontend suite; production compilation passes. New browser visual/keyboard acceptance remains NOT RUN.
 - [x] **T21 - Revision 6 delivery and verification.** Recorded selected unit/build results and browser/provider gaps in implementation.md; reconciled scope/navigation and reviewed links/whitespace. Earlier acceptance and owner closure records are preserved. No commit/push.
+
+## Definition diagram enhancement — 2026-11-05
+
+- [x] Add saved-definition diagram below JSON with bounded fallback and no runtime links/state.
+- [x] Verify frontend projections, saved editor behavior, production compilation and handover. Browser visual acceptance remains NOT RUN.
+
+- [x] Add definition transition selection, accessible hit targets and saved condition/default details; isolated checks/build pass. Browser visual/keyboard acceptance NOT RUN.
+
+- [x] Add selected node/transition JSON fragment editor with guarded draft-only application; isolated tests/build/CSP pass, browser acceptance NOT RUN.

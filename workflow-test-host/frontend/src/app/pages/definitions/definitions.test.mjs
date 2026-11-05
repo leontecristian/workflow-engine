@@ -153,3 +153,32 @@ test("out-of-order detail response cannot overwrite a later route identity", asy
   assert.equal(page.detail().summary.id, "2");
   assert.equal(page.document, '"new"');
 });
+
+test("definition diagram follows loaded/saved source, not unsaved editor changes", async (t) => {
+  const { page } = component(t, VersionPage, {
+    async version() { return { summary: { status: "DRAFT", lockVersion: "1" }, documentJson: '{"saved":true}' }; },
+    async saveDocument() { return { changed: true, after: { lockVersion: "2" } }; }
+  });
+  page.id = "1";
+  await page.load();
+  page.document = '{"edited":true}'; page.dirty = true;
+  assert.equal(page.savedDocument(), '{\n  "saved": true\n}');
+  await page.saveDocument();
+  assert.equal(page.savedDocument(), '{"edited":true}');
+});
+
+test("diagram uses submitted text when editor changes while save is pending", async (t) => {
+  let finish;
+  const { page } = component(t, VersionPage, {
+    saveDocument() { return new Promise(resolve => finish = resolve); }
+  });
+  page.id = "1";
+  page.detail.set({ summary: { lockVersion: "1" } });
+  page.document = '{"submitted":true}';
+  const saving = page.saveDocument();
+  page.document = '{"newer":true}';
+  finish({ changed: true, after: { lockVersion: "2" } });
+  await saving;
+  assert.equal(page.savedDocument(), '{"submitted":true}');
+  assert.equal(page.dirty, true);
+});

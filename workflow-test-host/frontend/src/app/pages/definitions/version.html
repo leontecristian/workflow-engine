@@ -90,6 +90,13 @@
     </div>
   </mat-card-content></mat-card
 >
+@if(detail()) {
+<mat-card appearance="outlined"><mat-card-header><h2>Workflow diagram</h2></mat-card-header><mat-card-content>
+<p>Read-only diagram of the last loaded or saved definition. This preview does not validate execution.</p>
+@if(dirty) { <p class="muted">Unsaved editor changes are not shown. Save the draft to update the diagram.</p> }
+<console-definition-graph [document]="savedDocument()" [editable]="detail()?.summary?.status === 'DRAFT' && !busy()" (fragmentApplied)="applySelectedObject($event)" />
+</mat-card-content></mat-card>
+}
 <div class="two-column">
   <mat-card appearance="outlined"
     ><mat-card-header
