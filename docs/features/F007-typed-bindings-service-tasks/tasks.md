@@ -1,6 +1,6 @@
 # Tasks — F007 Typed bindings and service tasks
 
-Applies to [spec revision 2](spec.md) and [plan](plan.md). Implementation delivered against READY revision 2; T09 is CLOSED by owner acceptance on 2026-11-01. Unverified follow-up coverage is recorded in implementation.md. Unchecked means not completed. Planned checks are in the plan; actual results belong in [implementation.md](implementation.md).
+Applies to [spec revision 3](spec.md) and [plan](plan.md). Implementation delivered through revision 3; the original T00-T10 acceptance applies to revision 2; T09 is CLOSED by owner acceptance on 2026-11-01. Unverified follow-up coverage is recorded in implementation.md. Unchecked means not completed. Planned checks are in the plan; actual results belong in [implementation.md](implementation.md).
 
 - [x] **T00 — Prepare four-document draft.** Inspect existing language/feature/source contracts; record scope, requirements, acceptance and readiness gates. Completion does not mean READY or implemented.
 - [x] **T01 — Close G01–G04 (R01–12; plan 1/3/4).** Finalize DTO/SPI/error/read contracts, receipt/history compatibility examples, bounds, storage/sample action and complete inline definition/commands. Reconcile impacted feature contracts. **Done when:** no open dependent contract remains, all ACs map to planned checks, and spec/plan are READY. Completed in revision 2: G01 exact APIs/transport/bounds; G02 versioned identity/evidence; G03 host migration/action; G04 fixture and acceptance matrix. No implementation was performed.
@@ -21,3 +21,16 @@ Historical implementation handoff - 2026-11-01: T02-T08 and T10 are implemented/
 Historical T09 manual-run update - 2026-11-01: **PARTIAL at that handoff; superseded by owner closure below.** The owner-authorized manual API/SQL run passed migration/restart, G04, scalar persistence/presence/mappings, rollback modes, replay/races, 50/51 steps, cumulative evidence rollback, retirement/selectability, missing deployment, retained v1 receipt replay, local handoff and security observations. A discovered invalid-date error translation was fixed and rechecked. Browser automation was stopped by its URL-confidence policy, so AC14 browser/recovery acceptance is BLOCKED. Concurrent-commit-during-page-read and the remaining selected action-output deployment cases remain NOT RUN. No database integration tests were created/run. T10 reconciliation was refreshed with these actual results and stopped process state; no commit/push.
 
 T09 owner closure - 2026-11-01: **CLOSED.** The owner supplied browser evidence for instance 29, exact LONG values, history sequences 1-16, BEFORE/AFTER effects 123/124, and original completion-result recovery; they confirmed retry retained 16 events and two effects, then explicitly requested closure. The development-UI environment and unverified packaged-UI, reload/restore, wire-value and provider cases remain documented as follow-up coverage in implementation.md. This closure does not alter F005/F006 acceptance or establish production readiness.
+
+## Proposed follow-up backlog - not part of T00-T10 closure
+
+- [x] **P01 - Review batched variable-write evidence proposal (selected 2026-11-05; superseded by revision 3/B01).** See [specification](spec.md#proposed-follow-up---batched-variable-write-evidence) and [planning](plan.md#proposed-follow-up-planning---batched-variable-write-evidence). Settle versioning, ordering/bounds, event privacy, historic consumers and receipt/sequence compatibility; obtain explicit selection before implementation. Recording the proposal does not approve replacing `VARIABLE_WRITTEN`, reopen T09 or authorize code changes. Implementation tasks remain to be defined after contract approval.
+
+## Revision 3 execution - batched variable-write events
+
+P01 selected by the owner on 2026-11-05; revision 3 now specifies its formats, compatibility and bounds. Original T00-T10 closure remains historical.
+
+- [x] **B01 - Finalize contracts (AC16-19).** Specify one batch per nonempty operation, deterministic evidence, privacy, versions/bounds and legacy replay before code. Revision 3 is READY.
+- [x] **B02 - Implement atomic batch emission (AC16/17).** Depends B01. Prepare/preflight one batch in RuntimeVariables and preserve aggregate/transaction behavior. Done when focused tests establish operation counts/content and no variable mutation on bounds failures.
+- [x] **B03 - Verify compatibility and consumers (AC18/19).** Depends B02. Cover multi-write commands/replay, retained receipts/events, mixed graph histories and console regression/builds. Done when permitted checks pass and provider results/gaps are accurately recorded.
+- [x] **B04 - Reconcile delivery.** Depends B02/B03. Update all four documents and feature navigation, inspect diff/links/whitespace and record process state. No commit or push requested.

@@ -79,9 +79,9 @@ class RuntimeCommandsUnitTest {
                     new MinimalWorkflowDefinition.Transition("beginService","BEGIN","BEFORE",null),new MinimalWorkflowDefinition.Transition("beginReview","BEFORE","REVIEW",null),
                     new MinimalWorkflowDefinition.Transition("finishReview","REVIEW","AFTER","COMPLETE"),new MinimalWorkflowDefinition.Transition("finishService","AFTER","DONE",null)),
                 Map.of("quantity",new MinimalWorkflowDefinition.Input(new ActionField("quantity",VariableValueType.LONG,true,false),null)),fields,
-                Map.of("quantity",new Binding("startInput","quantity",null)),Map.of(
-                    "BEFORE",new MinimalWorkflowDefinition.Service("BEFORE","sandbox.recordQuantity",Map.of("quantity",new Binding("variable","quantity",null)),Map.of("recordedQuantity",new Binding("actionOutput","recordedQuantity",null)),1),
-                    "AFTER",new MinimalWorkflowDefinition.Service("AFTER","sandbox.recordQuantity",Map.of("quantity",new Binding("variable","recordedQuantity",null)),Map.of("recordedQuantity",new Binding("actionOutput","recordedQuantity",null)),3)));
+                Map.of("quantity",new Binding("startInput","quantity",null),"recordedQuantity",new Binding("startInput","quantity",null)),Map.of(
+                    "BEFORE",new MinimalWorkflowDefinition.Service("BEFORE","sandbox.recordQuantity",Map.of("quantity",new Binding("variable","quantity",null)),Map.of("quantity",new Binding("actionOutput","recordedQuantity",null),"recordedQuantity",new Binding("actionOutput","recordedQuantity",null)),1),
+                    "AFTER",new MinimalWorkflowDefinition.Service("AFTER","sandbox.recordQuantity",Map.of("quantity",new Binding("variable","recordedQuantity",null)),Map.of("quantity",new Binding("actionOutput","recordedQuantity",null),"recordedQuantity",new Binding("actionOutput","recordedQuantity",null)),3)));
         var definition=new ExecutableDefinition(42,40,"sandbox.serviceReview",1,"ab".repeat(32),DefinitionStatus.PUBLISHED,model);
         when(definitions.loadForStart(42)).thenReturn(definition); when(definitions.loadPinned(42)).thenReturn(definition);
         when(catalog.findByCode("SANDBOX_REVIEW")).thenReturn(Optional.of(new TaskTypeView(5,"SANDBOX_REVIEW","Review",null,false,0)));
@@ -122,7 +122,9 @@ class RuntimeCommandsUnitTest {
         var inputs=new StartInputs(Map.of("quantity",new TextLiteral("9007199254740993")));
         var opened=service.start(start,inputs,context,null); assertEquals(9,opened.execution().lastHistorySequence());
         assertEquals(8,opened.execution().activity().activationSequence());
-        assertEquals(List.of("INSTANCE_STARTED","START_INPUTS_ACCEPTED","VARIABLE_WRITTEN","TRANSITION_TAKEN","SERVICE_TASK_COMPLETED","VARIABLE_WRITTEN","TRANSITION_TAKEN","ACTIVITY_ENTERED","TASK_CREATED"),facts.values().stream().map(WorkflowHistoryEntity::getEventType).toList());
+        assertEquals(List.of("INSTANCE_STARTED","START_INPUTS_ACCEPTED","VARIABLES_WRITTEN","TRANSITION_TAKEN","SERVICE_TASK_COMPLETED","VARIABLES_WRITTEN","TRANSITION_TAKEN","ACTIVITY_ENTERED","TASK_CREATED"),facts.values().stream().map(WorkflowHistoryEntity::getEventType).toList());
+        assertEquals(2,json.tree(facts.get(3L).getDetailsJson()).path("writes").size());
+        assertEquals(2,json.tree(facts.get(6L).getDetailsJson()).path("writes").size());
         var instance=persisted.stream().filter(WorkflowInstanceEntity.class::isInstance).map(WorkflowInstanceEntity.class::cast).findFirst().orElseThrow();
         var activity=persisted.stream().filter(WorkflowActivityEntity.class::isInstance).map(WorkflowActivityEntity.class::cast).findFirst().orElseThrow();
         var task=persisted.stream().filter(WorkflowTaskEntity.class::isInstance).map(WorkflowTaskEntity.class::cast).findFirst().orElseThrow();
@@ -133,7 +135,7 @@ class RuntimeCommandsUnitTest {
         clearInvocations(em,action); var closed=service.completeTask(complete,reviewer);
         assertEquals(16,closed.execution().lastHistorySequence()); assertEquals(InstanceStatus.COMPLETED,closed.execution().instance().status());
         assertEquals(2,closed.execution().instance().lockVersion());
-        assertEquals(List.of("TASK_COMPLETED","ACTIVITY_COMPLETED","TRANSITION_TAKEN","SERVICE_TASK_COMPLETED","VARIABLE_WRITTEN","TRANSITION_TAKEN","INSTANCE_COMPLETED"),facts.tailMap(10L).values().stream().map(WorkflowHistoryEntity::getEventType).toList());
+        assertEquals(List.of("TASK_COMPLETED","ACTIVITY_COMPLETED","TRANSITION_TAKEN","SERVICE_TASK_COMPLETED","VARIABLES_WRITTEN","TRANSITION_TAKEN","INSTANCE_COMPLETED"),facts.tailMap(10L).values().stream().map(WorkflowHistoryEntity::getEventType).toList());
         var order=inOrder(em,action); order.verify(em).refresh(instance); order.verify(em).flush(); order.verify(action).execute(any(),any());
         for(var row:variableRows.values()) assertEquals("9007199254740993",((TextLiteral)row.scalar().value()).value());
         clearInvocations(action,definitions,em,host);

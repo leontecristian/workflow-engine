@@ -1,6 +1,6 @@
 # Plan — F007 Typed bindings and service tasks
 
-**Status:** READY. Applies to [spec revision 2](spec.md), with G01–G04 resolved. This remains the intended approach for revision 2; actual delivery and verification are in [implementation.md](implementation.md). Follow [package conventions](../../package-structure.md), [coding standards](../../coding-standards.md) and [development workflow](../../specification-driven-development.md).
+**Status:** READY for revision 3. Applies to [specification](spec.md), with G01–G04 retained and B01–B04 specified below. Sections 1–6 retain the revision 2 baseline; the revision 3 plan extends it; actual delivery and verification are in [implementation.md](implementation.md). Follow [package conventions](../../package-structure.md), [coding standards](../../coding-standards.md) and [development workflow](../../specification-driven-development.md).
 
 ## 1. Implement the selected contracts
 
@@ -90,3 +90,17 @@ The owner explicitly requested T09 after the implementation handoff, authorizing
 ## Owner closure reconciliation - 2026-11-01
 
 T09 is CLOSED at the owner's explicit request following the manual API/SQL observations and owner browser walkthrough/replay confirmation. The earlier execution reconciliation describes the state at that handoff. See implementation.md for the actual port-4200 evidence and remaining unverified follow-up coverage; closure does not retrospectively mark those cases PASS or close F005/F006 acceptance.
+
+## Proposed follow-up planning - batched variable-write evidence
+
+See the [proposal in the specification](spec.md#proposed-follow-up---batched-variable-write-evidence). This is documentation of a candidate optimization, not a READY implementation plan. Preserve revision 2 behavior and acceptance until the contract is approved.
+
+If selected, first settle evidence versions, bounds, deterministic ordering, privacy-preserving event payloads, historical reader compatibility and receipt/sequence behavior. Then plan focused changes in `core.service.runtime` (`RuntimeVariables`, `RuntimeHistoryBatch`, `RuntimeJson` and affected progression/finalization code), relevant workflow-owned DTOs, and host history/event consumers. Preserve atomic prepared mappings, the host transaction and existing-instance claim. Identify exact affected packages/classes during that contract review rather than assuming all require modification.
+
+Planned verification after approval: isolated cases for one/multiple writes, unchanged values, missing versus null, exact scalars, independent mapping sources, deterministic ordering, size-bound failures, old/new history consumption and retained receipt replay without repeated effects. Reconcile sequence fixtures and console projections. Record permitted provider checks separately for transaction rollback and concurrent commands; test doubles alone cannot establish those guarantees. No such tests/builds/runtime checks are required for this proposal-only update.
+
+## Revision 3 implementation plan - batched variable-write events
+
+Implements [revision 3](spec.md#revision-3---batched-variable-write-events-ready-2026-11-05), superseding the conditional proposal plan. In `io.github.leontecristian.workflow.core.service.runtime`, change RuntimeVariables.apply to assemble sorted complete evidence, validate state/evidence and append a batch through RuntimeHistoryBatch before any variable-row/snapshot changes. Reuse the existing history envelope/schema, scalar codecs, sequence allocation and command transaction. No new DTO, module, dependency or migration is needed. WorkflowExecutionService/RuntimeJson receipt behavior remains compatible; test actual sequence ranges rather than adding a new receipt format. Preserve the unrelated ServiceActionDescriptor formatting edit.
+
+Verification: add isolated operation tests for multiple/empty/omitted/unchanged/null/exact writes, pre-state source semantics, per-record and cumulative preflight rejection; adapt command tests to multiple writes and verify replay has no effects. Exercise mixed legacy/batch histories in host projection tests and retain receipt compatibility suites. Run unit-only Maven suites on JDK 21, frontend regressions and UI-enabled packaging. Add a guarded host database test extending DatabaseIntegrationTest on localhost:1433/apolo_workflow_test to observe committed batch history/variables/durable handoff and rollback outside the tested component transaction; replay is verified through the real command service with isolated persistence doubles, with unique test-owned fixture cleanup. Run serially; do not touch development data or stop other processes. Record unavailable provider/browser checks as NOT RUN.

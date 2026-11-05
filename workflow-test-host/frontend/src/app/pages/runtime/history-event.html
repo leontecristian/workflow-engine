@@ -9,7 +9,7 @@
       {{meta.title}} <span class="muted">#{{sequence}}</span>
     </h2></mat-card-header
   ><mat-card-content
-    ><console-details [value]="detail()?.summary" />@if(detail()?.detailsJson){
+    ><console-details [value]="detail()?.envelope" />@if(detail()?.detailsJson){
     <h3>Exact persisted evidence</h3>
     <pre>{{detail()?.detailsJson}}</pre>
     }</mat-card-content

@@ -1,6 +1,6 @@
 # F007 — Typed bindings and service tasks
 
-**Status:** IMPLEMENTED against READY revision 2; see [implementation.md](implementation.md) for isolated verification. T09 is CLOSED by owner acceptance on 2026-11-01 after manual API/SQL observations and the owner browser walkthrough/replay confirmation. Remaining unverified coverage is explicitly retained as follow-up in implementation.md. G01–G04 remain governing contracts. **Revision:** 2 — 2026-11-01. **Owner:** Workflow project owner. **Constitution:** [v3.0.0](../../constitution.md).
+**Status:** IMPLEMENTED through revision 3 (batched variable-write events); revision 2 remains the historical baseline; see [implementation.md](implementation.md) for isolated verification. T09 is CLOSED by owner acceptance on 2026-11-01 after manual API/SQL observations and the owner browser walkthrough/replay confirmation. Remaining unverified coverage is explicitly retained as follow-up in implementation.md. G01–G04 remain governing contracts subject to the revision 3 B01–B04 evidence changes below. **Revision:** 3 — 2026-11-05 (revision 2 retained as the historical baseline). **Owner:** Workflow project owner. **Constitution:** [v3.0.0](../../constitution.md).
 
 ## Outcome and authority
 
@@ -134,8 +134,9 @@ Existing F005 event types/details retain details_schema_version=1. New event typ
 | New event | Exact details fields and ordering |
 | --- | --- |
 | START_INPUTS_ACCEPTED | `{inputs: {...}}` with validated/defaulted normalized input values, preserving absence. Emit after INSTANCE_STARTED and before initialization writes, for extended definitions only, even when inputs is empty. |
-| VARIABLE_WRITTEN | `{nodeKey,variableKey,type,source,previousInitialized,previousValue,value}`. source is the definition's exact source descriptor. previousValue is null when absent or typed-null (Boolean distinguishes them); value is the normalized scalar token. Emit once for each applied initializer/output mapping, including same-value writes. Missing optional source emits no write. Initializer nodeKey is the START key. |
-| SERVICE_TASK_COMPLETED | `{nodeKey,action,inputs:{...},outputs:{...}}` containing validated normalized scalar tokens, with optional omissions preserved. Emit once after action and output/mapping validation, before VARIABLE_WRITTEN events, then TRANSITION_TAKEN. No separate durable started/failed event; a failed command commits none of these events. |
+| VARIABLE_WRITTEN (legacy revision 2) | `{nodeKey,variableKey,type,source,previousInitialized,previousValue,value}`. Retained records remain readable. Revision 2 emitted one per applied variable, including same-value writes; revision 3 replaces future emission with the batch below. |
+| VARIABLES_WRITTEN (revision 3) | One per nonempty applied initializer/output operation; sorted per-variable evidence and metadata-only durable payload follow B01-B04 below. Initializer nodeKey is the START key. Missing optional sources emit no write; unchanged values remain recorded. |
+| SERVICE_TASK_COMPLETED | `{nodeKey,action,inputs:{...},outputs:{...}}` containing validated normalized scalar tokens, with optional omissions preserved. Emit once after action and output/mapping validation, before the nonempty VARIABLES_WRITTEN batch, then TRANSITION_TAKEN. No separate durable started/failed event; a failed command commits none of these events. |
 
 Sequence: INSTANCE_STARTED → START_INPUTS_ACCEPTED → initialization writes → outgoing START transition → each service success/writes/outgoing transition → ACTIVITY_ENTERED → TASK_CREATED. Completion: existing TASK_COMPLETED → ACTIVITY_COMPLETED → outgoing human transition → service success/writes/transitions → INSTANCE_COMPLETED. Zero-variable/service legacy flows emit exactly F005's old eight events across their two commands. Service nodes never create human activities or tasks.
 
@@ -204,8 +205,8 @@ Prerequisites: normal console capabilities/failure settings; explicitly create/s
 
 1. Admin creates a sandbox request via the existing request page. Retain returned requestId/lockVersion and published definitionVersionId exactly as strings.
 2. POST `/console/api/instances/start` with an authenticated admin session/CSRF and body `{commandId:<new UUID>,definitionVersionId:<returned ID>,requestId:<returned ID>,expectedRequestVersion:<original token>,inputs:{quantity:"9007199254740993"}}`. Angle-bracket terms are placeholders for server values, not literal JSON. The actual input token is a string beyond JavaScript's safe integer range.
-3. Expected paused result: current REVIEW, one open assigned task, two initialized LONG variables equal to the exact supplied value, one BEFORE effect row. History sequences: 1 INSTANCE_STARTED; 2 START_INPUTS_ACCEPTED; 3 quantity VARIABLE_WRITTEN; 4 beginService transition; 5 BEFORE SERVICE_TASK_COMPLETED; 6 recordedQuantity VARIABLE_WRITTEN; 7 beginReview transition; 8 ACTIVITY_ENTERED; 9 TASK_CREATED. Use the returned managed token; do not predict its increment.
-4. Assigned reviewer POSTs `/console/api/instances/{instanceId}/tasks/{taskId}/complete` using the existing If-Match token syntax and body `{commandId:<another UUID>,outcomeKey:"COMPLETE",comment:null}`. Expected history: 10 TASK_COMPLETED; 11 ACTIVITY_COMPLETED; 12 finishReview transition; 13 AFTER SERVICE_TASK_COMPLETED; 14 recordedQuantity VARIABLE_WRITTEN (same-value write); 15 finishService transition; 16 INSTANCE_COMPLETED. Result is COMPLETED with the same task/activity closed, resultKey COMPLETED, and two effect rows total. Start costs two automatic steps; completion costs two.
+3. Expected paused result: current REVIEW, one open assigned task, two initialized LONG variables equal to the exact supplied value, one BEFORE effect row. History sequences: 1 INSTANCE_STARTED; 2 START_INPUTS_ACCEPTED; 3 quantity VARIABLES_WRITTEN (one entry); 4 beginService transition; 5 BEFORE SERVICE_TASK_COMPLETED; 6 recordedQuantity VARIABLES_WRITTEN (one entry); 7 beginReview transition; 8 ACTIVITY_ENTERED; 9 TASK_CREATED. Use the returned managed token; do not predict its increment.
+4. Assigned reviewer POSTs `/console/api/instances/{instanceId}/tasks/{taskId}/complete` using the existing If-Match token syntax and body `{commandId:<another UUID>,outcomeKey:"COMPLETE",comment:null}`. Expected history: 10 TASK_COMPLETED; 11 ACTIVITY_COMPLETED; 12 finishReview transition; 13 AFTER SERVICE_TASK_COMPLETED; 14 recordedQuantity VARIABLES_WRITTEN (one same-value entry); 15 finishService transition; 16 INSTANCE_COMPLETED. Result is COMPLETED with the same task/activity closed, resultKey COMPLETED, and two effect rows total. Start costs two automatic steps; completion costs two.
 5. Replaying the exact original start or completion returns its original result with replayed=true; receipt and effect/event counts stay unchanged. Current reads may show newer state than the replayed start snapshot. Changing quantity or original expected token under that UUID conflicts. For an old empty-input definition, omitted inputs and `{}` resolve the same v1 receipt; a nonempty map conflicts before any new action.
 6. On a fresh attempt, configure fail-service-node=AFTER before completing. The failure leaves the prior start, its first effect, nine history events, original variables and open task intact; no completion receipt or second effect commits. Reset to normal and explicitly submit the original command: because the failed attempt committed no receipt, it may succeed with the original still-current token. Distinguish this deliberate user retry from successful receipt replay. Also exercise failure at BEFORE, invalid-service-output-node and fail-event-recording, recording separate evidence.
 
@@ -230,3 +231,46 @@ Nonempty typed start input:
 ```
 
 SHA-256: `929d0614b1368316890117ff578fc63c07c534ffa6c7110a4d2de26f811d3076`.
+
+## PROPOSED follow-up - batched variable-write evidence
+
+Historical status: **PROPOSED on 2026-11-01; selected and superseded by revision 3 on 2026-11-05.** Recorded at the owner's request on 2026-11-01. At proposal recording, the per-variable `VARIABLE_WRITTEN` contract remained authoritative; revision 3 below now governs future writes. T09 closure and historical evidence are unchanged.
+
+Motivation: a mapping operation writing N variables currently produces N history rows and N corresponding durable events, in addition to service-completion and transition facts. Large mappings increase storage and delivery volume.
+
+Proposal: replace those individual facts for future executions with one `VARIABLES_WRITTEN` history record and one corresponding durable event per nonempty mapping operation, covering start initialization and service output mappings. Each entry retains the variable key, declared type, binding source, previous-initialized flag, previous value and accepted new value. Retain writes whose value is unchanged, so explicit mapping execution remains observable. Do not combine writes across service nodes or commands. Variable storage continues to use one row per initialized variable; mapping preparation, atomic application, host transaction participation and instance concurrency protection remain unchanged (CON-06/07/12, ASM-02/03/04).
+
+Illustrative history-details shape only; not a finalized wire schema:
+
+```json
+{
+  "nodeKey": "BEFORE",
+  "writes": [
+    {
+      "variableKey": "recordedQuantity",
+      "type": "LONG",
+      "source": {"source": "actionOutput", "key": "recordedQuantity"},
+      "previousInitialized": false,
+      "previousValue": null,
+      "value": "25"
+    }
+  ]
+}
+```
+
+Missing/uninitialized and explicit null must remain distinguishable; exact scalar encodings must be preserved. The full value-bearing history payload must not automatically become the durable-event payload: retain the existing privacy boundary and settle the bounded summary/reference shape separately.
+
+Before adoption, settle history/event versioning, deterministic entry order, per-record and cumulative size limits, overflow behavior without partial writes, sequence-range effects and consumer compatibility. Existing `VARIABLE_WRITTEN` history, retained events and command receipts must remain readable/replayable without rewriting or executing effects again. Update the G02/G04 sequence examples and downstream projections/consumers only as part of an approved contract revision. No migration, runtime change or new execution scope is authorized by recording this proposal.
+
+## Revision 3 - batched variable-write events (READY, 2026-11-05)
+
+Owner selected implementation of the preceding proposal on 2026-11-05. This revision supersedes revision 2's per-variable write-event emission for future commands, while retaining its definitions, command APIs, request fingerprints, receipt schemas and historical acceptance. The earlier proposal is retained as history, not an open approval gate. Applies CON-06/07/12 and ASM-02/03/04.
+
+- **B01 - One fact per operation:** each nonempty applied start-initialization or service-output mapping emits exactly one `VARIABLES_WRITTEN` history record and corresponding durable event. Missing optional sources are omitted; a mapping applying zero writes emits neither. Retain same-value writes. Never coalesce distinct operations/nodes/commands. Variable rows and prepared snapshot semantics are unchanged.
+- **B02 - Evidence:** history details are exactly `{nodeKey,writes:[{variableKey,type,source,previousInitialized,previousValue,value},...]}`. Entries are unique and sorted by variable key using Java String natural ordering (technical keys are ASCII). Source descriptors and normalized scalar tokens retain revision 2 rules. All entries observe the same pre-operation state; previousInitialized distinguishes missing from typed null. The new event type starts at history payload schema 1 and durable envelope schema 1; existing types keep their versions. Durable payload is exactly `{nodeKey,writeCount}`, both strings; values, binding descriptors and variable names remain in authorized history only. Event identity remains instance ID plus history sequence.
+- **B03 - Atomic bounds:** retain 100-variable/state limits, the existing 128 KiB per-record bound in both UTF-8 and UTF-16, 6,000 facts and 16 MiB cumulative evidence per command. Validate the complete batch, post-mapping state and command evidence budgets before mutating variable rows or the in-memory snapshot. Overflow fails with LIMIT_EXCEEDED and rolls back the host transaction, including earlier action effects; no truncation, splitting or fallback to individual facts. Consequence: mappings whose combined evidence exceeds 128 KiB now fail even when their former individual records would have fitted. This explicit operation bound is required by the selected one-record contract; larger batches require a separately specified capacity change.
+- **B04 - Compatibility:** retain/read existing `VARIABLE_WRITTEN` records and version-1 delivery envelopes unchanged. Mixed histories across a deployment are valid. New records use contiguous actual sequence numbers; one batch occupies one position regardless of write count. Receipt result schema 2 already supports variable sequence ranges and remains unchanged; legacy schema 1 keeps strict minimal positions. Replay returns original stored snapshots without synthesizing batches or repeating effects. No migration or published-definition/hash rewrite, command fingerprint change or new execution scope.
+
+G02 ordering now uses a single VARIABLES_WRITTEN after SERVICE_TASK_COMPLETED for a nonempty output mapping. G04 remains 1-9 at start and 10-16 at completion because each operation writes one variable; positions 3, 6 and 14 become VARIABLES_WRITTEN with one entry. A mapping with N applied writes consumes one sequence rather than N; activation/final sequence positions and receipts must derive from actual history, not fixed offsets. The original T09 evidence remains evidence of revision 2 only.
+
+Acceptance: **AC16** multi-variable initialization/output yields one sorted batch per operation, with exact values, missing/null/unchanged evidence and independent sources. **AC17** zero-write mappings emit nothing; per-record/cumulative overflow fails before variable mutation and database checks observe complete rollback of the command. **AC18** retained legacy records/events/receipts and mixed old/new history remain readable; new multi-variable command replay preserves snapshots and repeats no effect. **AC19** privacy-preserving durable batches and console history/graph operate with actual sequence ranges; builds and focused verification are recorded separately from unperformed browser/provider checks.

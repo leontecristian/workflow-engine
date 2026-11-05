@@ -87,7 +87,7 @@ class ConsoleGeneralGraphUnitTest {
                 transition(4, "start", "BEGIN", "BEFORE"), event(5, "SERVICE_TASK_COMPLETED"), event(6, "VARIABLE_WRITTEN"), transition(7, "review", "BEFORE", "REVIEW"),
                 fact(8, "ACTIVITY_ENTERED", 101L, null, null, null, null), fact(9, "TASK_CREATED", 101L, 201L, null, null, null),
                 event(10, "TASK_COMPLETED"), event(11, "ACTIVITY_COMPLETED"), transition(12, "finish", "REVIEW", "AFTER"),
-                event(13, "SERVICE_TASK_COMPLETED"), event(14, "VARIABLE_WRITTEN"), transition(15, "end", "AFTER", "DONE"), event(16, "INSTANCE_COMPLETED"));
+                event(13, "SERVICE_TASK_COMPLETED"), event(14, "VARIABLES_WRITTEN"), transition(15, "end", "AFTER", "DONE"), event(16, "INSTANCE_COMPLETED"));
         setup(doc, facts, InstanceStatus.ACTIVE, "REVIEW", 9);
         var paused = graphs.find(1);
         assertEquals(List.of("BEGIN", "BEFORE", "REVIEW", "AFTER", "DONE"), paused.nodes().stream().map(InstanceGraphView.Node::key).toList());

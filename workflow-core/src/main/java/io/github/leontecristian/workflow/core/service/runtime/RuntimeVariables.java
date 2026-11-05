@@ -36,18 +36,25 @@ public class RuntimeVariables {
             Map<String,ScalarValue> writes,RuntimeHistoryBatch batch) {
         Map<String,ScalarValue> after=new TreeMap<>(before); after.putAll(writes);
         RuntimeInputs.require(json.encode(RuntimeScalarBindings.tokens(after,json)).length()*2L<=1024*1024,Category.LIMIT_EXCEEDED);
-        for (var e:new TreeMap<>(writes).entrySet()) {
+        if (writes.isEmpty()) return;
+        var orderedWrites=new TreeMap<>(writes);
+        var details=json.object(); details.put("nodeKey",nodeKey);
+        var entries=details.putArray("writes");
+        for (var e:orderedWrites.entrySet()) {
             var old=before.get(e.getKey()); var value=e.getValue();
-            var details=json.object(); details.put("nodeKey",nodeKey); details.put("variableKey",e.getKey()); details.put("type",value.type().name());
-            details.set("source",RuntimeScalarBindings.source(bindings.get(e.getKey()),json)); details.put("previousInitialized",old!=null);
-            details.set("previousValue",old==null ? com.fasterxml.jackson.databind.node.NullNode.instance : RuntimeScalarBindings.token(old.value()));
-            details.set("value",RuntimeScalarBindings.token(value.value()));
-            // Validate complete required evidence before mutating this value.
-            json.evidence(details);
+            var entry=entries.addObject(); entry.put("variableKey",e.getKey()); entry.put("type",value.type().name());
+            entry.set("source",RuntimeScalarBindings.source(bindings.get(e.getKey()),json)); entry.put("previousInitialized",old!=null);
+            entry.set("previousValue",old==null ? com.fasterxml.jackson.databind.node.NullNode.instance : RuntimeScalarBindings.token(old.value()));
+            entry.set("value",RuntimeScalarBindings.token(value.value()));
+        }
+        // Check complete per-record/cumulative evidence before changing any variable. The history
+        // append and subsequent writes participate in the same host transaction and roll back together.
+        batch.next("VARIABLES_WRITTEN",null,null,null,details,
+                Map.of("nodeKey",nodeKey,"writeCount",Integer.toString(orderedWrites.size())));
+        for (var e:orderedWrites.entrySet()) {
             var id=new io.github.leontecristian.workflow.core.entity.runtime.WorkflowVariableId(instanceId,e.getKey());
             var row=repository.findById(id).orElse(null);
-            if(row==null) entityManager.persist(new WorkflowVariableEntity(instanceId,e.getKey(),value)); else row.replace(value);
-            batch.next("VARIABLE_WRITTEN",null,null,null,details,Map.of("nodeKey",nodeKey,"variableKey",e.getKey()));
+            if(row==null) entityManager.persist(new WorkflowVariableEntity(instanceId,e.getKey(),e.getValue())); else row.replace(e.getValue());
         }
         before.clear(); before.putAll(after);
     }

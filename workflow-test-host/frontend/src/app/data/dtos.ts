@@ -208,7 +208,7 @@ export interface HistorySummary {
   detailsSchemaVersion: number;
 }
 export interface HistoryEvent {
-  summary: HistorySummary;
+  envelope: HistorySummary;
   detailsJson: JsonText;
 }
 export interface TaskSubmission {
