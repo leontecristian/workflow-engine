@@ -1,5 +1,7 @@
 # Reusable Workflow Engine
 
+**Owner correction — 2026-11-05:** expression arithmetic follows native SpEL numeric behavior, including floating-point approximation, promotion, rounding and integral overflow. Do not reject a result solely for precision loss or compare it with an exact reference calculation. Declared DECIMAL variables enter evaluation as BigDecimal; decimal literals retain native SpEL types. Native evaluation errors and resource limits still fail the command. Exact decoding, transport, persistence and accepted-submission rules remain unchanged. This supersedes earlier expression-arithmetic exactness wording and the misinterpreted numeric owner decision.
+
 ## Technical Design — APOLO-first Embedded Library
 
 | Document field | Value |
@@ -271,7 +273,7 @@ Use explicit map access rather than relying on implicit bean-property resolution
 
 For initial workflow routing, `#facts` contains validated inputs prepared by the host data provider, and `#vars` contains the permitted workflow-variable projection. A future standalone decision evaluator can use `#facts` for its validated inputs. The same workflow expression contract is used in validation, predicate preview, sandbox execution, and APOLO.
 
-Typed values initially cover `STRING`, `LONG`, `DECIMAL`, `BOOLEAN`, `DATE`, and `DATETIME`. Financial arithmetic uses decimal semantics, not floating-point approximations. The proposed JSON contract represents decimal and potentially unsafe-size integer values as strings validated against their declared types, avoiding precision loss in the designer. Final encodings must be fixed in the schema.
+Typed values initially cover `STRING`, `LONG`, `DECIMAL`, `BOOLEAN`, `DATE`, and `DATETIME`. Declared DECIMAL variables enter SpEL as BigDecimal, while literals, promotion and arithmetic retain native SpEL semantics. Exact JSON decoding/transport/storage remains distinct from computed expression arithmetic. The JSON contract represents decimal and potentially unsafe-size integer values as strings validated against their declared types, avoiding precision loss in the designer; feature specifications fix their encodings.
 
 O6 confirms these initial scalar types and precision requirements. Dates must be explicit and timestamps unambiguous; specify formats, timezone/offset handling, precision and nullability in the schema before implementing the codecs. String encoding for decimals/large integers remains a proposed means of meeting the agreed precision requirement.
 

@@ -29,8 +29,16 @@ public class MinimalDefinitionLoader {
     private final String schemaDigest;
     private final JsonSchema extendedSchema;
     private final String extendedDigest;
+    private final JsonSchema routingSchema;
+    private final String routingDigest;
+    private final io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService expressions;
 
     public MinimalDefinitionLoader() {
+        this(new io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService());
+    }
+    @org.springframework.beans.factory.annotation.Autowired
+    public MinimalDefinitionLoader(io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService expressions) {
+        this.expressions=expressions;
         try (InputStream input = getClass().getResourceAsStream("/schemas/workflow-definition/minimal-v1.schema.json")) {
             if (input == null) throw new IllegalStateException("Missing bundled definition schema");
             byte[] bytes = input.readAllBytes();
@@ -51,20 +59,31 @@ public class MinimalDefinitionLoader {
                         .pathType(PathType.JSON_POINTER).typeLoose(false).build());
                 extendedSchema.initializeValidators();
             }
+            try (InputStream routing = getClass().getResourceAsStream("/schemas/workflow-definition/exclusive-routing-v1.schema.json")) {
+                if(routing==null) throw new IllegalStateException("Missing routing schema");
+                byte[] content=routing.readAllBytes();
+                routingDigest=DefinitionContentCanonicalizer.hex(DefinitionContentCanonicalizer.hash(new String(content,java.nio.charset.StandardCharsets.UTF_8)));
+                routingSchema=factory.getSchema(json.readTree(content),SchemaValidatorsConfig.builder().failFast(true).pathType(PathType.JSON_POINTER).typeLoose(false).build());
+                routingSchema.initializeValidators();
+            }
         } catch (IOException failure) { throw new IllegalStateException("Cannot load bundled definition schema", failure); }
     }
 
     String schemaDigest() { return schemaDigest; }
     String schemaDigest(boolean extended) { return extended ? extendedDigest : schemaDigest; }
+    String schemaDigest(JsonNode root) { return routing(root) ? routingDigest : schemaDigest(extended(root)); }
+    static boolean routing(JsonNode root) {
+        return java.util.stream.StreamSupport.stream(root.path("nodes").spliterator(),false).anyMatch(n->"EXCLUSIVE_GATEWAY".equals(n.path("type").asText()));
+    }
     static boolean extended(JsonNode root) {
-        return root.path("variables").size()>0 || root.path("startPolicy").path("inputContract").size()>0
+        return routing(root) || root.path("variables").size()>0 || root.path("startPolicy").path("inputContract").size()>0
                 || root.path("startPolicy").path("initialize").size()>0
                 || java.util.stream.StreamSupport.stream(root.path("nodes").spliterator(),false).anyMatch(n -> "SERVICE_TASK".equals(n.path("type").asText()));
     }
 
     MinimalWorkflowDefinition model(DefinitionDocumentCodec.Document document, DefinitionDiagnostics diagnostics) {
         boolean extended = extended(document.tree());
-        unsupported(document.tree(), "", diagnostics, extended);
+        unsupported(document.tree(), "", diagnostics, extended,routing(document.tree()));
         // Designer data is opaque. Avoid asking the structural validator to interpret arbitrary numeric values.
         ObjectNode validationTree = document.tree().deepCopy();
         if (validationTree.has("designer") && validationTree.get("designer").isObject()) validationTree.set("designer", json.createObjectNode());
@@ -72,7 +91,7 @@ public class MinimalDefinitionLoader {
         validationTree.put("schemaVersion", 1); validationTree.put("version", document.version());
         Set<com.networknt.schema.ValidationMessage> errors;
         try {
-            errors = (extended ? extendedSchema : schema).validate(validationTree);
+            errors = (routing(document.tree()) ? routingSchema : extended ? extendedSchema : schema).validate(validationTree);
         } catch (RuntimeException failure) {
             // The default provider output converts fail-fast assertions into returned messages.
             // Other failures are infrastructure failures, never evidence that this document is invalid.
@@ -89,7 +108,7 @@ public class MinimalDefinitionLoader {
             }
             diagnostics.error(code,DiagnosticStage.STRUCTURE,"Document does not match the supported structure.",pointer);
         }
-        return errors.isEmpty() ? (extended ? ScalarDefinitionModel.load(document.tree(), diagnostics) : graph(document.tree(), diagnostics)) : null;
+        return errors.isEmpty() ? (extended ? ScalarDefinitionModel.load(document.tree(), diagnostics,routing(document.tree()) ? expressions : null) : graph(document.tree(), diagnostics)) : null;
 
     }
 
@@ -133,7 +152,7 @@ public class MinimalDefinitionLoader {
                 new MinimalWorkflowDefinition.Node(endKey, "END", end.get("name").textValue(), end.get("result").textValue()), transitions);
     }
 
-    private void unsupported(JsonNode node, String pointer, DefinitionDiagnostics diagnostics, boolean extended) {
+    private void unsupported(JsonNode node, String pointer, DefinitionDiagnostics diagnostics, boolean extended,boolean routing) {
         if (!node.isContainerNode()) return;
         if (node.isObject()) {
             node.fields().forEachRemaining(entry -> {
@@ -143,12 +162,12 @@ public class MinimalDefinitionLoader {
                         || (!extended && Set.of("inputs", "initialize").contains(field) && value.isObject() && !value.isEmpty())
                         || (field.equals("policy") && value.isTextual() && !value.textValue().equals("SINGLE"))
                         || (field.equals("mode") && value.isTextual() && !value.textValue().equals("FORBIDDEN"))
-                        || (field.equals("type") && value.isTextual() && Set.of("EXCLUSIVE_GATEWAY", "DECISION", "PARALLEL_GATEWAY", "INCLUSIVE_GATEWAY").contains(value.textValue()))
-                        || (Set.of("condition", "expressionPolicy").contains(field) || (!extended && field.equals("default")));
+                        || (field.equals("type") && value.isTextual() && Set.of("DECISION", "PARALLEL_GATEWAY", "INCLUSIVE_GATEWAY").contains(value.textValue()))
+                        || (field.equals("expressionPolicy") || (!routing && field.equals("condition")) || (!extended && field.equals("default")));
                 String path = pointer + "/" + field.replace("~", "~0").replace("/", "~1");
                 if (unsupported) diagnostics.error("UNSUPPORTED_FEATURE", DiagnosticStage.CONTRACT, "Recognized feature is not implemented by this publication subset.", path);
-                unsupported(value, path, diagnostics, extended);
+                unsupported(value, path, diagnostics, extended,routing);
             });
-        } else for (int i = 0; i < node.size(); i++) unsupported(node.get(i), pointer + "/" + i, diagnostics, extended);
+        } else for (int i = 0; i < node.size(); i++) unsupported(node.get(i), pointer + "/" + i, diagnostics, extended,routing);
     }
 }

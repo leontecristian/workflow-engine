@@ -1,10 +1,12 @@
 # Workflow project constitution
 
+**Owner correction — 2026-11-05:** expression arithmetic follows native SpEL numeric behavior, including floating-point approximation, promotion, rounding and integral overflow. Do not reject a result solely for precision loss or compare it with an exact reference calculation. Declared DECIMAL variables enter evaluation as BigDecimal; decimal literals retain native SpEL types. Native evaluation errors and resource limits still fail the command. Exact decoding, transport, persistence and accepted-submission rules remain unchanged. This supersedes earlier expression-arithmetic exactness wording and the misinterpreted numeric owner decision.
+
 **Version:** 3.0.0
 
 **Established:** 2026-10-24
 
-**Last amended:** 2026-10-31
+**Last amended:** 2026-11-05 (numeric interpretation clarification; architecture version unchanged)
 
 **Basis:** consolidated design v0.9, database design v1.4 and subsequent owner decisions; see [design sources](design-sources.md) for precedence and proposal status
 
@@ -103,7 +105,7 @@ Expression rules MUST allow only specified syntax and read-only access to bounde
 
 Time and other decision inputs must be supplied explicitly; expressions cannot fetch business data or read hidden mutable globals. Specify limits for expression size/complexity, inputs and evaluations, plus stable errors, before implementing evaluation.
 
-Initial scalar types are STRING, LONG, DECIMAL, BOOLEAN, DATE and DATETIME. Preserve numeric precision and define explicit date/timestamp semantics. Exact JSON encoding, precision, nullability and timezone rules remain specification work. Unsupported versions and semantic features MUST be rejected.
+Initial scalar types are STRING, LONG, DECIMAL, BOOLEAN, DATE and DATETIME. Preserve exact declared-input decoding, transport and storage, and define explicit date/timestamp semantics. Expression arithmetic retains native SpEL numeric behavior. Exact JSON encoding, precision, nullability and timezone rules remain specification work. Unsupported versions and semantic features MUST be rejected.
 
 A task may submit a bounded JSON object containing nested objects/arrays under its pinned result contract. Core validates structure and bounds; the host validates business meaning. Reject duplicate JSON keys and inexact conversions. Schema syntax/features, payload/depth/collection/string limits and versioned canonicalization MUST be specified before implementation. Task submissions are not automatically exposed or merged into expressions/variables. Declared services may aggregate exact-activity submissions and return validated scalar or JSON outputs through explicit bindings without changing the original evidence.
 

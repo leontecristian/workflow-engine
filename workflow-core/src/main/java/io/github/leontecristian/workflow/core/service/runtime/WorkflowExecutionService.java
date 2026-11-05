@@ -128,8 +128,9 @@ public class WorkflowExecutionService {
                 var writes=RuntimeScalarBindings.prepare(model.initialize(),model.variables(),state,acceptedInputs,Category.INVALID_INPUT);
                 variables.apply(instance.getId(),model.start().key(),model.initialize(),state,writes,batch);
             }
-            services.traverse(model,model.start().key(),model.human().key(),new ServiceActionContext(
-                    command.commandId(),instance.getId(),definition.versionId(),model.start().key(),command.businessType(),command.businessId(),context),state,progression,batch);
+            var paused=services.traverse(model,model.start().key(),model.human().key(),new ServiceActionContext(
+                    command.commandId(),instance.getId(),definition.versionId(),model.start().key(),command.businessType(),command.businessId(),context),state,progression,batch,definition.contentHash());
+            RuntimeInputs.require("HUMAN_TASK".equals(paused.type()),Category.HOST_CONFIGURATION);
             var assignment = host.resolve(resolver, new AssignmentContext(command.commandId(), instance.getId(), definition.versionId(),
                     definition.key(), definition.version(), definition.contentHash(), model.human().key(),command.businessType(),command.businessId(),context));
             var resolved=assignment.tasks().get(0);
@@ -212,12 +213,12 @@ public class WorkflowExecutionService {
             batch.append(RuntimeProgression.advance(first, 1), "ACTIVITY_COMPLETED", activity.getId(), null, null,
                     Map.of("outcomeKey", command.outcomeKey(), "closureReason", "TASK_OUTCOME"), Map.of("outcomeKey", command.outcomeKey()));
             var budget=new RuntimeProgression();
-            services.traverse(model,model.human().key(),model.end().key(),new ServiceActionContext(
+            var end=services.traverse(model,model.human().key(),null,new ServiceActionContext(
                     command.commandId(),instance.getId(),definition.versionId(),model.human().key(),instance.getBusinessType(),instance.getBusinessId(),context),
-                    variables.read(instance.getId(),model),budget,batch);
-            budget.visit(model.end(),"END");
-            batch.next("INSTANCE_COMPLETED",null,null,null,Map.of("resultKey",model.end().result()),Map.of("resultKey",model.end().result()));
-            instance.complete(model.end().key(),model.end().result(),batch.last(),time,context.actorRef());
+                    variables.read(instance.getId(),model),budget,batch,definition.contentHash());
+            budget.visit(end,"END");
+            batch.next("INSTANCE_COMPLETED",null,null,null,Map.of("resultKey",end.result()),Map.of("resultKey",end.result()));
+            instance.complete(end.key(),end.result(),batch.last(),time,context.actorRef());
             return finish(command.commandId(), WorkflowOperation.COMPLETE_TASK, context, fingerprint, definition, instance, activity, task, first, batch, recorder, RuntimeJson.FINGERPRINT_VERSION);
         });
     }

@@ -6,15 +6,19 @@ import io.github.leontecristian.workflow.core.dto.runtime.ScalarLiteral;
 /** Internal validated subset; canonical source is retained separately, including all designer values. */
 public record MinimalWorkflowDefinition(Node start, Human human, Node end, List<Transition> transitions,
         Map<String,Input> inputs, Map<String,ActionField> variables, Map<String,Binding> initialize,
-        Map<String,Service> services) {
+        Map<String,Service> services, Map<String,Node> ends, java.util.Set<String> gateways) {
     public MinimalWorkflowDefinition {
         transitions = List.copyOf(transitions); inputs=Map.copyOf(inputs); variables=Map.copyOf(variables);
-        initialize=Map.copyOf(initialize); services=Map.copyOf(services);
+        initialize=Map.copyOf(initialize); services=Map.copyOf(services); ends=Map.copyOf(ends); gateways=java.util.Set.copyOf(gateways);
+    }
+    public MinimalWorkflowDefinition(Node start, Human human, Node end, List<Transition> transitions,
+            Map<String,Input> inputs, Map<String,ActionField> variables, Map<String,Binding> initialize, Map<String,Service> services) {
+        this(start,human,end,transitions,inputs,variables,initialize,services,end==null ? Map.of() : Map.of(end.key(),end),java.util.Set.of());
     }
     public MinimalWorkflowDefinition(Node start, Human human, Node end, List<Transition> transitions) {
         this(start,human,end,transitions,Map.of(),Map.of(),Map.of(),Map.of());
     }
-    public boolean extended() { return !inputs.isEmpty() || !variables.isEmpty() || !initialize.isEmpty() || !services.isEmpty(); }
+    public boolean extended() { return !inputs.isEmpty() || !variables.isEmpty() || !initialize.isEmpty() || !services.isEmpty() || !gateways.isEmpty(); }
     public record Input(ActionField field, ScalarLiteral defaultValue) {}
     public record Binding(String source, String key, ScalarLiteral value) {}
     public record Service(String key, String action, Map<String,Binding> inputs, Map<String,Binding> outputs, int sourceIndex) {
@@ -24,5 +28,7 @@ public record MinimalWorkflowDefinition(Node start, Human human, Node end, List<
     public record Assignment(String resolver) {}
     public record Outcome(String key, String label, boolean requiresComment) {}
     public record Human(String key, String taskType, Assignment assignment, Outcome outcome) {}
-    public record Transition(String key, String from, String to, String outcome) {}
+    public record Transition(String key, String from, String to, String outcome, String condition, boolean defaultRoute) {
+        public Transition(String key,String from,String to,String outcome) { this(key,from,to,outcome,null,false); }
+    }
 }

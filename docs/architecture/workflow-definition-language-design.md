@@ -1,5 +1,7 @@
 # Workflow Definition Language — JSON Design
 
+**Owner correction — 2026-11-05:** expression arithmetic follows native SpEL numeric behavior, including floating-point approximation, promotion, rounding and integral overflow. Do not reject a result solely for precision loss or compare it with an exact reference calculation. Declared DECIMAL variables enter evaluation as BigDecimal; decimal literals retain native SpEL types. Native evaluation errors and resource limits still fail the command. Exact decoding, transport, persistence and accepted-submission rules remain unchanged. This supersedes earlier expression-arithmetic exactness wording and the misinterpreted numeric owner decision.
+
 ## Standards research, conceptual model and proposed direction
 
 | Document field | Value |
@@ -987,7 +989,7 @@ Workflows use **expressions** to evaluate conditions over supplied data and **ho
 
 The engine's integration contract must specify:
 
-- **Typed inputs:** decode values according to their declared workflow types before evaluation. For example, a string-encoded `DECIMAL` becomes a typed decimal value. Reconcile numeric operations and conversions with the agreed exactness rules; adopting SpEL does not permit silent precision loss.
+- **Typed inputs:** decode values according to their declared workflow types before evaluation. For example, a string-encoded `DECIMAL` becomes a typed decimal value. Preserve exact input decoding; expression arithmetic follows native SpEL numeric behavior, including approximation and rounding.
 - **Read-only access:** expose only declared, validated data, including permitted bounded JSON field/index access. Expressions cannot access application services, Spring beans or arbitrary Java objects, construct objects, invoke general methods, mutate data or fetch hidden time/random values. Existing restrictions on unrestricted regular expressions and collection traversal remain; they do not redefine the meaning of supported operators.
 - **Results and errors:** routing conditions must produce a Boolean. Missing required inputs or paths and evaluation errors fail the command. An evaluated read of an uninitialized workflow variable fails even when nullable; skipped reads do not fail. Explicitly assigned null retains SpEL's null semantics, and null-safe operations cannot hide an uninitialized-variable error (section 10.3). The accessor implementation must enforce these rules while retaining the selected operator semantics.
 - **Resource bounds:** enforce L16's selected source-length, parsed-size/depth, navigation, evaluation-count and per-evaluation operation limits (section 14.2). Configure enforcement locally for the workflow engine; dependency support and counter behavior must be verified before execution support is claimed.

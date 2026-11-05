@@ -45,7 +45,13 @@ public class DefinitionValidationService {
         DefinitionCapabilities capabilities = snapshot();
         ObjectNode provenance = json.createObjectNode();
         boolean extended=MinimalDefinitionLoader.extended(document.tree());
-        provenance.put("validator", extended ? "wf-scalar-service-validator-v1" : IDENTIFIER); provenance.put("structuralSchemaHash", loader.schemaDigest(extended));
+        boolean routing=MinimalDefinitionLoader.routing(document.tree());
+        provenance.put("validator", routing ? "wf-exclusive-routing-validator-v1" : extended ? "wf-scalar-service-validator-v1" : IDENTIFIER);
+        provenance.put("structuralSchemaHash", loader.schemaDigest(document.tree()));
+        if(routing) {
+            provenance.put("expressionProfile",io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService.PROFILE);
+            provenance.put("springExpressionVersion",io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService.SPRING_VERSION);
+        }
         if (model!=null && extended) {
             ServiceBindingValidation.check(model,actions,diagnostics);
             var refs=provenance.putArray("actions");

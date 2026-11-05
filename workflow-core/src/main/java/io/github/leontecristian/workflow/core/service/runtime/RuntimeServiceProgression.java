@@ -13,20 +13,38 @@ public class RuntimeServiceProgression {
     private final ServiceActionRegistry actions;
     private final RuntimeVariables variables;
     private final RuntimeJson json;
+    private final io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService expressions;
     public RuntimeServiceProgression(ServiceActionRegistry actions,RuntimeVariables variables,RuntimeJson json) {
+        this(actions,variables,json,new io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService());
+    }
+    @org.springframework.beans.factory.annotation.Autowired
+    public RuntimeServiceProgression(ServiceActionRegistry actions,RuntimeVariables variables,RuntimeJson json,
+            io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService expressions) {
+        this.expressions=expressions;
         this.actions=actions; this.variables=variables; this.json=json;
     }
-    void traverse(MinimalWorkflowDefinition model,String from,String stop,ServiceActionContext context,
+    MinimalWorkflowDefinition.Node traverse(MinimalWorkflowDefinition model,String from,String stop,ServiceActionContext context,
             Map<String,ScalarValue> state,RuntimeProgression budget,RuntimeHistoryBatch batch) {
+        RuntimeInputs.require(model.gateways().isEmpty(),Category.HOST_CONFIGURATION);
+        return traverse(model,from,stop,context,state,budget,batch,"legacy");
+    }
+    MinimalWorkflowDefinition.Node traverse(MinimalWorkflowDefinition model,String from,String stop,ServiceActionContext context,
+            Map<String,ScalarValue> state,RuntimeProgression budget,RuntimeHistoryBatch batch,String definitionHash) {
         String cursor=from;
         while (true) {
             String current=cursor;
-            var edge=model.transitions().stream().filter(t -> t.from().equals(current)).findFirst()
+            var edge=model.gateways().contains(current) ? route(model,current,definitionHash,state,budget,batch)
+                    : model.transitions().stream().filter(t -> t.from().equals(current)).findFirst()
                     .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
             Map<String,String> detail=current.equals(model.human().key()) ? Map.of("outcomeKey",model.human().outcome().key()) : Map.of();
             batch.next("TRANSITION_TAKEN",null,null,edge,detail,Map.of());
             cursor=edge.to();
-            if (cursor.equals(stop)) return;
+            if (cursor.equals(stop)) return new MinimalWorkflowDefinition.Node(cursor,"HUMAN_TASK",null,null);
+            if (model.ends().containsKey(cursor)) return model.ends().get(cursor);
+            if (model.gateways().contains(cursor)) {
+                budget.visit(new MinimalWorkflowDefinition.Node(cursor,"EXCLUSIVE_GATEWAY",null,null),"EXCLUSIVE_GATEWAY");
+                continue;
+            }
             var node=model.services().get(cursor);
             RuntimeInputs.require(node!=null,Category.HOST_CONFIGURATION);
             budget.visit(new MinimalWorkflowDefinition.Node(cursor,"SERVICE_TASK",null,null),"SERVICE_TASK");
@@ -55,5 +73,40 @@ public class RuntimeServiceProgression {
             batch.next("SERVICE_TASK_COMPLETED",null,null,null,success,Map.of("nodeKey",cursor,"action",node.action()));
             variables.apply(context.instanceId(),cursor,node.outputs(),state,writes,batch);
         }
+    }
+    private MinimalWorkflowDefinition.Transition route(MinimalWorkflowDefinition model,String node,String hash,
+            Map<String,ScalarValue> state,RuntimeProgression budget,RuntimeHistoryBatch batch) {
+        var snapshot=Map.copyOf(state);
+        var details=json.object(); details.put("nodeKey",node); var evaluations=details.putArray("evaluations");
+        MinimalWorkflowDefinition.Transition selected=null, fallback=null;
+        for (var transition:model.transitions()) {
+            if (!transition.from().equals(node)) continue;
+            if (transition.defaultRoute()) { fallback=transition; continue; }
+            io.github.leontecristian.workflow.core.dto.expression.ExpressionEvaluation evaluated;
+            try { evaluated=expressions.evaluate(hash,transition.key(),transition.condition(),model.variables(),snapshot,budget.expressions()); }
+            catch (io.github.leontecristian.workflow.core.exception.expression.ExpressionException failure) {
+                Category category=switch(failure.kind()) {
+                    case UNINITIALIZED -> Category.UNINITIALIZED_VARIABLE;
+                    case LIMIT -> Category.EXPRESSION_LIMIT_EXCEEDED;
+                    case INVALID -> Category.HOST_CONFIGURATION;
+                    case UNSUPPORTED -> Category.UNSUPPORTED_VERSION;
+                    case EVALUATION -> Category.EXPRESSION_EVALUATION_FAILED;
+                };
+                throw new WorkflowExecutionException(category,failure);
+            }
+            var evaluation=evaluations.addObject(); evaluation.put("transitionKey",transition.key()); evaluation.put("result",evaluated.result());
+            var reads=evaluation.putArray("reads");
+            for (var read:evaluated.reads()) {
+                var entry=reads.addObject(); entry.put("variableKey",read.variableKey()); entry.put("type",read.value().type().name());
+                entry.set("value",RuntimeScalarBindings.token(read.value().value()));
+            }
+            if(evaluated.result()) { selected=transition; break; }
+        }
+        boolean usedDefault=selected==null;
+        if(usedDefault) selected=fallback;
+        RuntimeInputs.require(selected!=null,Category.ROUTE_NOT_FOUND);
+        details.put("selectedTransitionKey",selected.key()); details.put("usedDefault",usedDefault);
+        batch.next("GATEWAY_ROUTED",null,null,null,details,Map.of("nodeKey",node,"selectedTransitionKey",selected.key()));
+        return selected;
     }
 }

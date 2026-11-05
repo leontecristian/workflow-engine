@@ -36,6 +36,10 @@ final class ScalarDefinitionModel {
         return result;
     }
     static MinimalWorkflowDefinition load(JsonNode root, DefinitionDiagnostics d) {
+        return load(root,d,null);
+    }
+    static MinimalWorkflowDefinition load(JsonNode root, DefinitionDiagnostics d,
+            io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService expressions) {
         Map<String,MinimalWorkflowDefinition.Input> inputs = new HashMap<>();
         Map<String,ActionField> variables = new HashMap<>();
         int i=0;
@@ -77,10 +81,12 @@ final class ScalarDefinitionModel {
                 case "HUMAN_TASK" -> { human=n; humans++; }
                 case "END" -> { end=n; ends++; }
                 case "SERVICE_TASK" -> services.put(key,new MinimalWorkflowDefinition.Service(key,n.path("action").textValue(),bindings(n.path("inputs")),bindings(n.path("outputs")),nodeIndex));
+                case "EXCLUSIVE_GATEWAY" -> { if(expressions==null) error(d,"UNSUPPORTED_FEATURE","/nodes"); }
                 default -> error(d,"UNSUPPORTED_FEATURE","/nodes");
             }
             nodeIndex++;
         }
+        if (expressions!=null) return RoutingDefinitionModel.load(root,d,inputs,variables,initialize,services,expressions);
         if (starts!=1 || humans!=1 || ends!=1) error(d,"INVALID_GRAPH","/nodes");
         if (d.failed()) return null;
         var outcome=human.path("outcomes").get(0);

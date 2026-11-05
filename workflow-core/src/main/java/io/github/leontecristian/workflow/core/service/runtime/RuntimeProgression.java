@@ -6,6 +6,8 @@ import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutio
 /** Per-command budget: START/END cost one; human entry and transitions cost zero. */
 final class RuntimeProgression {
     private int automaticSteps;
+    private final io.github.leontecristian.workflow.core.service.expression.ExpressionAllowance expressions = new io.github.leontecristian.workflow.core.service.expression.ExpressionAllowance();
+    io.github.leontecristian.workflow.core.service.expression.ExpressionAllowance expressions() { return expressions; }
     void visit(MinimalWorkflowDefinition.Node node, String expectedType) {
         RuntimeInputs.require(expectedType.equals(node.type()), Category.INVALID_STATE);
         RuntimeInputs.require(automaticSteps < 50, Category.LIMIT_EXCEEDED);

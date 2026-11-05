@@ -5,6 +5,7 @@ import { ConsoleApi } from "../../data/console-api";
 import type { HistoryEvent } from "../../data/dtos";
 import { PAGE_IMPORTS } from "../../ui/page-imports";
 import { pageState } from "../../ui/page-state";
+import { routingEvidence } from "../../data/routing-evidence";
 @Component({
   selector: "console-history-event",
   standalone: true,
@@ -28,6 +29,10 @@ export class HistoryEventPage {
   id = "";
   sequence = "";
   detail = signal<HistoryEvent | null>(null);
+  routing() {
+    const event = this.detail();
+    return routingEvidence(event?.envelope.eventType, event?.detailsJson);
+  }
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   ngOnInit() {

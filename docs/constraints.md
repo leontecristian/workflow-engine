@@ -1,5 +1,7 @@
 # Project constraints
 
+**Owner correction — 2026-11-05:** expression arithmetic follows native SpEL numeric behavior, including floating-point approximation, promotion, rounding and integral overflow. Do not reject a result solely for precision loss or compare it with an exact reference calculation. Declared DECIMAL variables enter evaluation as BigDecimal; decimal literals retain native SpEL types. Native evaluation errors and resource limits still fail the command. Exact decoding, transport, persistence and accepted-submission rules remain unchanged. This supersedes earlier expression-arithmetic exactness wording and the misinterpreted numeric owner decision.
+
 **Version:** 3.0.0
 
 **Recorded:** 2026-10-31
@@ -112,9 +114,9 @@ Validate all conditions' syntax and permitted features before publication. Prese
 
 Expression rules are centrally enforced and determined by the workflow-language version. Definitions have no independent expressionPolicy field; host configuration cannot replace those semantics. Engine upgrades preserve supported language versions or reject unsupported versions explicitly. Incompatible expression changes require a new language version. The legacy expression_policy database column requires separate persistence reconciliation, without rewriting applied migrations.
 
-Reject unsupported schema versions and semantics. Prevent type/constructor/bean access, general method invocation, assignment, mutation and arbitrary object access. Use explicit structural enforcement of the context's necessary syntax restrictions and bounded evaluation/input complexity. Expressions cannot fetch business data or read hidden time/random/global state. Within that controlled context, retain standard SpEL operator, precedence, short-circuit and null semantics; do not prohibit ordinary arithmetic by default. Decode declared workflow types before evaluation and reconcile exactness and missing-required-data checks with SpEL behavior. Context enforcement and upgrade compatibility require verification.
+Reject unsupported schema versions and semantics. Prevent type/constructor/bean access, general method invocation, assignment, mutation and arbitrary object access. Use explicit structural enforcement of the context's necessary syntax restrictions and bounded evaluation/input complexity. Expressions cannot fetch business data or read hidden time/random/global state. Within that controlled context, retain standard SpEL operator, precedence, short-circuit and null semantics; do not prohibit ordinary arithmetic by default. Decode declared workflow types exactly before evaluation; native SpEL numeric behavior governs arithmetic, and missing required data still fails. Context enforcement and upgrade compatibility require verification.
 
-Scalar types remain STRING, LONG, DECIMAL, BOOLEAN, DATE and DATETIME; execution variables also support JSON under CON-14. Preserve numeric precision and use explicit dates/unambiguous timestamps. Required inputs and declared service bindings must be validated. Exact encodings, nullability, limits and error codes remain to be specified.
+Scalar types remain STRING, LONG, DECIMAL, BOOLEAN, DATE and DATETIME; execution variables also support JSON under CON-14. Preserve exact declared-input decoding/transport/storage and use explicit dates/unambiguous timestamps; expression arithmetic keeps native SpEL behavior. Required inputs and declared service bindings must be validated. Exact encodings, nullability, limits and error codes remain to be specified.
 
 **Trace:** C08; design sections 5, 7.3, 8.4 and 10.4; O1/O6.
 

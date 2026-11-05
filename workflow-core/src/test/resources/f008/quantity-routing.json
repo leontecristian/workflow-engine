@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1, "key": "sandbox.quantityRouting", "version": 1, "name": "Quantity routing",
+  "startPolicy": {
+    "inputContract": [{"key":"quantity","type":"LONG","required":true,"nullable":false}],
+    "initialize": {"quantity":{"source":"startInput","key":"quantity"}}
+  },
+  "variables": [
+    {"key":"quantity","type":"LONG","nullable":false},
+    {"key":"recordedQuantity","type":"LONG","nullable":false}
+  ],
+  "nodes": [
+    {"key":"BEGIN","type":"START","name":"Start"},
+    {"key":"RECORD","type":"SERVICE_TASK","name":"Record quantity","action":"sandbox.recordQuantity",
+     "inputs":{"quantity":{"source":"variable","key":"quantity"}},
+     "outputs":{"recordedQuantity":{"source":"actionOutput","key":"recordedQuantity"}}},
+    {"key":"REVIEW","type":"HUMAN_TASK","name":"Review","taskType":"SANDBOX_REVIEW",
+     "assignment":{"resolver":"sandbox.singleReviewer","inputs":{}},"completion":{"policy":"SINGLE"},
+     "inputContract":[],"resultContract":{"mode":"FORBIDDEN"},
+     "outcomes":[{"key":"COMPLETE","label":"Complete","requiresComment":false}]},
+    {"key":"ROUTE","type":"EXCLUSIVE_GATEWAY","name":"Choose result"},
+    {"key":"HIGH","type":"END","name":"High quantity","result":"HIGH"},
+    {"key":"LOW","type":"END","name":"Other quantity","result":"LOW"}
+  ],
+  "transitions": [
+    {"key":"beginRecord","from":"BEGIN","to":"RECORD"},
+    {"key":"beginReview","from":"RECORD","to":"REVIEW"},
+    {"key":"finishReview","from":"REVIEW","to":"ROUTE","outcome":"COMPLETE"},
+    {"key":"fallback","from":"ROUTE","to":"LOW","default":true},
+    {"key":"high","from":"ROUTE","to":"HIGH","condition":"#vars.recordedQuantity > 10"},
+    {"key":"positive","from":"ROUTE","to":"LOW","condition":"#vars.recordedQuantity > 0"}
+  ]
+}
