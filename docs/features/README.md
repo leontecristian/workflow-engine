@@ -1,5 +1,7 @@
 # Feature specifications
 
+[F010 — Human-task outcomes and outcome-based routing](F010-human-task-outcomes/spec.md) is **READY revision 1**, documentation only (2026-11-06). The next selected increment supports 1–16 outcomes and exact outcome routes within one SINGLE human stage. See its [plan](F010-human-task-outcomes/plan.md), [tasks](F010-human-task-outcomes/tasks.md) and [handoff](F010-human-task-outcomes/implementation.md). Implementation is not authorized.
+
 [F009 — JSON execution variables](F009-json-execution-variables/spec.md) is **IMPLEMENTED revision 3** (2026-11-06): schema-free bounded snapshots, explicit start/service mappings and safe nested SpEL reads. See its [plan](F009-json-execution-variables/plan.md), [tasks](F009-json-execution-variables/tasks.md) and [handover](F009-json-execution-variables/implementation.md). D17 removes pre-F009 API/data compatibility requirements while preserving history and guarantees for new executions. The technical annex governs the implementation. Automated unit/SQL/frontend verification is recorded in the handover; interactive browser acceptance remains NOT RUN.
 
 This folder contains specifications and delivery records for individual features. Project-wide principles, constraints, assumptions and development guidance live in the parent [docs folder](../README.md).
