@@ -15,7 +15,8 @@ export class InstanceGraphComponent {
   graph = input.required<InstanceGraph>();
 
   layout = computed(() => layoutGraph(this.graph()));
-  zoom = signal(1);
+  readonly defaultZoom = 0.5;
+  zoom = signal(this.defaultZoom);
   changeZoom(delta: number) {
     this.zoom.update(value => Math.min(2, Math.max(0.25, Math.round((value + delta) * 100) / 100)));
   }

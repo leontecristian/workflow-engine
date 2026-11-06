@@ -7,7 +7,7 @@
   <button mat-stroked-button type="button" (click)="changeZoom(-0.25)" [disabled]="zoom() <= 0.25" aria-label="Zoom out">&minus;</button>
   <span aria-live="polite">{{zoomPercent()}}%</span>
   <button mat-stroked-button type="button" (click)="changeZoom(0.25)" [disabled]="zoom() >= 2" aria-label="Zoom in">+</button>
-  <button mat-button type="button" (click)="zoom.set(1)">Reset zoom</button>
+  <button mat-button type="button" (click)="zoom.set(defaultZoom)">Reset zoom</button>
 </div>
 <div class="graph-scroll" tabindex="0" aria-label="Workflow graph. Scroll horizontally or vertically to explore all steps.">
   <svg [attr.viewBox]="'0 0 ' + layout().width + ' ' + layout().height"
