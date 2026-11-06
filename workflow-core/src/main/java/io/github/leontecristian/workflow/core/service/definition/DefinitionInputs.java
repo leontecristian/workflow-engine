@@ -51,8 +51,12 @@ final class DefinitionInputs {
     }
 
     static WorkflowDefinitionException error(String code, String message) {
+        return error(code, message, null);
+    }
+
+    static WorkflowDefinitionException error(String code, String message, String pointer) {
         return new WorkflowDefinitionException(WorkflowDefinitionException.Category.INVALID_INPUT,
                 List.of(new DefinitionDiagnostic("WF_DEF_" + code, DiagnosticStage.PARSE,
-                        DiagnosticSeverity.ERROR, message, null, null, null)));
+                        DiagnosticSeverity.ERROR, message, pointer, null, null)));
     }
 }

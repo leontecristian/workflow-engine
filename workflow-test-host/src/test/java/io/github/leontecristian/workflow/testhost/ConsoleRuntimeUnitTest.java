@@ -38,6 +38,16 @@ import java.util.UUID;
 /** Isolated collaborators only. These tests do not claim proxy rollback or SQL locking evidence. */
 class ConsoleRuntimeUnitTest {
     @Test
+    void advertisedSandboxCapabilitiesIncludeEveryExampleOutcome() throws Exception {
+        var settings = new io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings(
+                new org.springframework.mock.env.MockEnvironment().withProperty("workflow.console.reviewer.username", "reviewer"));
+        var controller = new io.github.leontecristian.workflow.testhost.controller.console.ConsoleSessionController(
+                new io.github.leontecristian.workflow.testhost.service.console.ConsoleWire(), mock(ConsoleContext.class), settings);
+        var advertised = new com.fasterxml.jackson.databind.ObjectMapper().readTree(controller.capabilities().getBody()).path("taskTypes").path("SANDBOX_REVIEW");
+        assertEquals(java.util.Set.of("COMPLETE", "APPROVE", "REJECT"),
+                java.util.stream.StreamSupport.stream(advertised.spliterator(), false).map(com.fasterxml.jackson.databind.JsonNode::asText).collect(java.util.stream.Collectors.toSet()));
+    }
+    @Test
     void losingCommandUsesOneReplayLookupWithOriginalInputAndDoesNotRetryMutation() {
         var tx = mock(ConsoleRuntimeTransaction.class);
         var coordinator = new ConsoleRuntimeCoordinator(tx);

@@ -41,6 +41,9 @@ export class TaskPage {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((params) => {
         if (this.id !== params.get("id")) {
+          this.detail.set(null);
+          this.contract.set(null);
+          this.submission.set(null);
           this.outcome = "";
           this.comment = "";
         }
@@ -62,15 +65,24 @@ export class TaskPage {
       this.submission.set(s);
     });
   }
-  async complete(): Promise<void> {
+  commentBlank(): boolean {
+    // Java String.isBlank whitespace; preserve the submitted text exactly.
+    return /^[\u0009-\u000d\u001c-\u0020\u1680\u2000-\u2006\u2008-\u200a\u2028\u2029\u205f\u3000]*$/u.test(this.comment);
+  }
+  async complete(outcomeKey: string): Promise<void> {
+    if (this.busy()) return;
     await this.run(async () => {
+      const selected = this.contract()?.outcomes.find(o => o.key === outcomeKey);
+      if (!selected || this.detail()?.status !== "OPEN") throw new Error("Choose an available outcome on an open task.");
+      this.outcome = selected.key;
+      if (selected.requiresComment && this.commentBlank()) throw new Error("A comment is required for " + selected.label + ".");
       this.commands.buffer.remember({
         kind: "complete",
         body: {
           commandId: crypto.randomUUID(),
           instanceId: this.detail()!.instanceId,
           taskId: this.id,
-          outcomeKey: this.outcome,
+          outcomeKey: selected.key,
           comment: this.comment || null,
         },
         expectedToken: this.contract()!.instanceLockVersion,

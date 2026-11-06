@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 /** Internal publication-subset checker. No represented host function is ever executed. */
 @Component
 public class DefinitionValidationService {
-    static final String IDENTIFIER = "wf-minimal-single-validator-v1";
+    static final String IDENTIFIER = "wf-human-outcome-validator-v1";
     private final TaskTypeCatalogService catalog;
     private final DefinitionCapabilityProvider provider;
     private final ObjectMapper json = new ObjectMapper();
@@ -46,7 +46,7 @@ public class DefinitionValidationService {
         ObjectNode provenance = json.createObjectNode();
         boolean extended=MinimalDefinitionLoader.extended(document.tree());
         boolean routing=MinimalDefinitionLoader.routing(document.tree());
-        provenance.put("validator", "wf-json-variable-validator-v1");
+        provenance.put("validator", IDENTIFIER);
         provenance.put("structuralSchemaHash", loader.schemaDigest(document.tree()));
         if(routing) {
             provenance.put("expressionProfile",io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService.PROFILE);
@@ -79,7 +79,7 @@ public class DefinitionValidationService {
                 ObjectNode descriptor = provenance.putObject("taskCapability"); descriptor.put("taskType", presentation.taskType());
                 var outcomes = descriptor.putArray("supportedOutcomes"); presentation.supportedOutcomes().stream().sorted().forEach(outcomes::add);
             }
-            if (assignment == null || presentation == null || !presentation.supportedOutcomes().contains(human.outcome().key()))
+            if (assignment == null || presentation == null || !human.outcomes().stream().allMatch(outcome -> presentation.supportedOutcomes().contains(outcome.key())))
                 diagnostics.error("HOST_CAPABILITY_UNAVAILABLE", DiagnosticStage.HOST, "Required deployed host capability is unavailable.", null);
         } else if (capabilities == null) {
             diagnostics.error("HOST_CAPABILITY_UNAVAILABLE", DiagnosticStage.HOST, "Deployed host capability provider is unavailable.", null);

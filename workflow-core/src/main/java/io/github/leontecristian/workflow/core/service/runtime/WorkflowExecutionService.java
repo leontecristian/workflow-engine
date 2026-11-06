@@ -129,7 +129,7 @@ public class WorkflowExecutionService {
                 variables.apply(instance.getId(),model.start().key(),model.initialize(),state,writes,batch);
             }
             var paused=services.traverse(model,model.start().key(),model.human().key(),new ServiceActionContext(
-                    command.commandId(),instance.getId(),definition.versionId(),model.start().key(),command.businessType(),command.businessId(),context),state,progression,batch,definition.contentHash());
+                    command.commandId(),instance.getId(),definition.versionId(),model.start().key(),command.businessType(),command.businessId(),context),state,progression,batch,definition.contentHash(),null);
             RuntimeInputs.require("HUMAN_TASK".equals(paused.type()),Category.HOST_CONFIGURATION);
             var assignment = host.resolve(resolver, new AssignmentContext(command.commandId(), instance.getId(), definition.versionId(),
                     definition.key(), definition.version(), definition.contentHash(), model.human().key(),command.businessType(),command.businessId(),context));
@@ -201,8 +201,9 @@ public class WorkflowExecutionService {
             RuntimeInputs.require("ACTIVITY_ENTERED".equals(entered.getEventType()) && activity.getId().equals(entered.getActivityId())
                     && entered.getTaskId() == null && entered.getCommandId().equals(created.getCommandId())
                     && entered.getOccurredAt().equals(activity.getEnteredAt()), Category.HOST_CONFIGURATION);
-            RuntimeInputs.require(model.human().outcome().key().equals(command.outcomeKey()), Category.INVALID_INPUT);
-            RuntimeInputs.require(!model.human().outcome().requiresComment() || (command.comment() != null && !command.comment().isBlank()), Category.INVALID_INPUT);
+            var selectedOutcome = model.human().outcome(command.outcomeKey())
+                    .orElseThrow(() -> new WorkflowExecutionException(Category.INVALID_INPUT));
+            RuntimeInputs.require(!selectedOutcome.requiresComment() || (command.comment() != null && !command.comment().isBlank()), Category.INVALID_INPUT);
             var time = RuntimeInputs.context(context);
             RuntimeInputs.require(!time.isBefore(instance.getStartedAt()) && !time.isBefore(activity.getEnteredAt()) && !time.isBefore(task.getCreatedAt()), Category.INVALID_INPUT);
             task.complete(command.outcomeKey(), time, context.actorRef()); activity.complete(command.outcomeKey(), time, context.actorRef());
@@ -215,7 +216,7 @@ public class WorkflowExecutionService {
             var budget=new RuntimeProgression();
             var end=services.traverse(model,model.human().key(),null,new ServiceActionContext(
                     command.commandId(),instance.getId(),definition.versionId(),model.human().key(),instance.getBusinessType(),instance.getBusinessId(),context),
-                    variables.read(instance.getId(),model),budget,batch,definition.contentHash());
+                    variables.read(instance.getId(),model),budget,batch,definition.contentHash(),selectedOutcome.key());
             budget.visit(end,"END");
             batch.next("INSTANCE_COMPLETED",null,null,null,Map.of("resultKey",end.result()),Map.of("resultKey",end.result()));
             instance.complete(end.key(),end.result(),batch.last(),time,context.actorRef());

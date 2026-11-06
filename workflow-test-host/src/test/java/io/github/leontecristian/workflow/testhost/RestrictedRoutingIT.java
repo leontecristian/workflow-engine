@@ -473,6 +473,141 @@ class RestrictedRoutingIT extends DatabaseIntegrationTest {
         assertThat(count("wf.workflow_history",started.instance().id())).isEqualTo((int)started.lastHistorySequence());
         assertThat(count("wf_test.workflow_event_outbox",started.instance().id())).isEqualTo((int)started.lastHistorySequence());
     }
+    /** F010: the minimal outcome branch must not depend on a gateway or variables. */
+    private ObjectNode outcomeFixture(boolean jsonValues, boolean failAfterEffect) throws Exception {
+        var source = jsonValues ? jsonFixture(failAfterEffect ? "1 / 0 > 0" : "#vars.booking.amount > 0") : fixture();
+        var human = (ObjectNode) source.path("nodes").get(1);
+        var outcomes = human.putArray("outcomes");
+        outcomes.addObject().put("key", "APPROVE").put("label", "Approve").put("requiresComment", false);
+        outcomes.addObject().put("key", "REJECT").put("label", "Reject").put("requiresComment", true);
+        var edges = (ArrayNode) source.get("transitions");
+        ((ObjectNode) edges.get(1)).put("outcome", "APPROVE").put("key", "approve");
+        if (jsonValues) {
+            // Both branches have a distinct service node; only one may run.
+            var record = (ObjectNode) source.path("nodes").get(2);
+            ((ArrayNode) source.get("nodes")).add(record.deepCopy().put("key", "REJECT_RECORD"));
+            edges.addObject().put("key", "reject").put("from", "REVIEW").put("to", "REJECT_RECORD").put("outcome", "REJECT");
+            edges.addObject().put("key", "rejectedEnd").put("from", "REJECT_RECORD").put("to", "LOW");
+        } else {
+            source.putArray("variables");
+            var policy = source.putObject("startPolicy"); policy.putArray("inputContract");
+            var nodes = (ArrayNode) source.get("nodes"); nodes.remove(3); nodes.remove(2);
+            while (edges.size() > 2) edges.remove(2);
+            ((ObjectNode) edges.get(1)).put("to", "HIGH");
+            edges.addObject().put("key", "reject").put("from", "REVIEW").put("to", "LOW").put("outcome", "REJECT");
+        }
+        return source;
+    }
+    private WorkflowExecutionResult outcomeStart(ObjectNode source, boolean jsonValues) {
+        long version = publish(source);
+        if (jsonValues) return jsonStart(version, UUID.randomUUID(), "{\"amount\":1.00,\"obsolete\":true}");
+        var result = tx().execute(status -> engine.start(new StartWorkflow(UUID.randomUUID(), version, null, null, null), context(false), null)).execution();
+        instances.add(result.instance().id()); return result;
+    }
+    private CompleteWorkflowTask outcomeCommand(WorkflowExecutionResult started, String outcome, String comment) {
+        return new CompleteWorkflowTask(UUID.randomUUID(), started.instance().id(), started.task().id(), started.instance().lockVersion(), outcome, comment);
+    }
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void f010ExactOutcomeRoutesEvidenceSubmissionAndReplay(boolean jsonValues) throws Exception {
+        var source = outcomeFixture(jsonValues, false);
+        for (String outcome : List.of("APPROVE", "REJECT")) {
+            if (outcome.equals("REJECT")) {
+                // New immutable version reverses presentation and edge order.
+                source.put("version", 2);
+                var choices = (ArrayNode) source.path("nodes").get(1).path("outcomes"); choices.add(choices.remove(0));
+                var edges = (ArrayNode) source.get("transitions"); edges.add(edges.remove(1));
+            }
+            var started = outcomeStart(source, jsonValues);
+            String comment = outcome.equals("REJECT") ? "  reason\n" : null;
+            var command = outcomeCommand(started, outcome, comment);
+            var completed = complete(command).execution();
+            assertThat(completed.instance().status()).isEqualTo(InstanceStatus.COMPLETED);
+            assertThat(completed.instance().resultKey()).isEqualTo(outcome.equals("APPROVE") ? "HIGH" : "LOW");
+            assertThat(completed.task().outcomeKey()).isEqualTo(outcome);
+            assertThat(completed.activity().outcomeKey()).isEqualTo(outcome);
+            assertThat(completed.instance().lockVersion()).isEqualTo(reads.findInstance(started.instance().id()).orElseThrow().lockVersion());
+            var facts = jdbc.queryForList("SELECT event_type,details_json FROM wf.workflow_history WHERE instance_id=? AND event_type IN ('TASK_COMPLETED','ACTIVITY_COMPLETED','TRANSITION_TAKEN') ORDER BY sequence_number", started.instance().id());
+            int outcomeFacts = 0;
+            for (var fact : facts) {
+                var detail = json.readTree((String) fact.get("details_json"));
+                if (detail.has("outcomeKey")) { assertThat(detail.path("outcomeKey").asText()).isEqualTo(outcome); outcomeFacts++; }
+            }
+            assertThat(outcomeFacts).isEqualTo(3);
+            assertThat(jdbc.queryForList("SELECT transition_key FROM wf.workflow_history WHERE instance_id=? AND source_node_key='REVIEW'", String.class, started.instance().id()))
+                    .containsExactly(outcome.toLowerCase(Locale.ROOT));
+            assertThat(reads.findTaskSubmission(started.task().id()).orElseThrow().outcomeKey()).isEqualTo(outcome);
+            int effectsBeforeReplay = effects();
+            assertThat(complete(command).execution()).isEqualTo(completed);
+            assertThat(complete(command).replayed()).isTrue();
+            assertThat(effects()).isEqualTo(effectsBeforeReplay);
+            var changed = new CompleteWorkflowTask(command.commandId(), command.instanceId(), command.taskId(), command.expectedLockVersion(), outcome.equals("APPROVE") ? "REJECT" : "APPROVE", comment);
+            assertThatThrownBy(() -> complete(changed)).isInstanceOfSatisfying(WorkflowExecutionException.class, e -> assertThat(e.category()).isEqualTo(WorkflowExecutionException.Category.COMMAND_ID_CONFLICT));
+            var changedComment = new CompleteWorkflowTask(command.commandId(), command.instanceId(), command.taskId(), command.expectedLockVersion(), outcome, "different");
+            assertThatThrownBy(() -> complete(changedComment)).isInstanceOf(WorkflowExecutionException.class);
+            if (jsonValues) {
+                var executed = jdbc.queryForList("SELECT source_node_key FROM wf.workflow_history WHERE instance_id=? AND event_type='SERVICE_TASK_COMPLETED'", String.class, started.instance().id());
+                // Service facts retain nodeKey in details, rather than transition source metadata.
+                assertThat(executed).hasSize(1);
+                var details = json.readTree(jdbc.queryForObject("SELECT details_json FROM wf.workflow_history WHERE instance_id=? AND event_type='SERVICE_TASK_COMPLETED'", String.class, started.instance().id()));
+                assertThat(details.path("nodeKey").asText()).isEqualTo(outcome.equals("APPROVE") ? "RECORD" : "REJECT_RECORD");
+            }
+        }
+        assertThat(effects()).isEqualTo(jsonValues ? 2 : 0);
+    }
+    @ParameterizedTest @ValueSource(strings = {"", " ", "\n\t", "UNKNOWN", "approve"})
+    void f010InvalidOutcomesAndRequiredCommentsLeaveNoCommittedChanges(String value) throws Exception {
+        var started = outcomeStart(outcomeFixture(false, false), false);
+        var command = value.isBlank() ? outcomeCommand(started, "REJECT", value) : outcomeCommand(started, value, null);
+        assertThatThrownBy(() -> complete(command)).isInstanceOfSatisfying(WorkflowExecutionException.class, e -> assertThat(e.category()).isEqualTo(WorkflowExecutionException.Category.INVALID_INPUT));
+        assertUnchanged(started);
+    }
+    @Test void f010SelectedJsonBranchFailureRollsBackAllParticipatingChanges() throws Exception {
+        var started = outcomeStart(outcomeFixture(true, true), true);
+        assertThatThrownBy(() -> complete(outcomeCommand(started, "APPROVE", null))).isInstanceOfSatisfying(WorkflowExecutionException.class, e -> assertThat(e.category()).isEqualTo(WorkflowExecutionException.Category.EXPRESSION_EVALUATION_FAILED));
+        assertThat(effects()).isZero();
+        assertThat(reads.findTask(started.task().id()).orElseThrow().status()).isEqualTo(TaskStatus.OPEN);
+        assertThat(reads.findInstance(started.instance().id()).orElseThrow().lockVersion()).isEqualTo(started.instance().lockVersion());
+        assertThat(count("wf.workflow_history", started.instance().id())).isEqualTo((int) started.lastHistorySequence());
+        assertThat(count("wf_test.workflow_event_outbox", started.instance().id())).isEqualTo((int) started.lastHistorySequence());
+        assertThat(count("wf.workflow_command_receipt", started.instance().id())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT json_value FROM wf.workflow_variable WHERE instance_id=? AND variable_key='booking'", String.class, started.instance().id())).contains("\"obsolete\":true");
+    }
+    @Test void f010CompetingOutcomesCommitOnlyTheWinner() throws Exception {
+        var started = outcomeStart(outcomeFixture(true, false), true);
+        host.entered = new CountDownLatch(1); host.release = new CountDownLatch(1);
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var first = executor.submit(() -> complete(outcomeCommand(started, "APPROVE", null)));
+            assertThat(host.entered.await(10, TimeUnit.SECONDS)).isTrue();
+            var secondStarted = new CountDownLatch(1);
+            var second = executor.submit(() -> tx().execute(status -> { secondStarted.countDown(); return engine.completeTask(outcomeCommand(started, "REJECT", "reason"), context(true)); }));
+            assertThat(secondStarted.await(10, TimeUnit.SECONDS)).isTrue(); host.release.countDown();
+            assertThat(first.get(20, TimeUnit.SECONDS).execution().task().outcomeKey()).isEqualTo("APPROVE");
+            assertThatThrownBy(() -> second.get(20, TimeUnit.SECONDS)).hasCauseInstanceOf(WorkflowExecutionException.class);
+            assertThat(effects()).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT outcome_key FROM wf.workflow_task WHERE id=?", String.class, started.task().id())).isEqualTo("APPROVE");
+        } finally { host.release.countDown(); executor.shutdownNow(); assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue(); }
+    }
+    @Test void f010PinnedOutcomesSurviveCatalogDisablingAndWrongAssigneeCannotComplete() throws Exception {
+        var source = outcomeFixture(false, false);
+        long version = publish(source);
+        tx().executeWithoutResult(status -> catalog.update(new io.github.leontecristian.workflow.core.dto.tasktype.UpdateTaskType(taskTypeId, 0, marker, null, false)));
+        var started = tx().execute(status -> engine.start(new StartWorkflow(UUID.randomUUID(), version, null, null, null), context(false), null)).execution();
+        instances.add(started.instance().id());
+        var command = outcomeCommand(started, "REJECT", null);
+        assertThatThrownBy(() -> complete(command)).isInstanceOfSatisfying(WorkflowExecutionException.class,
+                e -> assertThat(e.category()).isEqualTo(WorkflowExecutionException.Category.INVALID_INPUT));
+        var wrongActor = new WorkflowCommandContext(ActorKind.USER, "other-reviewer", now.plusSeconds(1), correlation);
+        var valid = outcomeCommand(started, "REJECT", "reason");
+        assertThatThrownBy(() -> tx().execute(status -> engine.completeTask(valid, wrongActor))).isInstanceOfSatisfying(WorkflowExecutionException.class,
+                e -> assertThat(e.category()).isEqualTo(WorkflowExecutionException.Category.NOT_ASSIGNED));
+        assertUnchanged(started);
+        assertThat(complete(valid).execution().instance().resultKey()).isEqualTo("LOW");
+        assertThatThrownBy(() -> tx().execute(status -> definitions.replaceDraft(new io.github.leontecristian.workflow.core.dto.definition.ReplaceWorkflowDraft(
+                version, definitions.findVersion(version).orElseThrow().summary().lockVersion(), source.toString()), new DefinitionManagementContext(marker, now))))
+                .isInstanceOf(io.github.leontecristian.workflow.core.exception.definition.WorkflowDefinitionException.class);
+    }
+
     @TestConfiguration static class Adapters {
         @Bean WorkflowServiceAction jsonReplacementAction(TestHost host) {
             return new WorkflowServiceAction() {
@@ -501,7 +636,7 @@ class RestrictedRoutingIT extends DatabaseIntegrationTest {
         private final JdbcTemplate jdbc; private final ConsoleEventStore outbox; private final ConsoleWire wire;
         TestHost(JdbcTemplate jdbc,ConsoleEventStore outbox,ConsoleWire wire) { this.jdbc=jdbc; this.outbox=outbox; this.wire=wire; }
         @Override public DefinitionCapabilities snapshot() {
-            var types=new HashSet<TaskTypeCapability>(); taskCodes.forEach(code->types.add(new TaskTypeCapability(code,Set.of("COMPLETE"))));
+            var types=new HashSet<TaskTypeCapability>(); taskCodes.forEach(code->types.add(new TaskTypeCapability(code,Set.of("COMPLETE", "APPROVE", "REJECT"))));
             return new DefinitionCapabilities(Set.of(new SingleAssignmentCapability(identifier())),types);
         }
         @Override public String identifier() { return "f008.reviewer"; }

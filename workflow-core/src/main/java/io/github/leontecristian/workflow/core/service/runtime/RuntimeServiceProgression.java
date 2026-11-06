@@ -26,18 +26,17 @@ public class RuntimeServiceProgression {
     MinimalWorkflowDefinition.Node traverse(MinimalWorkflowDefinition model,String from,String stop,ServiceActionContext context,
             Map<String,WorkflowValue> state,RuntimeProgression budget,RuntimeHistoryBatch batch) {
         RuntimeInputs.require(model.gateways().isEmpty(),Category.HOST_CONFIGURATION);
-        return traverse(model,from,stop,context,state,budget,batch,"legacy");
+        return traverse(model,from,stop,context,state,budget,batch,"legacy",null);
     }
     MinimalWorkflowDefinition.Node traverse(MinimalWorkflowDefinition model,String from,String stop,ServiceActionContext context,
-            Map<String,WorkflowValue> state,RuntimeProgression budget,RuntimeHistoryBatch batch,String definitionHash) {
+            Map<String,WorkflowValue> state,RuntimeProgression budget,RuntimeHistoryBatch batch,String definitionHash,String selectedOutcome) {
         String cursor=from;
         while (true) {
             String current=cursor;
             var edge=model.gateways().contains(current) ? route(model,current,definitionHash,state,budget,batch)
-                    : model.transitions().stream().filter(t -> t.from().equals(current)).findFirst()
-                    .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
-            Map<String,String> detail=current.equals(model.human().key()) ? Map.of("outcomeKey",model.human().outcome().key()) : Map.of();
-            batch.next("TRANSITION_TAKEN",null,null,edge,detail,Map.of());
+                    : explicitRoute(model, current, selectedOutcome);
+            Map<String,String> detail=current.equals(model.human().key()) ? Map.of("outcomeKey",selectedOutcome) : Map.of();
+            batch.next("TRANSITION_TAKEN",null,null,edge,detail,detail);
             cursor=edge.to();
             if (cursor.equals(stop)) return new MinimalWorkflowDefinition.Node(cursor,"HUMAN_TASK",null,null);
             if (model.ends().containsKey(cursor)) return model.ends().get(cursor);
@@ -73,6 +72,14 @@ public class RuntimeServiceProgression {
             batch.next("SERVICE_TASK_COMPLETED",null,null,null,success,Map.of("nodeKey",cursor,"action",node.action()));
             variables.apply(context.instanceId(),cursor,node.outputs(),state,writes,batch);
         }
+    }
+    private MinimalWorkflowDefinition.Transition explicitRoute(MinimalWorkflowDefinition model, String node, String selectedOutcome) {
+        boolean human = node.equals(model.human().key());
+        RuntimeInputs.require(!human || selectedOutcome != null, Category.HOST_CONFIGURATION);
+        var routes = model.transitions().stream().filter(edge -> edge.from().equals(node)
+                && (human ? selectedOutcome.equals(edge.outcome()) : edge.outcome() == null)).toList();
+        RuntimeInputs.require(routes.size() == 1, Category.HOST_CONFIGURATION);
+        return routes.get(0);
     }
     private MinimalWorkflowDefinition.Transition route(MinimalWorkflowDefinition model,String node,String hash,
             Map<String,WorkflowValue> state,RuntimeProgression budget,RuntimeHistoryBatch batch) {

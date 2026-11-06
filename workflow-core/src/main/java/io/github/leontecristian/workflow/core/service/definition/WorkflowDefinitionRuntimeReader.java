@@ -65,7 +65,7 @@ public class WorkflowDefinitionRuntimeReader {
         var snapshot = capabilities.snapshot();
         var human = definition.model().human();
         if (snapshot == null || snapshot.taskTypes().stream().noneMatch(c -> c.taskType().equals(human.taskType())
-                && c.supportedOutcomes().contains(human.outcome().key()))
+                && human.outcomes().stream().allMatch(outcome -> c.supportedOutcomes().contains(outcome.key())))
                 || (starting && snapshot.assignments().stream().noneMatch(c -> c.resolver().equals(human.assignment().resolver()))))
             throw corrupt();
     }

@@ -27,7 +27,12 @@ public record MinimalWorkflowDefinition(Node start, Human human, Node end, List<
     public record Node(String key, String type, String name, String result) {}
     public record Assignment(String resolver) {}
     public record Outcome(String key, String label, boolean requiresComment) {}
-    public record Human(String key, String taskType, Assignment assignment, Outcome outcome) {}
+    public record Human(String key, String taskType, Assignment assignment, List<Outcome> outcomes) {
+        public Human { outcomes = List.copyOf(outcomes); }
+        public java.util.Optional<Outcome> outcome(String key) {
+            return outcomes.stream().filter(outcome -> outcome.key().equals(key)).findFirst();
+        }
+    }
     public record Transition(String key, String from, String to, String outcome, String condition, boolean defaultRoute) {
         public Transition(String key,String from,String to,String outcome) { this(key,from,to,outcome,null,false); }
     }

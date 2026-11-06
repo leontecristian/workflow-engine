@@ -11,9 +11,7 @@ import io.github.leontecristian.workflow.core.dto.runtime.WorkflowLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 
 /** Pure semantic checks after the bounded structural schema. */
@@ -69,52 +67,15 @@ final class ExecutionValueDefinitionModel {
                 else compatible(inputs.get(source.key()).field(),dest);
             } catch (RuntimeException failure) { error(d,"INVALID_BINDING","/startPolicy/initialize/"+e.getKey()); }
         }
-        Map<String,JsonNode> nodes=new HashMap<>();
         Map<String,MinimalWorkflowDefinition.Service> services=new HashMap<>();
-        JsonNode start=null,human=null,end=null;
-        int starts=0,humans=0,ends=0;
         int nodeIndex=0;
         for (var n:root.path("nodes")) {
             String key=n.path("key").textValue();
-            if (nodes.putIfAbsent(key,n)!=null) error(d,"DUPLICATE_KEY","/nodes");
-            switch (n.path("type").textValue()) {
-                case "START" -> { start=n; starts++; }
-                case "HUMAN_TASK" -> { human=n; humans++; }
-                case "END" -> { end=n; ends++; }
-                case "SERVICE_TASK" -> services.put(key,new MinimalWorkflowDefinition.Service(key,n.path("action").textValue(),bindings(n.path("inputs")),bindings(n.path("outputs")),nodeIndex));
-                case "EXCLUSIVE_GATEWAY" -> { if(expressions==null) error(d,"UNSUPPORTED_FEATURE","/nodes"); }
-                default -> error(d,"UNSUPPORTED_FEATURE","/nodes");
-            }
+            if ("SERVICE_TASK".equals(n.path("type").textValue()))
+                services.put(key,new MinimalWorkflowDefinition.Service(key,n.path("action").textValue(),bindings(n.path("inputs")),bindings(n.path("outputs")),nodeIndex));
             nodeIndex++;
         }
-        if (expressions!=null) return RoutingDefinitionModel.load(root,d,inputs,variables,initialize,services,expressions);
-        if (starts!=1 || humans!=1 || ends!=1) error(d,"INVALID_GRAPH","/nodes");
-        if (d.failed()) return null;
-        var outcome=human.path("outcomes").get(0);
-        Map<String,MinimalWorkflowDefinition.Transition> outgoing=new HashMap<>();
-        var transitions=new ArrayList<MinimalWorkflowDefinition.Transition>();
-        var keys=new HashSet<String>();
-        for (var t:root.path("transitions")) {
-            var v=new MinimalWorkflowDefinition.Transition(t.path("key").textValue(),t.path("from").textValue(),t.path("to").textValue(),DefinitionDocumentCodec.string(t,"outcome"));
-            if (!keys.add(v.key()) || outgoing.putIfAbsent(v.from(),v)!=null || !nodes.containsKey(v.from()) || !nodes.containsKey(v.to())
-                    || v.from().equals(end.path("key").textValue())
-                    || (v.from().equals(human.path("key").textValue()) ? !outcome.path("key").textValue().equals(v.outcome()) : v.outcome()!=null))
-                error(d,"INVALID_GRAPH","/transitions");
-            transitions.add(v);
-        }
-        var visited=new HashSet<String>(); String cursor=start.path("key").textValue();
-        while (cursor!=null && visited.add(cursor)) {
-            var edge=outgoing.get(cursor); cursor=edge==null ? null : edge.to();
-        }
-        if (cursor!=null || visited.size()!=nodes.size() || outgoing.size()!=nodes.size()-1 || !visited.contains(end.path("key").textValue()))
-            error(d,"INVALID_GRAPH","/transitions");
-        if (d.failed()) return null;
-        return new MinimalWorkflowDefinition(new MinimalWorkflowDefinition.Node(start.path("key").textValue(),"START",start.path("name").textValue(),null),
-                new MinimalWorkflowDefinition.Human(human.path("key").textValue(),human.path("taskType").textValue(),
-                        new MinimalWorkflowDefinition.Assignment(human.path("assignment").path("resolver").textValue()),
-                        new MinimalWorkflowDefinition.Outcome(outcome.path("key").textValue(),outcome.path("label").textValue(),outcome.path("requiresComment").booleanValue())),
-                new MinimalWorkflowDefinition.Node(end.path("key").textValue(),"END",end.path("name").textValue(),end.path("result").textValue()),
-                transitions,inputs,variables,initialize,services);
+        return RoutingDefinitionModel.load(root,d,inputs,variables,initialize,services,expressions);
     }
     static void validate(ActionField field, WorkflowValue value) {
         if (value.type()!=field.type() || (!field.nullable() && value.value()==NullLiteral.INSTANCE)) throw new IllegalArgumentException();

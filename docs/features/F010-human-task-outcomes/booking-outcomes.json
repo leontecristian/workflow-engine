@@ -1,0 +1,165 @@
+{
+  "schemaVersion": 1,
+  "key": "sandbox.outcomeBookingReview",
+  "version": 1,
+  "name": "Outcome booking review",
+  "startPolicy": {
+    "inputContract": [
+      {
+        "key": "booking",
+        "type": "JSON",
+        "required": true,
+        "nullable": false
+      }
+    ],
+    "initialize": {
+      "booking": {
+        "source": "startInput",
+        "key": "booking"
+      }
+    }
+  },
+  "variables": [
+    {
+      "key": "booking",
+      "type": "JSON",
+      "nullable": false
+    }
+  ],
+  "nodes": [
+    {
+      "key": "BEGIN",
+      "type": "START",
+      "name": "Start"
+    },
+    {
+      "key": "REVIEW",
+      "type": "HUMAN_TASK",
+      "name": "Review booking",
+      "taskType": "SANDBOX_REVIEW",
+      "assignment": {
+        "resolver": "sandbox.singleReviewer",
+        "inputs": {}
+      },
+      "completion": {
+        "policy": "SINGLE"
+      },
+      "inputContract": [],
+      "resultContract": {
+        "mode": "FORBIDDEN"
+      },
+      "outcomes": [
+        {
+          "key": "APPROVE",
+          "label": "Approve",
+          "requiresComment": false
+        },
+        {
+          "key": "REJECT",
+          "label": "Reject",
+          "requiresComment": true
+        }
+      ]
+    },
+    {
+      "key": "RECORD",
+      "type": "SERVICE_TASK",
+      "name": "Refresh booking",
+      "action": "sandbox.refreshBooking",
+      "inputs": {
+        "booking": {
+          "source": "variable",
+          "key": "booking"
+        }
+      },
+      "outputs": {
+        "booking": {
+          "source": "actionOutput",
+          "key": "booking"
+        }
+      }
+    },
+    {
+      "key": "ROUTE",
+      "type": "EXCLUSIVE_GATEWAY",
+      "name": "Route booking"
+    },
+    {
+      "key": "SALES",
+      "type": "END",
+      "name": "Sales",
+      "result": "SALES"
+    },
+    {
+      "key": "OTHER",
+      "type": "END",
+      "name": "Other",
+      "result": "OTHER"
+    },
+    {
+      "key": "REJECT_RECORD",
+      "type": "SERVICE_TASK",
+      "name": "Refresh rejected booking",
+      "action": "sandbox.refreshBooking",
+      "inputs": {
+        "booking": {
+          "source": "variable",
+          "key": "booking"
+        }
+      },
+      "outputs": {
+        "booking": {
+          "source": "actionOutput",
+          "key": "booking"
+        }
+      }
+    },
+    {
+      "key": "REJECTED",
+      "type": "END",
+      "name": "Rejected",
+      "result": "REJECTED"
+    }
+  ],
+  "transitions": [
+    {
+      "key": "begin",
+      "from": "BEGIN",
+      "to": "REVIEW"
+    },
+    {
+      "key": "approve",
+      "from": "REVIEW",
+      "to": "RECORD",
+      "outcome": "APPROVE"
+    },
+    {
+      "key": "recorded",
+      "from": "RECORD",
+      "to": "ROUTE"
+    },
+    {
+      "key": "sales",
+      "from": "ROUTE",
+      "to": "SALES",
+      "condition": "#vars.booking.amount > 10000 and #vars.booking.department?.code == 'SALES'"
+    },
+    {
+      "key": "other",
+      "from": "ROUTE",
+      "to": "OTHER",
+      "default": true
+    },
+    {
+      "key": "reject",
+      "from": "REVIEW",
+      "to": "REJECT_RECORD",
+      "outcome": "REJECT"
+    },
+    {
+      "key": "rejected",
+      "from": "REJECT_RECORD",
+      "to": "REJECTED"
+    }
+  ]
+}

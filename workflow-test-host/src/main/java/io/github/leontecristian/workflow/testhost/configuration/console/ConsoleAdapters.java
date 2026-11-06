@@ -29,7 +29,7 @@ public class ConsoleAdapters {
                                 Set.of(new SingleAssignmentCapability("sandbox.singleReviewer")),
                                 Set.of(
                                         new TaskTypeCapability(
-                                                "SANDBOX_REVIEW", Set.of("COMPLETE"))))
+                                                "SANDBOX_REVIEW", Set.of("COMPLETE", "APPROVE", "REJECT"))))
                         : new DefinitionCapabilities(Set.of(), Set.of());
     }
 

@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "key": "sandbox.outcomeReview",
+  "version": 1,
+  "name": "Approve or reject",
+  "startPolicy": {
+    "inputContract": []
+  },
+  "variables": [],
+  "nodes": [
+    {
+      "key": "BEGIN",
+      "type": "START",
+      "name": "Start"
+    },
+    {
+      "key": "REVIEW",
+      "type": "HUMAN_TASK",
+      "name": "Review",
+      "taskType": "SANDBOX_REVIEW",
+      "assignment": {
+        "resolver": "sandbox.singleReviewer",
+        "inputs": {}
+      },
+      "completion": {
+        "policy": "SINGLE"
+      },
+      "inputContract": [],
+      "resultContract": {
+        "mode": "FORBIDDEN"
+      },
+      "outcomes": [
+        {
+          "key": "APPROVE",
+          "label": "Approve",
+          "requiresComment": false
+        },
+        {
+          "key": "REJECT",
+          "label": "Reject",
+          "requiresComment": true
+        }
+      ]
+    },
+    {
+      "key": "APPROVED",
+      "type": "END",
+      "name": "Approved",
+      "result": "APPROVED"
+    },
+    {
+      "key": "REJECTED",
+      "type": "END",
+      "name": "Rejected",
+      "result": "REJECTED"
+    }
+  ],
+  "transitions": [
+    {
+      "key": "begin",
+      "from": "BEGIN",
+      "to": "REVIEW"
+    },
+    {
+      "key": "approve",
+      "from": "REVIEW",
+      "to": "APPROVED",
+      "outcome": "APPROVE"
+    },
+    {
+      "key": "reject",
+      "from": "REVIEW",
+      "to": "REJECTED",
+      "outcome": "REJECT"
+    }
+  ]
+}

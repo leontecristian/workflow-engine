@@ -46,7 +46,7 @@ class ServiceProgressionUnitTest {
         }
         transitions.add(new MinimalWorkflowDefinition.Transition("human",previous,"HUMAN",null));
         return new MinimalWorkflowDefinition(new MinimalWorkflowDefinition.Node("START","START","Start",null),
-                new MinimalWorkflowDefinition.Human("HUMAN","TASK",new MinimalWorkflowDefinition.Assignment("resolver"),new MinimalWorkflowDefinition.Outcome("DONE","Done",false)),
+                new MinimalWorkflowDefinition.Human("HUMAN","TASK",new MinimalWorkflowDefinition.Assignment("resolver"),List.of(new MinimalWorkflowDefinition.Outcome("DONE","Done",false))),
                 new MinimalWorkflowDefinition.Node("END","END","End","DONE"),transitions,Map.of(),Map.of(),Map.of(),services);
     }
     @Test void step50CanPauseAndStep51IsNeverInvoked() {

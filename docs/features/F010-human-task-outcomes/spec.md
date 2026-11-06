@@ -1,10 +1,10 @@
 # F010 — Human-task outcomes and outcome-based routing
 
-**Status:** READY, revision 1 — 2026-11-06. **Owner:** Workflow project owner. **Constitution:** [5.0.0](../../constitution.md). **Authorization:** specification preparation only; implementation requires a subsequent user request.
+**Status:** IMPLEMENTED, revision 1 — 2026-11-06. **Owner:** Workflow project owner. **Constitution:** [5.0.0](../../constitution.md). **Authorization:** owner requested implementation of T02–T05 against READY revision 1 on 2026-11-06; no commit or push. Verification and remaining acceptance gaps are in the [implementation record](implementation.md).
 
 ## Purpose and authority
 
-Allow a reviewer to choose a declared outcome, such as APPROVE or REJECT, and execute its explicit route. F009 supplies JSON data and expression routing, but current definitions/execution still assume one human node with one outcome. This feature removes the single-outcome restriction while retaining one human stage and one directly assigned task.
+Allow a reviewer to choose a declared outcome, such as APPROVE or REJECT, and execute its explicit route. F009 supplies JSON data and expression routing; the pre-F010 implementation assumed one human node with one outcome. This feature removes the single-outcome restriction while retaining one human stage and one directly assigned task.
 
 Authority: constitution C06–C09; CON-03/05–10/12; ASM-02–06/08; [design-source precedence](../../design-sources.md); [language design](../../architecture/workflow-definition-language-design.md) sections 9, 12.1 and 14 (including the agreed 16-outcome limit). Build on F005 execution, F007 service actions, F008 routing and [F009](../F009-json-execution-variables/spec.md) values/evidence. This implements an existing language capability in a bounded slice; no new constitutional policy is selected.
 
@@ -35,7 +35,7 @@ No implicit outcome variable or new SpEL root is introduced. Services needing di
 
 ## Complete minimal example
 
-This future executable example requires the existing sample SANDBOX_REVIEW catalog entry and sandbox.singleReviewer resolver. It deliberately contains no gateway or variable, proving outcome routing does not depend on them. It is not accepted by the current single-outcome implementation.
+This executable example requires the sample SANDBOX_REVIEW catalog entry and sandbox.singleReviewer resolver. It deliberately contains no gateway or variable, proving outcome routing does not depend on them. Import [approve-reject.json](approve-reject.json) for this example, or [booking-outcomes.json](booking-outcomes.json) for selected-branch JSON replacement and gateway routing. The latter uses the F009 booking start inputs and the existing sandbox.refreshBooking action.
 
 ```json
 {
@@ -81,4 +81,4 @@ Two independent instances demonstrate APPROVE without a comment and REJECT with 
 
 ## Readiness
 
-No material product decision remains open for this bounded slice. READY means specified, not implemented or verified. All AC01–AC12 are NOT RUN. Follow [plan](plan.md), [tasks](tasks.md) and [implementation record](implementation.md). Multiple stages and operational commands remain separate roadmap candidates.
+No material product decision remains open for this bounded slice. Revision 1 is implemented; automated and HTTP checks do not establish interactive browser or APOLO acceptance. Follow [plan](plan.md), [tasks](tasks.md) and the scenario-specific evidence and gaps in the [implementation record](implementation.md). Multiple stages and operational commands remain separate roadmap candidates.

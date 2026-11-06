@@ -38,7 +38,7 @@ class GatewayRoutingUnitTest {
         edges.add(new Transition("positive","ROUTE","LOW",null,positive,false));
         var end=new Node("HIGH","END",null,"HIGH");
         return new MinimalWorkflowDefinition(new Node("BEGIN","START",null,null),
-                new Human("REVIEW","REVIEW",new Assignment("resolver"),new Outcome("COMPLETE","Complete",false)),
+                new Human("REVIEW","REVIEW",new Assignment("resolver"),List.of(new Outcome("COMPLETE","Complete",false))),
                 end,edges,Map.of(),Map.of("quantity",new ActionField("quantity",VariableValueType.LONG,false,true)),Map.of(),Map.of(),
                 Map.of("HIGH",end,"LOW",new Node("LOW","END",null,"LOW")),Set.of("ROUTE"));
     }
@@ -48,7 +48,7 @@ class GatewayRoutingUnitTest {
         var context=new WorkflowCommandContext(ActorKind.USER,"reviewer",Instant.parse("2026-11-05T00:00:00Z"),"test");
         var batch=new RuntimeHistoryBatch(mock(EntityManager.class),json,1,1,UUID.randomUUID(),context);
         var end=progression.traverse(model,"REVIEW",null,new ServiceActionContext(UUID.randomUUID(),1,1,"REVIEW",null,null,context),
-                state,new RuntimeProgression(),batch,"a".repeat(64));
+                state,new RuntimeProgression(),batch,"a".repeat(64),"COMPLETE");
         assertThat(end.type()).isEqualTo("END");
         assertThat(end.key()).isEqualTo(batch.events().get(batch.events().size()-1).targetNodeKey());
         return batch.events();

@@ -24,19 +24,77 @@ test("completion captures original instance token and assignment-specific task I
     { provide: CommandRecovery, useValue: commands },
   ]);
   page.id = "9223372036854775807";
-  page.detail.set({ instanceId: "9007199254740993" });
-  page.contract.set({ instanceLockVersion: "9007199254740999" });
+  page.detail.set({ instanceId: "9007199254740993", status: "OPEN" });
+  page.contract.set({ instanceLockVersion: "9007199254740999", outcomes: [{key:"COMPLETE", label:"Complete", requiresComment:false}] });
   page.outcome = "COMPLETE";
   page.comment = "Original";
-  await page.complete();
+  await page.complete("COMPLETE");
   const original = buffer.command;
   page.comment = "Edited";
   page.contract.set({ instanceLockVersion: "100" });
   assert.equal(original.body.taskId, "9223372036854775807");
   assert.equal(original.body.comment, "Original");
+  assert.equal(original.body.outcomeKey, "COMPLETE");
   assert.equal(original.expectedToken, "9007199254740999");
   assert.ok(Object.isFrozen(original));
   assert.match(page.error(), /Transport outcome unknown/);
+});
+test("outcome actions require their own comments, explicit keys and an open task", async (t) => {
+  const buffer = new CommandBuffer();
+  let calls = 0;
+  const commands = { buffer, async execute() { calls++; throw new Error("Unknown transport outcome"); } };
+  const { page } = component(t, TaskPage, {}, routeAt(), undefined, [
+    { provide: CommandRecovery, useValue: commands },
+  ]);
+  page.id = "3";
+  page.detail.set({ instanceId: "1", status: "OPEN" });
+  page.contract.set({ instanceLockVersion: "2", outcomes: [
+    { key: "REJECT", label: "Reject", requiresComment: true },
+    { key: "APPROVE", label: "Approve", requiresComment: false },
+  ] });
+  page.comment = " \t\n";
+  await page.complete("REJECT");
+  assert.equal(calls, 0);
+  assert.match(page.error(), /comment is required/);
+  await page.complete("unknown");
+  assert.equal(calls, 0);
+  page.comment = "  Exact reason\n";
+  await page.complete("REJECT");
+  assert.equal(calls, 1);
+  const original = buffer.command;
+  assert.equal(original.body.outcomeKey, "REJECT");
+  assert.equal(original.body.comment, "  Exact reason\n");
+  page.comment = "";
+  await page.complete("APPROVE");
+  assert.equal(calls, 2);
+  assert.equal(buffer.command.body.outcomeKey, "APPROVE");
+  assert.equal(buffer.command.body.comment, null);
+  assert.equal(buffer.entries[0], original);
+  page.detail.set({ instanceId: "1", status: "COMPLETED" });
+  await page.complete("APPROVE");
+  assert.equal(calls, 2);
+});
+test("pending completion freezes one outcome and blocks other action clicks", async (t) => {
+  const buffer = new CommandBuffer();
+  let release;
+  const commands = { buffer, execute: () => new Promise((resolve) => { release = resolve; }) };
+  const { page } = component(t, TaskPage, {}, routeAt(), undefined, [
+    { provide: CommandRecovery, useValue: commands },
+  ]);
+  page.id = "3";
+  page.detail.set({ instanceId: "1", status: "OPEN" });
+  page.contract.set({ instanceLockVersion: "2", outcomes: [
+    { key: "APPROVE", label: "Approve", requiresComment: false },
+    { key: "REJECT", label: "Reject", requiresComment: true },
+  ] });
+  const pending = page.complete("APPROVE");
+  page.comment = "Changed while pending";
+  await page.complete("REJECT");
+  assert.equal(buffer.entries.length, 1);
+  assert.equal(buffer.command.body.outcomeKey, "APPROVE");
+  assert.equal(buffer.command.body.comment, null);
+  release();
+  await pending;
 });
 test("reused task route resets completion input and destroyed pages ignore later parameters", async (t) => {
   const route = routeAt({ id: "1" });

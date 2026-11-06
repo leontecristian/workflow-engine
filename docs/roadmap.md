@@ -1,6 +1,6 @@
 # Workflow engine roadmap
 
-**Updated:** 2026-11-06, to select F010 outcome routing as the next bounded increment.
+**Updated:** 2026-11-06, to record F010 outcome routing implementation and its Chrome walkthrough.
 
 This is the current delivery roadmap. It replaces the separate development plan formerly held in `apolo-docs`. The [feature index](features/README.md) tracks implemented features; each feature's tasks and implementation record own detailed progress and evidence. The [constitution](constitution.md), [constraints](constraints.md) and [design-source precedence](design-sources.md) govern behavior. This roadmap selects no new API, schema, business rule or release date.
 
@@ -17,7 +17,7 @@ The agreed delivery direction is **working sandbox → first APOLO booking integ
 
 See the [feature index](features/README.md) and [F006 handover](features/F006-test-host-definition-console/implementation.md) for revision-specific results. IMPLEMENTED means code exists, not that all acceptance or production gates passed. Historical BLOCKED entries describe the environment at the time; they do not establish that the same blocker still exists today.
 
-F007–F009 now implement service actions, explicit scalar/JSON bindings and restricted expression routing. The runtime still supports only one human stage with one outcome. F010 specifies multiple outcomes within that stage. Multiple stages, structured results, collective review and cancellation/reassignment remain future work. The console's read-only graph is not the graphical designer.
+F007–F009 implement service actions, explicit scalar/JSON bindings and restricted expression routing. F010 adds 1–16 outcomes with exact routes within one SINGLE human stage. Multiple stages, structured results, collective review and cancellation/reassignment remain future work. The console's read-only graph is not the graphical designer.
 
 ## 2. Immediate priority: accept the existing baseline
 
@@ -34,7 +34,7 @@ Complete this work under the existing features rather than creating a new capabi
 
 ## 3. Next engine increments
 
-**Next selected feature:** [F010 — Human-task outcomes and outcome-based routing](features/F010-human-task-outcomes/spec.md), READY revision 1, documentation only. Deliver explicit Approve/Reject-style choices and exact routes before adding richer submissions. Keep one SINGLE human stage; multiple sequential stages are a separate candidate after F010. Earlier acceptance reconciliation remains independent work, not a reason to invent a new feature. No implementation is authorized by this roadmap.
+**Latest implemented increment:** [F010 — Human-task outcomes and outcome-based routing](features/F010-human-task-outcomes/spec.md), revision 1, delivers explicit Approve/Reject-style choices and exact routes within one SINGLE human stage. Local unit/SQL/HTTP checks and the completed Chrome walkthrough are recorded in its handover, with their coverage limits. Multiple sequential stages are a separate candidate after F010. Earlier acceptance reconciliation remains independent work. This roadmap selects no additional implementation scope.
 
 The proposed sequence grows from the accepted minimal workflow to a useful branching sandbox, then richer reviews. Each increment should include its core contract, real test-host adapter/UI support where needed, and its own acceptance evidence. Extend the F006 graph only for shapes it can represent correctly; retain an explicit unavailable state for unsupported shapes.
 

@@ -38,16 +38,6 @@
       </div></mat-card-header
     ><mat-card-content>
       <mat-form-field appearance="outline" class="full-width"
-        ><mat-label>Outcome</mat-label
-        ><mat-select [(ngModel)]="outcome"
-          ><mat-option value="">Choose an outcome</mat-option>@for(o of
-          contract()?.outcomes || [];track o.key){<mat-option [value]="o.key"
-            >{{o.label || o.key}}{{o.requiresComment ? ' · comment required' :
-            ''}}</mat-option
-          >}</mat-select
-        ></mat-form-field
-      >
-      <mat-form-field appearance="outline" class="full-width"
         ><mat-label>Comment</mat-label
         ><textarea
           matInput
@@ -62,14 +52,17 @@
       <div class="form-footer">
         <span class="muted"
           >Expected token <code>{{contract()?.instanceLockVersion}}</code></span
-        ><button
-          mat-flat-button
-          (click)="complete()"
-          [disabled]="busy() || !outcome || detail()?.status !== 'OPEN'"
         >
-          <console-icon name="check" /> Complete task
-        </button>
       </div>
+      <div class="actions">
+        @for(o of contract()?.outcomes || []; track o.key) {
+          <button mat-flat-button (click)="complete(o.key)"
+            [disabled]="busy() || detail()?.status !== 'OPEN' || (o.requiresComment && commentBlank())">
+            {{o.label}}{{o.requiresComment ? ' - comment required' : ''}}
+          </button>
+        }
+      </div>
+      <p class="muted">Actions marked "comment required" need a reason in the shared comment field.</p>
       <mat-expansion-panel class="evidence-panel"
         ><mat-expansion-panel-header
           ><mat-panel-title

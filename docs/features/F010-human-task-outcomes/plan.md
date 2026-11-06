@@ -1,6 +1,6 @@
 # Plan — F010
 
-Targets [specification revision 1](spec.md). Documentation only; await implementation authorization. Follow package/coding standards and the existing two-module boundary. No migration or new public command shape is planned.
+Targets [specification revision 1](spec.md). Implementation authorized by the owner on 2026-11-06. Follow package/coding standards and the existing two-module boundary. No migration or new public command shape is planned.
 
 ## P01 — Definition contract and model (R01–03/08)
 
@@ -27,4 +27,4 @@ Use the spec's complete example and derived service/JSON/gateway fixtures in the
 - Build using root Maven wrapper with selected JDK 21 and Java 17 target; frontend production build/CSP checks using project-pinned tooling. Run relevant existing unit/regression suites; separate these results from SQL behavior.
 - Browser acceptance: two instances for approve/reject, required reason errors, correct ordered buttons and pending states, unauthorized/wrong-user access, refresh/history/graph, frozen recovery/replay and selected/unselected service effects. Cover AC11 and observable parts of AC04/05/08/10/12. Use only an authorized host/database; starting the normal dev host is not implied by test-database authorization.
 
-Record actual commands/results/gaps in implementation.md. No build/test/host/database action is needed for this specification-only task.
+Record actual commands/results/gaps in implementation.md. Implementation verification is authorized under the repository test-database rules. Use an isolated frontend copy if another process holds the shared toolchain open. A temporary browser harness must use IntegrationDatabaseInitializer and the integration-test profile; never start the normal development configuration.

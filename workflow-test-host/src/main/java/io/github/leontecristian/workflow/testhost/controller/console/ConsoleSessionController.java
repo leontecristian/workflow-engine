@@ -85,7 +85,7 @@ public class ConsoleSessionController {
                         settings.sample ? new String[] {"sandbox.singleReviewer"} : new String[] {},
                         "taskTypes",
                         settings.sample
-                                ? Map.of("SANDBOX_REVIEW", new String[] {"COMPLETE"})
+                                ? Map.of("SANDBOX_REVIEW", new String[] {"COMPLETE", "APPROVE", "REJECT"})
                                 : Map.of(),
                         "failureFlags",
                         Map.of(

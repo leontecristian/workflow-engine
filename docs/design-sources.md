@@ -1,6 +1,6 @@
 # Design sources and decision status
 
-**F010 current contract — 2026-11-06:** [Human-task outcomes and outcome-based routing](features/F010-human-task-outcomes/spec.md), READY revision 1, specifies multiple outcomes within one SINGLE human stage. It extends the prior single-outcome implementation subset using existing language outcome/transition rules. Future multiple stages, guards and structured submissions remain separate; no runtime implementation is claimed.
+**F010 current contract — 2026-11-06:** [Human-task outcomes and outcome-based routing](features/F010-human-task-outcomes/spec.md), IMPLEMENTED revision 1, supports multiple outcomes within one SINGLE human stage using existing language outcome/transition rules. See the [handover](features/F010-human-task-outcomes/implementation.md) for local automated/HTTP evidence and the completed Chrome walkthrough. Multiple stages, guards and structured submissions remain separate.
 
 **F009 current contract:** [IMPLEMENTED revision 3](features/F009-json-execution-variables/spec.md) and its [technical annex](features/F009-json-execution-variables/contracts.md) settle the previously open F009 engineering contracts. Earlier open-work narratives are superseded for this slice; the owner subsequently authorized implementation. See the [handover](features/F009-json-execution-variables/implementation.md) for local automated evidence and remaining browser/APOLO gaps. Earlier documentation-only execution restrictions below describe the preparation phase.
 

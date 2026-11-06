@@ -79,6 +79,25 @@ class ConsoleGeneralGraphUnitTest {
     }
     private InstanceGraphView.Node node(InstanceGraphView graph, String key) { return graph.nodes().stream().filter(n -> key.equals(n.key())).findFirst().orElseThrow(); }
 
+    @Test void outcomeBranchesWithoutGatewayDisplayAllEdgesAndOnlyTheRecordedRouteIsTaken() {
+        var doc = document("BEGIN", "START", "REVIEW", "HUMAN_TASK", "APPROVED", "END", "REJECTED", "END");
+        edge(doc, "begin", "BEGIN", "REVIEW");
+        edge(doc, "approve", "REVIEW", "APPROVED");
+        edge(doc, "reject", "REVIEW", "REJECTED");
+        ((ObjectNode) doc.path("transitions").get(1)).put("outcome", "APPROVE");
+        ((ObjectNode) doc.path("transitions").get(2)).put("outcome", "REJECT");
+        var facts = List.of(event(1, "INSTANCE_STARTED"), transition(2, "begin", "BEGIN", "REVIEW"),
+                fact(3, "ACTIVITY_ENTERED", 100L, null, null, null, null), fact(4, "TASK_CREATED", 100L, 200L, null, null, null),
+                event(5, "TASK_COMPLETED"), event(6, "ACTIVITY_COMPLETED"), transition(7, "reject", "REVIEW", "REJECTED"), event(8, "INSTANCE_COMPLETED"));
+        setup(doc, facts, InstanceStatus.COMPLETED, "REJECTED", 8);
+        var graph = graphs.find(1);
+        assertEquals(3, graph.edges().size());
+        assertFalse(graph.edges().stream().filter(e -> e.outcome() != null && e.outcome().equals("APPROVE")).findFirst().orElseThrow().traversed());
+        assertTrue(graph.edges().stream().filter(e -> e.outcome() != null && e.outcome().equals("REJECT")).findFirst().orElseThrow().traversed());
+        assertEquals(State.PENDING, node(graph, "APPROVED").state());
+        assertEquals(State.COMPLETED, node(graph, "REJECTED").state());
+    }
+
     @Test void serviceChainProjectsEveryNodeBeforeAndAfterCompletionWithoutPrivateSettings() {
         var doc = document("DONE", "END", "AFTER", "SERVICE_TASK", "REVIEW", "HUMAN_TASK", "BEFORE", "SERVICE_TASK", "BEGIN", "START");
         ((ObjectNode) doc.path("nodes").get(1)).put("action", "private-action").putObject("outputs").put("private", "never expose");

@@ -47,7 +47,7 @@ public class DefinitionDocumentCodec {
         String description = string(object, "description");
         DefinitionInputs.require(!object.has("description") || description != null);
         DefinitionInputs.metadata(name, description);
-        checkTexts(object, "", false);
+        checkTexts(object, "", false, "");
         for (String field : new String[]{"nodes", "transitions"}) {
             JsonNode array = object.get(field);
             if (array != null && array.isArray() && array.size() > (field.equals("nodes") ? 200 : 500))
@@ -94,19 +94,24 @@ public class DefinitionDocumentCodec {
         throw new JsonParseException(parser, "Invalid value");
     }
 
-    private void checkTexts(JsonNode node, String field, boolean designer) {
+    private void checkTexts(JsonNode node, String field, boolean designer, String pointer) {
         if (node.isTextual() && !designer) {
             String value = node.textValue();
             if ((field.equals("name") || field.equals("label")) && !DefinitionInputs.text(value, 200, 400, true))
-                throw DefinitionInputs.error("LIMIT_EXCEEDED", "Name or label exceeds its contract.");
+                throw DefinitionInputs.error("LIMIT_EXCEEDED", "Name or label exceeds its contract.", pointer);
             if (field.equals("description") && !DefinitionInputs.text(value, 2000, 4000, false))
-                throw DefinitionInputs.error("LIMIT_EXCEEDED", "Description exceeds its contract.");
+                throw DefinitionInputs.error("LIMIT_EXCEEDED", "Description exceeds its contract.", pointer);
             if ((field.equals("key") || field.equals("taskType") || field.equals("from") || field.equals("to")
                     || field.equals("outcome") || field.equals("result")) && !DefinitionInputs.key(value))
-                throw DefinitionInputs.error("INVALID_IDENTITY", "Invalid technical key.");
+                throw DefinitionInputs.error("INVALID_IDENTITY", "Invalid technical key.", pointer);
         }
-        if (node.isObject()) node.fields().forEachRemaining(e -> { if (!e.getKey().equals("default") && !e.getKey().equals("value")) checkTexts(e.getValue(), e.getKey(), designer || e.getKey().equals("designer")); });
-        else if (node.isArray()) node.forEach(n -> checkTexts(n, field, designer));
+        if (node.isObject()) node.fields().forEachRemaining(e -> {
+            if (!e.getKey().equals("default") && !e.getKey().equals("value"))
+                checkTexts(e.getValue(), e.getKey(), designer || e.getKey().equals("designer"),
+                        pointer + "/" + e.getKey().replace("~", "~0").replace("/", "~1"));
+        });
+        else if (node.isArray()) for (int index = 0; index < node.size(); index++)
+            checkTexts(node.get(index), field, designer, pointer + "/" + index);
     }
 
     private void designerBounds(JsonNode node, int depth) {

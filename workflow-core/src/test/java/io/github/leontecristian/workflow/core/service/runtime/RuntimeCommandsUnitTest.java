@@ -74,7 +74,7 @@ class RuntimeCommandsUnitTest {
                 new RuntimeDefinitionPins(definitions,history,json),variables,new RuntimeServiceProgression(registry,variables,json));
         var fields=Map.of("quantity",new ActionField("quantity",VariableValueType.LONG,false,false),"recordedQuantity",new ActionField("recordedQuantity",VariableValueType.LONG,false,false));
         var model=new MinimalWorkflowDefinition(new MinimalWorkflowDefinition.Node("BEGIN","START","Start",null),
-                new MinimalWorkflowDefinition.Human("REVIEW","SANDBOX_REVIEW",new MinimalWorkflowDefinition.Assignment("sandbox.singleReviewer"),new MinimalWorkflowDefinition.Outcome("COMPLETE","Complete",false)),
+                new MinimalWorkflowDefinition.Human("REVIEW","SANDBOX_REVIEW",new MinimalWorkflowDefinition.Assignment("sandbox.singleReviewer"),List.of(new MinimalWorkflowDefinition.Outcome("COMPLETE","Complete",false))),
                 new MinimalWorkflowDefinition.Node("DONE","END","Done","COMPLETED"),List.of(
                     new MinimalWorkflowDefinition.Transition("beginService","BEGIN","BEFORE",null),new MinimalWorkflowDefinition.Transition("beginReview","BEFORE","REVIEW",null),
                     new MinimalWorkflowDefinition.Transition("finishReview","REVIEW","AFTER","COMPLETE"),new MinimalWorkflowDefinition.Transition("finishService","AFTER","DONE",null)),
