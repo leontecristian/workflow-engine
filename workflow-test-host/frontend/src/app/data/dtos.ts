@@ -100,7 +100,7 @@ export interface TaskTypeInput {
   description: string | null;
   selectable: boolean;
 }
-export interface SandboxRequest {
+export interface SandboxRequestSummary {
   id: Decimal;
   name: string;
   status: string;
@@ -108,6 +108,9 @@ export interface SandboxRequest {
   createdBy: string;
   instanceId: Decimal | null;
   lockVersion: Decimal;
+}
+export interface SandboxRequest extends SandboxRequestSummary {
+  requestDataJson: string | null;
 }
 export type InstanceStatus = "ACTIVE" | "COMPLETED" | "CANCELLED";
 export interface InstanceSummary {

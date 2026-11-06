@@ -4,14 +4,16 @@
   "version": 1,
   "name": "Sandbox request status review",
   "startPolicy": {
-    "inputContract": [],
+    "inputContract": [{ "key": "requestData", "type": "JSON", "required": false, "nullable": false, "default": {} }],
     "initialize": {
+      "requestData": { "source": "startInput", "key": "requestData" },
       "statusInReview": { "source": "literal", "value": "IN_REVIEW" },
       "statusApproved": { "source": "literal", "value": "APPROVED" },
       "statusRejected": { "source": "literal", "value": "REJECTED" }
     }
   },
   "variables": [
+    { "key": "requestData", "type": "JSON", "nullable": false },
     { "key": "statusInReview", "type": "STRING", "nullable": false },
     { "key": "statusApproved", "type": "STRING", "nullable": false },
     { "key": "statusRejected", "type": "STRING", "nullable": false }

@@ -7,6 +7,15 @@
   ><mat-card-header><h2>Request #{{id}}</h2></mat-card-header
   ><mat-card-content
     ><console-details [value]="detail()" />
+    @if(detail(); as request) {
+      <h3>Request data</h3>
+      @if(request.requestDataJson !== null) {
+        <pre class="json-block">{{request.requestDataJson}}</pre>
+        <p class="field-note">Passed automatically as requestData at start. The workflow must declare the JSON input and its variable mapping.</p>
+      } @else {
+        <p>No request data. The requestData input will be omitted.</p>
+      }
+    }
     <div class="actions spaced">
       <button
         mat-flat-button

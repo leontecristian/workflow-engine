@@ -1,6 +1,8 @@
 package io.github.leontecristian.workflow.testhost.repository.sandbox;
 
 import io.github.leontecristian.workflow.testhost.dto.sandbox.SandboxRequestView;
+import io.github.leontecristian.workflow.testhost.dto.sandbox.SandboxRequestSummary;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
 import io.github.leontecristian.workflow.testhost.exception.console.ConsoleException;
 import io.github.leontecristian.workflow.testhost.exception.console.SandboxRequestConflict;
 
@@ -26,14 +28,20 @@ public class SandboxRequestStore {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public SandboxRequestView create(String name, String actor, Instant time) {
+        return create(name, null, actor, time);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public SandboxRequestView create(String name, String requestDataJson, String actor, Instant time) {
         if (name == null || name.isBlank() || name.length() > 200) throw ConsoleException.invalid();
+        String data = requestDataJson == null ? null : WorkflowJsonValue.parse(requestDataJson).toJson();
         return jdbc.queryForObject(
-                "INSERT INTO wf_test.sandbox_request(name,created_by,created_at,lock_version)"
-                        + " OUTPUT inserted.* VALUES(?,?,?,0)",
+                "INSERT INTO wf_test.sandbox_request(name,created_by,created_at,lock_version,request_data_json)"
+                        + " OUTPUT inserted.* VALUES(?,?,?,0,?)",
                 this::map,
                 name,
                 actor,
-                utc(time));
+                utc(time), data);
     }
 
     public SandboxRequestView find(long id) {
@@ -44,10 +52,13 @@ public class SandboxRequestStore {
                 .orElseThrow(ConsoleException::missing);
     }
 
-    public List<SandboxRequestView> page(long after, int count) {
+    public List<SandboxRequestSummary> page(long after, int count) {
         return jdbc.query(
-                "SELECT TOP (?) * FROM wf_test.sandbox_request WHERE id>? ORDER BY id",
-                this::map,
+                "SELECT TOP (?) id,name,status,created_by,created_at,lock_version,instance_id"
+                        + " FROM wf_test.sandbox_request WHERE id>? ORDER BY id",
+                (rs, row) -> new SandboxRequestSummary(rs.getLong("id"), rs.getString("name"),
+                        rs.getString("status"), rs.getString("created_by"), instant(rs, "created_at"),
+                        rs.getLong("lock_version"), rs.getObject("instance_id", Long.class)),
                 count,
                 after);
     }
@@ -94,7 +105,8 @@ public class SandboxRequestStore {
                 rs.getString("created_by"),
                 instant(rs, "created_at"),
                 rs.getLong("lock_version"),
-                rs.getObject("instance_id", Long.class));
+                rs.getObject("instance_id", Long.class),
+                rs.getString("request_data_json"));
     }
 
     public static LocalDateTime utc(Instant time) {

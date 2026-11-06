@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd"
+                   logicalFilePath="db/changelog/test-host/changes/005-console-request-data.xml">
+    <changeSet id="f006-009-add-sandbox-request-data" author="workflow-test-host">
+        <preConditions onFail="HALT" onError="HALT"><dbms type="mssql"/></preConditions>
+        <sql dbms="mssql"><![CDATA[
+ALTER TABLE wf_test.sandbox_request ADD request_data_json NVARCHAR(MAX) NULL;
+ALTER TABLE wf_test.sandbox_request ADD CONSTRAINT ck_console_request_data
+CHECK (request_data_json IS NULL OR (ISJSON(request_data_json)=1 AND DATALENGTH(request_data_json)<=262144));
+        ]]></sql>
+    </changeSet>
+</databaseChangeLog>

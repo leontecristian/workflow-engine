@@ -86,12 +86,15 @@
   <button mat-stroked-button (click)="loadVariables()">Refresh variables</button>
   @if(variables(); as page) {
     <p>Instance token {{page.lockVersion}}. Uninitialized variables have no stored value; initialized null is explicit.</p>
-    @for(item of page.items; track item.key) {
+    @for(item of variableDisplays(); track item.key) {
       <h3>{{item.key}} · {{item.type}} · {{item.initialized ? (item.value === null ? 'Initialized null' : 'Initialized') : 'Uninitialized'}}</h3>
-      <p>Use the exact JSON below to inspect values.</p>
+      <pre>{{item.displayValue}}</pre>
     }
     <button mat-button (click)="exportVariables()">Download exact page JSON</button>
-    <pre>{{page.exactJson}}</pre>
+    <mat-expansion-panel>
+      <mat-expansion-panel-header><mat-panel-title>Exact page JSON</mat-panel-title></mat-expansion-panel-header>
+      <pre>{{page.exactJson}}</pre>
+    </mat-expansion-panel>
     @if(page.nextAfterKey) { <button mat-button (click)="loadVariables(true)">Next variable page</button> }
   }
   @if(variableError()) { <p role="alert">{{variableError()}}</p> }

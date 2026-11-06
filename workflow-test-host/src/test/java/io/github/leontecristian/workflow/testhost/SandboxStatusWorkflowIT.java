@@ -126,12 +126,59 @@ class SandboxStatusWorkflowIT extends DatabaseIntegrationTest {
     private int count(String table, long instance) {
         return jdbc.queryForObject("SELECT COUNT(*) FROM " + table + " WHERE instance_id=?", Integer.class, instance);
     }
+    private String variableJson(long instance) {
+        var variable = reads.listVariables(instance, null, 100, null).items().stream()
+                .filter(v -> v.key().equals("requestData")).findFirst().orElseThrow();
+        return ((io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue) variable.value().value()).toJson();
+    }
+
+    @Test void absentSourceUsesPinnedDefaultAndArraySourceIsSupported() throws Exception {
+        long definition = publish(fixture()), empty = request();
+        assertThat(requests.find(empty).requestDataJson()).isNull();
+        assertThat(variableJson(start(new SandboxStart(UUID.randomUUID(), definition, empty, 0)).instance().id()))
+                .isEqualTo("{}");
+        long array = tx().execute(t -> requests.create(marker, "[1.00,{\"flag\":true}]", marker, Instant.now())).id();
+        assertThat(variableJson(start(new SandboxStart(UUID.randomUUID(), definition, array, 0)).instance().id()))
+                .isEqualTo("[1.00,{\"flag\":true}]");
+        assertThat(new io.github.leontecristian.workflow.testhost.service.console.ConsoleWire()
+                .json(requests.page(array - 1, 1))).doesNotContain("requestDataJson");
+    }
+
+    @ParameterizedTest @ValueSource(booleans = {true, false})
+    void requiredMissingAndUndeclaredSourceFailWithoutHostChanges(boolean required) throws Exception {
+        var source = fixture();
+        var policy = (ObjectNode) source.path("startPolicy");
+        if (required) {
+            var declaration = (ObjectNode) policy.path("inputContract").get(0);
+            declaration.put("required", true); declaration.remove("default");
+        } else {
+            policy.putArray("inputContract");
+            ((ObjectNode) policy.path("initialize")).remove("requestData");
+        }
+        long definition = publish(source);
+        long id = tx().execute(t -> requests.create(marker, required ? null : "{}", marker, Instant.now())).id();
+        assertThatThrownBy(() -> runtime.start(new SandboxStart(UUID.randomUUID(), definition, id, 0), context(false)))
+                .isInstanceOf(WorkflowExecutionException.class);
+        assertThat(requests.find(id).instanceId()).isNull();
+        assertThat(requests.find(id).lockVersion()).isZero();
+        assertThat(requests.find(id).status()).isEqualTo("DRAFT");
+    }
 
     @ParameterizedTest @ValueSource(strings = {"APPROVE", "REJECT"})
     void selectedOutcomeUpdatesHostStatusAndSuccessfulReplayDoesNotWriteAgain(String outcome) throws Exception {
-        long definition = publish(fixture()), requestId = request();
+        long definition = publish(fixture());
+        String data = "{\"amount\":9007199254740993.00,\"booking\":{\"reference\":\"TEST-001\"},\"items\":[true,null]}";
+        long requestId = tx().execute(t -> requests.create(marker, data, marker, Instant.now())).id();
         var command = new SandboxStart(UUID.randomUUID(), definition, requestId, 0);
         var started = start(command);
+        assertThat(requests.find(requestId).requestDataJson()).isEqualTo(data);
+        assertThat(variableJson(started.instance().id())).isEqualTo(data);
+        assertThat(runtime.replayStart(command, context(false))).isPresent();
+        // A test-only source change proves the accepted variable is a persisted snapshot.
+        // There is deliberately no supported API for editing the source.
+        jdbc.update("UPDATE wf_test.sandbox_request SET request_data_json='{}' WHERE id=?", requestId);
+        assertThat(variableJson(started.instance().id())).isEqualTo(data);
+        jdbc.update("UPDATE wf_test.sandbox_request SET request_data_json=? WHERE id=?", data, requestId);
         assertThat(requests.find(requestId).status()).isEqualTo("IN_REVIEW");
         assertThat(requests.find(requestId).lockVersion()).isEqualTo(2);
         assertThat(runtime.start(command, context(false)).replayed()).isTrue();
@@ -153,6 +200,8 @@ class SandboxStatusWorkflowIT extends DatabaseIntegrationTest {
         String target = outcome.equals("APPROVE") ? "APPROVED" : "REJECTED";
         assertThat(result.execution().instance().resultKey()).isEqualTo(target);
         assertThat(requests.find(requestId).status()).isEqualTo(target);
+        assertThat(requests.find(requestId).requestDataJson()).isEqualTo(data);
+        assertThat(variableJson(started.instance().id())).isEqualTo(data);
         assertThat(requests.find(requestId).lockVersion()).isEqualTo(3);
         int events = count("wf_test.workflow_event_outbox", started.instance().id());
         assertThat(runtime.complete(completion, context(true)).replayed()).isTrue();
@@ -178,6 +227,7 @@ class SandboxStatusWorkflowIT extends DatabaseIntegrationTest {
         edges.addObject().put("key", "fallback").put("from", "FAIL_ROUTE").put("to", "APPROVED").put("default", true);
         long definition = publish(source), requestId = request();
         var started = start(new SandboxStart(UUID.randomUUID(), definition, requestId, 0));
+        assertThat(variableJson(started.instance().id())).isEqualTo("{}");
         long instance = started.instance().id();
         int history = count("wf.workflow_history", instance), events = count("wf_test.workflow_event_outbox", instance);
         var completion = complete(started, "APPROVE");
@@ -197,7 +247,8 @@ class SandboxStatusWorkflowIT extends DatabaseIntegrationTest {
     @Test void invalidStartTransitionRollsBackAllocatedLinkAndStatus() throws Exception {
         var source = fixture();
         ((ObjectNode) source.path("startPolicy").path("initialize").path("statusInReview")).put("value", "APPROVED");
-        long definition = publish(source), requestId = request();
+        long definition = publish(source);
+        long requestId = tx().execute(t -> requests.create(marker, "{\"amount\":123.00}", marker, Instant.now())).id();
         assertThatThrownBy(() -> runtime.start(new SandboxStart(UUID.randomUUID(), definition, requestId, 0), context(false)))
                 .isInstanceOfSatisfying(WorkflowExecutionException.class,
                         failure -> assertThat(failure.category()).isEqualTo(WorkflowExecutionException.Category.SERVICE_ACTION_FAILED));

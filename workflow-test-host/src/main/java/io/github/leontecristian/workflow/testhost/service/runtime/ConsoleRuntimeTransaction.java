@@ -3,6 +3,9 @@ package io.github.leontecristian.workflow.testhost.service.runtime;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
+import io.github.leontecristian.workflow.core.dto.runtime.StartInputs;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
+import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
@@ -12,6 +15,7 @@ import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequ
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.Optional;
 
 @Service
@@ -34,12 +38,11 @@ public class ConsoleRuntimeTransaction {
 
     @Transactional
     public WorkflowCommandResult start(SandboxStart command, WorkflowCommandContext context) {
-        requests.find(command.requestId()); // No stale/link precheck: the core receipt remains
-        // authoritative.
+        var inputs = startInputs(command); // No stale/link precheck: core receipts remain authoritative.
         var result =
                 execution.start(
                         command.core(),
-                        command.inputs(),
+                        inputs,
                         context,
                         allocated -> {
                             requests.link(
@@ -80,7 +83,19 @@ public class ConsoleRuntimeTransaction {
     @Transactional(readOnly = true)
     public Optional<WorkflowCommandResult> replayStart(
             SandboxStart command, WorkflowCommandContext context) {
-        return execution.findReplay(command.core(), command.inputs(), context);
+        return execution.findReplay(command.core(), startInputs(command), context);
+    }
+
+    private StartInputs startInputs(SandboxStart command) {
+        if (command.inputs().values().containsKey("requestData")) {
+            throw new WorkflowExecutionException(WorkflowExecutionException.Category.INVALID_INPUT);
+        }
+        var request = requests.find(command.requestId());
+        // Saved source data has no update API; retry/recovery therefore uses the same fingerprint.
+        if (request.requestDataJson() == null) return command.inputs();
+        var values = new HashMap<>(command.inputs().values());
+        values.put("requestData", WorkflowJsonValue.parse(request.requestDataJson()));
+        return new StartInputs(values);
     }
 
     @Transactional(readOnly = true)

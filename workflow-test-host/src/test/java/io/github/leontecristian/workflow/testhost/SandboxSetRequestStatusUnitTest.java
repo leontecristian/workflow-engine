@@ -29,7 +29,7 @@ class SandboxSetRequestStatusUnitTest {
         return Map.of("status", new WorkflowValue(VariableValueType.STRING, new TextLiteral(status)));
     }
     private void request(String status, Long instance) {
-        when(requests.find(7)).thenReturn(new SandboxRequestView(7, "request", status, "admin", Instant.EPOCH, 3, instance));
+        when(requests.find(7)).thenReturn(new SandboxRequestView(7, "request", status, "admin", Instant.EPOCH, 3, instance, null));
     }
 
     @Test void permittedTransitionUsesTrustedLinkAndExpectedRequestVersion() {

@@ -7,7 +7,7 @@ import static io.github.leontecristian.workflow.testhost.service.console.Console
 import static io.github.leontecristian.workflow.testhost.service.console.ConsoleWire.query;
 import static io.github.leontecristian.workflow.testhost.service.console.ConsoleWire.text;
 
-import io.github.leontecristian.workflow.testhost.dto.sandbox.SandboxRequestView;
+import io.github.leontecristian.workflow.testhost.dto.sandbox.SandboxRequestSummary;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleWire;
 import io.github.leontecristian.workflow.testhost.service.sandbox.ConsoleSandboxService;
@@ -41,7 +41,8 @@ public class ConsoleSandboxController {
 
     @PostMapping
     public ResponseEntity<String> create(HttpServletRequest r) {
-        return wire.response(service.create(text(wire.body(r, "name"), "name", false)));
+        var body = wire.body(r, 2 * 1024 * 1024, "name", "requestDataJson");
+        return wire.response(service.create(text(body, "name", false), text(body, "requestDataJson", true)));
     }
 
     @GetMapping
@@ -54,7 +55,7 @@ public class ConsoleSandboxController {
                         rows.stream().limit(n).toList(),
                         rows.size() > n ? rows.get(n - 1).id() : null,
                         "nextAfterId",
-                        SandboxRequestView::id));
+                        SandboxRequestSummary::id));
     }
 
     @GetMapping("/{id}")

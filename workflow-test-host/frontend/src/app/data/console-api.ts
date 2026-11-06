@@ -12,6 +12,7 @@ import type {
   TaskTypeView,
   TaskTypeInput,
   SandboxRequest,
+  SandboxRequestSummary,
   InstanceSummary,
   InstanceView,
   InstanceGraph,
@@ -151,7 +152,7 @@ export class ConsoleApi {
     );
   }
   listRequests(cursor?: string, limit = 50) {
-    return this.transport.call<Page<SandboxRequest>>(
+    return this.transport.call<Page<SandboxRequestSummary>>(
       "/sandbox-requests" + pageQuery(cursor, limit),
     );
   }
@@ -160,9 +161,10 @@ export class ConsoleApi {
       "/sandbox-requests/" + segment(id),
     );
   }
-  createRequest(name: string) {
+  createRequest(name: string, requestDataJson: string | null = null) {
     return this.transport.call<SandboxRequest>("/sandbox-requests", "POST", {
       name,
+      requestDataJson,
     });
   }
   listInstances(status: string, cursor?: string, limit = 50) {

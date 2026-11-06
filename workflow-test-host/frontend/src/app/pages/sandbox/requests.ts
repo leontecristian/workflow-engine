@@ -5,7 +5,7 @@ import { MatAutocompleteModule } from "@angular/material/autocomplete";
 import { ConsoleApi } from "../../data/console-api";
 import { CommandRecovery } from "../../data/command-recovery";
 import { exactDecimal, parseScalarInputs } from "../../command-buffer";
-import type { DefinitionView, VersionSummary, SandboxRequest } from "../../data/dtos";
+import type { DefinitionView, VersionSummary, SandboxRequestSummary } from "../../data/dtos";
 import { PAGE_IMPORTS } from "../../ui/page-imports";
 import { pageState } from "../../ui/page-state";
 @Component({
@@ -34,10 +34,11 @@ export class RequestsPage {
       "Create a sandbox request and start an explicitly selected published workflow.",
     icon: "start",
   };
-  rows = signal<SandboxRequest[]>([]);
+  rows = signal<SandboxRequestSummary[]>([]);
   next: string | null = null;
   pageSize = 50;
   name = "";
+  requestDataText = "";
   familyId = "";
   workflowInput: string | DefinitionView = "";
   workflows = signal<DefinitionView[]>([]);
@@ -135,7 +136,7 @@ export class RequestsPage {
   }
   async createRequest() {
     await this.run(async () => {
-      const r = await this.api.createRequest(this.name);
+      const r = await this.api.createRequest(this.name, this.requestDataText.trim() ? this.requestDataText : null);
       this.requestId = r.id;
       this.requestToken = r.lockVersion;
       this.notice.set("Request " + r.id + " created");

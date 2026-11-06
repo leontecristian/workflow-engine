@@ -46,3 +46,9 @@ T08/T09 source is implemented and compiled, but their required browser behavior 
 - [x] Add definition transition selection, accessible hit targets and saved condition/default details; isolated checks/build pass. Browser visual/keyboard acceptance NOT RUN.
 
 - [x] Add selected node/transition JSON fragment editor with guarded draft-only application; isolated tests/build/CSP pass, browser acceptance NOT RUN.
+
+## Request JSON extension
+
+- [x] RD-T01 Specify and implement optional persisted exact request JSON and bounded summary reads.
+- [x] RD-T02 Bind requestData on start/replay; update console and sample.
+- [x] RD-T03 Verify unit, SQL integration and frontend behavior; record evidence/gaps.

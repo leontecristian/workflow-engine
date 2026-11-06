@@ -12,6 +12,19 @@ const identity = {
   csrfHeaderName: "X-CSRF-TOKEN",
   csrfToken: "server-token",
 };
+test("request creation transports exact JSON text and represents omission as null", async (t) => {
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    calls.push(options); return { ok: true, text: async () => '{}' };
+  });
+  const injector = services(t); injector.get(ConsoleSession).session.set(identity);
+  const api = injector.get(ConsoleApi);
+  const source = '{"amount":9007199254740993.00,"value":1E+2}';
+  await api.createRequest("Exact request", source);
+  await api.createRequest("No data");
+  assert.equal(JSON.parse(calls[0].body).requestDataJson, source);
+  assert.equal(JSON.parse(calls[1].body).requestDataJson, null);
+});
 test("JSON start transport and variable inspection retain exact numeric text", async (t) => {
   const calls=[];
   const exact='{"items":[{"key":"booking","type":"JSON","initialized":true,"value":{"amount":9007199254740993.00}}],"nextAfterKey":null,"lockVersion":"2","instanceId":"1"}';

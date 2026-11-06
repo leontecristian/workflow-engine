@@ -19,7 +19,15 @@
           matInput
           [(ngModel)]="name"
           placeholder="Give this manual run a meaningful name" /></mat-form-field
-      ><button mat-stroked-button (click)="createRequest()" [disabled]="busy()">
+      >
+      <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
+        <mat-label>Request data (optional JSON object or array)</mat-label>
+        <textarea matInput [(ngModel)]="requestDataText" rows="6" spellcheck="false"
+          placeholder='{"bookingReference":"TEST-001","amount":12500.00}'></textarea>
+        <mat-hint>Saved with this request and passed automatically as requestData at start. Leave blank to omit.</mat-hint>
+      </mat-form-field>
+      <p class="field-note">The saved data is read-only. Create another request to test different data.</p>
+      <button mat-stroked-button (click)="createRequest()" [disabled]="busy()">
         <console-icon name="plus" /> Create request
       </button></mat-card-content
     ></mat-card
@@ -104,7 +112,7 @@
       <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
         <mat-label>Execution inputs (raw JSON object)</mat-label>
         <textarea matInput [(ngModel)]="inputsText" rows="4" spellcheck="false"></textarea>
-        <mat-hint>Use objects/arrays for JSON values, strings for scalar numbers and dates, true/false for Boolean, and null for explicit null. Omit absent keys.</mat-hint>
+        <mat-hint>Use objects/arrays for JSON values, strings for scalar numbers and dates, true/false for Boolean, and null for explicit null. Omit absent keys. Saved request data is supplied automatically as requestData; do not include that key here.</mat-hint>
       </mat-form-field>
       <button
         mat-flat-button

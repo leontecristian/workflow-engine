@@ -9,4 +9,5 @@ public record SandboxRequestView(
         String createdBy,
         Instant createdAt,
         long lockVersion,
-        Long instanceId) {}
+        Long instanceId,
+        String requestDataJson) {}

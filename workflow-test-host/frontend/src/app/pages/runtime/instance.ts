@@ -1,4 +1,6 @@
-import { Component, DestroyRef, inject, signal } from "@angular/core";
+import { Component, DestroyRef, computed, inject, signal } from "@angular/core";
+import { findNodeAtLocation, parseTree } from "jsonc-parser";
+import { prettyDocument } from "../../command-buffer";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { ActivatedRoute, Router } from "@angular/router";
 import { ConsoleApi } from "../../data/console-api";
@@ -31,6 +33,26 @@ export class InstancePage {
   graph = signal<InstanceGraph | null>(null);
   graphError = signal("");
   variables = signal<import("../../data/dtos").VariablePage|null>(null);
+  variableDisplays = computed(() => {
+    const page = this.variables();
+    if (!page) return [];
+    const source = page.exactJson;
+    const tree = source ? parseTree(source) : undefined;
+    return page.items.map((item, index) => {
+      const node = tree && findNodeAtLocation(tree, ["items", index, "value"]);
+      let displayValue = "No stored value";
+      if (item.initialized) {
+        if (item.value === null) displayValue = "null";
+        else if (item.type !== "JSON" && typeof item.value === "string") displayValue = item.value;
+        else if (node && source) {
+          // Slice the original response: JS number conversion would lose precision and scale.
+          displayValue = prettyDocument(source.slice(node.offset, node.offset + node.length));
+        } else if (typeof item.value === "boolean") displayValue = String(item.value);
+        else displayValue = "Value unavailable; refresh variables.";
+      }
+      return { ...item, displayValue };
+    });
+  });
   variableError = signal("");
   effects = signal<import("../../data/dtos").Page<import("../../data/dtos").ServiceEffect>|null>(null);
   effectError = signal("");

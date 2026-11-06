@@ -18,7 +18,7 @@ public class ConsoleSandboxService {
     }
 
     @Transactional
-    public SandboxRequestView create(String name) {
-        return requests.create(name, context.actor(), context.now());
+    public SandboxRequestView create(String name, String requestDataJson) {
+        return requests.create(name, requestDataJson, context.actor(), context.now());
     }
 }
