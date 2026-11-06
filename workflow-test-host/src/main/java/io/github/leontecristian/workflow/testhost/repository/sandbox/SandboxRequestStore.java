@@ -74,10 +74,23 @@ public class SandboxRequestStore {
                 == 1;
     }
 
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void updateStatus(long id, long instanceId, long expectedVersion, String previous, String status) {
+        if (expectedVersion == Long.MAX_VALUE
+                || jdbc.update(
+                        "UPDATE wf_test.sandbox_request SET status=?,lock_version=lock_version+1"
+                                + " WHERE id=? AND instance_id=? AND lock_version=?"
+                                + " AND status COLLATE Latin1_General_100_BIN2=?",
+                        status, id, instanceId, expectedVersion, previous) != 1) {
+            throw new SandboxRequestConflict();
+        }
+    }
+
     private SandboxRequestView map(ResultSet rs, int row) throws SQLException {
         return new SandboxRequestView(
                 rs.getLong("id"),
                 rs.getString("name"),
+                rs.getString("status"),
                 rs.getString("created_by"),
                 instant(rs, "created_at"),
                 rs.getLong("lock_version"),

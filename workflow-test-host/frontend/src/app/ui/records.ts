@@ -40,6 +40,7 @@ const COLUMNS: Record<string, RecordColumn[]> = {
   ],
   requests: [
     { key: "name", label: "Request" },
+    { key: "status", label: "Status" },
     { key: "instanceId", label: "Linked instance" },
     { key: "lockVersion", label: "Version" },
     { key: "createdAt", label: "Created" },

@@ -29,39 +29,65 @@
       ><div>
         <div class="eyebrow">STEP 2</div>
         <h2>Start a published workflow</h2>
-        <p>Choose an exact version and the original request token.</p>
+        <p>Find a workflow, then choose a published version to run.</p>
       </div></mat-card-header
-    ><mat-card-content>
-      <div class="inline-form">
-        <mat-form-field appearance="outline" subscriptSizing="dynamic"
-          ><mat-label>Definition family ID</mat-label
-          ><input
-            matInput
-            [(ngModel)]="familyId"
-            inputmode="numeric" /></mat-form-field
-        ><button
-          mat-stroked-button
-          (click)="loadPublished()"
-          [disabled]="busy()"
-        >
-          Load versions
-        </button>
-      </div>
-      <mat-form-field appearance="outline" class="full-width spaced"
+    ><mat-card-content class="start-form">
+      <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
+        <mat-label>Workflow</mat-label>
+        <input matInput [ngModel]="workflowInput" (ngModelChange)="workflowEdited($event)"
+          [matAutocomplete]="workflowOptions" [disabled]="busy()"
+          placeholder="Search by name or key" />
+        <mat-autocomplete #workflowOptions="matAutocomplete" [displayWith]="workflowLabel"
+          (optionSelected)="selectWorkflow($event.option.value)">
+          @for(workflow of matchingWorkflows(); track workflow.id) {
+            <mat-option [value]="workflow">{{workflow.name}} · {{workflow.key}}</mat-option>
+          }
+          @if(workflowsLoading()) { <mat-option disabled>Loading workflows…</mat-option> }
+          @else if(!matchingWorkflows().length) {
+            <mat-option disabled>No matching workflows in the loaded list</mat-option>
+          }
+        </mat-autocomplete>
+        <mat-hint>Type a name or key, then select a workflow from the list.</mat-hint>
+      </mat-form-field>
+      @if(workflowsLoading()) { <p class="field-note" role="status">Loading workflows…</p> }
+      @if(workflowNext) {
+        <p class="field-note">Search covers {{workflows().length}} loaded workflows. Load more to find additional workflows.</p>
+        <button mat-button (click)="loadWorkflows(true)" [disabled]="workflowsLoading() || busy()">Load more workflows</button>
+      }
+      @if(workflowError()) {
+        <p role="alert">Could not load workflows: {{workflowError()}}</p>
+        <button mat-button (click)="loadWorkflows(!!workflowNext)" [disabled]="workflowsLoading() || busy()">Retry workflows</button>
+      }
+      @if(!workflowsLoading() && !workflowError() && !workflows().length) {
+        <p class="field-note">No workflows yet. <a routerLink="/definitions">Import a definition</a> to get started.</p>
+      }
+      <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic"
         ><mat-label>Published version</mat-label
-        ><mat-select [(ngModel)]="versionId"
+        ><mat-select [(ngModel)]="versionId" [disabled]="!familyId || !publishedRows().length || versionsLoading() || busy()"
           ><mat-option value="">Choose a version</mat-option>@for(v of
           publishedRows();track v.id){<mat-option [value]="v.id"
-            >{{v.key}} · v{{v.version}} · #{{v.id}}</mat-option
+            >Version {{v.version}}</mat-option
           >}</mat-select
-        ></mat-form-field
+        >
+        <mat-hint>
+          @if(versionsLoading()) { Loading published versions… }
+          @else if(!familyId) { Select a workflow first. }
+          @else if(!versionError() && !publishedRows().length) { This workflow has no published versions. }
+          @else if(versionId) { This exact published version will be used. }
+          @else { Choose the published version to run. }
+        </mat-hint>
+        </mat-form-field
       >
+      @if(versionError()) {
+        <p role="alert">Could not load published versions: {{versionError()}}</p>
+        <button mat-button (click)="loadPublished()" [disabled]="versionsLoading() || busy()">Retry versions</button>
+      }
       @if(publishedNext){<button
         mat-button
         (click)="loadPublished(true)"
-        [disabled]="busy()"
+          [disabled]="busy() || versionsLoading()"
       >
-        Next version page <console-icon name="chevron" /></button
+        Load more versions <console-icon name="chevron" /></button
       >}
       <div class="form-grid">
         <mat-form-field appearance="outline"
@@ -75,7 +101,7 @@
           ><input matInput [(ngModel)]="requestToken" inputmode="numeric"
         /></mat-form-field>
       </div>
-      <mat-form-field appearance="outline" class="full-width">
+      <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
         <mat-label>Execution inputs (raw JSON object)</mat-label>
         <textarea matInput [(ngModel)]="inputsText" rows="4" spellcheck="false"></textarea>
         <mat-hint>Use objects/arrays for JSON values, strings for scalar numbers and dates, true/false for Boolean, and null for explicit null. Omit absent keys.</mat-hint>
@@ -83,7 +109,7 @@
       <button
         mat-flat-button
         (click)="start()"
-        [disabled]="busy() || !versionId"
+        [disabled]="busy() || versionsLoading() || !familyId || !versionId || !requestId"
       >
         <console-icon name="start" /> Start new command
       </button>

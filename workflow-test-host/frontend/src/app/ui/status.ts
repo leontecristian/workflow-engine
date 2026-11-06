@@ -14,6 +14,7 @@ export class ConsoleStatus {
       [
         "PUBLISHED",
         "COMPLETED",
+        "APPROVED",
         "PASSED",
         "DELIVERED",
         "SELECTABLE",
@@ -21,7 +22,7 @@ export class ConsoleStatus {
       ].includes(value)
     )
       return "success";
-    if (["ACTIVE", "OPEN", "PENDING", "DRAFT"].includes(value)) return "info";
+    if (["ACTIVE", "OPEN", "PENDING", "DRAFT", "IN_REVIEW"].includes(value)) return "info";
     if (["FAILED", "REJECTED", "UNKNOWN_OUTCOME"].includes(value))
       return "danger";
     return "neutral";

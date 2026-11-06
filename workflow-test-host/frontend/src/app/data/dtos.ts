@@ -103,6 +103,7 @@ export interface TaskTypeInput {
 export interface SandboxRequest {
   id: Decimal;
   name: string;
+  status: string;
   createdAt: string;
   createdBy: string;
   instanceId: Decimal | null;

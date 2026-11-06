@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "key": "sandbox.requestStatusReview",
+  "version": 1,
+  "name": "Sandbox request status review",
+  "startPolicy": {
+    "inputContract": [],
+    "initialize": {
+      "statusInReview": { "source": "literal", "value": "IN_REVIEW" },
+      "statusApproved": { "source": "literal", "value": "APPROVED" },
+      "statusRejected": { "source": "literal", "value": "REJECTED" }
+    }
+  },
+  "variables": [
+    { "key": "statusInReview", "type": "STRING", "nullable": false },
+    { "key": "statusApproved", "type": "STRING", "nullable": false },
+    { "key": "statusRejected", "type": "STRING", "nullable": false }
+  ],
+  "nodes": [
+    { "key": "BEGIN", "type": "START", "name": "Start" },
+    {
+      "key": "SET_IN_REVIEW", "type": "SERVICE_TASK", "name": "Mark request in review",
+      "action": "sandbox.setRequestStatus",
+      "inputs": { "status": { "source": "variable", "key": "statusInReview" } },
+      "outputs": {}
+    },
+    {
+      "key": "REVIEW", "type": "HUMAN_TASK", "name": "Approve or reject request",
+      "taskType": "SANDBOX_REVIEW",
+      "assignment": { "resolver": "sandbox.singleReviewer", "inputs": {} },
+      "completion": { "policy": "SINGLE" },
+      "inputContract": [], "resultContract": { "mode": "FORBIDDEN" },
+      "outcomes": [
+        { "key": "APPROVE", "label": "Approve", "requiresComment": false },
+        { "key": "REJECT", "label": "Reject", "requiresComment": true }
+      ]
+    },
+    {
+      "key": "SET_APPROVED", "type": "SERVICE_TASK", "name": "Mark request approved",
+      "action": "sandbox.setRequestStatus",
+      "inputs": { "status": { "source": "variable", "key": "statusApproved" } },
+      "outputs": {}
+    },
+    {
+      "key": "SET_REJECTED", "type": "SERVICE_TASK", "name": "Mark request rejected",
+      "action": "sandbox.setRequestStatus",
+      "inputs": { "status": { "source": "variable", "key": "statusRejected" } },
+      "outputs": {}
+    },
+    { "key": "APPROVED", "type": "END", "name": "Approved", "result": "APPROVED" },
+    { "key": "REJECTED", "type": "END", "name": "Rejected", "result": "REJECTED" }
+  ],
+  "transitions": [
+    { "key": "begin", "from": "BEGIN", "to": "SET_IN_REVIEW" },
+    { "key": "inReview", "from": "SET_IN_REVIEW", "to": "REVIEW" },
+    { "key": "approve", "from": "REVIEW", "to": "SET_APPROVED", "outcome": "APPROVE" },
+    { "key": "reject", "from": "REVIEW", "to": "SET_REJECTED", "outcome": "REJECT" },
+    { "key": "approved", "from": "SET_APPROVED", "to": "APPROVED" },
+    { "key": "rejected", "from": "SET_REJECTED", "to": "REJECTED" }
+  ]
+}

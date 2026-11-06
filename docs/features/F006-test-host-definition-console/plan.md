@@ -1,5 +1,11 @@
 # Plan — F006 Test-host workflow console
 
+## Sandbox status service plan — 2026-11-06 (SS01–05)
+
+Use test-host `service.sandbox.SandboxSetRequestStatusAction`, `repository.sandbox.SandboxRequestStore` and existing `dto.sandbox.SandboxRequestView`. Keep statuses/lifecycle validation inside the action; expose one expected-version/link-checked store write requiring the current transaction. Reuse ConsoleSettings, sample registration and existing failure injection. Keep all core code and migration infrastructure unchanged; depend on the preceding host status-column migration. Put the runnable workflow in this feature folder. Update the existing UI status color mapping for IN_REVIEW/APPROVED, without changing workflow semantics.
+
+Verify with isolated action tests and a dedicated guarded host integration class using actual console adapters/transactions/recorder: both outcomes, start/completion replay, missing/wrong links and invalid transition/input, no-op version, rollback after status update, and same-transaction evidence. Use only apolo_workflow_test, unique owned fixtures and scoped cleanup. Run relevant Java suites, compile/package, frontend unit/build/CSP checks and static fixture/link/whitespace checks. Record actual results and any browser/backend-restart gap in implementation.md. Do not stop or restart the owner's running development host.
+
 Implements [specification revision 6](spec.md), retaining earlier monitoring and extending the read-only pinned instance graph to bounded general topologies. Track progress in [tasks.md](tasks.md) and actual evidence in [implementation.md](implementation.md).
 
 ## 1. Baseline, dependency and toolchain (R01, R09–10)

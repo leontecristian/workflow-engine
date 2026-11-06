@@ -1,5 +1,11 @@
 # Tasks — F006 Test-host workflow console
 
+## Sandbox status service — 2026-11-06
+
+- [x] **SS-T01:** implement the host action and guarded store update against SS01–03.
+- [x] **SS-T02:** supply the explicit status-review example and status presentation against SS04.
+- [x] **SS-T03:** verify SS05 with isolated and guarded SQL tests; record commands/results/gaps and reconcile the handover. Both outcomes/replay and displayed request versions were also verified in Chrome after the owner restarted the backend.
+
 Applies to [specification revision 6](spec.md) and [plan](plan.md), including the increments tracked below. On 2026-11-01 the owner completed all six browser walkthrough points: management, two-tab conflict/reload/cancel, two-account completion, Instances/graph, command recovery, local dispatch/redelivery and logout clearing. See [current browser progress](implementation.md#owner-browser-acceptance-progress--2026-11-01) for the evidence and limits. Full scenario/evidence reconciliation is still required before closing T08/T09/T12/T13; historical blocked checks below are not automatically closed. Evidence belongs in [implementation.md](implementation.md). NOT RUN is not acceptance.
 
 - [x] **T01 — Establish baseline/dependencies/toolchain (R01/09/10; plan 1).** Depends on none. Inspect F002/F004/F005 source/contracts and concurrent work; select supported Angular/Node/npm from official sources. **Done when:** F005 availability, preserved changes and toolchain choices are recorded; no runtime stub is substituted.

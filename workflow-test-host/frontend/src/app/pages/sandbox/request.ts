@@ -23,7 +23,7 @@ export class RequestPage {
     title: "Sandbox request",
     eyebrow: "HOST RECORD",
     description:
-      "Inspect the immutable request and its committed workflow link.",
+      "Inspect the request, its sandbox business status and committed workflow link.",
     icon: "file",
   };
   id = "";

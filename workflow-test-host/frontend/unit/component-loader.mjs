@@ -29,6 +29,7 @@ const modules = new Map(
   }),
 );
 for (const name of [
+  "autocomplete",
   "button",
   "card",
   "checkbox",

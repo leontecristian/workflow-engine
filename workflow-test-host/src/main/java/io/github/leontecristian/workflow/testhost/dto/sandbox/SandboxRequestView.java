@@ -5,6 +5,7 @@ import java.time.Instant;
 public record SandboxRequestView(
         long id,
         String name,
+        String status,
         String createdBy,
         Instant createdAt,
         long lockVersion,
