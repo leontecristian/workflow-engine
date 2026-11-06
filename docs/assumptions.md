@@ -1,10 +1,12 @@
 # Assumptions and verification register
 
-**Version:** 3.0.0
+**F009 test-baseline exception — owner decision, 2026-11-06:** [F009 revision 2, D17](features/F009-json-execution-variables/spec.md) removes backward-compatibility obligations for pre-F009 Java APIs, formats and existing test data. Core/test-host callers may change together; old readers, compatibility overloads, dual limit profiles and old-data conversion are unnecessary. D15 capacities remain, but fresh test-schema/rebaseline or migration setup may establish them instead of a mandatory preserving forward migration. New executions still require history/evidence, pinned immutable definitions, concurrency, transactions and authorized idempotent replay. This scoped exception supersedes contrary older wording below; it grants no production compatibility waiver and authorizes no code/data changes in this documentation-only task.
 
-**Recorded:** 2026-10-31
+**Version:** 5.0.0
 
-**Applies to:** constitution v3.0.0 and planning for APOLO integration
+**Recorded:** 2026-11-06
+
+**Applies to:** constitution v5.0.0 and planning for APOLO integration
 
 An assumption is an expectation used for planning whose supporting evidence is incomplete. It must not be presented as a confirmed contract or an implemented guarantee. [Constraints](constraints.md) remain requirements even when the feasibility or mechanism for satisfying them needs verification.
 
@@ -166,7 +168,7 @@ The selected storage is the existing TASK_COMPLETED.details_json record, with ex
 
 The selected model adds JSON objects/arrays in workflow_variable.json_value while preserving scalar storage and immutable task results. Whole-value updates, declared bindings and restricted read-only navigation must preserve existing concurrency, atomicity, authorization and exact-value guarantees.
 
-**Evidence needed:** SQL CHECK and null behavior, explicit JPA replacement/dirty tracking, stale-write conflicts, transaction-local visibility, rollback, bounded schema validation, exact numeric round trips and full-payload fingerprints. Specify and verify detached projections and the expression allowlist for object/index access, required/missing/null/type errors and traversal limits. Reconcile per-instance/value budgets with command/read/history envelopes; verify immutable write/routing evidence and backward-compatible scalar codecs. No host data or mutable provider object may escape into expression evaluation.
+**Evidence needed:** SQL CHECK and null behavior, explicit JPA replacement/dirty tracking, stale-write conflicts, transaction-local visibility, rollback, bounded JSON parsing (field schemas deferred for F009 execution data), exact numeric round trips and full-payload fingerprints. Specify and verify detached projections and the expression allowlist for object/index access, missing-object-property projection to null (F009 D04), uninitialized-variable errors, null/type handling and traversal limits. F009 D15 selects the capacity table and history-constraint expansion; verify enforcement against command/read/history envelopes, maximum-record pagination and coordinated new-baseline caller integration under D17; verify immutable write/routing evidence and backward-compatible scalar codecs. No host data or mutable provider object may escape into expression evaluation.
 
 **If false:** revise the mapping/access mechanism and record contract changes before enabling affected definitions; do not silently accept lossy values, unsafe navigation, lost updates or missing evidence.
 
@@ -179,7 +181,7 @@ The selected model adds JSON objects/arrays in workflow_variable.json_value whil
 - **Submission contracts:** node-wide simple-input/result contracts, explicit empty input declarations and forbidden/optional/required result presence rules are agreed in language design section 15.4. Top-level result null is rejected; nested nulls follow the schema. Exact descriptors, schema profiles, start-input nesting and remaining optional-field defaults still require specification.
 - **Host associations:** APOLO ownership, instance-ID queries and optional engine correlation are selected. APOLO must specify its column/table shape, historical membership storage, authorization and start-time integration without making core depend on booking tables.
 - **Structured submissions:** result contract language/features and immutable reference resolution, payload/depth/collection/string limits, number and omitted/null/default rules, versioned canonicalization, public API/error shapes, bounded retrieval and prior-activity bindings remain specification gates. Define host business validation/aggregation and reviewer visibility without treating JSON as proof of membership or reviewed material. Draft/partial task saving is excluded.
-- **JSON variables:** exact declaration/schema, start/service/update bindings, authorized read projections, expression path syntax, full-value encoding/canonicalization, unset behavior and limits remain specification work. Whole-value replacement, SQL NULL for variable null and object/array roots are the selected initial shape. JSON-path search/indexing, patch/merge APIs and arbitrary Java-object serialization are not implied.
+- **JSON variables:** [F009](features/F009-json-execution-variables/spec.md) records the owner decision of 2026-11-06 to defer field schemas for JSON start/service/variable data. Exact declarations, start/service/update bindings, authorized read projections, expression path syntax, full-value encoding/canonicalization, unset behavior and limits remain specification work. Whole-value replacement, SQL NULL for variable null and object/array roots are the selected initial shape. JSON-path search/indexing, patch/merge APIs and arbitrary Java-object serialization are not implied.
 - **O4:** alternative-resource acceptance/reapproval behavior. No default replacement behavior has been selected.
 - **O9:** deployment-specific migration ordering, delivery/recovery and retention/redaction arrangements beyond the agreed ownership boundary.
 - **O11:** Angular version, graph library and detailed designer interactions. These do not block the first engine slice.

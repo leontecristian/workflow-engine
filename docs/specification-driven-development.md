@@ -1,6 +1,6 @@
 # Specification-driven development
 
-This workflow operationalizes [constitution v3.0.0](constitution.md). Its purpose is to make behavior clear before implementation and leave a useful handover afterward. Keep documentation proportional to the change; the four files below are responsibilities, not a requirement for four lengthy reports.
+This workflow operationalizes [constitution v5.0.0](constitution.md). Its purpose is to make behavior clear before implementation and leave a useful handover afterward. Keep documentation proportional to the change; the four files below are responsibilities, not a requirement for four lengthy reports.
 
 ## Four-document standard and authority
 

@@ -1,5 +1,15 @@
 # Workflow Definition Language — JSON Design
 
+**F009 test-baseline exception — owner decision, 2026-11-06:** [F009 revision 2, D17](../features/F009-json-execution-variables/spec.md) removes backward-compatibility obligations for pre-F009 Java APIs, formats and existing test data. Core/test-host callers may change together; old readers, compatibility overloads, dual limit profiles and old-data conversion are unnecessary. D15 capacities remain, but fresh test-schema/rebaseline or migration setup may establish them instead of a mandatory preserving forward migration. New executions still require history/evidence, pinned immutable definitions, concurrency, transactions and authorized idempotent replay. This scoped exception supersedes contrary older wording below; it grants no production compatibility waiver and authorizes no code/data changes in this documentation-only task.
+
+**F009 capacity decision — 2026-11-06:** [F009 D15](../features/F009-json-execution-variables/spec.md) raises each JSON variable/start/service value to 256 KiB UTF-16 and retains the 1 MiB UTF-16 current-variable total. Its table specifies larger JSON-profile input/service/history envelopes, history-read capacity and a required history-only forward constraint migration. It supersedes older 64 KiB variable/input and smaller related-envelope wording only for that profile. Scalar legacy limits, task-result scope and receipt/handoff bounds remain unchanged. No migration or implementation has been performed.
+
+**D09 owner decision — 2026-11-06:** F009 adopts standard SpEL navigation over read-only JSON, including explicit null-safe property/index access, fixed/computed keys and indices, and native escaping/evaluation order, subject to the agreed JSON adaptations in D02–D08. Missing properties/out-of-range indices return null; numeric leaves use BigDecimal. Existing method/reflection/mutation restrictions remain. Routine navigation details are engineering work, not separate owner approval gates; material behavior conflicts must be raised. No implementation is authorized.
+
+**D04 owner correction — 2026-11-06:** for F009, reading a missing property of an initialized JSON object returns null, just like explicit JSON null. APOLO may omit null-valued fields. This supersedes earlier missing-JSON-property failure wording only; undeclared/uninitialized variables and other evaluation errors remain failures. Stored missing/null distinctions remain. D05 subsequently selects explicit per-access `?.` property navigation; ordinary dot access on null fails. Array/index behavior and normalization remain specification work. See F009 D04.
+
+**Owner decision — 2026-11-06:** the initial JSON execution-data slice uses declared JSON variables and explicit start/service whole-value mappings without per-field structure schemas. APOLO supplies DTO-derived snapshots; core evaluates bounded read-only object/array navigation under `#vars`. Arbitrary nested fields are accepted within JSON validity, exact-value and resource constraints. Structure schemas are DEFERRED for these start inputs, service values and variables; workflow-document validation and task-result contracts are unchanged. This scoped amendment supersedes earlier mandatory embedded-schema wording for this slice, not the remaining schema design. See [F009](../features/F009-json-execution-variables/spec.md). Documentation only; no runtime implementation is claimed.
+
 **Owner correction — 2026-11-05:** expression arithmetic follows native SpEL numeric behavior, including floating-point approximation, promotion, rounding and integral overflow. Do not reject a result solely for precision loss or compare it with an exact reference calculation. Declared DECIMAL variables enter evaluation as BigDecimal; decimal literals retain native SpEL types. Native evaluation errors and resource limits still fail the command. Exact decoding, transport, persistence and accepted-submission rules remain unchanged. This supersedes earlier expression-arithmetic exactness wording and the misinterpreted numeric owner decision.
 
 ## Standards research, conceptual model and proposed direction
@@ -619,7 +629,7 @@ The key distinction is that **variables describe changeable execution state**, w
 | `BOOLEAN` | Only JSON `true` or `false`; no conversion from strings or numbers. | `true` |
 | `DATE` | ISO 8601 calendar date in `YYYY-MM-DD` form, without a time or timezone. | `"2026-10-31"` |
 | `DATETIME` | ISO 8601 date and time, separated by `T`, with seconds and a required `Z` or explicit `±HH:MM` offset. | `"2026-10-31T14:30:00Z"` |
-| `JSON` | Object or array validated against its declared contract. | `{"approved": true}` |
+| `JSON` | Object or array; F009 defers field schemas while retaining validity, exactness and bounds. | `{"approved": true}` |
 
 The six scalar types plus JSON are established. Database sizes and SQL storage choices must be reconciled with the final language, rather than silently treated as the entire wire contract. [A1, §5.2][A1] [A2, §12][A2]
 
@@ -728,6 +738,8 @@ The action sequence is therefore: validate inputs, run the registered action syn
 Start initialization and write boundaries are agreed in section 12.1.6; service-node fields and variable/action-output mappings are agreed in section 12.1.8. Direct fact and prior-submission bindings are future ideas, not prerequisites for the initial language. Remaining selected binding details, limits and diagnostic codes still require specification. These decisions do not claim an implemented binding mechanism.
 
 ### 10.5 Validating JSON structure
+
+**F009 scope amendment — 2026-11-06:** the schema profile below remains applicable to task results and future schema-enabled contracts. It is deferred for the initial JSON start/service/variable slice; no field schema is maintained or enforced there.
 
 **JSON Schema is an existing standard for describing and validating JSON data.** It is separate from JSON itself; we are adopting its validation vocabulary, not inventing it. [Official introduction](https://json-schema.org/learn/getting-started-step-by-step)
 
@@ -1212,6 +1224,8 @@ These are the selected bindings for start guards, not a blanket source restricti
 
 #### 12.1.4 Structured start inputs
 
+**F009 precedence — 2026-11-06:** the mandatory-schema descriptor/example below records the earlier broader design. The initial slice retains type/presence/nullability and explicit mappings without a field schema. Extra nested fields and new structures are allowed within generic bounds; nested nulls are data. Defaults satisfy generic JSON/type/nullability/bound checks. Schema support is deferred, not silently accepted and ignored. Final syntax is an F009 readiness gate.
+
 **AGREED — 31 October 2026 (L18):** keep one `startPolicy.inputContract` array containing both scalar and structured descriptors. A structured start input uses the fields from section 12.1.2 with `type: "JSON"` and a required embedded `schema` object. This extension applies only to start inputs; human-task structured submissions remain in `resultContract`.
 
 For example, a descriptor can accept a nonempty list of booking identifiers:
@@ -1256,7 +1270,7 @@ Variables retain execution data for later steps. **AGREED — 31 October 2026 (L
 | `key` | String | Yes | Variable name, unique among variable declarations in the definition. |
 | `type` | String | Yes | One of `STRING`, `LONG`, `DECIMAL`, `BOOLEAN`, `DATE`, `DATETIME` or `JSON`, using L10 representations. |
 | `nullable` | Boolean | Yes | Whether an explicitly stored null is allowed. |
-| `schema` | Object | For `JSON` only | Required embedded validation schema following L11; not allowed for scalar declarations. |
+| `schema` | Object | Deferred in F009 | Earlier broader design required an L11 schema. The initial JSON-variable slice has no field-schema contract; do not require or silently ignore schemas. |
 | `label` | String | No | Human-readable name. |
 | `description` | String | No | Explanation of the variable's purpose. |
 
@@ -1876,7 +1890,7 @@ The following tables retain the previously recorded values, counting rules and r
 | Automatic progression | 50 automatic steps | Per command; count each visit to START, SERVICE_TASK, EXCLUSIVE_GATEWAY or END using the rules below. |
 | Technical keys | 100 ASCII characters | Matches existing technical-key storage and L04 character rules. |
 | Structured task result | 64 KiB of serialized UTF-16 | Per result, still subject to the complete history-event budget. |
-| Individual JSON variable | 64 KiB of serialized UTF-16 | Per value; aggregate instance, command and evidence budgets also apply. |
+| Individual JSON variable | 256 KiB of serialized UTF-16 for F009 (D15); earlier design 64 KiB | Per value; retain 1 MiB current-state total and apply the F009 related-envelope table. |
 | Runtime JSON nesting | 16 container levels | Root object/array is level 1; each nested container adds one. Count each runtime value separately from its command envelope. |
 | Runtime JSON collections | 100 properties per object; 1,000 items per array | Applies alongside byte/depth limits; does not set collection limits for definitions or designer metadata. |
 | Expression source | 2,000 Unicode code points | Per decoded expression string; operation/complexity and per-command evaluation budgets are also required. |
@@ -1909,11 +1923,13 @@ Allow the 50th automatic step, but fail before executing a 51st, including befor
 - **Network bytes:** measure actual UTF-8 request/response bytes separately from stored UTF-16 bytes. Every applicable network, value and stored-envelope limit must pass; one does not replace another.
 - **Boundaries and scope:** the maximum itself is allowed; anything larger is rejected. KiB means 1,024 bytes and MiB means 1,048,576 bytes. Runtime depth and collection limits do not automatically apply to schema documents or designer metadata; their separate budgets are selected below. Formal codec/validator implementation and verification remain work.
 
+**F009 override — 2026-11-06:** D15 replaces earlier start aggregate/request/history/read capacities for the JSON profile, with explicit legacy compatibility and a forward history migration. The 1 MiB current-state total remains. The dated baseline below is retained for comparison; D15 governs F009.
+
 **Combined size budgets — AGREED, 31 October 2026 (L16):** these initial project limits apply together with individual-value limits and physical storage ceilings. They are not evidence of measured capacity.
 
 | Resource | Limit | Measurement scope |
 | --- | --- | --- |
-| One structured start input | 64 KiB UTF-16 | Its complete compact serialized JSON value. |
+| One structured start input | 256 KiB UTF-16 for F009; earlier design 64 KiB | Complete compact value; see F009 D15 for aggregate, request and evidence limits. |
 | All start inputs | 128 KiB UTF-16 | The complete compact input object, including field names and applied defaults. |
 | Current variables per instance | 1 MiB UTF-16 | One compact object containing all initialized variable names and values, including scalars and explicit nulls; omit uninitialized variables. This is a measurement projection, not a new storage format. |
 | Runtime command request | 256 KiB UTF-8 | The complete JSON request body. Definition uploads use the separate allowance below. |
@@ -2797,14 +2813,14 @@ This table summarizes the language choices and the questions still to resolve. *
 | L08 | Agreed | **Reading and updating data:** use explicit sources, defined missing/null rules and one mapping per destination. Prepare all updates from the same pre-update values (section 10.4). Direct fact/prior-submission input bindings are deferred. | Runtime binding behavior and separate variable-update command authorization/write contracts; limits and errors under L16/L15. Additional sources require a future scope decision. |
 | L09 | Agreed | **Checking workflow paths:** apply the [graph rules in section 8.3](#83-workflow-graph-validation-rules) before publication, covering connections, routes, start/end nodes, reachability and loops. Every node must have a possible path to an end; eventual completion is not guaranteed. | Detailed validation diagnostics remain under L15; route-priority notation is defined in section 12.1.16. |
 | L10 | Agreed | **Representing values:** use the exact formats and capacities in section 10.2, including string-encoded integers/decimals, UTC timestamps and exact nested JSON numbers. Section 10.3 distinguishes missing/null/defaults, rejects evaluated reads of uninitialized variables, prohibits clearing assigned variables back to uninitialized and specifies input/default/guard/initialization order. | No remaining behavior decisions for this scope. Formal codec, accessor and command contracts and implementation verification remain. Schema features: L11; resource limits: L16; diagnostics: L15. |
-| L11 | Agreed | **Validating structured data:** use the complete language-versioned profile in section 10.5: object-form embedded schemas, local noncircular references with supported sibling rules, closed objects, basic constraints, conditional requirements, identified alternatives and selected formats/metadata. Reject external references, arbitrary patterns and unsupported features. | No remaining feature-selection decisions. Formal validation contract and implementation verification remain. Diagnostics: L15; numeric limits: L16; numeric/time details: L10; Draft 2020-12 dialect: L02. |
+| L11 | Agreed; F009 execution-data exception | **Validating structured data:** use the complete language-versioned profile in section 10.5: object-form embedded schemas, local noncircular references with supported sibling rules, closed objects, basic constraints, conditional requirements, identified alternatives and selected formats/metadata. Reject external references, arbitrary patterns and unsupported features. | No remaining feature-selection decisions. Formal validation contract and implementation verification remain. Diagnostics: L15; numeric limits: L16; numeric/time details: L10; Draft 2020-12 dialect: L02. |
 | L12 | Agreed | **Evaluating expressions:** use standard SpEL semantics within a controlled, read-only context over typed `#facts` and `#vars`. Preserve Boolean routing, strict errors, access restrictions and language-version compatibility; no separate `expressionPolicy` field (section 11.1). | Context/access enforcement, typed conversion and precision/missing-data reconciliation, necessary restrictions and diagnostics. Numeric execution limits: L16. |
 | L13 | Agreed | **Designer information:** use an optional `designer` section independent of execution. Preserve unknown metadata values within its limits; block saves that cannot preserve them. Published metadata stays immutable (sections 12.3 and 14.1). | Exact layout fields and structural validation in the designer specification; numeric limits under L16. |
 | L14 | Agreed | **Comparing document content:** ignore formatting and object-property order while preserving values and array order. Include designer metadata, reject duplicate properties and version the canonicalization rules without silently replacing published fingerprints (section 12.4). | Exact canonicalization and fingerprint algorithms, fingerprint format and version representation, consistent with L10 numeric precision. |
 | L15 | Agreed | **Explaining errors:** provide stable codes, stages, severity, useful messages and applicable locations/element keys. Errors block publication; warnings do not. Report bounded independent errors, preserve distinct failure categories and avoid exposing internal or unauthorized data (section 13.2). | Complete error catalog, exact response fields and host HTTP mapping. Numeric diagnostic limits: L16. |
 | L16 | Agreed | **Keep workflows bounded:** enforce documented author-facing limits, reject oversized input and roll back commands that exceed execution limits. Preserve complete required evidence and support for published workflows. | No further language decision is needed now. Apply and verify the relevant safeguards as each feature is built; section 14.2 retains the detailed engineering reference. |
 | L17 | Agreed | **Keeping application support compatible:** stable identifiers represent stable contracts; breaking changes use new identifiers. Check compatibility before publication and application upgrades, retain required old support and fail explicitly rather than substitute capabilities. No separate capability-version system initially (sections 11.3 and 14.3). | Host resolver/guard/action API signatures and registration metadata in the integration specification, compatibility-check mechanisms and diagnostics. Application behavior still requires upgrade verification. |
-| L18 | Agreed | **Complete JSON document structure:** section 12.1 defines the envelope, start policy, inputs/defaults, variables/initialization, all five node types, human-task contracts, guard/binding forms and transitions with relative array ordering. Start and outcome authorization use optional declared guards. Additional scalar constraints and fact/prior-submission bindings remain deferred. | None for the selected document structure. Formal schemas belong to L02/L11; values/limits to L10/L16; diagnostics to L15; host APIs to the integration specification coordinated with L17; separate variable-update commands to the runtime specification coordinated with L08. |
+| L18 | Agreed; F009 JSON field schemas deferred | **Complete JSON document structure:** section 12.1 defines the envelope, start policy, inputs/defaults, variables/initialization, all five node types, human-task contracts, guard/binding forms and transitions with relative array ordering. Start and outcome authorization use optional declared guards. Additional scalar constraints and fact/prior-submission bindings remain deferred. | None for the selected document structure. Formal schemas belong to L02/L11; values/limits to L10/L16; diagnostics to L15; host APIs to the integration specification coordinated with L17; separate variable-update commands to the runtime specification coordinated with L08. |
 
 ### 16.2 Host-owned decisions
 

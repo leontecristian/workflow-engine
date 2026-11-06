@@ -1,5 +1,9 @@
 # Workflow engine
 
+**F009 test-baseline policy:** revision 2 permits coordinated breaking API/format changes and disposable existing test data, without legacy compatibility layers. New executions still record history and retain transaction, concurrency and replay guarantees. Documentation only; no data or code changes are authorized now.
+
+[F009 — JSON execution variables](docs/features/F009-json-execution-variables/spec.md) is READY revision 3, documentation only: bounded DTO-derived JSON snapshots, explicit start/service mappings and safe nested expressions without field schemas. No runtime support is claimed; F008 remains scalar-only.
+
 See the [project roadmap](docs/roadmap.md) for current priorities and the path from the F006 sandbox to APOLO integration and the designer. The [feature index](docs/features/README.md) tracks delivery status and links to acceptance evidence.
 
 Two Maven modules, targeting Java 17 and intended to run on JDK 21:

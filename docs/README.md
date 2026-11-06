@@ -14,7 +14,7 @@ Read these documents in order:
 6. [Coding standards](coding-standards.md): practical clean-code guidance for Java, Spring, JPA and Lombok, applied during implementation and review.
 7. [Package structure](package-structure.md): agreed technical-layer-first Java hierarchy, dependency boundaries and exact F002 package assignments.
 
-The constitution is version **3.0.0**, established on **2026-10-24** and last amended on **2026-10-31** to select ordered first-match routing. It retains the earlier database design v1.4 amendments for structured task submissions and JSON execution variables. It codifies the agreed direction; it does not establish that the planned engine has been implemented. Existing F001/F002 records retain their historical constitution baselines; this routing amendment does not change their schema or catalog contracts.
+The constitution is version **5.0.0**, established on **2026-10-24** and last amended on **2026-11-06** to permit a disposable F009 test baseline without backward compatibility, while retaining new-execution history and guarantees. The earlier JSON field-schema deferral remains. [F009](features/F009-json-execution-variables/spec.md) is DRAFT and documentation only. Task-result schemas and existing scalar/F008 behavior remain unchanged. Earlier feature records retain their historical constitution baselines.
 
 ## Document responsibilities
 

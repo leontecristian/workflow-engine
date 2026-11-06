@@ -1,12 +1,14 @@
 # Project constraints
 
+**F009 test-baseline exception — owner decision, 2026-11-06:** [F009 revision 2, D17](features/F009-json-execution-variables/spec.md) removes backward-compatibility obligations for pre-F009 Java APIs, formats and existing test data. Core/test-host callers may change together; old readers, compatibility overloads, dual limit profiles and old-data conversion are unnecessary. D15 capacities remain, but fresh test-schema/rebaseline or migration setup may establish them instead of a mandatory preserving forward migration. New executions still require history/evidence, pinned immutable definitions, concurrency, transactions and authorized idempotent replay. This scoped exception supersedes contrary older wording below; it grants no production compatibility waiver and authorizes no code/data changes in this documentation-only task.
+
 **Owner correction — 2026-11-05:** expression arithmetic follows native SpEL numeric behavior, including floating-point approximation, promotion, rounding and integral overflow. Do not reject a result solely for precision loss or compare it with an exact reference calculation. Declared DECIMAL variables enter evaluation as BigDecimal; decimal literals retain native SpEL types. Native evaluation errors and resource limits still fail the command. Exact decoding, transport, persistence and accepted-submission rules remain unchanged. This supersedes earlier expression-arithmetic exactness wording and the misinterpreted numeric owner decision.
 
-**Version:** 3.0.0
+**Version:** 5.0.0
 
-**Recorded:** 2026-10-31
+**Recorded:** 2026-11-06
 
-**Applies to:** constitution v3.0.0 and the current separate-development phase
+**Applies to:** constitution v5.0.0 and the current separate-development phase
 
 Constraints are confirmed boundaries that specifications and implementations must satisfy. They are requirements, not evidence that the corresponding behavior already exists. This document makes the [constitution](constitution.md) operational without replacing the detailed [consolidated design](architecture/workflow-engine-design.md).
 
@@ -164,12 +166,13 @@ For temporary authorized runtime verification, stop processes afterward unless a
 ## CON-14 — JSON execution variables
 
 - Add JSON alongside scalar variable types, with nullable json_value and matching-type/JSON-validity checks. Non-null roots are objects or arrays; top-level primitives use scalar types. Preserve absent row versus explicit SQL NULL, nested null, missing property and empty collection distinctions.
-- Pin declarations, validation contracts and writer/binding permissions to the workflow version. Reject duplicate keys, malformed or undeclared content, lossy numeric conversions and exceeded per-value/per-instance/request/read/history bounds. Exact schema features, numeric/null/default encoding and limits require specification.
+- Pin declarations, nullability and writer/binding permissions to the workflow version. In [F009](features/F009-json-execution-variables/spec.md), field schemas are deferred for JSON start/service/variable values: arbitrary nested fields require no separate declarations. Reject unknown top-level contract keys, duplicate JSON keys, malformed JSON, lossy numeric conversions and exceeded bounds. Workflow-document and task-result schemas are unaffected. Exact codec/API/navigation contracts remain specification gates.
 - Initialize or replace entire values via declared start/service bindings or authorized commands. Existing-instance updates require the early version-checked instance claim; start-time initialization shares the new instance's transaction. Stale replacements fail. No patch/deep-merge/in-place nested-write API is implied. Public boundaries expose detached/read-only data, not mutable provider/application objects.
-- Provide authorized bounded reads and explicit path projections. Restricted #vars object-key/array-index access is read-only; missing required values, null/type mismatch and invalid indices fail. Retain the expression allowlist and prohibit arbitrary methods, reflection, mutation and host-object traversal. Exact path/binding syntax and safety verification remain pending.
+- Provide authorized bounded reads and explicit path projections. Restricted #vars object-key/array-index access is read-only; missing object properties in F009 project to null, matching explicit JSON null. Undeclared/uninitialized variables, incompatible operations and invalid index types remain failures; F009 D06 makes out-of-range integer array reads return null without reverse indexing or mutation; F009 D05 selects explicit per-access `?.` property traversal; ordinary property access on null fails. D09 selects standard SpEL navigation including explicit null-safe indexing, with the agreed JSON adaptations; concrete integration remains engineering specification/verification work. Retain the expression allowlist and prohibit arbitrary methods, reflection, mutation and host-object traversal. Exact path/binding syntax and safety verification remain pending.
 - Fingerprint full replacement values and preserve accepted write/routing evidence before later mutations. Same-transaction consumers see accepted updates; failures roll back values, effects and evidence. Persist replacements explicitly rather than relying on incidental JSON-tree dirty tracking.
 - Keep immutable task submissions, current execution context and authoritative APOLO membership separate. No implicit result-to-variable merge or partial-ALL mutation of frozen material. JSON-path filtering/indexing requires a separate justified projection design; storing JSON does not create indexed search.
-- Preserve older scalar rows and definition/API behavior. Extend type checks, codecs and capability detection explicitly before enabling JSON definitions; applied schemas require ordered forward migrations.
+- F009 D15 selects 256 KiB UTF-16 per JSON start/service/variable value and retains 1 MiB UTF-16 current state; use its complete related-envelope table. History capacity needs schema setup under D17 (fresh test baseline/rebaseline or migration); selected receipt/handoff bounds remain.
+- F009 D17 permits coordinated breaking API/codec/schema changes and disposable pre-F009 test rows. Implement scalar and JSON behavior in one new baseline; no old readers, compatibility overloads or dual profiles are required. Establish coherent fresh test-schema/rebaseline or migration setup before execution. Continue history recording and all runtime guarantees for new executions; no production exception is implied.
 
 **Trace:** C06/C08/C09; database design sections 5, 12, 19–21; ASM-11.
 

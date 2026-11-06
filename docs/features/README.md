@@ -1,5 +1,7 @@
 # Feature specifications
 
+[F009 — JSON execution variables](F009-json-execution-variables/spec.md) is **READY revision 3**, documentation only (2026-11-06): schema-free bounded snapshots, explicit start/service mappings and safe nested SpEL reads. See its [plan](F009-json-execution-variables/plan.md), [tasks](F009-json-execution-variables/tasks.md) and [handover](F009-json-execution-variables/implementation.md). D17 removes pre-F009 API/data compatibility requirements while preserving history and guarantees for new executions. Concrete contracts are finalized in its technical annex; implementation is not authorized.
+
 This folder contains specifications and delivery records for individual features. Project-wide principles, constraints, assumptions and development guidance live in the parent [docs folder](../README.md).
 
 The [project roadmap](../roadmap.md) owns delivery sequencing, proposed future increments and milestone exit conditions. This index tracks specified features; roadmap proposals are not READY specifications.
@@ -30,7 +32,7 @@ Follow the [specification-driven development workflow](../specification-driven-d
 
 ## Feature index
 
-[F008 — Restricted expressions and exclusive routing](F008-restricted-expressions-routing/spec.md) is **DRAFT revision 1**, based on implemented F007 revision 3. Its [plan](F008-restricted-expressions-routing/plan.md), [tasks](F008-restricted-expressions-routing/tasks.md) and [handover](F008-restricted-expressions-routing/implementation.md) track scalar first-match routing, expression safety and the open G01–G03 readiness gates, including integration with batched variable-write evidence and retained legacy receipts. No F008 implementation or safety verification is claimed.
+[F008 — Restricted expressions and exclusive routing](F008-restricted-expressions-routing/spec.md) is **IMPLEMENTED revision 3**, with T08 browser/live-delivery acceptance open. Its [handover](F008-restricted-expressions-routing/implementation.md) records actual checks. F009 extends its scalar-only scope without changing that historical baseline.
 
 [F007 — Typed bindings and service tasks](F007-typed-bindings-service-tasks/spec.md) is **IMPLEMENTED through revision 3** (batched variable-write events), with revision 2 T09 **CLOSED by owner acceptance** on 2026-11-01 after manual API/SQL observations and owner browser walkthrough/replay confirmation; unverified follow-up coverage remains recorded in the handover. Its [plan](F007-typed-bindings-service-tasks/plan.md), [tasks](F007-typed-bindings-service-tasks/tasks.md) and [handover](F007-typed-bindings-service-tasks/implementation.md) record scalar bindings, synchronous service tasks, one privacy-preserving variable-write event per nonempty mapping operation, exact receipts/history, transactional sandbox support and isolated checks/builds. F005/F006 acceptance is unchanged.
 
