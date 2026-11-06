@@ -1,6 +1,6 @@
 # F009 concrete contracts — revision 3
 
-This technical annex is normative for [specification revision 3](spec.md), completing G01–G04 within D01–D17. It specifies future behavior, not implemented or verified behavior. The four process documents remain spec, plan, tasks and implementation.
+This technical annex is normative for [specification revision 3](spec.md), completing G01–G04 within D01–D17. It governs the implementation; actual verification and limitations are recorded in [implementation.md](implementation.md). The four process documents remain spec, plan, tasks and implementation.
 
 ## C01 — Java values and integration
 
@@ -88,4 +88,4 @@ Start inputs are `{"booking":{"amount":12500.00,"department":{"code":"SALES"},"o
 
 ## C07 — Readiness and verification boundary
 
-G01–G04 are resolved as specification contracts by C01–C06. T02 is complete. No additional product decision is required to start the planned implementation once the owner requests it. Parser integration, exact-value round trips, maximum-response sizing, SQL constraint trust, transactions/concurrency and browser preservation remain mandatory unexecuted acceptance work, not readiness claims of proven behavior. Any discovered conflict with D01–D17 must update the specification before dependent code proceeds.
+G01–G04 are resolved as specification contracts by C01–C06. T02 is complete. No additional product decision is required to start the planned implementation once the owner requests it. Parser integration, exact-value round trips, maximum-response sizing, SQL constraint trust, transactions/concurrency and browser preservation are verification obligations, with actual outcomes recorded separately in implementation.md; specification readiness alone is not proof. Any discovered conflict with D01–D17 must update the specification before dependent code proceeds.

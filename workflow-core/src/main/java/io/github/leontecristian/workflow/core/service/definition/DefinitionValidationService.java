@@ -46,7 +46,7 @@ public class DefinitionValidationService {
         ObjectNode provenance = json.createObjectNode();
         boolean extended=MinimalDefinitionLoader.extended(document.tree());
         boolean routing=MinimalDefinitionLoader.routing(document.tree());
-        provenance.put("validator", routing ? "wf-exclusive-routing-validator-v1" : extended ? "wf-scalar-service-validator-v1" : IDENTIFIER);
+        provenance.put("validator", "wf-json-variable-validator-v1");
         provenance.put("structuralSchemaHash", loader.schemaDigest(document.tree()));
         if(routing) {
             provenance.put("expressionProfile",io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService.PROFILE);

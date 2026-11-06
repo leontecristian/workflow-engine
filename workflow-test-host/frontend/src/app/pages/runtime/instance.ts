@@ -5,6 +5,7 @@ import { ConsoleApi } from "../../data/console-api";
 import type { InstanceView, InstanceGraph } from "../../data/dtos";
 import { InstanceGraphComponent } from "./graph/instance-graph";
 import { PAGE_IMPORTS } from "../../ui/page-imports";
+import { downloadJson } from "../../ui/download-json";
 @Component({
   selector: "console-instance",
   standalone: true,
@@ -34,6 +35,10 @@ export class InstancePage {
   effects = signal<import("../../data/dtos").Page<import("../../data/dtos").ServiceEffect>|null>(null);
   effectError = signal("");
   private variableGeneration=0;
+  exportVariables() {
+    const text=this.variables()?.exactJson;
+    if(text) downloadJson(text,"workflow-variables.json");
+  }
   async loadVariables(next=false) {
     const id=this.id, generation=++this.variableGeneration;
     const previous=this.variables(); this.variableError.set("");

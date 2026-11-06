@@ -80,6 +80,7 @@ export class ConsoleSession {
         { httpStatus: response.status },
       );
     }
+    if (value && typeof value === "object") Object.defineProperty(value, "exactJson", {value: text});
     return value;
   }
   clear() {

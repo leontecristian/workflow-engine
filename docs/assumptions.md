@@ -160,7 +160,7 @@ The selected storage is the existing TASK_COMPLETED.details_json record, with ex
 
 ## ASM-11 — JSON variables preserve persistence and expression guarantees
 
-**Status:** capability SELECTED; contracts and integration PENDING VERIFICATION — database design v1.4, section 12.
+**Status:** F009 contracts and implementation selected; local automated checks recorded in its [handover](features/F009-json-execution-variables/implementation.md). Interactive browser and APOLO integration remain PENDING VERIFICATION — database design v1.4, section 12.
 
 **Owner:** workflow persistence/expression maintainers with APOLO integration owner.
 

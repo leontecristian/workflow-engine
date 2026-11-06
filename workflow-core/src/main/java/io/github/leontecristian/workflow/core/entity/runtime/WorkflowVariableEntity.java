@@ -1,8 +1,8 @@
 package io.github.leontecristian.workflow.core.entity.runtime;
 import io.github.leontecristian.workflow.core.dto.runtime.BooleanLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.NullLiteral;
-import io.github.leontecristian.workflow.core.dto.runtime.ScalarLiteral;
-import io.github.leontecristian.workflow.core.dto.runtime.ScalarValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowLiteral;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
 
 import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
@@ -62,13 +62,14 @@ public class WorkflowVariableEntity {
     @Column(name = "json_value", columnDefinition = "nvarchar(max)")
     private String jsonValue;
 
-    public WorkflowVariableEntity(long instanceId, String key, ScalarValue value) {
+    public WorkflowVariableEntity(long instanceId, String key, WorkflowValue value) {
         id=new WorkflowVariableId(instanceId,key); replace(value);
     }
-    public void replace(ScalarValue value) {
+    public void replace(WorkflowValue value) {
         valueType=value.type(); stringValue=null; longValue=null; decimalValue=null; booleanValue=null;
         dateValue=null; datetimeValue=null; jsonValue=null;
         if (value.value()==NullLiteral.INSTANCE) return;
+        if (value.value() instanceof io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue json) { jsonValue=json.toJson(); return; }
         if (value.value() instanceof BooleanLiteral v) { booleanValue=v.value(); return; }
         String text=((TextLiteral)value.value()).value();
         switch (valueType) {
@@ -80,7 +81,13 @@ public class WorkflowVariableEntity {
             default -> throw new IllegalArgumentException("Unsupported value");
         }
     }
-    public ScalarValue scalar() {
+    public WorkflowValue executionValue() {
+        if (valueType == VariableValueType.JSON) {
+            try { return new WorkflowValue(valueType, jsonValue == null ? NullLiteral.INSTANCE
+                    : io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue.parse(jsonValue)); }
+            catch (RuntimeException failure) { throw new io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException(
+                    io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.HOST_CONFIGURATION); }
+        }
         String text=switch(valueType) {
             case STRING -> stringValue;
             case LONG -> longValue==null ? null : longValue.toString();
@@ -90,10 +97,10 @@ public class WorkflowVariableEntity {
             case BOOLEAN -> null;
             default -> throw new IllegalStateException("Unsupported persisted scalar");
         };
-        ScalarLiteral token=NullLiteral.INSTANCE;
+        WorkflowLiteral token=NullLiteral.INSTANCE;
         if(text!=null) token=new TextLiteral(text);
         if(booleanValue!=null) token=new BooleanLiteral(booleanValue);
-        return new ScalarValue(valueType,token);
+        return new WorkflowValue(valueType,token);
     }
     protected WorkflowVariableEntity() {
     }

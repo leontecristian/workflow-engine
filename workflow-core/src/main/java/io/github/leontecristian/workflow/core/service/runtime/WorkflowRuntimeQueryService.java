@@ -75,7 +75,7 @@ public class WorkflowRuntimeQueryService {
             String k=keys.get(i); var value=values.get(k);
             items.add(new WorkflowVariableView(k,model.variables().get(k).type(),value!=null,value));
             next=i+1<keys.size() ? k : null;
-            if(!RuntimeJson.fits(json.encode(new WorkflowVariablePage(instanceId,before,items,next)),1024*1024)) {
+            if(!RuntimeJson.utf8Fits(json.variablePage(new WorkflowVariablePage(instanceId,before,items,next)),1024*1024)) {
                 items.remove(items.size()-1); RuntimeInputs.require(!items.isEmpty(),Category.LIMIT_EXCEEDED); next=items.get(items.size()-1).key(); break;
             }
         }
@@ -127,8 +127,10 @@ public class WorkflowRuntimeQueryService {
     public Optional<WorkflowHistoryEvent> findHistoryEvent(long instanceId, long sequence) {
         RuntimeInputs.id(instanceId); RuntimeInputs.id(sequence);
         return RuntimePersistenceErrors.call(() -> history.findById(new WorkflowHistoryId(instanceId, sequence)).map(entity -> {
-            RuntimeInputs.require(RuntimeJson.fits(entity.getDetailsJson(), 128 * 1024), Category.LIMIT_EXCEEDED);
-            return new WorkflowHistoryEvent(RuntimeViews.history(entity), entity.getDetailsJson());
+            RuntimeInputs.require(RuntimeJson.fits(entity.getDetailsJson(), 4 * 1024 * 1024), Category.LIMIT_EXCEEDED);
+            var result=new WorkflowHistoryEvent(RuntimeViews.history(entity), entity.getDetailsJson());
+            RuntimeInputs.require(RuntimeJson.utf8Fits(json.encode(result),8*1024*1024),Category.LIMIT_EXCEEDED);
+            return result;
         }));
     }
     public Optional<TaskSubmission> findTaskSubmission(long taskId) {
@@ -147,7 +149,7 @@ public class WorkflowRuntimeQueryService {
     private TaskSubmission submission(WorkflowTaskEntity task) {
         var activity = owner(task);
         var fact = history.findCompletionByTaskId(task.getId()).orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
-        RuntimeInputs.require(fact.getDetailsSchemaVersion() == 1, Category.UNSUPPORTED_VERSION);
+        RuntimeInputs.require(fact.getDetailsSchemaVersion() == 2, Category.UNSUPPORTED_VERSION);
         var details = json.tree(fact.getDetailsJson());
         RuntimeInputs.require(details.isObject() && details.size() == 3 && details.has("outcomeKey") && details.has("comment") && details.has("inputs")
                 && details.get("outcomeKey").isTextual() && details.get("inputs").isObject() && details.get("inputs").isEmpty()
@@ -171,11 +173,11 @@ public class WorkflowRuntimeQueryService {
         for (int i = 0; i < Math.min(rows.size(), limit); i++) {
             T item = map.apply(rows.get(i));
             // A single item must fit its own complete page, even if this page is already nearly full.
-            RuntimeInputs.require(RuntimeJson.fits(json.encode(create.apply(List.of(item), cursor.applyAsLong(item))), 1024 * 1024), Category.LIMIT_EXCEEDED);
+            RuntimeInputs.require(RuntimeJson.utf8Fits(json.encode(create.apply(List.of(item), cursor.applyAsLong(item))), 1024 * 1024), Category.LIMIT_EXCEEDED);
             emitted.add(item);
             Long next = i + 1 < rows.size() ? cursor.applyAsLong(item) : null;
             P candidate = create.apply(emitted, next);
-            if (!RuntimeJson.fits(json.encode(candidate), 1024 * 1024)) {
+            if (!RuntimeJson.utf8Fits(json.encode(candidate), 1024 * 1024)) {
                 emitted.remove(emitted.size() - 1);
                 RuntimeInputs.require(!emitted.isEmpty(), Category.LIMIT_EXCEEDED);
                 return create.apply(emitted, cursor.applyAsLong(emitted.get(emitted.size() - 1)));

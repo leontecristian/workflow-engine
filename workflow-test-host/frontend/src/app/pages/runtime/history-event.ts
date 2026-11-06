@@ -6,6 +6,7 @@ import type { HistoryEvent } from "../../data/dtos";
 import { PAGE_IMPORTS } from "../../ui/page-imports";
 import { pageState } from "../../ui/page-state";
 import { routingEvidence } from "../../data/routing-evidence";
+import { downloadJson } from "../../ui/download-json";
 @Component({
   selector: "console-history-event",
   standalone: true,
@@ -29,9 +30,13 @@ export class HistoryEventPage {
   id = "";
   sequence = "";
   detail = signal<HistoryEvent | null>(null);
+  exportDetails() {
+    const text=this.detail()?.detailsJson;
+    if(text) downloadJson(text,"workflow-history-details.json");
+  }
   routing() {
     const event = this.detail();
-    return routingEvidence(event?.envelope.eventType, event?.detailsJson);
+    return routingEvidence(event?.summary.eventType, event?.detailsJson);
   }
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);

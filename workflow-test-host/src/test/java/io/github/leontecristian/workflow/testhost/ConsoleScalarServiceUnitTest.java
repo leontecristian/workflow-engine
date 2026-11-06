@@ -13,7 +13,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
 import io.github.leontecristian.workflow.core.dto.runtime.NullLiteral;
-import io.github.leontecristian.workflow.core.dto.runtime.ScalarValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionContext;
 import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
@@ -58,7 +58,7 @@ class ConsoleScalarServiceUnitTest {
         assertThrows(IllegalStateException.class,() -> new ConsoleSettings(environment().withProperty("workflow.console.fail-service-node","AFTER").withProperty("workflow.console.invalid-service-output-node","AFTER")));
         var effects=mock(SandboxServiceEffectStore.class);
         var ctx=new ServiceActionContext(UUID.randomUUID(),1,42,"AFTER","SANDBOX_REQUEST","2",new WorkflowCommandContext(ActorKind.USER,"reviewer",Instant.EPOCH,"test"));
-        var inputs=Map.of("quantity",new ScalarValue(VariableValueType.LONG,new TextLiteral("9007199254740993")));
+        var inputs=Map.of("quantity",new WorkflowValue(VariableValueType.LONG,new TextLiteral("9007199254740993")));
         var normal=new SandboxRecordQuantityAction(effects,new ConsoleSettings(environment()));
         assertEquals(inputs.get("quantity"),normal.execute(ctx,inputs).outputs().get("recordedQuantity"));
         var fail=new SandboxRecordQuantityAction(effects,new ConsoleSettings(environment().withProperty("workflow.console.fail-service-node","AFTER")));
@@ -66,7 +66,7 @@ class ConsoleScalarServiceUnitTest {
         var invalid=new SandboxRecordQuantityAction(effects,new ConsoleSettings(environment().withProperty("workflow.console.invalid-service-output-node","AFTER")));
         assertTrue(invalid.execute(ctx,inputs).outputs().isEmpty()); verify(effects,times(3)).insert(ctx,9007199254740993L);
     }
-    @Test void startTransportKeepsTokensAndRejectsNumbersContainersNullDuplicateAndUnknownFields() {
+    @Test void startTransportKeepsTokensAndRejectsScalarNumbersNullDuplicateAndUnknownFields() {
         var commands=mock(ConsoleRuntimeCoordinator.class); var context=mock(ConsoleContext.class);
         var controller=new ConsoleRuntimeController(null,null,null,commands,null,context,new ConsoleWire(),null);
         String prefix="{\"commandId\":\"12345678-1234-1234-1234-123456789abc\",\"definitionVersionId\":\"42\",\"requestId\":\"1\",\"expectedRequestVersion\":\"0\"";
@@ -74,7 +74,7 @@ class ConsoleScalarServiceUnitTest {
         var captured=ArgumentCaptor.forClass(SandboxStart.class); verify(commands).start(captured.capture(),any());
         assertEquals(new TextLiteral("9007199254740993"),captured.getValue().inputs().values().get("quantity"));
         assertEquals(NullLiteral.INSTANCE,captured.getValue().inputs().values().get("note"));
-        for(String suffix:java.util.List.of(",\"inputs\":null}",",\"inputs\":{\"q\":1}}",",\"inputs\":{\"q\":{}}}",",\"inputs\":{\"q\":\"1\",\"q\":\"2\"}}",",\"actor\":\"untrusted\"}"))
+        for(String suffix:java.util.List.of(",\"inputs\":null}",",\"inputs\":{\"q\":1}}",",\"inputs\":{\"q\":\"1\",\"q\":\"2\"}}",",\"actor\":\"untrusted\"}"))
             assertThrows(ConsoleException.class,() -> controller.start(request(prefix+suffix)));
         String tooMany=java.util.stream.IntStream.range(0,101).mapToObj(i -> "\"key"+i+"\":null").collect(java.util.stream.Collectors.joining(","));
         assertEquals(422,assertThrows(ConsoleException.class,() -> controller.start(request(prefix+",\"inputs\":{"+tooMany+"}}"))).status());
@@ -82,6 +82,21 @@ class ConsoleScalarServiceUnitTest {
         assertDoesNotThrow(() -> wire.body(request("{\"inputs\":{\"large\":\""+"x".repeat(17000)+"\"}}"),256*1024,"inputs"));
         assertEquals(413,assertThrows(ConsoleException.class,() -> wire.body(request("{\"inputs\":\""+"x".repeat(256*1024)+"\"}"),256*1024,"inputs")).status());
         assertEquals(413,assertThrows(ConsoleException.class,() -> wire.body(request("{\"name\":\""+"x".repeat(17000)+"\"}"),"name")).status());
+    }
+    @Test void jsonHttpTokensRemainExactOrdinaryJsonAndStartIngressCountsActualBytes() {
+        var commands=mock(ConsoleRuntimeCoordinator.class); var context=mock(ConsoleContext.class);
+        var wire=new ConsoleWire();
+        var controller=new ConsoleRuntimeController(null,null,null,commands,null,context,wire,null);
+        String prefix="{\"commandId\":\"12345678-1234-1234-1234-123456789abc\",\"definitionVersionId\":\"42\",\"requestId\":\"1\",\"expectedRequestVersion\":\"0\",\"inputs\":{";
+        controller.start(request(prefix+"\"booking\":{\"amount\":9007199254740993.00,\"exponent\":1E+2,\"values\":[null,1.00]}}}"));
+        var captured=ArgumentCaptor.forClass(SandboxStart.class); verify(commands).start(captured.capture(),any());
+        var value=(io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue)captured.getValue().inputs().values().get("booking");
+        assertEquals("{\"amount\":9007199254740993.00,\"exponent\":1E+2,\"values\":[null,1.00]}",value.toJson());
+        assertEquals("{\"value\":"+value.toJson()+"}",wire.json(Map.of("value",value)));
+        String empty=prefix+"}}";
+        String maximum=empty+" ".repeat(2*1024*1024-empty.length());
+        assertDoesNotThrow(()->controller.start(request(maximum)));
+        assertEquals(413,assertThrows(ConsoleException.class,()->controller.start(request(maximum+" "))).status());
     }
     private MockHttpServletRequest request(String text) {
         var request=new MockHttpServletRequest(); request.setContentType("application/json"); request.setContent(text.getBytes(StandardCharsets.UTF_8)); return request;

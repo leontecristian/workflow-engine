@@ -1,6 +1,6 @@
 package io.github.leontecristian.workflow.testhost.service.sandbox;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
-import io.github.leontecristian.workflow.core.dto.runtime.ScalarValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionContext;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionDescriptor;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionResult;
@@ -27,7 +27,7 @@ public class SandboxRecordQuantityAction implements WorkflowServiceAction {
                 List.of(new ActionField("recordedQuantity",VariableValueType.LONG,true,false)));
     }
     @Transactional(propagation=Propagation.MANDATORY)
-    public ServiceActionResult execute(ServiceActionContext context,Map<String,ScalarValue> inputs) {
+    public ServiceActionResult execute(ServiceActionContext context,Map<String,WorkflowValue> inputs) {
         var quantity=inputs.get("quantity");
         effects.insert(context,Long.parseLong(((TextLiteral)quantity.value()).value()));
         if (context.nodeKey().equals(settings.failServiceNode)) throw new IllegalStateException("Configured service failure");

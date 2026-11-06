@@ -1,6 +1,6 @@
 # Workflow project constitution
 
-**F009 specification readiness — 2026-11-06:** revision 3 closes the engineering contracts in its [technical annex](features/F009-json-execution-variables/contracts.md), within the unchanged D01–D17 decisions and constitution 5.0.0. Implementation and runtime verification remain pending; this is not implementation authorization.
+**F009 specification readiness — 2026-11-06:** revision 3 closes the engineering contracts in its [technical annex](features/F009-json-execution-variables/contracts.md), within the unchanged D01–D17 decisions and constitution 5.0.0. The owner subsequently authorized implementation; see the [F009 handover](features/F009-json-execution-variables/implementation.md) for local automated evidence and remaining browser/APOLO gaps. Specification readiness itself was not implementation authorization.
 
 **Owner correction — 2026-11-05:** expression arithmetic follows native SpEL numeric behavior, including floating-point approximation, promotion, rounding and integral overflow. Do not reject a result solely for precision loss or compare it with an exact reference calculation. Declared DECIMAL variables enter evaluation as BigDecimal; decimal literals retain native SpEL types. Native evaluation errors and resource limits still fail the command. Exact decoding, transport, persistence and accepted-submission rules remain unchanged. This supersedes earlier expression-arithmetic exactness wording and the misinterpreted numeric owner decision.
 

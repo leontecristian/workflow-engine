@@ -44,7 +44,7 @@
                   "DECIMAL",
                   "BOOLEAN",
                   "DATE",
-                  "DATETIME"
+                  "DATETIME", "JSON"
                 ]
               },
               "nullable": {
@@ -65,7 +65,7 @@
                 "type": [
                   "string",
                   "boolean",
-                  "null"
+                  "null", "object", "array"
                 ]
               }
             },
@@ -118,7 +118,7 @@
                     "type": [
                       "string",
                       "boolean",
-                      "null"
+                      "null", "object", "array"
                     ]
                   }
                 },
@@ -154,7 +154,7 @@
               "DECIMAL",
               "BOOLEAN",
               "DATE",
-              "DATETIME"
+              "DATETIME", "JSON"
             ]
           },
           "nullable": {

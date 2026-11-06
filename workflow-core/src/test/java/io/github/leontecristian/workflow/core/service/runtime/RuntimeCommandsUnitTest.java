@@ -22,7 +22,7 @@ import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.ResolvedTask;
-import io.github.leontecristian.workflow.core.dto.runtime.ScalarValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionDescriptor;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionResult;
 import io.github.leontecristian.workflow.core.dto.runtime.SingleAssignmentResult;
@@ -90,7 +90,7 @@ class RuntimeCommandsUnitTest {
         var recorder=mock(WorkflowEventRecorder.class); when(host.recorder()).thenReturn(recorder);
         when(registry.descriptor("sandbox.recordQuantity")).thenReturn(new ServiceActionDescriptor("sandbox.recordQuantity",List.of(new ActionField("quantity",VariableValueType.LONG,true,false)),List.of(new ActionField("recordedQuantity",VariableValueType.LONG,true,false))));
         when(registry.action(anyString())).thenReturn(action);
-        when(action.execute(any(),any())).thenAnswer(i -> new ServiceActionResult(Map.of("recordedQuantity",((Map<String,ScalarValue>)i.getArgument(1)).get("quantity"))));
+        when(action.execute(any(),any())).thenAnswer(i -> new ServiceActionResult(Map.of("recordedQuantity",((Map<String,WorkflowValue>)i.getArgument(1)).get("quantity"))));
         var persisted=new ArrayList<Object>(); var variableRows=new HashMap<WorkflowVariableId,WorkflowVariableEntity>();
         var facts=new TreeMap<Long,WorkflowHistoryEntity>(); var storedReceipts=new HashMap<UUID,WorkflowCommandReceiptEntity>();
         doAnswer(i -> {
@@ -137,12 +137,12 @@ class RuntimeCommandsUnitTest {
         assertEquals(2,closed.execution().instance().lockVersion());
         assertEquals(List.of("TASK_COMPLETED","ACTIVITY_COMPLETED","TRANSITION_TAKEN","SERVICE_TASK_COMPLETED","VARIABLES_WRITTEN","TRANSITION_TAKEN","INSTANCE_COMPLETED"),facts.tailMap(10L).values().stream().map(WorkflowHistoryEntity::getEventType).toList());
         var order=inOrder(em,action); order.verify(em).refresh(instance); order.verify(em).flush(); order.verify(action).execute(any(),any());
-        for(var row:variableRows.values()) assertEquals("9007199254740993",((TextLiteral)row.scalar().value()).value());
+        for(var row:variableRows.values()) assertEquals("9007199254740993",((TextLiteral)row.executionValue().value()).value());
         clearInvocations(action,definitions,em,host);
         assertEquals(opened.execution(),service.start(start,inputs,context,null).execution());
         assertTrue(service.completeTask(complete,reviewer).replayed());
         assertThrows(RuntimeException.class,() -> service.start(start,new StartInputs(Map.of("quantity",new TextLiteral("1"))),context,null));
         verifyNoInteractions(action,definitions,em,host);
-        assertEquals(2,storedReceipts.size()); assertTrue(storedReceipts.values().stream().allMatch(r -> r.getResultSchemaVersion()==2));
+        assertEquals(2,storedReceipts.size()); assertTrue(storedReceipts.values().stream().allMatch(r -> r.getResultSchemaVersion()==3));
     }
 }

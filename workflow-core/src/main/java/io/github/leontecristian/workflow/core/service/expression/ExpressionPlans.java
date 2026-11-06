@@ -101,7 +101,7 @@ final class ExpressionPlans {
     }
     private static Plan describe(SpelNode n, String source, Map<String, ActionField> declarations, boolean listAllowed) {
         if (n.getClass() == CompoundExpression.class) {
-            if (n.getChildCount() != 2 || n.getChild(0).getClass() != VariableReference.class
+            if (n.getChildCount() < 2 || n.getChild(0).getClass() != VariableReference.class
                     || !n.getChild(0).toStringAST().equals("#vars")) throw new ExpressionException(INVALID);
             SpelNode access = n.getChild(1); String key; int cost = 3;
             if (access.getClass() == PropertyOrFieldReference.class) key = ((PropertyOrFieldReference) access).getName();
@@ -114,9 +114,21 @@ final class ExpressionPlans {
             Type type = switch (field.type()) {
                 case BOOLEAN -> Type.BOOLEAN; case LONG, DECIMAL -> Type.NUMBER;
                 case STRING -> Type.STRING; case DATE -> Type.DATE; case DATETIME -> Type.INSTANT;
-                default -> throw new ExpressionException(INVALID);
+                case JSON -> Type.MIXED;
             };
-            return new Plan("Read", field, key, List.of(), type, cost);
+            var steps = new ArrayList<Plan>();
+            for (int i = 2; i < n.getChildCount(); i++) {
+                if (field.type() != io.github.leontecristian.workflow.core.dto.runtime.VariableValueType.JSON) throw new ExpressionException(INVALID);
+                SpelNode step = n.getChild(i);
+                if (step.getClass() == PropertyOrFieldReference.class) {
+                    var property = (PropertyOrFieldReference) step;
+                    steps.add(new Plan("Property", property.isNullSafe(), property.getName(), List.of(), Type.MIXED, 1));
+                } else if (step.getClass() == Indexer.class && step.getChildCount() == 1) {
+                    steps.add(new Plan("Index", ((Indexer)step).isNullSafe(), null,
+                            List.of(describe(step.getChild(0),source,declarations,false)),Type.MIXED,1));
+                } else throw new ExpressionException(INVALID);
+            }
+            return new Plan("Read", field, key, steps, type, cost);
         }
         if (!ALLOWED.contains(n.getClass()) || (n.getClass() == InlineList.class && !listAllowed)) throw new ExpressionException(INVALID);
         if (n instanceof Literal literal) {

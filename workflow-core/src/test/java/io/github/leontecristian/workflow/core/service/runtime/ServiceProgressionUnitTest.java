@@ -82,7 +82,7 @@ class ServiceProgressionUnitTest {
         for(int i=0;i<6000;i++) batch.next("TEST",null,null,null,Map.of(),Map.of());
         assertThrows(WorkflowExecutionException.class,() -> batch.next("TEST",null,null,null,Map.of(),Map.of()));
         var large=new RuntimeHistoryBatch(em,json,1,42,UUID.randomUUID(),context);
-        assertThrows(WorkflowExecutionException.class,() -> large.next("TEST",null,null,null,Map.of("value","x".repeat(65536)),Map.of()));
+        assertThrows(WorkflowExecutionException.class,() -> large.next("TEST",null,null,null,Map.of("value","x".repeat(2*1024*1024)),Map.of()));
         var total=new RuntimeHistoryBatch(em,json,1,42,UUID.randomUUID(),context);
         assertThrows(WorkflowExecutionException.class,() -> { for(int i=0;i<200;i++) total.next("TEST",null,null,null,Map.of("value","x".repeat(60000)),Map.of()); });
     }

@@ -1,2 +1,2 @@
 package io.github.leontecristian.workflow.core.dto.runtime;
-public record BooleanLiteral(boolean value) implements ScalarLiteral {}
+public record BooleanLiteral(boolean value) implements WorkflowLiteral {}

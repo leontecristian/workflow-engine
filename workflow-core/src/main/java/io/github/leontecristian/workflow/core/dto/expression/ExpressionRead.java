@@ -1,9 +1,10 @@
 package io.github.leontecristian.workflow.core.dto.expression;
 
-import io.github.leontecristian.workflow.core.dto.runtime.ScalarValue;
-import java.util.Objects;
+import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
+import java.util.List;
 
-/** One initialized scalar actually read, including its declared type and explicit null. */
-public record ExpressionRead(String variableKey, ScalarValue value) {
-    public ExpressionRead { Objects.requireNonNull(variableKey); Objects.requireNonNull(value); }
+/** Detached exact operand evidence, retaining declared root type, resolved path and read state. */
+public record ExpressionRead(String variableKey, VariableValueType type, List<PathSegment> path, String state, String valueJson) {
+    public ExpressionRead { path = List.copyOf(path); }
+    public record PathSegment(String kind, String key, String index) { }
 }

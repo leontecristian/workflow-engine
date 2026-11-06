@@ -1,4 +1,4 @@
-export type ScalarInputs = Readonly<Record<string, string | boolean | null>>;
+export type ScalarInputs = string;
 export type CommandBody = Readonly<{
   commandId: string;
   definitionVersionId?: string;
@@ -159,13 +159,13 @@ export function commandRequest(
   replay: boolean,
 ): {
   path: string;
-  body: Readonly<Record<string, unknown>>;
+  body: Readonly<Record<string, unknown>> | string;
   token: string | null;
 } {
   if (envelope.kind === "start")
     return {
       path: replay ? "/commands/start/replay" : "/instances/start",
-      body: envelope.body,
+      body: startRequest(envelope.body),
       token: null,
     };
   const { instanceId, taskId, ...body } = envelope.body;
@@ -179,15 +179,13 @@ export function commandRequest(
 }
 
 export function freezeInputs(value: unknown): ScalarInputs {
-  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length > 100) throw new Error("Inputs must be a scalar object");
-  const result: Record<string,string|boolean|null> = Object.create(null);
-  for (const [key, token] of Object.entries(value)) {
-    if (!/^[A-Za-z][A-Za-z0-9._-]{0,99}$/.test(key) || !(token === null || typeof token === "boolean" || typeof token === "string")) throw new Error("Use exact strings, booleans or null for inputs");
-    result[key] = token;
-  }
-  return Object.freeze(result);
+  if (typeof value !== "string") throw new Error("Inputs must be raw JSON object text");
+  const object = parseExactJson(value);
+  if (!object || typeof object !== "object" || Array.isArray(object) || Object.keys(object).length > 100) throw new Error("Inputs must be an object");
+  for (const key of Object.keys(object)) if (!/^[A-Za-z][A-Za-z0-9._-]{0,99}$/.test(key)) throw new Error("Invalid input key");
+  return value;
 }
-export function parseScalarInputs(text: string): ScalarInputs { return freezeInputs(parseExactJson(text)); }
+export function parseScalarInputs(text: string): ScalarInputs { return freezeInputs(text); }
 // Reject duplicate properties before JSON.parse can discard them.
 function parseExactJson(text: string): unknown {
   const tokens = text.match(/"(?:\\.|[^"\\])*"|[{}\[\],:]|true|false|null|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g) || [];
@@ -206,10 +204,10 @@ function parseExactJson(text: string): unknown {
   return JSON.parse(text);
 }
 function commandIdentity(body: Envelope["body"]): string {
-  const copy: Record<string,unknown> = {...body};
-  if (body.inputs) {
-    if(Object.keys(body.inputs).length===0) delete copy["inputs"];
-    else copy["inputs"] = Object.fromEntries(Object.entries(body.inputs).sort(([a],[b])=>a.localeCompare(b)));
-  }
-  return JSON.stringify(Object.fromEntries(Object.entries(copy).sort(([a],[b])=>a.localeCompare(b))));
+  return JSON.stringify(Object.fromEntries(Object.entries(body).sort(([a],[b])=>a.localeCompare(b))));
+}
+function startRequest(body: CommandBody): string {
+  const {inputs, ...fields} = body;
+  const prefix = JSON.stringify(fields);
+  return prefix.slice(0,-1) + ',"inputs":' + (inputs === undefined ? "{}" : freezeInputs(inputs)) + "}";
 }

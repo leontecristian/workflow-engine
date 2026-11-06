@@ -1,5 +1,5 @@
 package io.github.leontecristian.workflow.core.service.runtime;
-import io.github.leontecristian.workflow.core.dto.runtime.ScalarValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionContext;
 import io.github.leontecristian.workflow.core.dto.runtime.StartInputs;
 
@@ -92,7 +92,7 @@ public class WorkflowExecutionService {
     public WorkflowCommandResult start(StartWorkflow command, StartInputs inputs, WorkflowCommandContext context, StartLinkAction links) {
         return guarded(() -> {
             RuntimeInputs.start(command, context);
-            RuntimeScalarBindings.basic(inputs,json);
+            RuntimeValueBindings.basic(inputs,json);
             RuntimeInputs.require((command.hostStartIntent() == null) == (links == null), Category.INVALID_INPUT);
             byte[] fingerprint = json.fingerprint(command, inputs, context);
             var replay = startReplay(command, context, fingerprint);
@@ -101,7 +101,7 @@ public class WorkflowExecutionService {
             var definition = definitions.loadForStart(command.definitionVersionId());
             definitions.requireCapabilities(definition, true);
             var model = definition.model();
-            var acceptedInputs=RuntimeScalarBindings.inputs(model,inputs,json);
+            var acceptedInputs=RuntimeValueBindings.inputs(model,inputs,json);
             var resolver = host.resolver(model.human().assignment().resolver());
             var taskType = catalog.findByCode(model.human().taskType())
                     .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
@@ -122,10 +122,10 @@ public class WorkflowExecutionService {
             started.put("definitionHash", definition.contentHash()); started.put("businessType", command.businessType()); started.put("businessId", command.businessId());
             started.set("hostStartIntent", json.tree(json.evidence(command.hostStartIntent())));
             batch.next("INSTANCE_STARTED",null,null,null,started,Map.of());
-            Map<String,ScalarValue> state=new java.util.TreeMap<>();
+            Map<String,WorkflowValue> state=new java.util.TreeMap<>();
             if (model.extended()) {
-                batch.next("START_INPUTS_ACCEPTED",null,null,null,Map.of("inputs",RuntimeScalarBindings.tokens(acceptedInputs,json)),Map.of());
-                var writes=RuntimeScalarBindings.prepare(model.initialize(),model.variables(),state,acceptedInputs,Category.INVALID_INPUT);
+                batch.next("START_INPUTS_ACCEPTED",null,null,null,Map.of("inputs",RuntimeValueBindings.tokens(acceptedInputs,json)),Map.of());
+                var writes=RuntimeValueBindings.prepare(model.initialize(),model.variables(),state,acceptedInputs,Category.INVALID_INPUT);
                 variables.apply(instance.getId(),model.start().key(),model.initialize(),state,writes,batch);
             }
             var paused=services.traverse(model,model.start().key(),model.human().key(),new ServiceActionContext(
@@ -188,7 +188,7 @@ public class WorkflowExecutionService {
                     .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
             RuntimeInputs.require("TASK_CREATED".equals(created.getEventType()) && task.getId().equals(created.getTaskId())
                     && activity.getId().equals(created.getActivityId()), Category.HOST_CONFIGURATION);
-            RuntimeInputs.require(created.getDetailsSchemaVersion() == 1, Category.UNSUPPORTED_VERSION);
+            RuntimeInputs.require(created.getDetailsSchemaVersion() == 2, Category.UNSUPPORTED_VERSION);
             var assignmentEvidence = json.tree(created.getDetailsJson());
             RuntimeInputs.require(assignmentEvidence.isObject() && assignmentEvidence.size() == 2
                     && assignmentEvidence.path("taskKey").isTextual() && assignmentEvidence.path("assignedUserRef").isTextual()
@@ -227,7 +227,7 @@ public class WorkflowExecutionService {
         return findReplay(command,StartInputs.empty(),context);
     }
     public Optional<WorkflowCommandResult> findReplay(StartWorkflow command, StartInputs inputs, WorkflowCommandContext context) {
-        RuntimeInputs.start(command,context); RuntimeScalarBindings.basic(inputs,json);
+        RuntimeInputs.start(command,context); RuntimeValueBindings.basic(inputs,json);
         return RuntimePersistenceErrors.call(() -> startReplay(command, context, json.fingerprint(command, inputs, context))
                 .map(result -> new WorkflowCommandResult(true, result)));
     }
@@ -266,7 +266,7 @@ public class WorkflowExecutionService {
         entityManager.flush(); // Capture actual final managed token after every instance update, not a predicted increment.
         WorkflowExecutionResult result = snapshot(commandId, operation, definition, instance, activity, task, first);
         entityManager.persist(new WorkflowCommandReceiptEntity(commandId, instance.getId(), operation.name(), context.actorKind(), context.actorRef(),
-                fingerprint, fingerprintVersion, RuntimeInputs.context(context), json.evidence(result), (short)(definition.model().extended() ? 2 : 1)));
+                fingerprint, fingerprintVersion, RuntimeInputs.context(context), json.evidence(result), (short)3));
         entityManager.flush(); // Detect a receipt-PK loser before invoking the durable recorder; never recover in this transaction.
         host.record(recorder, batch.events());
         entityManager.flush();

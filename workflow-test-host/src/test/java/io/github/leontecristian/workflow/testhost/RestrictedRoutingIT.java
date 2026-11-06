@@ -15,7 +15,8 @@ import io.github.leontecristian.workflow.core.dto.runtime.AssignmentContext;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.ResolvedTask;
-import io.github.leontecristian.workflow.core.dto.runtime.ScalarValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionContext;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionDescriptor;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionResult;
@@ -264,11 +265,11 @@ class RestrictedRoutingIT extends DatabaseIntegrationTest {
         ((ObjectNode)source.path("transitions").get(4)).put("condition","#vars.date == #vars.date and #vars.time == #vars.time and #vars.flag and #vars.text == 'x' and #vars.optional == null and #vars.decimal + #vars.quantity == #vars.quantity + 1");
         var started=start(publish(source),"20"); assertThat(complete(command(started)).execution().instance().resultKey()).isEqualTo("HIGH");
         var evidence=routed(started.instance().id()).path("evaluations").get(0).path("reads");
-        assertThat(evidence.size()).isEqualTo(7);
-        assertThat(evidence.get(1).path("value").asText()).isEqualTo("2026-11-05T00:00:00.1234567Z");
-        assertThat(evidence.get(4).path("value").isNull()).isTrue();
+        assertThat(evidence.size()).isEqualTo(10);
+        assertThat(evidence.get(2).path("value").asText()).isEqualTo("2026-11-05T00:00:00.1234567Z");
+        assertThat(evidence.get(6).path("value").isNull()).isTrue();
     }
-    @Test void oversizedCompleteRoutingEvidenceRollsBackAllEarlierParticipatingEffects() throws Exception {
+    @Test void scalarRoutingEvidenceFitsTheNewHistoryCapacityWithoutDeduplicatingReads() throws Exception {
         var source=fixture(); var nodes=(ArrayNode)source.get("nodes"); var vars=(ArrayNode)source.get("variables");
         var edges=(ArrayNode)source.get("transitions");
         ((ObjectNode)edges.get(2)).put("to","TEXT0"); edges.remove(5); edges.remove(4);
@@ -281,9 +282,10 @@ class RestrictedRoutingIT extends DatabaseIntegrationTest {
             edges.addObject().put("key","check"+i).put("from","ROUTE").put("to","HIGH").put("condition","#vars."+key+" == ''");
         }
         var started=start(publish(source),"20");
-        assertThatThrownBy(()->complete(command(started))).isInstanceOfSatisfying(WorkflowExecutionException.class,e->assertThat(e.category()).isEqualTo(WorkflowExecutionException.Category.LIMIT_EXCEEDED));
-        assertUnchanged(started);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf.workflow_variable WHERE instance_id=? AND variable_key LIKE 'text%'",Integer.class,started.instance().id())).isZero();
+        assertThat(complete(command(started)).execution().instance().resultKey()).isEqualTo("LOW");
+        assertThat(routed(started.instance().id()).path("evaluations")).hasSize(20);
+        assertThat(effects()).isEqualTo(21);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf.workflow_variable WHERE instance_id=? AND variable_key LIKE 'text%'",Integer.class,started.instance().id())).isEqualTo(20);
     }
     @ParameterizedTest @ValueSource(ints={48,49})
     void gatewayVisitsAndEndShareTheFiftyAutomaticSteps(int gateways) throws Exception {
@@ -327,8 +329,9 @@ class RestrictedRoutingIT extends DatabaseIntegrationTest {
         assertThat(routed(old.instance().id()).path("selectedTransitionKey").asText()).isEqualTo("high");
         assertThat(routed(fresh.instance().id()).path("selectedTransitionKey").asText()).isEqualTo("positive");
     }
-    @Test void overlappingCompletionsCommitExactlyOneEffectAndRoute() throws Exception {
-        var started=start(publish(fixture()),"20");
+    @ParameterizedTest @ValueSource(booleans={false,true})
+    void overlappingCompletionsCommitExactlyOneEffectAndRoute(boolean jsonValues) throws Exception {
+        var started=jsonValues ? jsonStart(publish(jsonFixture("#vars.booking.amount > 0")),UUID.randomUUID(),"{\"amount\":1.00,\"obsolete\":true}") : start(publish(fixture()),"20");
         host.entered=new CountDownLatch(1); host.release=new CountDownLatch(1);
         var executor=Executors.newFixedThreadPool(2);
         try {
@@ -343,14 +346,151 @@ class RestrictedRoutingIT extends DatabaseIntegrationTest {
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf.workflow_history WHERE instance_id=? AND event_type='GATEWAY_ROUTED'",Integer.class,started.instance().id())).isEqualTo(1);
         } finally { host.release.countDown(); executor.shutdownNow(); assertThat(executor.awaitTermination(10,TimeUnit.SECONDS)).isTrue(); }
     }
+    private ObjectNode jsonFixture(String condition) throws Exception {
+        var source=fixture(); var policy=(ObjectNode)source.get("startPolicy");
+        policy.putArray("inputContract").addObject().put("key","booking").put("type","JSON").put("required",true).put("nullable",false);
+        var initialize=policy.putObject("initialize"); initialize.putObject("booking").put("source","startInput").put("key","booking");
+        initialize.putObject("explicitNull").put("source","literal").putNull("value");
+        var vars=source.putArray("variables");
+        vars.addObject().put("key","booking").put("type","JSON").put("nullable",false);
+        vars.addObject().put("key","explicitNull").put("type","JSON").put("nullable",true);
+        vars.addObject().put("key","uninitialized").put("type","JSON").put("nullable",true);
+        var node=(ObjectNode)source.path("nodes").get(2); node.put("action","f009.replace");
+        node.putObject("inputs").putObject("booking").put("source","variable").put("key","booking");
+        node.putObject("outputs").putObject("booking").put("source","actionOutput").put("key","booking");
+        ((ObjectNode)source.path("transitions").get(4)).put("condition",condition);
+        ((ObjectNode)source.path("transitions").get(5)).put("condition","false");
+        return source;
+    }
+    private WorkflowExecutionResult jsonStart(long version,UUID command,String value) {
+        var started=tx().execute(status->engine.start(new StartWorkflow(command,version,null,null,null),
+                new StartInputs(Map.of("booking",WorkflowJsonValue.parse(value))),context(false),null)).execution();
+        instances.add(started.instance().id()); return started;
+    }
+    @Test void jsonSnapshotsRoundTripReplaceRouteAndReplayWithCoordinatedHistoryReaders() throws Exception {
+        String original="{\"amount\":12500.00,\"department\":{\"code\":\"SALES\"},\"obsolete\":true}";
+        long version=publish(jsonFixture("#vars.booking.amount > 10000 and #vars.booking.department?.code == 'SALES'"));
+        UUID command=UUID.randomUUID(); var started=jsonStart(version,command,original);
+        var page=reads.listVariables(started.instance().id(),null,100,null);
+        assertThat(page.items()).filteredOn(v->v.key().equals("explicitNull")).allSatisfy(v->{ assertThat(v.initialized()).isTrue(); assertThat(v.value().value()).isEqualTo(io.github.leontecristian.workflow.core.dto.runtime.NullLiteral.INSTANCE); });
+        assertThat(page.items()).filteredOn(v->v.key().equals("uninitialized")).allSatisfy(v->assertThat(v.initialized()).isFalse());
+        assertThat(jdbc.queryForObject("SELECT json_value FROM wf.workflow_variable WHERE instance_id=? AND variable_key='booking'",String.class,started.instance().id())).contains("12500.00");
+        var closed=complete(command(started)).execution(); assertThat(closed.instance().resultKey()).isEqualTo("HIGH");
+        assertThat(reads.findTaskSubmission(started.task().id())).isPresent();
+        assertThat(closed.instance().lockVersion()).isEqualTo(reads.findInstance(started.instance().id()).orElseThrow().lockVersion());
+        assertThat(jdbc.queryForObject("SELECT json_value FROM wf.workflow_variable WHERE instance_id=? AND variable_key='booking'",String.class,started.instance().id())).doesNotContain("obsolete").contains("12500.00");
+        var evidence=routed(started.instance().id()).path("evaluations").get(0).path("reads");
+        assertThat(evidence).hasSize(2); assertThat(evidence.get(0).path("path").get(0).path("key").asText()).isEqualTo("amount");
+        assertThat(evidence.get(0).path("type").asText()).isEqualTo("JSON");
+        String routingText=jdbc.queryForObject("SELECT details_json FROM wf.workflow_history WHERE instance_id=? AND event_type='GATEWAY_ROUTED'",String.class,started.instance().id());
+        assertThat(routingText).contains("12500.00").doesNotContain("obsolete");
+        String writes=jdbc.queryForObject("SELECT details_json FROM wf.workflow_history WHERE instance_id=? AND event_type='VARIABLES_WRITTEN' AND details_json LIKE '%actionOutput%'",String.class,started.instance().id());
+        assertThat(writes).contains("previousValue","obsolete","12500.00");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf.workflow_history WHERE instance_id=? AND details_schema_version<>2",Integer.class,started.instance().id())).isZero();
+        clearInvocations(expressions);
+        var replay=tx().execute(status->engine.start(new StartWorkflow(command,version,null,null,null),new StartInputs(Map.of("booking",WorkflowJsonValue.parse("{\"obsolete\":true,\"department\":{\"code\":\"SALES\"},\"amount\":12500.00}"))),context(false),null));
+        assertThat(replay.replayed()).isTrue(); assertThat(replay.execution()).isEqualTo(started); assertThat(effects()).isEqualTo(1);
+        verify(expressions,never()).evaluate(anyString(),anyString(),anyString(),anyMap(),anyMap(),any());
+        assertThatThrownBy(()->tx().execute(status->engine.start(new StartWorkflow(command,version,null,null,null),new StartInputs(Map.of("booking",WorkflowJsonValue.parse(original.replace("12500.00","12500.0")))),context(false),null)))
+                .isInstanceOfSatisfying(WorkflowExecutionException.class,e->assertThat(e.category()).isEqualTo(WorkflowExecutionException.Category.COMMAND_ID_CONFLICT));
+        var constraint=jdbc.queryForMap("SELECT definition,is_disabled,is_not_trusted FROM sys.check_constraints WHERE name='ck_workflow_history_json'");
+        assertThat(constraint.get("definition").toString()).contains("4194304","isjson"); assertThat(constraint.get("is_disabled")).isEqualTo(false); assertThat(constraint.get("is_not_trusted")).isEqualTo(false);
+    }
+    @Test void jsonFailureAfterReplacementRollsBackHostEffectValuesAndHistory() throws Exception {
+        var started=jsonStart(publish(jsonFixture("#vars.booking.missing.code == 'x'")),UUID.randomUUID(),"{\"amount\":1.00,\"obsolete\":true}");
+        assertThatThrownBy(()->complete(command(started))).isInstanceOfSatisfying(WorkflowExecutionException.class,e->assertThat(e.category()).isEqualTo(WorkflowExecutionException.Category.EXPRESSION_EVALUATION_FAILED));
+        assertThat(jdbc.queryForObject("SELECT json_value FROM wf.workflow_variable WHERE instance_id=? AND variable_key='booking'",String.class,started.instance().id())).contains("obsolete","1.00");
+        assertThat(reads.findTask(started.task().id()).orElseThrow().status()).isEqualTo(TaskStatus.OPEN);
+        assertThat(count("wf.workflow_history",started.instance().id())).isEqualTo((int)started.lastHistorySequence());
+        assertThat(count("wf.workflow_command_receipt",started.instance().id())).isEqualTo(1); assertThat(effects()).isZero();
+    }
+    private String maximumJson(String character) {
+        var out=new StringBuilder("["); int remaining=128*1024-28;
+        for(int i=0;i<9;i++) { if(i>0) out.append(','); int n=Math.min(16000,remaining); out.append('"').append(character.repeat(n)).append('"'); remaining-=n; }
+        return out.append(']').toString();
+    }
+    @ParameterizedTest @ValueSource(booleans={false,true})
+    void maximumJsonStartDefaultServiceAndReadRoundTrip(boolean useDefault) throws Exception {
+        String maximum=maximumJson("x");
+        var source=jsonFixture("#vars.explicitNull == null");
+        if(useDefault) {
+            var input=(ObjectNode)source.path("startPolicy").path("inputContract").get(0); input.put("required",false);
+            input.set("default",json.readTree(maximum));
+        }
+        long version=publish(source);
+        WorkflowExecutionResult started;
+        if(useDefault) {
+            started=tx().execute(status->engine.start(new StartWorkflow(UUID.randomUUID(),version,null,null,null),StartInputs.empty(),context(false),null)).execution();
+            instances.add(started.instance().id());
+        } else started=jsonStart(version,UUID.randomUUID(),maximum);
+        assertThat(jdbc.queryForObject("SELECT DATALENGTH(json_value) FROM wf.workflow_variable WHERE instance_id=? AND variable_key='booking'",Integer.class,started.instance().id())).isEqualTo(256*1024);
+        complete(command(started));
+        var page=reads.listVariables(started.instance().id(),null,100,null);
+        assertThat(page.items()).filteredOn(v->v.key().equals("booking")).allSatisfy(v->assertThat(((WorkflowJsonValue)v.value().value()).toJson()).isEqualTo(maximum));
+        var sequences=jdbc.queryForList("SELECT sequence_number FROM wf.workflow_history WHERE instance_id=? AND event_type='VARIABLES_WRITTEN'",Long.class,started.instance().id());
+        assertThat(sequences).hasSize(2);
+        for(long sequence:sequences) assertThat(reads.findHistoryEvent(started.instance().id(),sequence).orElseThrow().detailsJson()).contains(maximum);
+    }
+    @Test void unicodeVariablePagesFitActualUtf8AndKeepStableContinuation() throws Exception {
+        String maximum=maximumJson("中"); var source=jsonFixture("#vars.explicitNull == null");
+        for(String key:List.of("bcopy","ccopy")) {
+            ((ArrayNode)source.get("variables")).addObject().put("key",key).put("type","JSON").put("nullable",false);
+            ((ObjectNode)source.path("startPolicy").path("initialize")).putObject(key).put("source","startInput").put("key","booking");
+        }
+        var started=jsonStart(publish(source),UUID.randomUUID(),maximum);
+        var page=reads.listVariables(started.instance().id(),null,100,null);
+        assertThat(page.items()).hasSize(2); assertThat(page.nextAfterKey()).isEqualTo("booking");
+        var next=reads.listVariables(started.instance().id(),page.nextAfterKey(),100,page.lockVersion());
+        assertThat(next.items()).extracting(v->v.key()).containsExactly("ccopy","explicitNull","uninitialized");
+        assertThat(next.nextAfterKey()).isNull();
+        assertThatThrownBy(()->reads.listVariables(started.instance().id(),page.nextAfterKey(),100,null)).isInstanceOf(WorkflowExecutionException.class);
+    }
+    @Test void cumulativeJsonEvidenceOverflowRollsBackEarlierReplacementEffectsAndClaim() throws Exception {
+        var source=jsonFixture("#vars.explicitNull == null");
+        var nodes=(ArrayNode)source.get("nodes"); var edges=(ArrayNode)source.get("transitions");
+        ((ObjectNode)edges.get(2)).put("to","COPY0");
+        for(int i=0;i<17;i++) {
+            var node=nodes.addObject().put("key","COPY"+i).put("type","SERVICE_TASK").put("name","Retained snapshot").put("action","f009.replace");
+            node.putObject("inputs").putObject("booking").put("source","variable").put("key","booking");
+            node.putObject("outputs").putObject("booking").put("source","actionOutput").put("key","booking");
+            edges.addObject().put("key","copyEdge"+i).put("from","COPY"+i).put("to",i==16 ? "ROUTE" : "COPY"+(i+1));
+        }
+        var started=jsonStart(publish(source),UUID.randomUUID(),maximumJson("x"));
+        assertThatThrownBy(()->complete(command(started))).isInstanceOfSatisfying(WorkflowExecutionException.class,e->assertThat(e.category()).isEqualTo(WorkflowExecutionException.Category.LIMIT_EXCEEDED));
+        assertThat(effects()).isZero();
+        assertThat(reads.findInstance(started.instance().id()).orElseThrow().lockVersion()).isEqualTo(started.instance().lockVersion());
+        assertThat(reads.findTask(started.task().id()).orElseThrow().status()).isEqualTo(TaskStatus.OPEN);
+        assertThat(count("wf.workflow_history",started.instance().id())).isEqualTo((int)started.lastHistorySequence());
+        assertThat(count("wf_test.workflow_event_outbox",started.instance().id())).isEqualTo((int)started.lastHistorySequence());
+    }
+    @Test void routingRecordOverflowRollsBackReplacementAndHostEffect() throws Exception {
+        var source=jsonFixture("#vars.booking == null");
+        var edges=(ArrayNode)source.get("transitions");
+        for(int i=0;i<17;i++) edges.addObject().put("key","largeRead"+i).put("from","ROUTE").put("to","HIGH").put("condition","#vars.booking == null");
+        var started=jsonStart(publish(source),UUID.randomUUID(),maximumJson("x"));
+        assertThatThrownBy(()->complete(command(started))).isInstanceOfSatisfying(WorkflowExecutionException.class,e->assertThat(e.category()).isEqualTo(WorkflowExecutionException.Category.LIMIT_EXCEEDED));
+        assertThat(effects()).isZero(); assertThat(reads.findTask(started.task().id()).orElseThrow().status()).isEqualTo(TaskStatus.OPEN);
+        assertThat(count("wf.workflow_history",started.instance().id())).isEqualTo((int)started.lastHistorySequence());
+        assertThat(count("wf_test.workflow_event_outbox",started.instance().id())).isEqualTo((int)started.lastHistorySequence());
+    }
     @TestConfiguration static class Adapters {
+        @Bean WorkflowServiceAction jsonReplacementAction(TestHost host) {
+            return new WorkflowServiceAction() {
+                public ServiceActionDescriptor descriptor() { var f=new ActionField("booking",VariableValueType.JSON,true,false); return new ServiceActionDescriptor("f009.replace",List.of(f),List.of(f)); }
+                public ServiceActionResult execute(ServiceActionContext context,Map<String,WorkflowValue> inputs) {
+                    host.effect(context); host.awaitRelease(); var input=(WorkflowJsonValue)inputs.get("booking").value();
+                    var output=WorkflowJsonValue.parse(input.toJson().replace(",\"obsolete\":true",""));
+                    return new ServiceActionResult(Map.of("booking",new WorkflowValue(VariableValueType.JSON,output)));
+                }
+            };
+        }
         @Bean TestHost routingTestHost(JdbcTemplate jdbc,ConsoleEventStore outbox,ConsoleWire wire) { return new TestHost(jdbc,outbox,wire); }
         @Bean WorkflowServiceAction routingTextAction(TestHost host) {
             return new WorkflowServiceAction() {
                 @Override public ServiceActionDescriptor descriptor() { return new ServiceActionDescriptor("f008.text",List.of(),List.of(new ActionField("text",VariableValueType.STRING,true,false))); }
-                @Override public ServiceActionResult execute(ServiceActionContext context,Map<String,ScalarValue> inputs) {
+                @Override public ServiceActionResult execute(ServiceActionContext context,Map<String,WorkflowValue> inputs) {
                     host.effect(context);
-                    return new ServiceActionResult(Map.of("text",new ScalarValue(VariableValueType.STRING,new TextLiteral("x".repeat(4000)))));
+                    return new ServiceActionResult(Map.of("text",new WorkflowValue(VariableValueType.STRING,new TextLiteral("x".repeat(4000)))));
                 }
             };
         }
@@ -368,15 +508,18 @@ class RestrictedRoutingIT extends DatabaseIntegrationTest {
         @Override public SingleAssignmentResult resolve(AssignmentContext context) { return new SingleAssignmentResult(List.of(new ResolvedTask("review","f008-reviewer")),null); }
         @Override public ServiceActionDescriptor descriptor() { return new ServiceActionDescriptor("f008.record",
                 List.of(new ActionField("quantity",VariableValueType.LONG,true,false)),List.of(new ActionField("recordedQuantity",VariableValueType.LONG,true,false))); }
-        @Override public ServiceActionResult execute(ServiceActionContext context,Map<String,ScalarValue> inputs) {
+        @Override public ServiceActionResult execute(ServiceActionContext context,Map<String,WorkflowValue> inputs) {
             effect(context);
+            awaitRelease();
+            return new ServiceActionResult(Map.of("recordedQuantity",inputs.get("quantity")));
+        }
+        void awaitRelease() {
             var began=entered; var finish=release;
             if(began!=null && finish!=null) {
                 began.countDown();
                 try { if(!finish.await(10,TimeUnit.SECONDS)) throw new IllegalStateException("Test release timeout"); }
                 catch(InterruptedException e) { Thread.currentThread().interrupt(); throw new IllegalStateException(e); }
             }
-            return new ServiceActionResult(Map.of("recordedQuantity",inputs.get("quantity")));
         }
         void effect(ServiceActionContext context) {
             jdbc.update("INSERT INTO wf_test.management_audit(occurred_at,actor_ref,operation,entity_kind,entity_id,correlation_id,evidence_json) VALUES(SYSUTCDATETIME(),?,'F008_EFFECT','TASK_TYPE',1,?,N'{}')",

@@ -1,7 +1,7 @@
 package io.github.leontecristian.workflow.testhost.controller.runtime;
 import io.github.leontecristian.workflow.core.dto.runtime.BooleanLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.NullLiteral;
-import io.github.leontecristian.workflow.core.dto.runtime.ScalarLiteral;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.StartInputs;
 import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
 
@@ -81,7 +81,7 @@ public class ConsoleRuntimeController {
     private SandboxStart startBody(HttpServletRequest r) {
         var b =
                 wire.body(
-                        r, 256*1024,
+                        r, 2*1024*1024,
                         "commandId",
                         "definitionVersionId",
                         "requestId",
@@ -98,12 +98,13 @@ public class ConsoleRuntimeController {
         var n=body.get("inputs");
         if (!n.isObject()) throw ConsoleException.invalid();
         if (n.size()>100) throw new ConsoleException(422,"LIMIT_EXCEEDED");
-        var values=new java.util.HashMap<String,ScalarLiteral>();
+        var values=new java.util.HashMap<String,WorkflowLiteral>();
         n.fields().forEachRemaining(e -> {
-            var v=e.getValue(); ScalarLiteral token;
+            var v=e.getValue(); WorkflowLiteral token;
             if(v.isNull()) token=NullLiteral.INSTANCE;
             else if(v.isBoolean()) token=new BooleanLiteral(v.booleanValue());
             else if(v.isTextual()) token=new TextLiteral(v.textValue());
+            else if(v.isContainerNode()) token=io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue.parse(v.toString());
             else throw ConsoleException.invalid();
             values.put(e.getKey(),token);
         });
@@ -121,6 +122,7 @@ public class ConsoleRuntimeController {
             if(v.value()!=null) {
                 if(v.value().value() instanceof TextLiteral t) value=t.value();
                 else if(v.value().value() instanceof BooleanLiteral t) value=t.value();
+                else if(v.value().value() instanceof io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue t) value=t;
             }
             item.put("value",value); items.add(item);
         }

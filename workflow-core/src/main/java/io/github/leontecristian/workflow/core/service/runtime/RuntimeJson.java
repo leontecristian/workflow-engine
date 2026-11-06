@@ -41,12 +41,18 @@ import org.springframework.stereotype.Component;
 /** Private, versioned runtime JSON; never modifies host serialization configuration. */
 @Component
 public class RuntimeJson {
-    static final String FINGERPRINT_VERSION = "wf-runtime-request-v1";
+    static final String FINGERPRINT_VERSION = "wf-runtime-request-v3";
     private final ObjectMapper mapper;
     public RuntimeJson() {
         mapper = new ObjectMapper(JsonFactory.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
                 .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(32).maxStringLength(131072).maxNumberLength(128).build()).build());
         SimpleModule numbers = new SimpleModule();
+        numbers.addSerializer(io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue.class,
+                new com.fasterxml.jackson.databind.JsonSerializer<>() {
+                    @Override public void serialize(io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue value,
+                            com.fasterxml.jackson.core.JsonGenerator generator,com.fasterxml.jackson.databind.SerializerProvider provider)
+                            throws IOException { generator.writeRawValue(value.toJson()); }
+                });
         numbers.addSerializer(Long.class, ToStringSerializer.instance);
         numbers.addSerializer(Long.TYPE, ToStringSerializer.instance);
         JsonDeserializer<Long> longs = new JsonDeserializer<>() {
@@ -68,27 +74,49 @@ public class RuntimeJson {
         numbers.addDeserializer(Integer.class, integers); numbers.addDeserializer(Integer.TYPE, integers);
         mapper.registerModule(new JavaTimeModule()).registerModule(numbers);
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        mapper.setNodeFactory(com.fasterxml.jackson.databind.node.JsonNodeFactory.withExactBigDecimals(true));
         mapper.enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS, DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
                 DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES, DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES,
                 DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS, DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS,
                 DeserializationFeature.USE_BIG_INTEGER_FOR_INTS);
     }
     ObjectNode object() { return mapper.createObjectNode(); }
+    String variablePage(io.github.leontecristian.workflow.core.dto.runtime.WorkflowVariablePage page) {
+        var root=new java.util.LinkedHashMap<String,Object>(); root.put("instanceId",page.instanceId()); root.put("lockVersion",page.lockVersion());
+        root.put("nextAfterKey",page.nextAfterKey()); var items=new java.util.ArrayList<Object>(); root.put("items",items);
+        for (var view:page.items()) {
+            var item=new java.util.LinkedHashMap<String,Object>(); items.add(item);
+            item.put("key",view.key()); item.put("type",view.type().name()); item.put("initialized",view.initialized());
+            Object token=view.initialized() ? view.value().value() : null;
+            if(token instanceof io.github.leontecristian.workflow.core.dto.runtime.TextLiteral text) token=text.value();
+            else if(token instanceof io.github.leontecristian.workflow.core.dto.runtime.BooleanLiteral bool) token=bool.value();
+            else if(token==io.github.leontecristian.workflow.core.dto.runtime.NullLiteral.INSTANCE) token=null;
+            item.put("value",token);
+        }
+        try { return mapper.writeValueAsString(root); }
+        catch (IOException failure) { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION); }
+    }
+    static boolean utf8Fits(String value,int bytes) { return value.getBytes(StandardCharsets.UTF_8).length<=bytes; }
     String encode(Object value) { return DefinitionContentCanonicalizer.canonical(mapper.valueToTree(value)); }
     static byte[] hash(String value) { return DefinitionContentCanonicalizer.hash(value); }
     static boolean fits(String text, int bytes) {
         return text != null && text.length() * 2L <= bytes && text.getBytes(StandardCharsets.UTF_8).length <= bytes;
     }
     String evidence(Object value) {
-        String json = encode(value); RuntimeInputs.require(fits(json, 128 * 1024), Category.LIMIT_EXCEEDED); return json;
+        String json = DefinitionContentCanonicalizer.canonical(mapper.valueToTree(value),64*1024,128*1024);
+        RuntimeInputs.require(fits(json, 128 * 1024), Category.LIMIT_EXCEEDED); return json;
+    }
+    String history(Object value) {
+        String result = DefinitionContentCanonicalizer.canonical(mapper.valueToTree(value),2*1024*1024,4*1024*1024);
+        RuntimeInputs.require(fits(result,4*1024*1024),Category.LIMIT_EXCEEDED); return result;
     }
     JsonNode tree(String source) {
-        RuntimeInputs.require(fits(source, 128 * 1024) && RuntimeInputs.unicode(source), Category.HOST_CONFIGURATION);
+        RuntimeInputs.require(fits(source, 4 * 1024 * 1024) && RuntimeInputs.unicode(source), Category.HOST_CONFIGURATION);
         try { return mapper.readTree(source); }
-        catch (IOException failure) { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION, failure); }
+        catch (IOException failure) { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION); }
     }
     String fingerprintVersion(StartInputs inputs) {
-        return inputs.values().isEmpty() ? FINGERPRINT_VERSION : "wf-runtime-request-v2";
+        return FINGERPRINT_VERSION;
     }
     byte[] fingerprint(StartWorkflow command, WorkflowCommandContext context) {
         return fingerprint(command,StartInputs.empty(),context);
@@ -98,8 +126,8 @@ public class RuntimeJson {
         request.put("businessType", command.businessType()); request.put("businessId", command.businessId());
         if (command.hostStartIntent() == null) request.putNull("hostStartIntent");
         else request.set("hostStartIntent", mapper.valueToTree(command.hostStartIntent()));
-        if (!inputs.values().isEmpty()) {
-            var raw=object(); inputs.values().forEach((k,v) -> raw.set(k,RuntimeScalarBindings.token(v))); request.set("inputs",raw);
+        {
+            var raw=object(); inputs.values().forEach((k,v) -> raw.set(k,RuntimeValueBindings.token(v))); request.set("inputs",raw);
         }
         return fingerprint(WorkflowOperation.START_WORKFLOW, context, request,fingerprintVersion(inputs));
     }
@@ -122,8 +150,8 @@ public class RuntimeJson {
         if (receipt == null) return Optional.empty();
         RuntimeInputs.require(receipt.getActorKind() == context.actorKind() && java.util.Objects.equals(receipt.getActorRef(), context.actorRef())
                 && operation.name().equals(receipt.getOperationType()), Category.COMMAND_ID_CONFLICT);
-        RuntimeInputs.require((FINGERPRINT_VERSION.equals(receipt.getFingerprintVersion()) || "wf-runtime-request-v2".equals(receipt.getFingerprintVersion()))
-                && (Short.valueOf((short)1).equals(receipt.getResultSchemaVersion()) || Short.valueOf((short)2).equals(receipt.getResultSchemaVersion())),
+        RuntimeInputs.require(FINGERPRINT_VERSION.equals(receipt.getFingerprintVersion())
+                && Short.valueOf((short)3).equals(receipt.getResultSchemaVersion()),
                 Category.UNSUPPORTED_VERSION);
         RuntimeInputs.require(Arrays.equals(receipt.getRequestFingerprint(), fingerprint), Category.COMMAND_ID_CONFLICT);
         JsonNode stored = tree(receipt.getResultJson());
@@ -132,18 +160,17 @@ public class RuntimeJson {
             WorkflowExecutionResult result = mapper.readValue(receipt.getResultJson(), WorkflowExecutionResult.class);
             verifyResult(result, commandId, operation, receipt);
             return Optional.of(result);
-        } catch (IOException | IllegalArgumentException failure) { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION, failure); }
+        } catch (IOException | IllegalArgumentException failure) { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION); }
     }
     private void verifyResult(WorkflowExecutionResult result, UUID commandId, WorkflowOperation operation, WorkflowCommandReceiptEntity receipt) {
         RuntimeInputs.require(result != null && commandId.equals(result.commandId()) && result.operation() == operation
                 && result.instance() != null && result.activity() != null && result.task() != null, Category.HOST_CONFIGURATION);
-        boolean extended=receipt.getResultSchemaVersion()==2;
         var instance = result.instance(); var activity = result.activity(); var task = result.task();
         RuntimeInputs.require(instance.id() == receipt.getInstanceId() && instance.id() > 0 && instance.definitionVersionId() > 0 && instance.lockVersion() >= 0
                 && activity.instanceId() == instance.id() && task.instanceId() == instance.id() && task.activityId() == activity.id()
                 && task.taskTypeId() == activity.taskTypeId() && instance.lastHistorySequence() == result.lastHistorySequence()
-                && (extended ? (operation==WorkflowOperation.START_WORKFLOW ? result.firstHistorySequence()==1 : result.firstHistorySequence()>1) : result.firstHistorySequence() == (operation == WorkflowOperation.START_WORKFLOW ? 1 : 5))
-                && (extended ? result.firstHistorySequence()>0 && result.lastHistorySequence()>=result.firstHistorySequence() && result.lastHistorySequence()-result.firstHistorySequence()<6000 : result.lastHistorySequence() == (operation == WorkflowOperation.START_WORKFLOW ? 4 : 8))
+                && (operation==WorkflowOperation.START_WORKFLOW ? result.firstHistorySequence()==1 : result.firstHistorySequence()>1)
+                && result.firstHistorySequence()>0 && result.lastHistorySequence()>=result.firstHistorySequence() && result.lastHistorySequence()-result.firstHistorySequence()<6000
                 && instance.definitionHash() != null && instance.definitionHash().matches("[0-9a-f]{64}")
                 && RuntimeInputs.key(instance.definitionKey()) && instance.definitionVersion() > 0
                 && task.id() > 0 && activity.id() > 0, Category.HOST_CONFIGURATION);
@@ -151,8 +178,8 @@ public class RuntimeJson {
                 && RuntimeInputs.text(instance.startedBy(), 200, 200, true) && instance.terminationReason() == null
                 && ((instance.businessType() == null && instance.businessId() == null)
                     || (RuntimeInputs.key(instance.businessType()) && RuntimeInputs.text(instance.businessId(), 200, 200, true)))
-                && RuntimeInputs.key(activity.nodeKey()) && (extended ? activity.activationSequence()>0 && activity.activationSequence()<=result.lastHistorySequence()
-                    && (operation==WorkflowOperation.START_WORKFLOW ? activity.activationSequence()>=result.firstHistorySequence() : activity.activationSequence()<result.firstHistorySequence()) : activity.activationSequence() == 3) && activity.taskTypeId() > 0
+                && RuntimeInputs.key(activity.nodeKey()) && activity.activationSequence()>0 && activity.activationSequence()<=result.lastHistorySequence()
+                && (operation==WorkflowOperation.START_WORKFLOW ? activity.activationSequence()>=result.firstHistorySequence() : activity.activationSequence()<result.firstHistorySequence()) && activity.taskTypeId() > 0
                 && activity.completionPolicy() == CompletionPolicy.SINGLE
                 && activity.requiredTaskCount() == 1 && activity.contributionOutcomeKey() == null
                 && (activity.reviewRevisionRef() == null || RuntimeInputs.text(activity.reviewRevisionRef(), 200, 200, true))

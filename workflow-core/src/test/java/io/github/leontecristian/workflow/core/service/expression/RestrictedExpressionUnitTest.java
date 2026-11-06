@@ -2,7 +2,7 @@ package io.github.leontecristian.workflow.core.service.expression;
 
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
 import io.github.leontecristian.workflow.core.dto.runtime.NullLiteral;
-import io.github.leontecristian.workflow.core.dto.runtime.ScalarValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
 import io.github.leontecristian.workflow.core.exception.expression.ExpressionException;
@@ -28,11 +28,11 @@ class RestrictedExpressionUnitTest {
             "b", new ActionField("b", VariableValueType.BOOLEAN, false, true),
             "a.b", new ActionField("a.b", VariableValueType.STRING, false, false),
             "class", new ActionField("class", VariableValueType.STRING, false, false));
-    private boolean eval(String source, Map<String, ScalarValue> state) {
+    private boolean eval(String source, Map<String, WorkflowValue> state) {
         return evaluator.evaluate("a".repeat(64), "route", source, fields, state, new ExpressionAllowance()).result();
     }
-    private ScalarValue value(VariableValueType type, String value) { return new ScalarValue(type, new TextLiteral(value)); }
-    private void fails(String source, Map<String, ScalarValue> state, ExpressionException.Kind kind) {
+    private WorkflowValue value(VariableValueType type, String value) { return new WorkflowValue(type, new TextLiteral(value)); }
+    private void fails(String source, Map<String, WorkflowValue> state, ExpressionException.Kind kind) {
         assertThatThrownBy(() -> eval(source, state)).isInstanceOfSatisfying(ExpressionException.class, e -> assertThat(e.kind()).isEqualTo(kind));
     }
     @ParameterizedTest @ValueSource(strings = {"true", "1 + 2 * 3 == 7", "5 / 2 == 2", "-5 / 2 == -2",
@@ -56,11 +56,11 @@ class RestrictedExpressionUnitTest {
     @Test void initializedNullAbsentAndReadTracing() {
         fails("#vars.n == null", Map.of(), UNINITIALIZED);
         fails("#vars?.['n'] == null", Map.of(), UNINITIALIZED);
-        assertThat(eval("#vars.n == null", Map.of("n", new ScalarValue(VariableValueType.LONG, NullLiteral.INSTANCE)))).isTrue();
+        assertThat(eval("#vars.n == null", Map.of("n", new WorkflowValue(VariableValueType.LONG, NullLiteral.INSTANCE)))).isTrue();
         var evaluation = evaluator.evaluate("hash", "r", "#vars.n + #vars['n'] == 4 and (true or #vars.d > 0)", fields,
                 Map.of("n", value(VariableValueType.LONG, "2")), new ExpressionAllowance());
         assertThat(evaluation.result()).isTrue();
-        assertThat(evaluation.reads()).extracting(r -> r.variableKey()).containsExactly("n");
+        assertThat(evaluation.reads()).extracting(r -> r.variableKey()).containsExactly("n", "n");
         assertThat(eval("#vars['a.b'] == 'x' and #vars.class == 'x'", Map.of("a.b", value(VariableValueType.STRING, "x"), "class", value(VariableValueType.STRING, "x")))).isTrue();
         fails("false ? true : 0", Map.of(), EVALUATION);
     }

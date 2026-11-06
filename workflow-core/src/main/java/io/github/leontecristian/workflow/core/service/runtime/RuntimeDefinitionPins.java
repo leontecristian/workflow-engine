@@ -31,7 +31,7 @@ public class RuntimeDefinitionPins {
     private void verify(WorkflowInstanceEntity instance, long versionId, String key, int version, String hash) {
         var fact = history.findById(new WorkflowHistoryId(instance.getId(), 1L))
                 .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
-        RuntimeInputs.require(fact.getDetailsSchemaVersion() == 1, Category.UNSUPPORTED_VERSION);
+        RuntimeInputs.require(fact.getDetailsSchemaVersion() == 2, Category.UNSUPPORTED_VERSION);
         var details = json.tree(fact.getDetailsJson());
         RuntimeInputs.require("INSTANCE_STARTED".equals(fact.getEventType()) && fact.getActivityId() == null && fact.getTaskId() == null
                 && java.util.Objects.equals(fact.getActorRef(), instance.getStartedBy()) && fact.getOccurredAt().equals(instance.getStartedAt())

@@ -33,6 +33,8 @@ public class DefinitionDocumentCodec {
             throw DefinitionInputs.error("LIMIT_EXCEEDED", "JSON parser limit exceeded.");
         } catch (IOException failure) {
             throw DefinitionInputs.error("MALFORMED_JSON", "Invalid JSON syntax.");
+        } catch (ArithmeticException | NumberFormatException failure) {
+            throw DefinitionInputs.error("MALFORMED_JSON", "Invalid exact numeric token.");
         }
         ObjectNode object = (ObjectNode) root;
         String key = string(object, "key"), name = string(object, "name");
@@ -103,7 +105,7 @@ public class DefinitionDocumentCodec {
                     || field.equals("outcome") || field.equals("result")) && !DefinitionInputs.key(value))
                 throw DefinitionInputs.error("INVALID_IDENTITY", "Invalid technical key.");
         }
-        if (node.isObject()) node.fields().forEachRemaining(e -> checkTexts(e.getValue(), e.getKey(), designer || e.getKey().equals("designer")));
+        if (node.isObject()) node.fields().forEachRemaining(e -> { if (!e.getKey().equals("default") && !e.getKey().equals("value")) checkTexts(e.getValue(), e.getKey(), designer || e.getKey().equals("designer")); });
         else if (node.isArray()) node.forEach(n -> checkTexts(n, field, designer));
     }
 

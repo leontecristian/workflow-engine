@@ -1,6 +1,6 @@
 # F009 — JSON execution variables
 
-**Status:** READY, revision 3 — 2026-11-06. **Owner:** Workflow project owner. **Constitution:** [v5.0.0](../../constitution.md). **Authorization:** documentation only; do not implement until requested. Concrete contracts are finalized in the normative [technical annex](contracts.md); implementation and verification remain pending.
+**Status:** IMPLEMENTED, revision 3 — 2026-11-06. **Owner:** Workflow project owner. **Constitution:** [v5.0.0](../../constitution.md). **Authorization:** the owner requested T03–T06 implementation on 2026-11-06. The normative [technical annex](contracts.md) governs. See the [implementation record](implementation.md#implementation-and-verification--2026-11-06) for actual automated verification and remaining browser/APOLO gaps. Earlier documentation-only restrictions are historical; no database reset is authorized.
 
 ## Outcome and authority
 
@@ -225,7 +225,7 @@ Intended conditions include `#vars.booking.amount > 10000 and #vars.booking.depa
 
 ## Readiness gates — RESOLVED
 
-[Concrete contracts C01–C07](contracts.md) close G01 (public values/definitions), G02 (codec/evaluator), G03 (evidence/errors/envelopes) and G04 (persistence/host). This revision supersedes earlier decision narratives that describe these details as open or illustrative. D01–D17 remain controlling owner decisions. READY means specified, not implemented or proven. Implementation requires a new user request; AC01–AC14 remain NOT RUN.
+[Concrete contracts C01–C07](contracts.md) close G01 (public values/definitions), G02 (codec/evaluator), G03 (evidence/errors/envelopes) and G04 (persistence/host). This revision supersedes earlier decision narratives that describe these details as open or illustrative. D01–D17 remain controlling owner decisions. READY means specified, not implemented or proven. The subsequent owner request authorized implementation; actual AC01–AC14 coverage and gaps are recorded in implementation.md.
 
 ## Acceptance scenarios
 
@@ -246,4 +246,4 @@ Intended conditions include `#vars.booking.amount > 10000 and #vars.booking.depa
 | AC13 | Separately wrapped equal containers compare equal by D13; object order is ignored, array order/length and missing/null differ, and numeric scale matters recursively. Scalar numeric comparison remains native SpEL. Comparison exhaustion fails rather than returning false; business reapproval is not inferred. | R04/05/07/08 |
 | AC14 | D15's inclusive capacities accept a 256 KiB JSON value through start/service/replacement/read when all other bounds pass. One-unit overflow, excessive resulting state or cumulative evidence fails atomically. Verify complete old/new evidence, Unicode/escaping, byte pagination, new-baseline scalar/JSON behavior, fresh schema/rebaseline or migration with the selected history constraint and unchanged receipt/handoff bounds. | R01/03/06–09 |
 
-No F009 scenario has been executed. See [plan](plan.md), [tasks](tasks.md) and [implementation record](implementation.md).
+See [plan](plan.md), [tasks](tasks.md) and the [implementation record](implementation.md) for automated scenario coverage and remaining verification gaps. Interactive browser acceptance is NOT RUN.

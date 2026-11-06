@@ -7,8 +7,8 @@ import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWor
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
 import io.github.leontecristian.workflow.core.dto.runtime.BooleanLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.NullLiteral;
-import io.github.leontecristian.workflow.core.dto.runtime.ScalarLiteral;
-import io.github.leontecristian.workflow.core.dto.runtime.ScalarValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowLiteral;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.dto.runtime.StartInputs;
 import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
@@ -18,50 +18,73 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /** Pure preparation. A mapping never observes another mapping's result. */
-final class RuntimeScalarBindings {
-    private RuntimeScalarBindings() {}
-    static JsonNode token(ScalarLiteral value) {
+final class RuntimeValueBindings {
+    private RuntimeValueBindings() {}
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper()
+            .enable(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+            .setNodeFactory(com.fasterxml.jackson.databind.node.JsonNodeFactory.withExactBigDecimals(true));
+    private static JsonNode jsonToken(String source) {
+        try { return JSON.readTree(source); }
+        catch (java.io.IOException failure) { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION); }
+    }
+    static JsonNode token(WorkflowLiteral value) {
         var f=com.fasterxml.jackson.databind.node.JsonNodeFactory.instance;
         if (value==NullLiteral.INSTANCE) return f.nullNode();
+        if (value instanceof io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue j) return jsonToken(j.toJson());
         if (value instanceof TextLiteral t) return f.textNode(t.value());
         return f.booleanNode(((BooleanLiteral)value).value());
     }
-    static ObjectNode tokens(Map<String,ScalarValue> values,RuntimeJson json) {
-        var result=json.object(); values.forEach((k,v) -> result.set(k,token(v.value()))); return result;
+    static ObjectNode tokens(Map<String,WorkflowValue> values,RuntimeJson json) {
+        var envelope=new TokenEnvelope(json,512*1024);
+        values.forEach((k,v)->envelope.add(k,v.value())); return envelope.values;
+    }
+    private static final class TokenEnvelope {
+        private final RuntimeJson json;
+        private final int maxChars;
+        private final ObjectNode values;
+        private long chars=2, bytes=2;
+        TokenEnvelope(RuntimeJson json,int maxChars) { this.json=json; this.maxChars=maxChars; values=json.object(); }
+        void add(String key,WorkflowLiteral literal) {
+            JsonNode scalar=literal instanceof io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue ? null : token(literal);
+            String encoded=literal instanceof io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue value ? value.toJson() : json.encode(scalar);
+            long punctuation=key.length()+3L+(values.isEmpty() ? 0 : 1);
+            chars+=punctuation+encoded.length(); bytes+=punctuation+encoded.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+            RuntimeInputs.require(chars<=maxChars && bytes<=2*1024*1024,Category.LIMIT_EXCEEDED);
+            values.set(key,scalar==null ? token(literal) : scalar);
+        }
     }
     static void basic(StartInputs inputs,RuntimeJson json) {
         RuntimeInputs.require(inputs!=null && inputs.values().size()<=100,Category.INVALID_INPUT);
-        var raw=json.object();
+        var raw=new TokenEnvelope(json,2*1024*1024);
         for (var e:inputs.values().entrySet()) {
             RuntimeInputs.require(RuntimeInputs.key(e.getKey()),Category.INVALID_INPUT);
             if (e.getValue() instanceof TextLiteral t) RuntimeInputs.require(RuntimeInputs.unicode(t.value()) && t.value().length()<=4000,Category.INVALID_INPUT);
-            raw.set(e.getKey(),token(e.getValue()));
+            raw.add(e.getKey(),e.getValue());
         }
-        RuntimeInputs.require(json.encode(raw).length()*2L<=128*1024,Category.LIMIT_EXCEEDED);
     }
-    static Map<String,ScalarValue> inputs(MinimalWorkflowDefinition model,StartInputs supplied,RuntimeJson json) {
+    static Map<String,WorkflowValue> inputs(MinimalWorkflowDefinition model,StartInputs supplied,RuntimeJson json) {
         RuntimeInputs.require(model.inputs().keySet().containsAll(supplied.values().keySet()),Category.INVALID_INPUT);
-        Map<String,ScalarValue> result=new TreeMap<>();
+        Map<String,WorkflowValue> result=new TreeMap<>();
         model.inputs().forEach((key,decl) -> {
-            ScalarLiteral token=supplied.values().get(key);
+            WorkflowLiteral token=supplied.values().get(key);
             if (token==null) token=decl.defaultValue();
             RuntimeInputs.require(token!=null || !decl.field().required(),Category.INVALID_INPUT);
             if (token!=null) {
-                try { var v=new ScalarValue(decl.field().type(),token); validate(decl.field(),v,Category.INVALID_INPUT); result.put(key,v); }
+                try { var v=new WorkflowValue(decl.field().type(),token); validate(decl.field(),v,Category.INVALID_INPUT); result.put(key,v); }
                 catch (IllegalArgumentException | java.time.DateTimeException e) { throw new WorkflowExecutionException(Category.INVALID_INPUT,e); }
             }
         });
-        RuntimeInputs.require(json.encode(tokens(result,json)).length()*2L<=128*1024,Category.LIMIT_EXCEEDED);
+        envelope(json.encode(tokens(result,json)));
         return Map.copyOf(result);
     }
-    static Map<String,ScalarValue> prepare(Map<String,Binding> bindings,Map<String,ActionField> declarations,
-            Map<String,ScalarValue> before,Map<String,ScalarValue> sources,Category category) {
-        Map<String,ScalarValue> writes=new TreeMap<>();
+    static Map<String,WorkflowValue> prepare(Map<String,Binding> bindings,Map<String,ActionField> declarations,
+            Map<String,WorkflowValue> before,Map<String,WorkflowValue> sources,Category category) {
+        Map<String,WorkflowValue> writes=new TreeMap<>();
         for (var e:bindings.entrySet()) {
             var b=e.getValue(); var dest=declarations.get(e.getKey());
             RuntimeInputs.require(dest!=null,Category.HOST_CONFIGURATION);
-            ScalarValue value;
-            if (b.source().equals("literal")) value=new ScalarValue(dest.type(),b.value());
+            WorkflowValue value;
+            if (b.source().equals("literal")) value=new WorkflowValue(dest.type(),b.value());
             else if (b.source().equals("variable")) {
                 value=before.get(b.key()); RuntimeInputs.require(value!=null,Category.UNINITIALIZED_VARIABLE);
             } else value=sources.get(b.key());
@@ -69,10 +92,10 @@ final class RuntimeScalarBindings {
         }
         return writes;
     }
-    static void validate(ActionField field,ScalarValue value,Category category) {
+    static void validate(ActionField field,WorkflowValue value,Category category) {
         RuntimeInputs.require(value!=null && value.type()==field.type() && (field.nullable() || value.value()!=NullLiteral.INSTANCE),category);
     }
-    static void output(List<ActionField> fields,Map<String,ScalarValue> values,RuntimeJson json) {
+    static void output(List<ActionField> fields,Map<String,WorkflowValue> values,RuntimeJson json) {
         RuntimeInputs.require(values!=null && values.size()<=100,Category.INVALID_ACTION_OUTPUT);
         var known=new java.util.HashSet<String>();
         for (var f:fields) {
@@ -81,7 +104,10 @@ final class RuntimeScalarBindings {
             if (v!=null) validate(f,v,Category.INVALID_ACTION_OUTPUT);
         }
         RuntimeInputs.require(known.containsAll(values.keySet()),Category.INVALID_ACTION_OUTPUT);
-        RuntimeInputs.require(RuntimeJson.fits(json.encode(tokens(values,json)),64*1024),Category.LIMIT_EXCEEDED);
+        envelope(json.encode(tokens(values,json)));
+    }
+    static void envelope(String value) {
+        RuntimeInputs.require(value.length()*2L<=1024*1024 && RuntimeJson.utf8Fits(value,2*1024*1024),Category.LIMIT_EXCEEDED);
     }
     static ObjectNode source(Binding b,RuntimeJson json) {
         var n=json.object(); n.put("source",b.source());

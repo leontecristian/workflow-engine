@@ -76,9 +76,9 @@
         /></mat-form-field>
       </div>
       <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Scalar start inputs (JSON object)</mat-label>
+        <mat-label>Execution inputs (raw JSON object)</mat-label>
         <textarea matInput [(ngModel)]="inputsText" rows="4" spellcheck="false"></textarea>
-        <mat-hint>Use strings for numbers and dates, true/false for Boolean, null for explicit null. Omit absent keys.</mat-hint>
+        <mat-hint>Use objects/arrays for JSON values, strings for scalar numbers and dates, true/false for Boolean, and null for explicit null. Omit absent keys.</mat-hint>
       </mat-form-field>
       <button
         mat-flat-button

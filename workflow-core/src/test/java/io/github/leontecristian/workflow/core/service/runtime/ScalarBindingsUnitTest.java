@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
 import io.github.leontecristian.workflow.core.dto.runtime.BooleanLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.NullLiteral;
-import io.github.leontecristian.workflow.core.dto.runtime.ScalarValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.dto.runtime.StartInputs;
 import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
@@ -27,11 +27,11 @@ class ScalarBindingsUnitTest {
         for(var entry:Map.of(VariableValueType.DATE,"2025-02-29",VariableValueType.DATETIME,"2026-13-01T00:00:00Z").entrySet()) {
             var field=new ActionField("value",entry.getKey(),true,false);
             var model=new MinimalWorkflowDefinition(null,null,null,List.of(),Map.of("value",new MinimalWorkflowDefinition.Input(field,null)),Map.of(),Map.of(),Map.of());
-            var error=assertThrows(WorkflowExecutionException.class,() -> RuntimeScalarBindings.inputs(model,new StartInputs(Map.of("value",new TextLiteral(entry.getValue()))),new RuntimeJson()));
+            var error=assertThrows(WorkflowExecutionException.class,() -> RuntimeValueBindings.inputs(model,new StartInputs(Map.of("value",new TextLiteral(entry.getValue()))),new RuntimeJson()));
             assertEquals(Category.INVALID_INPUT,error.category());
         }
     }
-    private ScalarValue scalar(VariableValueType type,String text) { return new ScalarValue(type,new TextLiteral(text)); }
+    private WorkflowValue scalar(VariableValueType type,String text) { return new WorkflowValue(type,new TextLiteral(text)); }
     @ParameterizedTest
     @CsvSource({"LONG,-9223372036854775808,-9223372036854775808","LONG,9223372036854775807,9223372036854775807",
         "LONG,9007199254740993,9007199254740993","DECIMAL,12.5000,12.5","DECIMAL,0.0000000000,0",
@@ -41,7 +41,7 @@ class ScalarBindingsUnitTest {
         "DATETIME,2026-01-01T00:00:00.00000000000Z,2026-01-01T00:00:00Z"})
     void exactAcceptedValues(VariableValueType type,String raw,String expected) {
         var v=scalar(type,raw); assertEquals(expected,((TextLiteral)v.value()).value());
-        assertEquals(v,new WorkflowVariableEntity(1,"value",v).scalar());
+        assertEquals(v,new WorkflowVariableEntity(1,"value",v).executionValue());
     }
     @ParameterizedTest
     @CsvSource({"LONG,-0","LONG,+1","LONG,01","LONG,1.0","LONG,1e1","LONG,9223372036854775808",
@@ -53,54 +53,54 @@ class ScalarBindingsUnitTest {
     void inexactOrNoncanonicalEncodingsFail(VariableValueType type,String raw) { assertThrows(RuntimeException.class,() -> scalar(type,raw)); }
     @Test void tokenKindsUnicodeAndReplacementColumns() {
         assertThrows(IllegalArgumentException.class,() -> scalar(VariableValueType.BOOLEAN,"true"));
-        assertThrows(IllegalArgumentException.class,() -> new ScalarValue(VariableValueType.LONG,new BooleanLiteral(true)));
+        assertThrows(IllegalArgumentException.class,() -> new WorkflowValue(VariableValueType.LONG,new BooleanLiteral(true)));
         assertThrows(IllegalArgumentException.class,() -> scalar(VariableValueType.STRING,"\ud800"));
         scalar(VariableValueType.STRING,"😀".repeat(2000));
         assertThrows(IllegalArgumentException.class,() -> scalar(VariableValueType.STRING,"😀".repeat(2001)));
         var row=new WorkflowVariableEntity(1,"x",scalar(VariableValueType.LONG,"-1"));
         row.replace(scalar(VariableValueType.DECIMAL,"12.500")); assertNull(row.getLongValue()); assertNull(row.getJsonValue());
-        row.replace(new ScalarValue(VariableValueType.DECIMAL,NullLiteral.INSTANCE)); assertNull(row.getDecimalValue());
-        assertEquals(NullLiteral.INSTANCE,row.scalar().value());
+        row.replace(new WorkflowValue(VariableValueType.DECIMAL,NullLiteral.INSTANCE)); assertNull(row.getDecimalValue());
+        assertEquals(NullLiteral.INSTANCE,row.executionValue().value());
     }
     @Test void defaultsApplyOnlyToAbsentOptionalValuesAndAbsenceRemainsAbsent() {
         var field=new ActionField("x",VariableValueType.LONG,false,true);
         var model=new MinimalWorkflowDefinition(null,null,null,List.of(),Map.of("x",new MinimalWorkflowDefinition.Input(field,new TextLiteral("12"))),Map.of(),Map.of(),Map.of());
-        assertEquals(scalar(VariableValueType.LONG,"12"),RuntimeScalarBindings.inputs(model,StartInputs.empty(),new RuntimeJson()).get("x"));
-        assertEquals(NullLiteral.INSTANCE,RuntimeScalarBindings.inputs(model,new StartInputs(Map.of("x",NullLiteral.INSTANCE)),new RuntimeJson()).get("x").value());
-        assertThrows(WorkflowExecutionException.class,() -> RuntimeScalarBindings.inputs(model,new StartInputs(Map.of("x",new TextLiteral("bad"))),new RuntimeJson()));
+        assertEquals(scalar(VariableValueType.LONG,"12"),RuntimeValueBindings.inputs(model,StartInputs.empty(),new RuntimeJson()).get("x"));
+        assertEquals(NullLiteral.INSTANCE,RuntimeValueBindings.inputs(model,new StartInputs(Map.of("x",NullLiteral.INSTANCE)),new RuntimeJson()).get("x").value());
+        assertThrows(WorkflowExecutionException.class,() -> RuntimeValueBindings.inputs(model,new StartInputs(Map.of("x",new TextLiteral("bad"))),new RuntimeJson()));
         var absent=new MinimalWorkflowDefinition(null,null,null,List.of(),Map.of("x",new MinimalWorkflowDefinition.Input(field,null)),Map.of(),Map.of(),Map.of());
-        assertTrue(RuntimeScalarBindings.inputs(absent,StartInputs.empty(),new RuntimeJson()).isEmpty());
+        assertTrue(RuntimeValueBindings.inputs(absent,StartInputs.empty(),new RuntimeJson()).isEmpty());
     }
     @Test void swapMappingsReadOriginalSnapshotAndOptionalMissingOutputSkipsWrite() {
         var decl=Map.of("a",new ActionField("a",VariableValueType.LONG,false,false),"b",new ActionField("b",VariableValueType.LONG,false,false));
         var state=Map.of("a",scalar(VariableValueType.LONG,"1"),"b",scalar(VariableValueType.LONG,"2"));
-        var writes=RuntimeScalarBindings.prepare(Map.of("a",new Binding("variable","b",null),"b",new Binding("variable","a",null)),decl,state,Map.of(),Category.INVALID_ACTION_OUTPUT);
+        var writes=RuntimeValueBindings.prepare(Map.of("a",new Binding("variable","b",null),"b",new Binding("variable","a",null)),decl,state,Map.of(),Category.INVALID_ACTION_OUTPUT);
         assertEquals(state.get("b"),writes.get("a")); assertEquals(state.get("a"),writes.get("b"));
-        assertTrue(RuntimeScalarBindings.prepare(Map.of("a",new Binding("actionOutput","optional",null)),decl,state,Map.of(),Category.INVALID_ACTION_OUTPUT).isEmpty());
-        assertThrows(WorkflowExecutionException.class,() -> RuntimeScalarBindings.prepare(Map.of("a",new Binding("variable","missing",null)),decl,state,Map.of(),Category.INVALID_ACTION_OUTPUT));
-        assertThrows(WorkflowExecutionException.class,() -> RuntimeScalarBindings.prepare(Map.of("a",new Binding("actionOutput","o",null)),decl,state,Map.of("o",new ScalarValue(VariableValueType.LONG,NullLiteral.INSTANCE)),Category.INVALID_ACTION_OUTPUT));
+        assertTrue(RuntimeValueBindings.prepare(Map.of("a",new Binding("actionOutput","optional",null)),decl,state,Map.of(),Category.INVALID_ACTION_OUTPUT).isEmpty());
+        assertThrows(WorkflowExecutionException.class,() -> RuntimeValueBindings.prepare(Map.of("a",new Binding("variable","missing",null)),decl,state,Map.of(),Category.INVALID_ACTION_OUTPUT));
+        assertThrows(WorkflowExecutionException.class,() -> RuntimeValueBindings.prepare(Map.of("a",new Binding("actionOutput","o",null)),decl,state,Map.of("o",new WorkflowValue(VariableValueType.LONG,NullLiteral.INSTANCE)),Category.INVALID_ACTION_OUTPUT));
         assertEquals("1",((TextLiteral)state.get("a").value()).value());
     }
     @Test void everyReturnedOutputIsValidatedEvenWhenUnmapped() {
         var fields=List.of(new ActionField("needed",VariableValueType.LONG,true,false),new ActionField("optional",VariableValueType.STRING,false,true));
         var json=new RuntimeJson();
-        RuntimeScalarBindings.output(fields,Map.of("needed",scalar(VariableValueType.LONG,"2")),json);
-        for(var output:List.of(Map.<String,ScalarValue>of(),Map.of("needed",scalar(VariableValueType.LONG,"2"),"unknown",scalar(VariableValueType.STRING,"x")),
+        RuntimeValueBindings.output(fields,Map.of("needed",scalar(VariableValueType.LONG,"2")),json);
+        for(var output:List.of(Map.<String,WorkflowValue>of(),Map.of("needed",scalar(VariableValueType.LONG,"2"),"unknown",scalar(VariableValueType.STRING,"x")),
                 Map.of("needed",scalar(VariableValueType.STRING,"2"))))
-            assertEquals(Category.INVALID_ACTION_OUTPUT,assertThrows(WorkflowExecutionException.class,() -> RuntimeScalarBindings.output(fields,output,json)).category());
+            assertEquals(Category.INVALID_ACTION_OUTPUT,assertThrows(WorkflowExecutionException.class,() -> RuntimeValueBindings.output(fields,output,json)).category());
     }
     @Test void completeInvocationAndStartDefaultBudgetsRejectWithoutTruncation() {
         var fields=new java.util.ArrayList<ActionField>();
-        var outputs=new java.util.HashMap<String,ScalarValue>();
+        var outputs=new java.util.HashMap<String,WorkflowValue>();
         var inputs=new java.util.HashMap<String,MinimalWorkflowDefinition.Input>();
         for(int i=0;i<100;i++) {
             String key="value"+i; var field=new ActionField(key,VariableValueType.STRING,false,false);
-            fields.add(field); outputs.put(key,scalar(VariableValueType.STRING,"x".repeat(4000)));
-            inputs.put(key,new MinimalWorkflowDefinition.Input(field,new TextLiteral("x".repeat(4000))));
+            fields.add(field); outputs.put(key,scalar(VariableValueType.STRING,"\u0000".repeat(4000)));
+            inputs.put(key,new MinimalWorkflowDefinition.Input(field,new TextLiteral("\u0000".repeat(4000))));
         }
-        assertEquals(Category.LIMIT_EXCEEDED,assertThrows(WorkflowExecutionException.class,() -> RuntimeScalarBindings.output(fields,outputs,new RuntimeJson())).category());
+        assertEquals(Category.LIMIT_EXCEEDED,assertThrows(WorkflowExecutionException.class,() -> RuntimeValueBindings.output(fields,outputs,new RuntimeJson())).category());
         var model=new MinimalWorkflowDefinition(null,null,null,List.of(),inputs,Map.of(),Map.of(),Map.of());
-        assertEquals(Category.LIMIT_EXCEEDED,assertThrows(WorkflowExecutionException.class,() -> RuntimeScalarBindings.inputs(model,StartInputs.empty(),new RuntimeJson())).category());
+        assertEquals(Category.LIMIT_EXCEEDED,assertThrows(WorkflowExecutionException.class,() -> RuntimeValueBindings.inputs(model,StartInputs.empty(),new RuntimeJson())).category());
         assertEquals(4000,((TextLiteral)outputs.get("value0").value()).value().length());
     }
 }

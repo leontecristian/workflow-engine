@@ -39,16 +39,27 @@ public class ConsoleWire {
                 new SimpleModule()
                         .addSerializer(Long.class, ToStringSerializer.instance)
                         .addSerializer(Long.TYPE, ToStringSerializer.instance);
+        longs.addSerializer(io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue.class,
+                new com.fasterxml.jackson.databind.JsonSerializer<>() {
+                    @Override public void serialize(io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue value,
+                            com.fasterxml.jackson.core.JsonGenerator generator, com.fasterxml.jackson.databind.SerializerProvider provider)
+                            throws java.io.IOException { generator.writeRawValue(value.toJson()); }
+                });
         mapper =
                 new ObjectMapper(
                                 JsonFactory.builder()
                                         .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+                                        .streamReadConstraints(com.fasterxml.jackson.core.StreamReadConstraints.builder()
+                                                .maxNestingDepth(64).maxNumberLength(128).maxStringLength(2*1024*1024).build())
                                         .build())
                         .registerModule(longs)
                         .registerModule(new JavaTimeModule())
                         .registerModule(new Jdk8Module())
                         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                         .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
+        mapper.enable(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS,
+                com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_INTEGER_FOR_INTS);
+        mapper.setNodeFactory(com.fasterxml.jackson.databind.node.JsonNodeFactory.withExactBigDecimals(true));
     }
 
     public String json(Object value) {
@@ -66,6 +77,8 @@ public class ConsoleWire {
             return result;
         } catch (ConsoleException e) {
             throw e;
+        } catch (com.fasterxml.jackson.core.exc.StreamConstraintsException e) {
+            throw new ConsoleException(422,"LIMIT_EXCEEDED");
         } catch (Exception e) {
             throw ConsoleException.invalid();
         }

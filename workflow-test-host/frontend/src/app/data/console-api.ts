@@ -273,6 +273,7 @@ export class ConsoleApi {
       "POST",
       request.body,
       request.token,
+      envelope.kind === 'start',
     );
   }
 }

@@ -12,6 +12,21 @@ const identity = {
   csrfHeaderName: "X-CSRF-TOKEN",
   csrfToken: "server-token",
 };
+test("JSON start transport and variable inspection retain exact numeric text", async (t) => {
+  const calls=[];
+  const exact='{"items":[{"key":"booking","type":"JSON","initialized":true,"value":{"amount":9007199254740993.00}}],"nextAfterKey":null,"lockVersion":"2","instanceId":"1"}';
+  t.mock.method(globalThis,"fetch",async(url,options)=>{
+    calls.push({url,options}); return {ok:true,text:async()=>url.includes("/variables?") ? exact : '{}'};
+  });
+  const injector=services(t); injector.get(ConsoleSession).session.set(identity);
+  const api=injector.get(ConsoleApi);
+  const inputs='{"booking":{"amount":9007199254740993.00,"exponent":1E+2}}';
+  const envelope={kind:'start',body:{commandId:'12345678-1234-1234-1234-123456789abc',definitionVersionId:'42',requestId:'1',expectedRequestVersion:'0',inputs},expectedToken:null};
+  await api.executeCommand(envelope,false); await api.executeCommand(envelope,true);
+  assert.ok(calls[0].options.body.includes(inputs)); assert.equal(calls[0].options.body,calls[1].options.body);
+  assert.equal(calls[0].options.headers['X-CSRF-TOKEN'],'server-token');
+  const page=await api.variables('1'); assert.equal(page.exactJson,exact);
+});
 test("typed API keeps document text and exact expected token while adding CSRF", async (t) => {
   const calls = [];
   t.mock.method(globalThis, "fetch", async (url, options) => {

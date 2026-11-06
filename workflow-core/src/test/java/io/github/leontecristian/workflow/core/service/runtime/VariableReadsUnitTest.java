@@ -11,7 +11,7 @@ import io.github.leontecristian.workflow.core.dto.definition.document.Executable
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
 import io.github.leontecristian.workflow.core.dto.runtime.NullLiteral;
-import io.github.leontecristian.workflow.core.dto.runtime.ScalarValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowVariableView;
@@ -36,7 +36,7 @@ class VariableReadsUnitTest {
         var model=new MinimalWorkflowDefinition(null,null,null,List.of(),Map.of(),declarations,Map.of(),Map.of());
         when(instances.readLockVersion(1)).thenReturn(Optional.of(7L)); when(instances.findById(1L)).thenReturn(Optional.of(instance));
         when(pins.load(instance)).thenReturn(new ExecutableDefinition(42,40,"flow",1,"ab".repeat(32),DefinitionStatus.PUBLISHED,model));
-        when(variables.read(1,model)).thenReturn(Map.of("B",new ScalarValue(VariableValueType.LONG,NullLiteral.INSTANCE),"a",new ScalarValue(VariableValueType.LONG,new TextLiteral("9007199254740993"))));
+        when(variables.read(1,model)).thenReturn(Map.of("B",new WorkflowValue(VariableValueType.LONG,NullLiteral.INSTANCE),"a",new WorkflowValue(VariableValueType.LONG,new TextLiteral("9007199254740993"))));
         var service=new WorkflowRuntimeQueryService(instances,mock(WorkflowActivityRepository.class),mock(WorkflowTaskRepository.class),mock(WorkflowHistoryRepository.class),pins,new RuntimeJson(),variables);
         var page=service.listVariables(1,null,2,null); assertEquals(List.of("A","B"),page.items().stream().map(WorkflowVariableView::key).toList());
         assertFalse(page.items().get(0).initialized()); assertNull(page.items().get(0).value());

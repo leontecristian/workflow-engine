@@ -7,8 +7,8 @@ import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWor
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
 import io.github.leontecristian.workflow.core.dto.runtime.BooleanLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.NullLiteral;
-import io.github.leontecristian.workflow.core.dto.runtime.ScalarLiteral;
-import io.github.leontecristian.workflow.core.dto.runtime.ScalarValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowLiteral;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
 import java.util.ArrayList;
@@ -17,9 +17,10 @@ import java.util.HashSet;
 import java.util.Map;
 
 /** Pure semantic checks after the bounded structural schema. */
-final class ScalarDefinitionModel {
-    private ScalarDefinitionModel() {}
-    static ScalarLiteral literal(JsonNode value) {
+final class ExecutionValueDefinitionModel {
+    private ExecutionValueDefinitionModel() {}
+    static WorkflowLiteral literal(JsonNode value) {
+        if (value.isContainerNode()) return io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue.parse(DefinitionContentCanonicalizer.canonical(value));
         if (value.isNull()) return NullLiteral.INSTANCE;
         if (value.isBoolean()) return new BooleanLiteral(value.booleanValue());
         if (value.isTextual()) return new TextLiteral(value.textValue());
@@ -47,9 +48,9 @@ final class ScalarDefinitionModel {
             String path="/startPolicy/inputContract/"+i++;
             try {
                 var f=field(n,true);
-                ScalarLiteral def=n.has("default") ? literal(n.get("default")) : null;
+                WorkflowLiteral def=n.has("default") ? literal(n.get("default")) : null;
                 if (f.required() && def!=null) throw new IllegalArgumentException();
-                if (def!=null) validate(f,new ScalarValue(f.type(),def));
+                if (def!=null) validate(f,new WorkflowValue(f.type(),def));
                 if (inputs.putIfAbsent(f.key(),new MinimalWorkflowDefinition.Input(f,def))!=null) throw new IllegalArgumentException();
             } catch (RuntimeException e) { error(d,"INVALID_INPUT_CONTRACT",path); }
         }
@@ -64,7 +65,7 @@ final class ScalarDefinitionModel {
             try {
                 var dest=variables.get(e.getKey()); var source=e.getValue();
                 if (dest==null) throw new IllegalArgumentException();
-                if (source.source().equals("literal")) validate(dest,new ScalarValue(dest.type(),source.value()));
+                if (source.source().equals("literal")) validate(dest,new WorkflowValue(dest.type(),source.value()));
                 else compatible(inputs.get(source.key()).field(),dest);
             } catch (RuntimeException failure) { error(d,"INVALID_BINDING","/startPolicy/initialize/"+e.getKey()); }
         }
@@ -115,7 +116,7 @@ final class ScalarDefinitionModel {
                 new MinimalWorkflowDefinition.Node(end.path("key").textValue(),"END",end.path("name").textValue(),end.path("result").textValue()),
                 transitions,inputs,variables,initialize,services);
     }
-    static void validate(ActionField field, ScalarValue value) {
+    static void validate(ActionField field, WorkflowValue value) {
         if (value.type()!=field.type() || (!field.nullable() && value.value()==NullLiteral.INSTANCE)) throw new IllegalArgumentException();
     }
     static void compatible(ActionField source, ActionField target) {

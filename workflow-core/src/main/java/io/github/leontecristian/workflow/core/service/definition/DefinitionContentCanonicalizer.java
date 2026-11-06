@@ -18,7 +18,7 @@ import java.util.List;
 
 /** Engine-local exact canonical form. No floating-point or exponent expansion is used. */
 public final class DefinitionContentCanonicalizer {
-    public static final String IDENTIFIER = "wf-json-c14n-v1";
+    public static final String IDENTIFIER = "wf-json-c14n-v2";
 
     private DefinitionContentCanonicalizer() { }
 
@@ -31,12 +31,38 @@ public final class DefinitionContentCanonicalizer {
 
     /** Internal core codec reuse; not a host serialization policy. */
     public static String canonical(JsonNode node) {
-        StringBuilder out = new StringBuilder();
+        return canonical(node,8*1024*1024);
+    }
+    public static String canonical(JsonNode node,int maxChars) {
+        return canonical(node,maxChars,Integer.MAX_VALUE);
+    }
+    public static String canonical(JsonNode node,int maxChars,int maxUtf8Bytes) {
+        Output out = new Output(maxChars,maxUtf8Bytes);
         append(node, out);
         return out.toString();
     }
 
-    private static void append(JsonNode node, StringBuilder out) {
+    private static final class Output {
+        private final StringBuilder value=new StringBuilder();
+        private final int limit;
+        private final int byteLimit;
+        private long bytes;
+        Output(int limit,int byteLimit) { this.limit=limit; this.byteLimit=byteLimit; }
+        Output append(char c) {
+            // Valid surrogate pairs are charged in full at their leading code unit.
+            int size=Character.isHighSurrogate(c) ? 4 : Character.isLowSurrogate(c) ? 0 : c<=127 ? 1 : c<=2047 ? 2 : 3;
+            check(1,size); value.append(c); return this;
+        }
+        Output append(String text) { check(text.length(),text.getBytes(StandardCharsets.UTF_8).length); value.append(text); return this; }
+        private void check(int count,int encodedBytes) {
+            if ((long)value.length()+count>limit || bytes+encodedBytes>byteLimit) throw new io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException(
+                    io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.LIMIT_EXCEEDED);
+            bytes+=encodedBytes;
+        }
+        @Override public String toString() { return value.toString(); }
+    }
+
+    private static void append(JsonNode node, Output out) {
         if (node.isObject()) {
             out.append('{');
             List<String> names = new ArrayList<>();
@@ -57,7 +83,7 @@ public final class DefinitionContentCanonicalizer {
             }
             out.append(']');
         } else if (node.isTextual()) quote(node.textValue(), out);
-        else if (node.isNumber()) out.append(node instanceof ExactNumber number ? number.canonical : normalize(node.asText()));
+        else if (node.isNumber()) out.append(node instanceof ExactNumber number ? number.canonical : (node.isIntegralNumber() ? node.bigIntegerValue().toString() : node.decimalValue().toString()));
         else out.append(node.isNull() ? "null" : node.booleanValue() ? "true" : "false");
     }
 
@@ -71,7 +97,7 @@ public final class DefinitionContentCanonicalizer {
         return Integer.compare(a.length() - ai, b.length() - bi);
     }
 
-    private static void quote(String value, StringBuilder out) {
+    private static void quote(String value, Output out) {
         out.append('"');
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
@@ -82,28 +108,10 @@ public final class DefinitionContentCanonicalizer {
         out.append('"');
     }
 
-    static String normalize(String token) {
-        if (token.length() > 128) throw DefinitionInputs.error("LIMIT_EXCEEDED", "Numeric token exceeds its limit.");
-        String[] parts = token.toLowerCase(java.util.Locale.ROOT).split("e");
-        String mantissa = parts[0];
-        boolean negative = mantissa.startsWith("-");
-        if (negative) mantissa = mantissa.substring(1);
-        int point = mantissa.indexOf('.');
-        int fractional = point < 0 ? 0 : mantissa.length() - point - 1;
-        String digits = mantissa.replace(".", "").replaceFirst("^0+", "");
-        if (digits.isEmpty()) return "0";
-        int trailing = 0;
-        while (digits.charAt(digits.length() - trailing - 1) == '0') trailing++;
-        String coefficient = digits.substring(0, digits.length() - trailing);
-        BigInteger exponent = (parts.length == 1 ? BigInteger.ZERO : new BigInteger(parts[1]))
-                .subtract(BigInteger.valueOf(fractional)).add(BigInteger.valueOf(trailing));
-        return (negative ? "-" : "") + coefficient + (exponent.signum() == 0 ? "" : "e" + exponent);
-    }
-
-    /** Carries exact JSON numeric spelling even when an exponent exceeds BigDecimal's int range. */
+    /** Scale-preserving numeric token inside a bounded definition document. */
     static final class ExactNumber extends NumericNode {
         private final String canonical;
-        ExactNumber(String token) { canonical = normalize(token); }
+        ExactNumber(String token) { canonical = new BigDecimal(token).toString(); }
         @Override public JsonToken asToken() { return JsonToken.VALUE_NUMBER_FLOAT; }
         @Override public JsonParser.NumberType numberType() { return JsonParser.NumberType.BIG_DECIMAL; }
         @Override public Number numberValue() { return decimalValue(); }

@@ -3,7 +3,7 @@ package io.github.leontecristian.workflow.core.service.expression;
 import io.github.leontecristian.workflow.core.dto.expression.ExpressionEvaluation;
 import io.github.leontecristian.workflow.core.dto.expression.ExpressionRead;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
-import io.github.leontecristian.workflow.core.dto.runtime.ScalarValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
 import io.github.leontecristian.workflow.core.exception.expression.ExpressionException;
 import java.math.BigDecimal;
@@ -62,9 +62,9 @@ public class RestrictedExpressionService {
     public void requireCompatible() { requireVersion(SPRING_VERSION); }
     static void requireVersion(String version) { if(!"6.2.6".equals(version)) throw new ExpressionException(UNSUPPORTED); }
 
-    /** The allowance belongs to the enclosing command; scalar values are detached immutable records. */
+    /** The allowance belongs to the enclosing command; values are detached immutable snapshots. */
     public ExpressionEvaluation evaluate(String hash, String transition, String source, Map<String, ActionField> declarations,
-            Map<String, ScalarValue> initialized, ExpressionAllowance allowance) {
+            Map<String, WorkflowValue> initialized, ExpressionAllowance allowance) {
         allowance.take();
         requireCompatible();
         Key key = new Key(hash, transition, source, PROFILE + ":" + SPRING_VERSION, declarations);
@@ -81,18 +81,21 @@ public class RestrictedExpressionService {
             Evaluation state = new Evaluation(Map.copyOf(initialized));
             Object value = new Node(plan).getValue(state);
             if (!(value instanceof Boolean result)) throw new ExpressionException(EVALUATION);
-            return new ExpressionEvaluation(result, new ArrayList<>(state.reads.values()));
+            return new ExpressionEvaluation(result, state.reads);
         } catch (ExpressionException failure) { throw failure; }
+        catch (io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException failure) { throw failure; }
         catch (RuntimeException failure) { throw new ExpressionException(EVALUATION); }
     }
     int cachedPlans() { synchronized (plans) { return plans.size(); } }
 
     private static final class Evaluation extends ExpressionState {
         private long remaining = 10_000;
-        private final Map<String, ScalarValue> initialized;
-        private final Map<String, ExpressionRead> reads = new LinkedHashMap<>();
+        private final Map<String, WorkflowValue> initialized;
+        private final List<ExpressionRead> reads = new ArrayList<>();
+        private final Map<String,com.fasterxml.jackson.databind.JsonNode> snapshots = new java.util.HashMap<>();
+        private long evidenceUtf16, evidenceUtf8;
         private boolean between;
-        Evaluation(Map<String, ScalarValue> initialized) {
+        Evaluation(Map<String, WorkflowValue> initialized) {
             super(context(), new SpelParserConfiguration(SpelCompilerMode.OFF, null, false, false, 0, 4000)); this.initialized = initialized;
             var nativeComparator=new org.springframework.expression.spel.support.StandardTypeComparator();
             ((StandardEvaluationContext)getEvaluationContext()).setTypeComparator(new org.springframework.expression.TypeComparator() {
@@ -108,11 +111,21 @@ public class RestrictedExpressionService {
             if (amount < 0 || amount > remaining) throw new ExpressionException(LIMIT);
             remaining -= amount;
         }
+        void record(ExpressionRead read) {
+
+            evidenceUtf16+=2L*read.valueJson().length();
+            evidenceUtf8+=read.valueJson().getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+            if(evidenceUtf16>4*1024*1024 || evidenceUtf8>4*1024*1024)
+                throw new io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException(
+                        io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.LIMIT_EXCEEDED);
+            reads.add(read);
+        }
         Object read(String key, ActionField declaration) {
-            ScalarValue value = initialized.get(key);
+            WorkflowValue value = initialized.get(key);
             if (value == null) throw new ExpressionException(UNINITIALIZED);
             if (value.type()!=declaration.type() || (!declaration.nullable() && value.value()==io.github.leontecristian.workflow.core.dto.runtime.NullLiteral.INSTANCE)) throw new ExpressionException(EVALUATION);
-            reads.putIfAbsent(key, new ExpressionRead(key, value));
+            if (value.value() instanceof io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue json)
+                return snapshots.computeIfAbsent(key,unused->JsonNavigation.parse(json.toJson()));
             if (value.value() == io.github.leontecristian.workflow.core.dto.runtime.NullLiteral.INSTANCE) return null;
             if (value.value() instanceof io.github.leontecristian.workflow.core.dto.runtime.BooleanLiteral b) return b.value();
             String text = ((TextLiteral)value.value()).value();
@@ -154,7 +167,7 @@ public class RestrictedExpressionService {
         @Override public TypedValue getValueInternal(ExpressionState expressionState) {
             Evaluation state = (Evaluation)expressionState; state.work(plan.cost());
             String kind = plan.kind();
-            if (kind.equals("Read")) return new TypedValue(state.read(plan.text(),(ActionField)plan.literal()));
+            if (kind.equals("Read")) return new TypedValue(read(state));
             if (kind.equals("Literal")) {
                 return new TypedValue(plan.literal());
             }
@@ -163,6 +176,11 @@ public class RestrictedExpressionService {
             Object[] values = new Object[children.length];
             for (int i = 0; i < children.length; i++) values[i] = children[i].getValueInternal(state).getValue();
             if (kind.equals("InlineList")) return new TypedValue(java.util.Arrays.asList(values));
+            if (java.util.Arrays.stream(values).anyMatch(v -> v instanceof com.fasterxml.jackson.databind.JsonNode)) {
+                if (!kind.equals("OpEQ") && !kind.equals("OpNE")) throw new ExpressionException(EVALUATION);
+                boolean equal = JsonNavigation.equal(values[0],values[1],state::work);
+                return new TypedValue(kind.equals("OpEQ") ? equal : !equal);
+            }
             boolean numeric = values[0] instanceof Number && (values.length == 1 || values[1] instanceof Number);
             if (numeric) NumericWork.check(isComparison(kind) ? "Compare" : kind,
                     (Number)values[0], values.length == 1 ? null : (Number)values[1], state::work);
@@ -189,6 +207,40 @@ public class RestrictedExpressionService {
                 if (s.length() > 8192) throw new ExpressionException(LIMIT);
             }
             return result;
+        }
+        private Object read(Evaluation state) {
+            Object current = state.read(plan.text(),(ActionField)plan.literal());
+            var path = new ArrayList<ExpressionRead.PathSegment>();
+            String status = current == null ? "NULL" : "VALUE";
+            for (int i = 0; i < plan.children().size(); i++) {
+                var step = plan.children().get(i); state.work(step.cost());
+                if (current == null) {
+                    if (!Boolean.TRUE.equals(step.literal())) throw new ExpressionException(EVALUATION);
+                    state.record(new ExpressionRead(plan.text(),((ActionField)plan.literal()).type(),path,status,"null"));
+                    status = "NULL_SAFE"; continue;
+                }
+                Object operand = step.kind().equals("Property") ? step.text() : ((Node)children[i]).children[0].getValueInternal(state).getValue();
+                if (!(current instanceof com.fasterxml.jackson.databind.JsonNode node) || !node.isContainerNode()) throw new ExpressionException(EVALUATION);
+                if (node.isObject()) {
+                    if (!(operand instanceof String key)) throw new ExpressionException(EVALUATION);
+                    state.work(key.length()); path.add(new ExpressionRead.PathSegment("PROPERTY",key,null));
+                    var next = node.get(key); status = next == null ? "MISSING" : next.isNull() ? "NULL" : "VALUE";
+                    current = JsonNavigation.project(next);
+                } else {
+                    if (step.kind().equals("Property")) throw new ExpressionException(EVALUATION);
+                    var index = JsonNavigation.index(operand,state::work);
+                    path.add(new ExpressionRead.PathSegment("INDEX",null,index.toPlainString()));
+                    if (index.signum() < 0 || index.compareTo(BigDecimal.valueOf(node.size())) >= 0) { current=null; status="OUT_OF_RANGE"; }
+                    else { var next=node.get(index.intValueExact()); status=next.isNull() ? "NULL" : "VALUE"; current=JsonNavigation.project(next); }
+                }
+            }
+            Object evidence=current;
+            if (((ActionField)plan.literal()).type()!=io.github.leontecristian.workflow.core.dto.runtime.VariableValueType.JSON) {
+                var token=state.initialized.get(plan.text()).value();
+                if(token instanceof TextLiteral text) evidence=text.value();
+            }
+            state.record(new ExpressionRead(plan.text(),((ActionField)plan.literal()).type(),path,status,JsonNavigation.encode(evidence)));
+            return current;
         }
         @Override public String toStringAST() { return "<validated>"; }
     }

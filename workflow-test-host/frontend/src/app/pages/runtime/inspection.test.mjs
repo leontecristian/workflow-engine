@@ -75,7 +75,7 @@ test("exact history evidence reads both Angular parameters without splitting URL
       async historyEvent(...args) {
         received = args;
         return {
-          envelope: { historySequence: args[1] },
+          summary: { historySequence: args[1] },
           detailsJson: '{"n":900719925474099312345}',
         };
       },
@@ -85,6 +85,6 @@ test("exact history evidence reads both Angular parameters without splitting URL
   page.ngOnInit();
   await tick();
   assert.deepEqual(received, ["9007199254740993", "9007199254740995"]);
-  assert.equal(page.detail().envelope.historySequence, "9007199254740995");
+  assert.equal(page.detail().summary.historySequence, "9007199254740995");
   assert.equal(page.detail().detailsJson, '{"n":900719925474099312345}');
 });

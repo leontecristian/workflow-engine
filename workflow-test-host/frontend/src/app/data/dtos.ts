@@ -208,7 +208,7 @@ export interface HistorySummary {
   detailsSchemaVersion: number;
 }
 export interface HistoryEvent {
-  envelope: HistorySummary;
+  summary: HistorySummary;
   detailsJson: JsonText;
 }
 export interface TaskSubmission {
@@ -283,9 +283,9 @@ export interface DeliveryResult {
   duplicate: boolean;
 }
 
-export interface VariablePage {
+export interface VariablePage { exactJson?: string;
   instanceId: Decimal; lockVersion: Decimal;
-  items: { key:string; type:string; initialized:boolean; value:string|boolean|null }[];
+  items: { key:string; type:string; initialized:boolean; value:unknown }[];
   nextAfterKey: string|null;
 }
 export interface ServiceEffect {

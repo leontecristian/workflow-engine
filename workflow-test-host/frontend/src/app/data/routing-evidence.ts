@@ -3,7 +3,7 @@ export interface RoutingEvidence {
   nodeKey: string;
   selectedTransitionKey: string;
   usedDefault: boolean;
-  evaluations: { transitionKey: string; result: boolean; reads: { variableKey: string; type: string; value: string | boolean | null }[] }[];
+  evaluations: { transitionKey: string; result: boolean; reads: { variableKey: string; type: string; value: unknown; state?: string; path?: unknown[] }[] }[];
 }
 export function routingEvidence(eventType: string | undefined, details: string | undefined): RoutingEvidence | null {
   if (eventType !== "GATEWAY_ROUTED" || !details) return null;
@@ -14,8 +14,8 @@ export function routingEvidence(eventType: string | undefined, details: string |
     for (const evaluation of value.evaluations) {
       if (!key(evaluation?.transitionKey) || typeof evaluation.result !== "boolean" || !Array.isArray(evaluation.reads)) return null;
       for (const read of evaluation.reads) {
-        if (!key(read?.variableKey) || !["STRING", "LONG", "DECIMAL", "BOOLEAN", "DATE", "DATETIME"].includes(read.type)) return null;
-        if (read.value !== null && (read.type === "BOOLEAN" ? typeof read.value !== "boolean" : typeof read.value !== "string")) return null;
+        if (!key(read?.variableKey) || !["STRING", "LONG", "DECIMAL", "BOOLEAN", "DATE", "DATETIME", "JSON"].includes(read.type)) return null;
+        if (read.type !== "JSON" && read.value !== null && (read.type === "BOOLEAN" ? typeof read.value !== "boolean" : typeof read.value !== "string")) return null;
       }
     }
     return value;

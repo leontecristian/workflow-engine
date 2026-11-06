@@ -9,14 +9,14 @@
       {{meta.title}} <span class="muted">#{{sequence}}</span>
     </h2></mat-card-header
   ><mat-card-content
-    ><console-details [value]="detail()?.envelope" />
+    ><console-details [value]="detail()?.summary" />
     @if(routing(); as route) {
       <h3>Exclusive route at {{route.nodeKey}}</h3>
       <p>Selected {{route.selectedTransitionKey}}{{route.usedDefault ? ' (default)' : ''}}.</p>
       @for(evaluation of route.evaluations; track evaluation.transitionKey) {
         <h4>{{evaluation.transitionKey}}: {{evaluation.result ? 'true' : 'false'}}</h4>
-        @for(read of evaluation.reads; track read.variableKey) {
-          <p>{{read.variableKey}} ({{read.type}}): {{read.value === null ? 'null' : read.value}}</p>
+        @for(read of evaluation.reads; track $index) {
+          <p>{{read.variableKey}} ({{read.type}}): {{read.state}}</p>
         }
         @if(!evaluation.reads.length) { <p>No variables read.</p> }
       }
@@ -26,6 +26,7 @@
     }
     @if(detail()?.detailsJson){
     <h3>Exact persisted evidence</h3>
+    <button mat-button (click)="exportDetails()">Download exact details JSON</button>
     <pre>{{detail()?.detailsJson}}</pre>
     }</mat-card-content
   ></mat-card

@@ -3,12 +3,13 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-/** Exact normalized scalar; never rounds or coerces values. */
-public record ScalarValue(VariableValueType type, ScalarLiteral value) {
-    public ScalarValue {
+/** Validated typed scalar or immutable JSON snapshot; Java null is never a value token. */
+public record WorkflowValue(VariableValueType type, WorkflowLiteral value) {
+    public WorkflowValue {
         java.util.Objects.requireNonNull(type); java.util.Objects.requireNonNull(value);
-        if (type == VariableValueType.JSON) throw new IllegalArgumentException("Unsupported scalar");
-        if (value != NullLiteral.INSTANCE) {
+        if (type == VariableValueType.JSON && !(value instanceof WorkflowJsonValue) && value != NullLiteral.INSTANCE)
+            throw new IllegalArgumentException("Expected JSON");
+        if (value != NullLiteral.INSTANCE && type != VariableValueType.JSON) {
             if (type == VariableValueType.BOOLEAN) {
                 if (!(value instanceof BooleanLiteral)) throw new IllegalArgumentException("Expected Boolean");
             } else {

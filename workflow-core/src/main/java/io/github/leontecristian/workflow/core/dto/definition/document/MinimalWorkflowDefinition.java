@@ -2,7 +2,7 @@ package io.github.leontecristian.workflow.core.dto.definition.document;
 import java.util.List;
 import java.util.Map;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
-import io.github.leontecristian.workflow.core.dto.runtime.ScalarLiteral;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowLiteral;
 /** Internal validated subset; canonical source is retained separately, including all designer values. */
 public record MinimalWorkflowDefinition(Node start, Human human, Node end, List<Transition> transitions,
         Map<String,Input> inputs, Map<String,ActionField> variables, Map<String,Binding> initialize,
@@ -19,8 +19,8 @@ public record MinimalWorkflowDefinition(Node start, Human human, Node end, List<
         this(start,human,end,transitions,Map.of(),Map.of(),Map.of(),Map.of());
     }
     public boolean extended() { return !inputs.isEmpty() || !variables.isEmpty() || !initialize.isEmpty() || !services.isEmpty() || !gateways.isEmpty(); }
-    public record Input(ActionField field, ScalarLiteral defaultValue) {}
-    public record Binding(String source, String key, ScalarLiteral value) {}
+    public record Input(ActionField field, WorkflowLiteral defaultValue) {}
+    public record Binding(String source, String key, WorkflowLiteral value) {}
     public record Service(String key, String action, Map<String,Binding> inputs, Map<String,Binding> outputs, int sourceIndex) {
         public Service { inputs=Map.copyOf(inputs); outputs=Map.copyOf(outputs); }
     }

@@ -108,7 +108,7 @@ public class MinimalDefinitionLoader {
             }
             diagnostics.error(code,DiagnosticStage.STRUCTURE,"Document does not match the supported structure.",pointer);
         }
-        return errors.isEmpty() ? (extended ? ScalarDefinitionModel.load(document.tree(), diagnostics,routing(document.tree()) ? expressions : null) : graph(document.tree(), diagnostics)) : null;
+        return errors.isEmpty() ? (extended ? ExecutionValueDefinitionModel.load(document.tree(), diagnostics,routing(document.tree()) ? expressions : null) : graph(document.tree(), diagnostics)) : null;
 
     }
 
@@ -157,7 +157,7 @@ public class MinimalDefinitionLoader {
         if (node.isObject()) {
             node.fields().forEachRemaining(entry -> {
                 String field = entry.getKey(); JsonNode value = entry.getValue();
-                if (field.equals("designer")) return;
+                if (field.equals("designer") || field.equals("default") || field.equals("value")) return;
                 boolean unsupported = ((field.equals("guards") || (!extended && Set.of("variables", "inputContract").contains(field))) && value.isArray() && !value.isEmpty())
                         || (!extended && Set.of("inputs", "initialize").contains(field) && value.isObject() && !value.isEmpty())
                         || (field.equals("policy") && value.isTextual() && !value.textValue().equals("SINGLE"))

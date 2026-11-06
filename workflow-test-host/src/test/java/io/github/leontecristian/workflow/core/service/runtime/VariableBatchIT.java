@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Binding;
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
-import io.github.leontecristian.workflow.core.dto.runtime.ScalarValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
@@ -75,7 +75,7 @@ class VariableBatchIT extends DatabaseIntegrationTest {
         });
     }
 
-    private void apply(Map<String, ScalarValue> writes, boolean failAfterHandoff) {
+    private void apply(Map<String, WorkflowValue> writes, boolean failAfterHandoff) {
         new TransactionTemplate(transactions).executeWithoutResult(status -> {
             var instance = em.find(WorkflowInstanceEntity.class, instanceId);
             long previous = instance.getLastHistorySequence();
@@ -95,8 +95,8 @@ class VariableBatchIT extends DatabaseIntegrationTest {
         });
     }
 
-    private Map<String, ScalarValue> smallWrites() {
-        var value = new ScalarValue(VariableValueType.LONG, new TextLiteral("9007199254740993"));
+    private Map<String, WorkflowValue> smallWrites() {
+        var value = new WorkflowValue(VariableValueType.LONG, new TextLiteral("9007199254740993"));
         return Map.of("quantity", value, "copy", value);
     }
 
@@ -112,7 +112,7 @@ class VariableBatchIT extends DatabaseIntegrationTest {
         assertTrue(jdbc.queryForList("SELECT long_value FROM wf.workflow_variable WHERE instance_id=?", Long.class, instanceId)
                 .stream().allMatch(value -> value == 9007199254740993L));
         var fact = reads.findHistoryEvent(instanceId, 1).orElseThrow();
-        assertEquals("VARIABLES_WRITTEN", fact.envelope().eventType());
+        assertEquals("VARIABLES_WRITTEN", fact.summary().eventType());
         var details = json.tree(fact.detailsJson());
         assertEquals(2, details.path("writes").size());
         assertEquals("copy", details.path("writes").get(0).path("variableKey").asText());
@@ -130,9 +130,9 @@ class VariableBatchIT extends DatabaseIntegrationTest {
     }
 
     @Test void oversizedCombinedBatchRollsBackPriorHostEffectAndAggregateClaim() {
-        var writes = new TreeMap<String, ScalarValue>();
-        for (int i = 0; i < 20; i++) writes.put("value" + i,
-                new ScalarValue(VariableValueType.STRING, new TextLiteral("x".repeat(4000))));
+        var writes = new TreeMap<String, WorkflowValue>();
+        for (int i = 0; i < 30; i++) writes.put("value" + i,
+                new WorkflowValue(VariableValueType.STRING, new TextLiteral("\u0000".repeat(4000))));
         var error = assertThrows(WorkflowExecutionException.class, () -> apply(writes, false));
         assertEquals(WorkflowExecutionException.Category.LIMIT_EXCEEDED, error.category());
         assertRolledBack();

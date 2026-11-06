@@ -82,14 +82,16 @@
   </mat-card-content>
 </mat-card>
 
-<mat-card appearance="outlined"><mat-card-header><h2>Scalar variables</h2></mat-card-header><mat-card-content>
+<mat-card appearance="outlined"><mat-card-header><h2>Execution variables</h2></mat-card-header><mat-card-content>
   <button mat-stroked-button (click)="loadVariables()">Refresh variables</button>
   @if(variables(); as page) {
     <p>Instance token {{page.lockVersion}}. Uninitialized variables have no stored value; initialized null is explicit.</p>
     @for(item of page.items; track item.key) {
-      <h3>{{item.key}} ? {{item.type}} ? {{item.initialized ? (item.value === null ? 'Initialized null' : 'Initialized') : 'Uninitialized'}}</h3>
-      <console-details [value]="item" />
+      <h3>{{item.key}} · {{item.type}} · {{item.initialized ? (item.value === null ? 'Initialized null' : 'Initialized') : 'Uninitialized'}}</h3>
+      <p>Use the exact JSON below to inspect values.</p>
     }
+    <button mat-button (click)="exportVariables()">Download exact page JSON</button>
+    <pre>{{page.exactJson}}</pre>
     @if(page.nextAfterKey) { <button mat-button (click)="loadVariables(true)">Next variable page</button> }
   }
   @if(variableError()) { <p role="alert">{{variableError()}}</p> }

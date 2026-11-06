@@ -35,14 +35,17 @@ final class RuntimeHistoryBatch {
     void append(long sequence, String type, Long activityId, Long taskId,
                 MinimalWorkflowDefinition.Transition transition, Object details, Map<String,String> payload) {
         RuntimeInputs.require(sequence==this.sequence+1 && events.size()<6000,io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.LIMIT_EXCEEDED);
-        String encoded=json.evidence(details);
+        String encoded=json.history(details);
         utf8Bytes+=encoded.getBytes(java.nio.charset.StandardCharsets.UTF_8).length; utf16Bytes+=encoded.length()*2L;
         RuntimeInputs.require(utf8Bytes<=16*1024*1024 && utf16Bytes<=16*1024*1024,io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.LIMIT_EXCEEDED);
         this.sequence=sequence;
         WorkflowHistorySummary fact = new WorkflowHistorySummary(instanceId, sequence, type, commandId, context.correlationId(),
                 context.actorKind(), context.actorRef(), context.occurredAt(), activityId, taskId,
                 transition == null ? null : transition.from(), transition == null ? null : transition.to(),
-                transition == null ? null : transition.key(), (short) 1);
+                transition == null ? null : transition.key(), (short) 2);
+        RuntimeInputs.require(json.encode(new io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistoryEvent(fact,encoded))
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8).length<=8*1024*1024,
+                io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.LIMIT_EXCEEDED);
         entityManager.persist(new WorkflowHistoryEntity(fact, encoded));
         var event=new WorkflowEvent((short) 1, instanceId + ":" + sequence, commandId, instanceId, definitionVersionId,
                 sequence, type, context.actorKind(), context.actorRef(), context.occurredAt(), context.correlationId(),

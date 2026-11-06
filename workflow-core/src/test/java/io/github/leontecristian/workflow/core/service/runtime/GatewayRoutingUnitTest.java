@@ -8,7 +8,7 @@ import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWor
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Transition;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
-import io.github.leontecristian.workflow.core.dto.runtime.ScalarValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionContext;
 import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
@@ -42,7 +42,7 @@ class GatewayRoutingUnitTest {
                 end,edges,Map.of(),Map.of("quantity",new ActionField("quantity",VariableValueType.LONG,false,true)),Map.of(),Map.of(),
                 Map.of("HIGH",end,"LOW",new Node("LOW","END",null,"LOW")),Set.of("ROUTE"));
     }
-    private List<WorkflowEvent> run(MinimalWorkflowDefinition model,Map<String,ScalarValue> state) {
+    private List<WorkflowEvent> run(MinimalWorkflowDefinition model,Map<String,WorkflowValue> state) {
         ObjectProvider<WorkflowServiceAction> provider=mock(ObjectProvider.class); when(provider.iterator()).thenAnswer(i->List.<WorkflowServiceAction>of().iterator());
         var progression=new RuntimeServiceProgression(new ServiceActionRegistry(provider),mock(RuntimeVariables.class),json);
         var context=new WorkflowCommandContext(ActorKind.USER,"reviewer",Instant.parse("2026-11-05T00:00:00Z"),"test");
@@ -55,7 +55,7 @@ class GatewayRoutingUnitTest {
     }
     @Test void firstMatchDefaultOrderAndEvidencePrivacy() {
         for(String quantity:List.of("20","5","0")) {
-            var events=run(model("#vars.quantity > 10","#vars.quantity > 0",true),Map.of("quantity",new ScalarValue(VariableValueType.LONG,new TextLiteral(quantity))));
+            var events=run(model("#vars.quantity > 10","#vars.quantity > 0",true),Map.of("quantity",new WorkflowValue(VariableValueType.LONG,new TextLiteral(quantity))));
             assertThat(events).extracting(WorkflowEvent::eventType).containsExactly("TRANSITION_TAKEN","GATEWAY_ROUTED","TRANSITION_TAKEN");
             String selected=quantity.equals("20") ? "high" : quantity.equals("5") ? "positive" : "fallback";
             assertThat(events.get(1).payload()).containsExactlyInAnyOrderEntriesOf(Map.of("nodeKey","ROUTE","selectedTransitionKey",selected));
