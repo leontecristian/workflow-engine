@@ -6,13 +6,15 @@ export interface SubmissionPage {
   nextAfterTaskId: Decimal | null;
 }
 
+export interface TaskAssignment { kind: "USER" | "GROUP" | "ROLE"; ref: string; }
+
 export interface TaskView {
   id: Decimal;
   activityId: Decimal;
   instanceId: Decimal;
   taskTypeId: Decimal;
   taskKey: string;
-  assignedUserRef: string;
+  assignment: TaskAssignment;
   status: string;
   outcomeKey: string | null;
   createdAt: string;
@@ -26,6 +28,8 @@ export interface TaskContract {
   instanceId: Decimal;
   instanceLockVersion: Decimal;
   taskType: string;
+  canComplete: boolean;
+  assignmentLabel: string;
   outcomes: {
     key: string;
     label: string;

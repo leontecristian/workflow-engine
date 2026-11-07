@@ -28,13 +28,31 @@ public class ConsoleRuntimeReadHost implements WorkflowRuntimeReadHost {
         return reads.listInstances(query);
     }
     @Override public WorkflowTaskPage listAssignedTasks(long afterId, int limit) {
-        return reads.listAssignedTasks(context.actor(), afterId, limit);
+        return reads.listEligibleTasks(context.actor(), afterId, limit, access::canReadTask);
     }
     @Override public WorkflowTaskPage listTasks(long id, long afterId, int limit) {
         instance(id);
-        var page = reads.listTasks(id, afterId, limit);
-        return new WorkflowTaskPage(page.items().stream().filter(access::canReadTask).toList(), page.nextAfterId());
+        var visible = new java.util.ArrayList<WorkflowTaskView>();
+        long cursor = afterId;
+        int examined = 0;
+        while (examined < 500) {
+            var page = reads.listTasks(id, cursor, Math.min(limit, 500 - examined));
+            for (int index = 0; index < page.items().size(); index++) {
+                var task = page.items().get(index);
+                cursor = task.id(); examined++;
+                if (access.canReadTask(task)) visible.add(task);
+                if (visible.size() == limit || examined == 500) {
+                    boolean more = index + 1 < page.items().size() || page.nextAfterId() != null;
+                    return new WorkflowTaskPage(visible, more ? cursor : null);
+                }
+            }
+            if (page.nextAfterId() == null) return new WorkflowTaskPage(visible, null);
+            cursor = page.nextAfterId();
+        }
+        return new WorkflowTaskPage(visible, cursor);
     }
+    @Override public boolean canCompleteTask(WorkflowTaskView task) { return access.canCompleteTask(task); }
+    @Override public boolean canReadTask(WorkflowTaskView task) { return access.canReadTask(task); }
     @Override public WorkflowInstanceView instance(long id) { return policy(() -> access.instance(id)); }
     @Override public WorkflowTaskView task(long id) { return policy(() -> access.task(id)); }
     @Override public WorkflowActivityView activity(long id) { return policy(() -> access.activity(id)); }

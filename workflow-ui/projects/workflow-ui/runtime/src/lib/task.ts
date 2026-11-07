@@ -1,10 +1,14 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, Input, inject, signal } from '@angular/core';
 import { CommandRecovery, WORKFLOW_RUNTIME_COMMANDS } from '@workflow-engine/ui';
 import type { TaskView, TaskContract, TaskSubmission } from '@workflow-engine/ui';
 import { RuntimeState } from './runtime-state';
 import { PAGE_IMPORTS } from './page-imports';
 @Component({selector:"workflow-task",standalone:true,imports:[...PAGE_IMPORTS],styleUrl:"./runtime.scss",templateUrl:"./task.html"})
 export class WorkflowTaskComponent extends RuntimeState {
+  @Input() diagnosticsEnabled = false;
+  get uncertain(): boolean {
+    return this.commands.buffer.entries.some(e => e.kind === "complete" && e.body["taskId"] === this.id && this.commands.observations.get(e.body["commandId"]!)?.outcome === "UNKNOWN_OUTCOME");
+  }
  protected clearContent(){this.detail.set(null);this.contract.set(null);this.submission.set(null);this.comment="";this.outcome="";}
   get meta() {return {
     title: this.messages.taskTitle,
@@ -43,9 +47,10 @@ export class WorkflowTaskComponent extends RuntimeState {
     return /^[\u0009-\u000d\u001c-\u0020\u1680\u2000-\u2006\u2008-\u200a\u2028\u2029\u205f\u3000]*$/u.test(this.comment);
   }
   async complete(outcomeKey: string): Promise<void> {
-    if (this.busy() || !this.commandProvider || !this.detail() || !this.contract()) return;
+    if (this.busy() || !this.commandProvider || !this.detail() || !this.contract()?.canComplete || this.uncertain) return;
     this.completing=true;
-    await this.run(async (signal,current) => {
+    let conflict = false;
+    const succeeded = await this.run(async (signal,current) => {
       const selected = this.contract()?.outcomes.find(o => o.key === outcomeKey);
       if (!selected || this.detail()?.status !== "OPEN") throw new Error("Choose an available outcome on an open task.");
       if(this.comment.length>2000)throw new Error("Comment exceeds 2000 characters.");
@@ -62,9 +67,22 @@ export class WorkflowTaskComponent extends RuntimeState {
         },
         expectedToken: this.contract()!.instanceLockVersion,
       });
-      await this.commands.execute(false,signal);
-      if(current())this.navigate({kind:"commands"});
+      try { await this.commands.execute(false,signal); }
+      catch (error) {
+        const status = (error as {httpStatus?:number})?.httpStatus;
+        conflict = status === 409;
+        if ((!status || status >= 500) && !this.diagnosticsEnabled) throw new Error("The outcome is uncertain. Contact your administrator before trying again.");
+        throw error;
+      }
+      if(current() && this.diagnosticsEnabled)this.navigate({kind:"commands"});
     });
     this.completing=false;
+    if (succeeded && !this.diagnosticsEnabled) {
+      await this.load();
+      this.notice.set("Task completed.");
+    } else if (conflict) {
+      await this.load();
+      this.error.set("The task changed. Current details have been refreshed.");
+    }
   }
 }

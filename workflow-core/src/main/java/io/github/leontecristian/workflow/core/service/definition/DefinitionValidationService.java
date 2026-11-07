@@ -20,15 +20,18 @@ import org.springframework.stereotype.Component;
 /** Internal publication-subset checker. No represented host function is ever executed. */
 @Component
 public class DefinitionValidationService {
-    static final String IDENTIFIER = "wf-sequential-human-validator-v1";
+    static final String IDENTIFIER = "wf-shared-assignment-validator-v1";
     private final TaskTypeCatalogService catalog;
     private final DefinitionCapabilityProvider provider;
+    private final io.github.leontecristian.workflow.core.service.runtime.RuntimeHostSupport runtimeHost;
     private final ObjectMapper json = new ObjectMapper();
     private final MinimalDefinitionLoader loader;
     private final io.github.leontecristian.workflow.core.service.runtime.ServiceActionRegistry actions;
 
     public DefinitionValidationService(TaskTypeCatalogService catalog, ObjectProvider<DefinitionCapabilityProvider> providers,
-                                       MinimalDefinitionLoader loader, io.github.leontecristian.workflow.core.service.runtime.ServiceActionRegistry actions) {
+                                       MinimalDefinitionLoader loader, io.github.leontecristian.workflow.core.service.runtime.ServiceActionRegistry actions,
+                                       io.github.leontecristian.workflow.core.service.runtime.RuntimeHostSupport runtimeHost) {
+        this.runtimeHost=runtimeHost;
         this.actions=actions;
         this.catalog = catalog;
         this.loader = loader;
@@ -79,7 +82,11 @@ public class DefinitionValidationService {
                         .filter(c -> c.resolver().equals(human.assignment().resolver())).findFirst().orElse(null);
                 TaskTypeCapability presentation = capabilities == null ? null : capabilities.taskTypes().stream()
                         .filter(c -> c.taskType().equals(human.taskType())).findFirst().orElse(null);
-                if (assignment != null) humanContext.putObject("assignmentCapability").put("resolver", assignment.resolver());
+                if (assignment != null) {
+                    runtimeHost.requireResolver(assignment.resolver(), assignment.targetKinds());
+                    var descriptor = humanContext.putObject("assignmentCapability"); descriptor.put("resolver", assignment.resolver());
+                    var kinds = descriptor.putArray("targetKinds"); assignment.targetKinds().stream().map(Enum::name).sorted().forEach(kinds::add);
+                }
                 if (presentation != null) {
                     ObjectNode descriptor = humanContext.putObject("taskCapability"); descriptor.put("taskType", presentation.taskType());
                     var outcomes = descriptor.putArray("supportedOutcomes"); presentation.supportedOutcomes().stream().sorted().forEach(outcomes::add);

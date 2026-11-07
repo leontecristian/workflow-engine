@@ -1,5 +1,7 @@
 # Feature specifications
 
+[F016 — Shared group/role task assignment with current membership](F016-shared-group-role-task-assignment/spec.md) is **IMPLEMENTED revision 2**. Typed assignment, current membership, authorized discovery, preserving migration and diagnostic opt-in UI are delivered; see its [handover](F016-shared-group-role-task-assignment/implementation.md). Claiming/releasing follows as the next separate feature.
+
 [F015 — Runtime task, command and recovery extraction](F015-runtime-task-instance-extraction/spec.md) is **IMPLEMENTED revision 2**. Runtime reads, complete task UI, immutable buffering and recovery are shared; independently activated completion mapping delegates to required host adapters. Read-only consumption needs no command provider. Business starts and transactional orchestration remain host-owned; see the [handover](F015-runtime-task-instance-extraction/implementation.md).
 
 [F014 — Definition and catalog administration](F014-definition-catalog-administration/spec.md) is **IMPLEMENTED revision 3**. Existing administration is shared through workflow-web and the workflow-ui administration entry point; sandbox policy and transaction/audit remain host-owned. Focused unit/build, guarded changed-write/audit and packaged-browser checks pass; see the [handover](F014-definition-catalog-administration/implementation.md).

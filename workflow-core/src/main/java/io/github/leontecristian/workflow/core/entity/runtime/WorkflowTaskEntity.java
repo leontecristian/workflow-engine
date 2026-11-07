@@ -2,6 +2,8 @@ package io.github.leontecristian.workflow.core.entity.runtime;
 
 import io.github.leontecristian.workflow.core.dto.runtime.TaskClosureReason;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
+import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Enumerated;
@@ -32,9 +34,13 @@ public class WorkflowTaskEntity {
     @Column(name = "task_key", nullable = false, length = 100)
     private String taskKey;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "assignment_kind", nullable = false, length = 5)
+    private AssignmentTargetKind assignmentKind;
+
     @Nationalized
-    @Column(name = "assigned_user_ref", nullable = false, length = 200)
-    private String assignedUserRef;
+    @Column(name = "assignment_ref", nullable = false, length = 200)
+    private String assignmentRef;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 12)
@@ -69,18 +75,23 @@ public class WorkflowTaskEntity {
     protected WorkflowTaskEntity() {
     }
 
-    public WorkflowTaskEntity(long activityId, String taskKey, String assignee, LocalDateTime time) {
+    public WorkflowTaskEntity(long activityId, String taskKey, TaskAssignmentTarget assignment, LocalDateTime time) {
         if (activityId <= 0) throw new IllegalArgumentException("Invalid activity identity");
         this.activityId = activityId; this.taskKey = java.util.Objects.requireNonNull(taskKey);
-        this.assignedUserRef = java.util.Objects.requireNonNull(assignee);
+        this.assignmentKind = java.util.Objects.requireNonNull(assignment.kind());
+        this.assignmentRef = java.util.Objects.requireNonNull(assignment.ref());
         this.createdAt = java.util.Objects.requireNonNull(time); this.status = TaskStatus.OPEN;
     }
 
+    public TaskAssignmentTarget getAssignment() {
+        return new TaskAssignmentTarget(assignmentKind, assignmentRef);
+    }
+
     public void complete(String outcome, LocalDateTime time, String actor) {
-        if (status != TaskStatus.OPEN || time.isBefore(createdAt) || !assignedUserRef.equals(actor))
+        if (status != TaskStatus.OPEN || time.isBefore(createdAt) || (assignmentKind == AssignmentTargetKind.USER && !assignmentRef.equals(actor)))
             throw new IllegalStateException("Assigned OPEN task required");
         status = TaskStatus.COMPLETED; outcomeKey = java.util.Objects.requireNonNull(outcome);
-        closedAt = time; closedBy = actor; closureReason = TaskClosureReason.TASK_OUTCOME;
+        closedAt = time; closedBy = java.util.Objects.requireNonNull(actor); closureReason = TaskClosureReason.TASK_OUTCOME;
     }
 
 }

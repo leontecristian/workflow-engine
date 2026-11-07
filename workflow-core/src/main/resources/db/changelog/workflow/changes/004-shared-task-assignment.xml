@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+    <!-- Stop existing writers before applying; mixed old/new writers are unsupported. -->
+    <changeSet id="004-shared-task-assignment" author="workflow" runInTransaction="true">
+        <sql>ALTER TABLE wf.workflow_task ADD assignment_kind VARCHAR(5) NULL,
+            assignment_ref NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL;</sql>
+        <sql>UPDATE wf.workflow_task SET assignment_kind = 'USER', assignment_ref = assigned_user_ref;</sql>
+        <sql splitStatements="false"><![CDATA[
+            IF EXISTS (SELECT 1 FROM wf.workflow_task WHERE assignment_kind IS NULL OR assignment_kind <> 'USER'
+                OR assignment_ref IS NULL OR assignment_ref <> assigned_user_ref
+                OR DATALENGTH(assignment_ref) <> DATALENGTH(assigned_user_ref))
+                THROW 51000, 'Task assignment backfill validation failed', 1;
+        ]]></sql>
+        <sql><![CDATA[
+            ALTER TABLE wf.workflow_task ALTER COLUMN assignment_kind VARCHAR(5) NOT NULL;
+            ALTER TABLE wf.workflow_task ALTER COLUMN assignment_ref NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL;
+            ALTER TABLE wf.workflow_task WITH CHECK ADD CONSTRAINT ck_workflow_task_assignment
+                CHECK (assignment_kind IN ('USER', 'GROUP', 'ROLE') AND DATALENGTH(assignment_ref) BETWEEN 2 AND 400);
+            DROP INDEX ix_workflow_task_open_assignee ON wf.workflow_task;
+            ALTER TABLE wf.workflow_task DROP COLUMN assigned_user_ref;
+            CREATE NONCLUSTERED INDEX ix_workflow_task_open_assignment
+                ON wf.workflow_task (assignment_kind, assignment_ref, id) INCLUDE (activity_id) WHERE status = 'OPEN';
+            CREATE NONCLUSTERED INDEX ix_workflow_task_open_scan
+                ON wf.workflow_task (id) INCLUDE (assignment_kind, assignment_ref, activity_id) WHERE status = 'OPEN';
+        ]]></sql>
+    </changeSet>
+</databaseChangeLog>

@@ -7,7 +7,7 @@ public record WorkflowTaskView(
         long instanceId,
         long taskTypeId,
         String taskKey,
-        String assignedUserRef,
+        TaskAssignmentTarget assignment,
         TaskStatus status,
         String outcomeKey,
         java.time.Instant createdAt,

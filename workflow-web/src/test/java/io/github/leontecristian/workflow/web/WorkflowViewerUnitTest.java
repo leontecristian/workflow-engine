@@ -58,6 +58,8 @@ class WorkflowViewerUnitTest {
         Object error() { throw new IllegalStateException("host failure"); }
         @org.springframework.web.bind.annotation.GetMapping("/host-number")
         Object number() { return java.util.Map.of("id", 9007199254740993L); }
+        @org.springframework.web.bind.annotation.PostMapping("/custom/read/instances/start")
+        String start() { return "host-start"; }
         @org.springframework.web.bind.annotation.ExceptionHandler(IllegalStateException.class)
         org.springframework.http.ResponseEntity<String> ownError() {
             return org.springframework.http.ResponseEntity.status(418).body("host-owned-error");
@@ -71,6 +73,18 @@ class WorkflowViewerUnitTest {
     private AnnotationConfigWebApplicationContext context(Class<?>... classes) {
         var context = new AnnotationConfigWebApplicationContext();
         context.setServletContext(new MockServletContext()); context.register(classes); context.refresh(); return context;
+    }
+    @Test void viewerReadPatternDoesNotShadowHostStartPost() throws Exception {
+        try (var context = context(Host.class, Enabled.class)) {
+            var mvc = MockMvcBuilders.webAppContextSetup(context).build();
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/custom/read/instances/start"))
+                    .andExpect(status().isOk()).andExpect(content().string("host-start"));
+            verifyNoViewerAccess(context);
+        }
+    }
+    private void verifyNoViewerAccess(AnnotationConfigWebApplicationContext context) {
+        org.mockito.Mockito.verifyNoInteractions(context.getBean(WorkflowViewerAccess.class),
+                context.getBean(WorkflowRuntimeQueryService.class));
     }
     @Test void packageScanningAndDependencyAloneExposeNothing() throws Exception {
         try (var context = new AnnotationConfigWebApplicationContext()) {

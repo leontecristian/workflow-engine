@@ -12,7 +12,7 @@ public class ConsoleSettings {
             failEventRecording,
             failRuntimeAfterResult;
     public final String failServiceNode, invalidServiceOutputNode;
-    public final String admin, reviewer, adminPassword, reviewerPassword;
+    public final String admin, reviewer, reviewer2, adminPassword, reviewerPassword, reviewer2Password;
 
     public ConsoleSettings(Environment env) {
         failServiceNode=env.getProperty("workflow.console.fail-service-node", "");
@@ -27,6 +27,8 @@ public class ConsoleSettings {
         sample = mode.equals("sample");
         admin = env.getProperty("workflow.console.admin.username");
         reviewer = env.getProperty("workflow.console.reviewer.username");
+        reviewer2 = env.getProperty("workflow.console.reviewer2.username", reviewer == null ? null : reviewer + "2");
+        reviewer2Password = env.getProperty("workflow.console.reviewer2.password", env.getProperty("workflow.console.reviewer.password"));
         adminPassword = env.getProperty("workflow.console.admin.password");
         reviewerPassword = env.getProperty("workflow.console.reviewer.password");
         failAudit = flag(env, "fail-audit");
@@ -36,6 +38,9 @@ public class ConsoleSettings {
         if (enabled
                 && (!actor(admin)
                         || !actor(reviewer)
+                        || !actor(reviewer2)
+                        || reviewer2.equals(admin) || reviewer2.equals(reviewer)
+                        || reviewer2Password == null || reviewer2Password.isBlank()
                         || admin.equals(reviewer)
                         || adminPassword == null
                         || adminPassword.isBlank()

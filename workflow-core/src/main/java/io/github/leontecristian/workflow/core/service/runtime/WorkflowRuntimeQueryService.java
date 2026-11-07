@@ -54,8 +54,10 @@ public class WorkflowRuntimeQueryService {
     private final RuntimeDefinitionPins pins;
     private final RuntimeJson json;
     private final RuntimeVariables variables;
+    private final WorkflowTaskEligibilityService eligibility;
     public WorkflowRuntimeQueryService(WorkflowInstanceRepository instances, WorkflowActivityRepository activities,
-            WorkflowTaskRepository tasks, WorkflowHistoryRepository history, RuntimeDefinitionPins pins, RuntimeJson json, RuntimeVariables variables) {
+            WorkflowTaskRepository tasks, WorkflowHistoryRepository history, RuntimeDefinitionPins pins, RuntimeJson json, RuntimeVariables variables, WorkflowTaskEligibilityService eligibility) {
+        this.eligibility=eligibility;
         this.variables=variables;
         this.instances = instances; this.activities = activities; this.tasks = tasks; this.history = history; this.pins = pins; this.json = json;
     }
@@ -118,6 +120,40 @@ public class WorkflowRuntimeQueryService {
         return RuntimePersistenceErrors.call(() -> page(tasks.findAssignedPage(assignee, assignee.length() * 2, afterId, PageRequest.of(0, limit + 1)),
                 limit, RuntimeViews::task, WorkflowTaskView::id, WorkflowTaskPage::new));
     }
+    /** Bounded source scan. Continuation is the last examined candidate, including denied candidates. */
+    public WorkflowTaskPage listEligibleTasks(String actorRef, long afterId, int limit,
+            java.util.function.Predicate<WorkflowTaskView> hostAccess) {
+        RuntimeInputs.require(RuntimeInputs.text(actorRef,200,200,true) && hostAccess != null, Category.INVALID_INPUT);
+        RuntimeInputs.page(afterId,limit);
+        return RuntimePersistenceErrors.call(() -> {
+            var items = new ArrayList<WorkflowTaskView>();
+            long cursor = afterId;
+            int examined = 0;
+            while (examined < 500 && items.size() < limit) {
+                int chunk = Math.min(100, 500-examined);
+                var rows = tasks.findEligibleCandidatesPage(actorRef, actorRef.length()*2, cursor, PageRequest.of(0,chunk+1));
+                int count = Math.min(chunk,rows.size());
+                for (int i=0;i<count;i++) {
+                    var task = RuntimeViews.task(rows.get(i));
+                    if (hostAccess.test(task) && eligibility.isEligible(task,actorRef)) {
+                        items.add(task);
+                        if (!RuntimeJson.utf8Fits(json.encode(new WorkflowTaskPage(items,task.id())),1024*1024)) {
+                            items.remove(items.size()-1);
+                            RuntimeInputs.require(!items.isEmpty(),Category.LIMIT_EXCEEDED);
+                            return new WorkflowTaskPage(items,cursor);
+                        }
+                    }
+                    cursor=task.id(); examined++;
+                    if (items.size()==limit || examined==500) {
+                        boolean more = i+1<rows.size();
+                        return new WorkflowTaskPage(items,more ? cursor : null);
+                    }
+                }
+                if (rows.size()<=chunk) return new WorkflowTaskPage(items,null);
+            }
+            return new WorkflowTaskPage(items,cursor);
+        });
+    }
     public WorkflowHistoryPage listHistory(long instanceId) { return listHistory(instanceId, 0, 50); }
     public WorkflowHistoryPage listHistory(long instanceId, long afterSequence, int limit) {
         RuntimeInputs.id(instanceId); RuntimeInputs.page(afterSequence, limit);
@@ -156,7 +192,8 @@ public class WorkflowRuntimeQueryService {
                 && (details.get("comment").isNull() || (details.get("comment").isTextual()
                     && RuntimeInputs.text(details.get("comment").textValue(), 2000, 2000, false))), Category.HOST_CONFIGURATION);
         RuntimeInputs.require(task.getStatus() == TaskStatus.COMPLETED && task.getClosureReason() == TaskClosureReason.TASK_OUTCOME
-                && fact.getActorKind() == ActorKind.USER && Objects.equals(task.getAssignedUserRef(), fact.getActorRef())
+                && fact.getActorKind() == ActorKind.USER && (task.getAssignmentKind() != io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER
+                    || Objects.equals(task.getAssignmentRef(), fact.getActorRef()))
                 && Objects.equals(task.getClosedBy(), fact.getActorRef()) && task.getClosedAt() != null && task.getClosedAt().equals(fact.getOccurredAt())
                 && !task.getClosedAt().isBefore(task.getCreatedAt()) && !task.getClosedAt().isBefore(activity.getEnteredAt())
                 && task.getId().equals(fact.getTaskId()) && activity.getId().equals(fact.getActivityId())

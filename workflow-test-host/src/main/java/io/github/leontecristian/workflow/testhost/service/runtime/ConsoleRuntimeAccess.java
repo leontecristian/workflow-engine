@@ -1,33 +1,49 @@
 package io.github.leontecristian.workflow.testhost.service.runtime;
 
+import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowActivityView;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService;
 import io.github.leontecristian.workflow.testhost.exception.console.ConsoleException;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
-
 import org.springframework.stereotype.Service;
 
 @Service
 public class ConsoleRuntimeAccess {
     private final WorkflowRuntimeQueryService reads;
     private final ConsoleContext context;
+    private final WorkflowTaskEligibilityService eligibility;
 
-    public ConsoleRuntimeAccess(WorkflowRuntimeQueryService reads, ConsoleContext context) {
+    public ConsoleRuntimeAccess(WorkflowRuntimeQueryService reads, ConsoleContext context,
+            WorkflowTaskEligibilityService eligibility) {
         this.reads = reads;
         this.context = context;
+        this.eligibility = eligibility;
     }
 
     public WorkflowTaskView task(long id) {
         var task = reads.findTask(id).orElseThrow(ConsoleException::missing);
-        if (!context.admin() && !context.actor().equals(task.assignedUserRef()))
+        if (!canReadTask(task))
             throw ConsoleException.missing();
         return task;
     }
 
     public boolean canReadTask(WorkflowTaskView task) {
-        return context.admin() || context.actor().equals(task.assignedUserRef());
+        if (context.admin()) return true;
+        if (task.assignment().kind() == AssignmentTargetKind.USER)
+            return context.actor().equals(task.assignment().ref());
+        if (task.status() == TaskStatus.OPEN)
+            return eligibility.isEligible(task, context.actor());
+        return task.status() == TaskStatus.COMPLETED
+                && context.actor().equals(task.closedBy());
+    }
+
+    public boolean canCompleteTask(WorkflowTaskView task) {
+        return task.status() == TaskStatus.OPEN
+                && eligibility.isEligible(task, context.actor());
     }
 
     /** Bounded bulk authorization for graph links; avoids an exact-task query per displayed node. */
@@ -66,7 +82,7 @@ public class ConsoleRuntimeAccess {
                     .anyMatch(
                             t ->
                                     (activityId == null || t.activityId() == activityId)
-                                            && context.actor().equals(t.assignedUserRef()))) return;
+                                            && canReadTask(t))) return;
             if (tasks.nextAfterId() == null) throw ConsoleException.missing();
             cursor = tasks.nextAfterId();
         }

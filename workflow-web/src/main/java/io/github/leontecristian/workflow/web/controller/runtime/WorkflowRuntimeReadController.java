@@ -8,12 +8,14 @@ import static io.github.leontecristian.workflow.web.service.runtime.RuntimeWire.
 import io.github.leontecristian.workflow.core.dto.runtime.BooleanLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmission;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmissionPage;
 import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceQuery;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceSummary;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
+import io.github.leontecristian.workflow.web.dto.runtime.WorkflowTaskContract;
 import io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException;
 import io.github.leontecristian.workflow.web.integration.runtime.WorkflowRuntimeReadHost;
 import io.github.leontecristian.workflow.web.service.runtime.RuntimeErrors;
@@ -129,15 +131,15 @@ public class WorkflowRuntimeReadController {
         var nodes = wire.tree(version.documentJson()).get("nodes");
         for (var node : nodes)
             if (activity.nodeKey().equals(node.path("key").asText())) {
-                var outcomes = new java.util.ArrayList<io.github.leontecristian.workflow.web.dto.runtime.WorkflowTaskContract.Outcome>();
+                var outcomes = new java.util.ArrayList<WorkflowTaskContract.Outcome>();
                 for (var outcome : node.get("outcomes")) {
                     outcomes.add(
-                            new io.github.leontecristian.workflow.web.dto.runtime.WorkflowTaskContract.Outcome(
+                            new WorkflowTaskContract.Outcome(
                                     outcome.get("key").textValue(), outcome.get("label").textValue(), outcome.get("requiresComment").booleanValue()));
                 }
                 return wire.response(
-                        new io.github.leontecristian.workflow.web.dto.runtime.WorkflowTaskContract(
-                                task.id(), task.instanceId(), instance.lockVersion(), node.get("taskType").textValue(), outcomes));
+                        new WorkflowTaskContract(
+                                task.id(), task.instanceId(), instance.lockVersion(), node.get("taskType").textValue(), outcomes, access.canCompleteTask(task), assignmentLabel(task)));
             }
         throw new IllegalStateException("Pinned human contract missing");
     }
@@ -150,15 +152,39 @@ public class WorkflowRuntimeReadController {
         query(r, "afterTaskId", "limit");
         long key = decimal(id, false);
         access.activity(key);
-        var page =
-                reads.listActivitySubmissions(
-                        key, after(r.getParameter("afterTaskId")), limit(r.getParameter("limit")));
-        return wire.response(
-                wire.page(
-                        page.items(),
-                        page.nextAfterTaskId(),
-                        "nextAfterTaskId",
-                        TaskSubmission::taskId));
+        var page = visibleSubmissions(key, after(r.getParameter("afterTaskId")), limit(r.getParameter("limit")));
+        return wire.response(wire.page(page.items(), page.nextAfterTaskId(), "nextAfterTaskId", TaskSubmission::taskId));
+    }
+    private TaskSubmissionPage visibleSubmissions(long activityId, long after, int limit) {
+        var visible = new java.util.ArrayList<TaskSubmission>();
+        long cursor = after;
+        int examined = 0;
+        while (examined < 500) {
+            var page = reads.listActivitySubmissions(activityId, cursor, Math.min(limit, 500 - examined));
+            for (int index = 0; index < page.items().size(); index++) {
+                var submission = page.items().get(index);
+                cursor = submission.taskId(); examined++;
+                var task = reads.findTask(submission.taskId())
+                        .orElseThrow(() -> new IllegalStateException("Submission task missing"));
+                if (access.canReadTask(task)) visible.add(submission);
+                if (visible.size() == limit || examined == 500) {
+                    boolean more = index + 1 < page.items().size() || page.nextAfterTaskId() != null;
+                    return new TaskSubmissionPage(visible, more ? cursor : null);
+                }
+            }
+            if (page.nextAfterTaskId() == null)
+                return new TaskSubmissionPage(visible, null);
+            cursor = page.nextAfterTaskId();
+        }
+        return new TaskSubmissionPage(visible, cursor);
+    }
+    private String assignmentLabel(WorkflowTaskView task) {
+        String label;
+        try { label = access.assignmentLabel(task); }
+        catch (RuntimeException unavailable) { label = null; }
+        if (label == null || label.isBlank() || !RuntimeWire.unicode(label) || label.length() > 200)
+            return task.assignment().ref();
+        return label;
     }
     @ExceptionHandler(Exception.class)
     public ResponseEntity<String> error(Exception failure, HttpServletRequest request) { return errors.error(failure, request); }

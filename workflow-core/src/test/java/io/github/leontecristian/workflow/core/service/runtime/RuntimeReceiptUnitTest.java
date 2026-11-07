@@ -47,7 +47,8 @@ class RuntimeReceiptUnitTest {
             var receipt=new WorkflowCommandReceiptEntity(id,1,op.name(),ActorKind.USER,ctx.actorRef(),new byte[32],RuntimeJson.FINGERPRINT_VERSION,
                     LocalDateTime.parse(complete?"2026-01-02T00:00:00":"2026-01-01T00:00:00"),bytes,(short)3);
             var result=json.replay(receipt,id,op,ctx,new byte[32]).orElseThrow();
-            assertEquals(bytes,json.evidence(result));
+            assertEquals(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER,result.task().assignment().kind());
+            assertEquals(json.tree(bytes).path("task").path("assignedUserRef").textValue(),result.task().assignment().ref());
             assertEquals(8,result.activity().activationSequence());
             assertEquals(Category.COMMAND_ID_CONFLICT,assertThrows(WorkflowExecutionException.class,() -> json.replay(receipt,id,op,context("other"),new byte[32])).category());
             var invalid=new WorkflowCommandReceiptEntity(id,1,op.name(),ActorKind.USER,ctx.actorRef(),new byte[32],"unsupported-version",receipt.getRecordedAt(),bytes,(short)3);
@@ -73,4 +74,46 @@ class RuntimeReceiptUnitTest {
             assertEquals("COMPLETED",result.activity().status().name());
         }
     }
+    @Test void currentReceiptsRetainTypedTargetsAndActualActorWithoutMembershipLookup() throws Exception {
+        for (String kind : java.util.List.of("USER", "GROUP", "ROLE")) {
+            var root=(com.fasterxml.jackson.databind.node.ObjectNode)json.tree(resource("extended-complete.json"));
+            var task=(com.fasterxml.jackson.databind.node.ObjectNode)root.path("task");
+            task.remove("assignedUserRef");
+            task.set("assignment",json.object().put("kind",kind).put("ref",kind.equals("USER")?"reviewer":"finance"));
+            String bytes=json.encode(root);
+            var receipt=new WorkflowCommandReceiptEntity(id,1,WorkflowOperation.COMPLETE_TASK.name(),ActorKind.USER,"reviewer",new byte[32],
+                    RuntimeJson.FINGERPRINT_VERSION,LocalDateTime.parse("2026-01-02T00:00:00"),bytes,(short)4);
+            var result=json.replay(receipt,id,WorkflowOperation.COMPLETE_TASK,context("reviewer"),new byte[32]).orElseThrow();
+            assertEquals(kind,result.task().assignment().kind().name());
+            assertEquals("reviewer",result.task().closedBy());
+            assertEquals(bytes,json.evidence(result));
+            assertEquals(bytes,receipt.getResultJson());
+        }
+    }
+    @Test void legacyAndCurrentReceiptShapesRemainStrict() throws Exception {
+        for (short version : new short[]{3,4}) {
+            for (String mutation : java.util.List.of("extra", "wrongShape", "wrongActor")) {
+                var root=(com.fasterxml.jackson.databind.node.ObjectNode)json.tree(resource("extended-complete.json"));
+                var task=(com.fasterxml.jackson.databind.node.ObjectNode)root.path("task");
+                if (version==4) {
+                    task.remove("assignedUserRef");
+                    task.set("assignment",json.object().put("kind","USER").put("ref","reviewer"));
+                }
+                if (mutation.equals("extra")) task.put("unexpected",true);
+                if (mutation.equals("wrongShape")) {
+                    if(version==3) { task.remove("assignedUserRef"); task.set("assignment",json.object().put("kind","USER").put("ref","reviewer")); }
+                    else { task.remove("assignment"); task.put("assignedUserRef","reviewer"); }
+                }
+                if (mutation.equals("wrongActor")) {
+                    if(version==3) task.put("assignedUserRef","another");
+                    else ((com.fasterxml.jackson.databind.node.ObjectNode)task.path("assignment")).put("ref","another");
+                }
+                var receipt=new WorkflowCommandReceiptEntity(id,1,WorkflowOperation.COMPLETE_TASK.name(),ActorKind.USER,"reviewer",new byte[32],
+                        RuntimeJson.FINGERPRINT_VERSION,LocalDateTime.parse("2026-01-02T00:00:00"),json.encode(root),version);
+                assertEquals(Category.HOST_CONFIGURATION,assertThrows(WorkflowExecutionException.class,
+                        () -> json.replay(receipt,id,WorkflowOperation.COMPLETE_TASK,context("reviewer"),new byte[32])).category());
+            }
+        }
+    }
+
 }

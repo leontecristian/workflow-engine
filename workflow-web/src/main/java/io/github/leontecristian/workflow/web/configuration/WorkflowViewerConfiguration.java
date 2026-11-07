@@ -29,6 +29,15 @@ public class WorkflowViewerConfiguration {
     @Bean public RequestMappingHandlerMapping workflowViewerHandlerMapping(WorkflowViewerOptions options) {
         var mapping = new RequestMappingHandlerMapping() {
             @Override protected boolean isHandler(Class<?> type) { return type == WorkflowInstanceViewerController.class; }
+            @Override protected org.springframework.web.method.HandlerMethod handleNoMatch(
+                    java.util.Set<org.springframework.web.servlet.mvc.method.RequestMappingInfo> infos,
+                    String lookupPath, jakarta.servlet.http.HttpServletRequest request) throws jakarta.servlet.ServletException {
+                try { return super.handleNoMatch(infos, lookupPath, request); }
+                catch (org.springframework.web.HttpRequestMethodNotSupportedException differentMethod) {
+                    // A read pattern such as /instances/{id} must not preempt the host's POST /instances/start.
+                    return null;
+                }
+            }
         };
         mapping.setOrder(-1);
         mapping.setPathPrefixes(Map.of(options.basePath(), type -> type == WorkflowInstanceViewerController.class));

@@ -5,4 +5,5 @@
     <include file="changes/001-initial-schema.xml" relativeToChangelogFile="true"/>
     <include file="changes/002-definition-management.xml" relativeToChangelogFile="true"/>
     <include file="changes/003-json-execution.xml" relativeToChangelogFile="true"/>
+    <include file="changes/004-shared-task-assignment.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

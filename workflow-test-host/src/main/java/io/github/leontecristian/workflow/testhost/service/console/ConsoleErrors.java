@@ -57,6 +57,7 @@ public class ConsoleErrors {
                         case INVALID_INPUT -> 400;
                         case NOT_FOUND -> 404;
                         case NOT_ASSIGNED -> 403;
+                case ASSIGNMENT_LOOKUP_FAILED -> 503;
                         case STALE_VERSION,
                                         CONCURRENT_COMMAND,
                                         COMMAND_ID_CONFLICT,
@@ -104,7 +105,7 @@ public class ConsoleErrors {
             status = 409;
             code = "SANDBOX_REQUEST_CONFLICT";
         }
-        if (status == 500)
+        if (status >= 500)
             LoggerFactory.getLogger(ConsoleErrors.class)
                     .error("Console failure {} ({})", correlation(request), code, failure);
         return ResponseEntity.status(status)

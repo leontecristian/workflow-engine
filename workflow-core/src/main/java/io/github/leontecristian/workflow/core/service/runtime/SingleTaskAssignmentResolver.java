@@ -4,5 +4,6 @@ import io.github.leontecristian.workflow.core.dto.runtime.SingleAssignmentResult
 /** A real zero-input SINGLE resolver, read-only with respect to workflow state. IDs are stable and exact. */
 public interface SingleTaskAssignmentResolver {
     String identifier();
+    java.util.Set<io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind> targetKinds();
     SingleAssignmentResult resolve(AssignmentContext context);
 }

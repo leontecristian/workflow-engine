@@ -74,7 +74,7 @@ class ConsoleInstanceGraphUnitTest {
     private final ViewerWire wire = new ViewerWire();
     private final WorkflowInstanceGraphService graphs =
             new WorkflowInstanceGraphService(
-                    new ConsoleViewerAccess(new ConsoleRuntimeAccess(reads, context), reads), definitions, reads, wire);
+                    new ConsoleViewerAccess(new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class)), reads), definitions, reads, wire);
 
     private WorkflowInstanceView instance(InstanceStatus status, long sequence) {
         return new WorkflowInstanceView(
@@ -203,7 +203,7 @@ class ConsoleInstanceGraphUnitTest {
         when(context.admin()).thenReturn(false);
         when(context.actor()).thenReturn("reviewer");
         var task = mock(WorkflowTaskView.class);
-        when(task.assignedUserRef()).thenReturn("reviewer");
+        when(task.assignment()).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER, "reviewer"));
         when(task.activityId()).thenReturn(ACTIVITY);
         when(reads.listTasks(ID, 0, 100)).thenReturn(new WorkflowTaskPage(List.of(task), null));
         assertEquals(State.ACTIVE, graphs.find(ID).nodes().get(1).state());
@@ -215,9 +215,9 @@ class ConsoleInstanceGraphUnitTest {
         when(context.admin()).thenReturn(false);
         when(context.actor()).thenReturn("earlier-reviewer");
         var earlier = mock(WorkflowTaskView.class);
-        when(earlier.assignedUserRef()).thenReturn("earlier-reviewer");
+        when(earlier.assignment()).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER, "earlier-reviewer"));
         var later = mock(WorkflowTaskView.class);
-        when(later.assignedUserRef()).thenReturn("later-reviewer");
+        when(later.assignment()).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER, "later-reviewer"));
         when(reads.listTasks(ID, 0, 100)).thenReturn(new WorkflowTaskPage(List.of(earlier,later), null));
         when(later.activityId()).thenReturn(ACTIVITY);
         var node = graphs.find(ID).nodes().get(1);
@@ -252,7 +252,7 @@ class ConsoleInstanceGraphUnitTest {
         var assigned = mock(WorkflowTaskView.class);
         when(assigned.id()).thenReturn(TASK + 1);
         when(assigned.activityId()).thenReturn(ACTIVITY);
-        when(assigned.assignedUserRef()).thenReturn("reviewer");
+        when(assigned.assignment()).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER, "reviewer"));
         when(reads.listTasks(ID, 0, 100)).thenReturn(new WorkflowTaskPage(List.of(assigned), null));
         var node = graphs.find(ID).nodes().get(1);
         assertEquals(ACTIVITY, node.activityId());
@@ -324,6 +324,6 @@ class ConsoleInstanceGraphUnitTest {
         verifyNoInteractions(definitions);
         assertEquals(
                 InstanceStatus.CANCELLED,
-                new ConsoleRuntimeAccess(reads, context).instance(ID).status());
+                new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class)).instance(ID).status());
     }
 }

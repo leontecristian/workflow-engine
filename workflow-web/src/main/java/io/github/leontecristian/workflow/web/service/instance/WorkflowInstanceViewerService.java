@@ -28,6 +28,7 @@ public class WorkflowInstanceViewerService {
     public String event(long id, long sequence) {
         access.requireInstanceRead(id); access.requireHistoryRead(id);
         var event = reads.findHistoryEvent(id, sequence).orElseThrow(WorkflowViewerException::missing);
+        access.requireHistoryEventRead(event.summary());
         if (!wire.fits(event.detailsJson(), 4 * 1024 * 1024)) throw new WorkflowViewerException(422, "LIMIT_EXCEEDED");
         var json = wire.json(event);
         if (json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 8 * 1024 * 1024)

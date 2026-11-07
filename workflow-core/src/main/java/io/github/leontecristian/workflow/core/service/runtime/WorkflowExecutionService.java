@@ -64,6 +64,7 @@ public class WorkflowExecutionService {
     private final TaskTypeCatalogService catalog;
     private final RuntimeJson json;
     private final RuntimeHostSupport host;
+    private final WorkflowTaskEligibilityService eligibility;
     private final RuntimeDefinitionPins pins;
     private final RuntimeVariables variables;
     private final RuntimeServiceProgression services;
@@ -72,7 +73,8 @@ public class WorkflowExecutionService {
     public WorkflowExecutionService(WorkflowInstanceRepository instances, WorkflowActivityRepository activities,
             WorkflowTaskRepository tasks, WorkflowHistoryRepository history, WorkflowCommandReceiptRepository receipts,
             EntityManager entityManager, WorkflowDefinitionRuntimeReader definitions, TaskTypeCatalogService catalog,
-            RuntimeJson json, RuntimeHostSupport host, RuntimeDefinitionPins pins, RuntimeVariables variables, RuntimeServiceProgression services) {
+            RuntimeJson json, RuntimeHostSupport host, RuntimeDefinitionPins pins, RuntimeVariables variables, RuntimeServiceProgression services, WorkflowTaskEligibilityService eligibility) {
+        this.eligibility = eligibility;
         this.variables=variables; this.services=services;
         this.instances = instances; this.activities = activities; this.tasks = tasks; this.history = history; this.receipts = receipts;
         this.entityManager = entityManager; this.definitions = definitions; this.catalog = catalog; this.json = json; this.host = host; this.pins = pins;
@@ -156,7 +158,6 @@ public class WorkflowExecutionService {
             entityManager.refresh(activity); entityManager.refresh(task);
             RuntimeInputs.require(task.getActivityId().equals(activity.getId()) && activity.getInstanceId().equals(instance.getId()), Category.INVALID_STATE);
             RuntimeInputs.require(activity.getStatus() == ActivityStatus.ACTIVE && task.getStatus() == TaskStatus.OPEN, Category.INVALID_STATE);
-            RuntimeInputs.require(task.getAssignedUserRef().equals(context.actorRef()), Category.NOT_ASSIGNED);
             var definition = pins.load(instance);
             definitions.requireCapabilities(definition, false);
             var model = definition.model();
@@ -174,14 +175,8 @@ public class WorkflowExecutionService {
                     .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
             RuntimeInputs.require("TASK_CREATED".equals(created.getEventType()) && task.getId().equals(created.getTaskId())
                     && activity.getId().equals(created.getActivityId()), Category.HOST_CONFIGURATION);
-            RuntimeInputs.require(created.getDetailsSchemaVersion() == 2, Category.UNSUPPORTED_VERSION);
-            var assignmentEvidence = json.tree(created.getDetailsJson());
-            RuntimeInputs.require(assignmentEvidence.isObject() && assignmentEvidence.size() == 2
-                    && assignmentEvidence.path("taskKey").isTextual() && assignmentEvidence.path("assignedUserRef").isTextual()
-                    && task.getTaskKey().equals(assignmentEvidence.path("taskKey").textValue())
-                    && task.getAssignedUserRef().equals(assignmentEvidence.path("assignedUserRef").textValue())
-                    && task.getCreatedAt().equals(created.getOccurredAt()),
-                    Category.HOST_CONFIGURATION);
+            RuntimeInputs.require(created.getDetailsSchemaVersion() == 2 || created.getDetailsSchemaVersion() == 3, Category.UNSUPPORTED_VERSION);
+            RuntimeInputs.require(RuntimeTaskCreationEvidence.matches(created, task, json), Category.HOST_CONFIGURATION);
             var entered = history.findById(new WorkflowHistoryId(instance.getId(), activity.getActivationSequence()))
                     .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
             RuntimeInputs.require("ACTIVITY_ENTERED".equals(entered.getEventType()) && activity.getId().equals(entered.getActivityId())
@@ -193,6 +188,7 @@ public class WorkflowExecutionService {
             RuntimeInputs.require(!selectedOutcome.requiresComment() || (command.comment() != null && !command.comment().isBlank()), Category.INVALID_INPUT);
             var time = RuntimeInputs.context(context);
             RuntimeInputs.require(!time.isBefore(instance.getStartedAt()) && !time.isBefore(activity.getEnteredAt()) && !time.isBefore(task.getCreatedAt()), Category.INVALID_INPUT);
+            RuntimeInputs.require(eligibility.isEligible(RuntimeViews.task(task, activity), context.actorRef()), Category.NOT_ASSIGNED);
             task.complete(command.outcomeKey(), time, context.actorRef()); activity.complete(command.outcomeKey(), time, context.actorRef());
             RuntimeHistoryBatch batch = new RuntimeHistoryBatch(entityManager, json, instance.getId(), definition.versionId(), command.commandId(), context);
             var submitted = json.object(); submitted.put("outcomeKey", command.outcomeKey()); submitted.put("comment", command.comment()); submitted.putObject("inputs");
@@ -248,13 +244,14 @@ public class WorkflowExecutionService {
         long activation=RuntimeProgression.advance(batch.last(),1);
         var activity=new WorkflowActivityEntity(instance.getId(),human.key(),activation,taskType.id(),assignment.reviewRevisionRef(),time);
         entityManager.persist(activity);
-        var task=new WorkflowTaskEntity(activity.getId(),resolved.taskKey(),resolved.assignedUserRef(),time); entityManager.persist(task);
+        var task=new WorkflowTaskEntity(activity.getId(),resolved.taskKey(),resolved.assignment(),time); entityManager.persist(task);
         var entered=json.object(); entered.put("nodeKey",human.key()); entered.put("activationSequence",Long.toString(activation));
         entered.put("taskTypeId",Long.toString(taskType.id())); entered.put("taskTypeCode",taskType.code());
         entered.put("completionPolicy","SINGLE"); entered.put("requiredTaskCount",1); entered.put("reviewRevisionRef",assignment.reviewRevisionRef());
         batch.next("ACTIVITY_ENTERED",activity.getId(),null,null,entered,Map.of());
-        Map<String,String> created=Map.of("taskKey",resolved.taskKey(),"assignedUserRef",resolved.assignedUserRef());
-        batch.next("TASK_CREATED",activity.getId(),task.getId(),null,created,created);
+        var created = json.object(); created.put("taskKey", resolved.taskKey()); created.set("assignment", json.tree(json.encode(resolved.assignment())));
+        batch.next("TASK_CREATED",activity.getId(),task.getId(),null,created,
+                Map.of("taskKey",resolved.taskKey(),"assignmentKind",resolved.assignment().kind().name(),"assignmentRef",resolved.assignment().ref()));
         return new EnteredStage(activity,task);
     }
 
@@ -286,7 +283,7 @@ public class WorkflowExecutionService {
         entityManager.flush(); // Capture actual final managed token after every instance update, not a predicted increment.
         WorkflowExecutionResult result = snapshot(commandId, operation, definition, instance, activity, task, first);
         entityManager.persist(new WorkflowCommandReceiptEntity(commandId, instance.getId(), operation.name(), context.actorKind(), context.actorRef(),
-                fingerprint, fingerprintVersion, RuntimeInputs.context(context), json.evidence(result), (short)3));
+                fingerprint, fingerprintVersion, RuntimeInputs.context(context), json.evidence(result), (short)4));
         entityManager.flush(); // Detect a receipt-PK loser before invoking the durable recorder; never recover in this transaction.
         host.record(recorder, batch.events());
         entityManager.flush();

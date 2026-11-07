@@ -56,12 +56,13 @@ public class WorkflowInstanceViewerController {
             switch (e.category()) {
                 case INVALID_INPUT -> { status = 400; code = "INVALID_INPUT"; }
                 case NOT_FOUND -> { status = 404; code = "NOT_FOUND"; }
+                case ASSIGNMENT_LOOKUP_FAILED -> { status = 503; code = "ASSIGNMENT_LOOKUP_FAILED"; }
                 case LIMIT_EXCEEDED -> { status = 422; code = "LIMIT_EXCEEDED"; }
                 default -> { status = 500; code = "HOST_CONFIGURATION"; }
             }
         }
         Object correlation = options.correlationAttribute() == null ? null : request.getAttribute(options.correlationAttribute());
-        if (status == 500)
+        if (status >= 500)
             LOG.error("Workflow viewer failure {} ({})", correlation instanceof String value ? value : null, code, failure);
         return ResponseEntity.status(status).header("Content-Type", "application/json")
                 .body(wire.json(new Failure(code, code, List.of(), correlation instanceof String value ? value : null)));

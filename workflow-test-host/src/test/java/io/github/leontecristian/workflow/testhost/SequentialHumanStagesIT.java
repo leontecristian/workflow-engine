@@ -324,6 +324,7 @@ class SequentialHumanStagesIT extends DatabaseIntegrationTest {
         @Bean StageHost stageHost(JdbcTemplate jdbc, ConsoleEventStore outbox, ConsoleWire wire, org.springframework.beans.factory.ObjectProvider<WorkflowRuntimeQueryService> reads) { return new StageHost(jdbc,outbox,wire,reads); }
     }
     static class StageHost implements DefinitionCapabilityProvider, SingleTaskAssignmentResolver, WorkflowServiceAction, WorkflowEventRecorder {
+        @Override public Set<io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind> targetKinds() { return Set.of(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER); }
         volatile String code, failureNode="", failure="";
         volatile boolean failRecorder, distinct;
         volatile CountDownLatch entered, release;
@@ -331,16 +332,16 @@ class SequentialHumanStagesIT extends DatabaseIntegrationTest {
         private final JdbcTemplate jdbc; private final ConsoleEventStore outbox; private final ConsoleWire wire; private final org.springframework.beans.factory.ObjectProvider<WorkflowRuntimeQueryService> readers;
         StageHost(JdbcTemplate jdbc,ConsoleEventStore outbox,ConsoleWire wire,org.springframework.beans.factory.ObjectProvider<WorkflowRuntimeQueryService> readers) { this.jdbc=jdbc; this.outbox=outbox; this.wire=wire; this.readers=readers; }
         public String identifier() { return "f011.reviewer"; }
-        public DefinitionCapabilities snapshot() { return new DefinitionCapabilities(Set.of(new SingleAssignmentCapability(identifier())),code==null?Set.of():Set.of(new TaskTypeCapability(code,Set.of("APPROVE","REJECT")))); }
+        public DefinitionCapabilities snapshot() { return new DefinitionCapabilities(Set.of(new SingleAssignmentCapability(identifier(), Set.of(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER))),code==null?Set.of():Set.of(new TaskTypeCapability(code,Set.of("APPROVE","REJECT")))); }
         public SingleAssignmentResult resolve(AssignmentContext context) {
             assignments.add(context);
             if(context.humanNodeKey().equals(failureNode)) switch(failure) {
                 case "exception" -> throw new IllegalStateException("Assignment failure");
                 case "empty" -> { return new SingleAssignmentResult(List.of(),null); }
-                case "multiple" -> { return new SingleAssignmentResult(List.of(new ResolvedTask("review","reviewer"),new ResolvedTask("other","reviewer")),null); }
+                case "multiple" -> { return new SingleAssignmentResult(List.of(new ResolvedTask("review", new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER, "reviewer")),new ResolvedTask("other", new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER, "reviewer"))),null); }
                 case "missing" -> { return new SingleAssignmentResult(List.of(new ResolvedTask("review",null)),null); }
             }
-            return new SingleAssignmentResult(List.of(new ResolvedTask("review",distinct?context.humanNodeKey():"reviewer")),"revision-"+context.humanNodeKey());
+            return new SingleAssignmentResult(List.of(new ResolvedTask("review", new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER, distinct?context.humanNodeKey():"reviewer"))),"revision-"+context.humanNodeKey());
         }
         public ServiceActionDescriptor descriptor() { return new ServiceActionDescriptor("f011.effect",List.of(),List.of(new ActionField("data",VariableValueType.JSON,true,false))); }
         public ServiceActionResult execute(ServiceActionContext context,Map<String,WorkflowValue> inputs) {

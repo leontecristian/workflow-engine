@@ -11,7 +11,8 @@ public interface RuntimeTaskRow {
     Long getInstanceId();
     Long getTaskTypeId();
     String getTaskKey();
-    String getAssignedUserRef();
+    io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind getAssignmentKind();
+    String getAssignmentRef();
     TaskStatus getStatus();
     String getOutcomeKey();
     LocalDateTime getCreatedAt();

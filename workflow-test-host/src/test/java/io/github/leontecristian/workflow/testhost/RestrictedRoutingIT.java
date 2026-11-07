@@ -631,16 +631,17 @@ class RestrictedRoutingIT extends DatabaseIntegrationTest {
         }
     }
     static class TestHost implements DefinitionCapabilityProvider,SingleTaskAssignmentResolver,WorkflowServiceAction,WorkflowEventRecorder {
+        @Override public Set<io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind> targetKinds() { return Set.of(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER); }
         final Set<String> taskCodes=ConcurrentHashMap.newKeySet(); final AtomicBoolean failRecorder=new AtomicBoolean();
         volatile CountDownLatch entered,release;
         private final JdbcTemplate jdbc; private final ConsoleEventStore outbox; private final ConsoleWire wire;
         TestHost(JdbcTemplate jdbc,ConsoleEventStore outbox,ConsoleWire wire) { this.jdbc=jdbc; this.outbox=outbox; this.wire=wire; }
         @Override public DefinitionCapabilities snapshot() {
             var types=new HashSet<TaskTypeCapability>(); taskCodes.forEach(code->types.add(new TaskTypeCapability(code,Set.of("COMPLETE", "APPROVE", "REJECT"))));
-            return new DefinitionCapabilities(Set.of(new SingleAssignmentCapability(identifier())),types);
+            return new DefinitionCapabilities(Set.of(new SingleAssignmentCapability(identifier(), Set.of(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER))),types);
         }
         @Override public String identifier() { return "f008.reviewer"; }
-        @Override public SingleAssignmentResult resolve(AssignmentContext context) { return new SingleAssignmentResult(List.of(new ResolvedTask("review","f008-reviewer")),null); }
+        @Override public SingleAssignmentResult resolve(AssignmentContext context) { return new SingleAssignmentResult(List.of(new ResolvedTask("review", new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER, "f008-reviewer"))),null); }
         @Override public ServiceActionDescriptor descriptor() { return new ServiceActionDescriptor("f008.record",
                 List.of(new ActionField("quantity",VariableValueType.LONG,true,false)),List.of(new ActionField("recordedQuantity",VariableValueType.LONG,true,false))); }
         @Override public ServiceActionResult execute(ServiceActionContext context,Map<String,WorkflowValue> inputs) {

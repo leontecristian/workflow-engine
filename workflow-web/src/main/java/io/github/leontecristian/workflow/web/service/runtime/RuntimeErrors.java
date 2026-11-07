@@ -27,6 +27,7 @@ public class RuntimeErrors {
                 case INVALID_INPUT -> 400;
                 case NOT_FOUND -> 404;
                 case NOT_ASSIGNED -> 403;
+                case ASSIGNMENT_LOOKUP_FAILED -> 503;
                 case STALE_VERSION, CONCURRENT_COMMAND, COMMAND_ID_CONFLICT, INVALID_STATE -> 409;
                 case LIMIT_EXCEEDED, UNINITIALIZED_VARIABLE, ROUTE_NOT_FOUND,
                         EXPRESSION_EVALUATION_FAILED, EXPRESSION_LIMIT_EXCEEDED -> 422;
@@ -36,7 +37,7 @@ public class RuntimeErrors {
                 || failure instanceof org.springframework.http.InvalidMediaTypeException) {
             status = 400; code = "INVALID_INPUT";
         }
-        if (status == 500) org.slf4j.LoggerFactory.getLogger(RuntimeErrors.class)
+        if (status >= 500) org.slf4j.LoggerFactory.getLogger(RuntimeErrors.class)
                 .error("Workflow runtime failure {} ({})", correlation(request), code, failure);
         return ResponseEntity.status(status).header("Content-Type", "application/json")
                 .body(wire.json(new Failure(code, code, List.of(), correlation(request))));

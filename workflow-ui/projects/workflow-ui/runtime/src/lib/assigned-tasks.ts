@@ -9,11 +9,11 @@ export class WorkflowAssignedTasksComponent extends RuntimeState {
     title: this.messages.assignedTitle,
     eyebrow: "YOUR WORKSPACE",
     description:
-      "Your directly assigned open tasks, read from the workflow engine.",
+      "Your eligible open tasks, read from the workflow engine.",
     icon: "tasks",
     listTitle: "Assigned to you",
     listDescription:
-      "Only your authenticated account’s stored assignments appear here.",
+      "Tasks available to your authenticated account appear here.",
   };}
   rows = signal<TaskView[]>([]);
   next: string | null = null;

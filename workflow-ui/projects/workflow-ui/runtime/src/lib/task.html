@@ -10,7 +10,7 @@
       <div>
         <div class="eyebrow">TASK #{{id}}</div>
         <h2>{{detail()?.taskKey}}</h2>
-        <p>Assigned to <strong>{{detail()?.assignedUserRef}}</strong></p>
+        <p>Assigned to <strong>{{detail()?.assignment?.kind}}: {{contract()?.assignmentLabel || detail()?.assignment?.ref}}</strong></p>
       </div>
       <console-status [value]="detail()?.status" /></div></mat-card-header
   ><mat-card-content
@@ -23,10 +23,10 @@
         <console-icon name="refresh" /> Refresh
       </button>
     </div>
-    <console-details [value]="detail()" />
-    @if(commands.buffer.command){<a mat-button [routerLink]="link({kind:'commands'})">Command recovery</a>}</mat-card-content
+    @if(diagnosticsEnabled){<console-details [value]="detail()" />}
+    @if(diagnosticsEnabled && commands.buffer.command){<a mat-button [routerLink]="link({kind:'commands'})">Command recovery</a>}</mat-card-content
 ></mat-card>
-@if(!commandProvider){<mat-card appearance="outlined"><mat-card-header><h2>Pinned contract</h2></mat-card-header><mat-card-content><console-details [value]="contract()" /></mat-card-content></mat-card>}
+@if(!commandProvider && diagnosticsEnabled){<mat-card appearance="outlined"><mat-card-header><h2>Pinned contract</h2></mat-card-header><mat-card-content><console-details [value]="contract()" /></mat-card-content></mat-card>}
 <div class="two-column">
 @if(commandProvider){
   <mat-card appearance="outlined"
@@ -35,16 +35,16 @@
         <div class="eyebrow">PINNED CONTRACT · {{contract()?.taskType}}</div>
         <h2>Complete your task</h2>
         <p>
-          Your stored assignment and the current instance token are checked by
-          the engine.
+          Your eligibility is checked when you complete the task.
         </p>
       </div></mat-card-header
     ><mat-card-content>
+      @if(contract() && !contract()?.canComplete && detail()?.status === 'OPEN'){<p>You cannot complete this task with your current access.</p>}
       <mat-form-field appearance="outline" class="full-width"
         ><mat-label>Comment</mat-label
         ><textarea
           matInput
-          [disabled]="busy() || !sessionScope || !detail() || !contract() || detail()?.status !== 'OPEN'"
+          [disabled]="busy() || !sessionScope || !detail() || !contract() || detail()?.status !== 'OPEN' || !contract()?.canComplete || uncertain"
           [(ngModel)]="comment"
           maxlength="2000"
           rows="4"
@@ -53,34 +53,34 @@
           >{{comment.length}} / 2000</mat-hint
         ></mat-form-field
       >
-      <div class="form-footer">
+      @if(diagnosticsEnabled){<div class="form-footer">
         <span class="muted"
           >Expected token <code>{{contract()?.instanceLockVersion}}</code></span
         >
       </div>
-      <div class="actions">
+      }<div class="actions">
         @for(o of contract()?.outcomes || []; track o.key) {
           <button mat-flat-button (click)="complete(o.key)"
-            [disabled]="busy() || !contract() || detail()?.status !== 'OPEN' || (o.requiresComment && commentBlank())">
+            [disabled]="busy() || !contract() || detail()?.status !== 'OPEN' || !contract()?.canComplete || uncertain || (o.requiresComment && commentBlank())">
             {{o.label}}{{o.requiresComment ? ' - comment required' : ''}}
           </button>
         }
       </div>
       <p class="muted">Actions marked "comment required" need a reason in the shared comment field.</p>
-      <mat-expansion-panel class="evidence-panel"
+      @if(diagnosticsEnabled){<mat-expansion-panel class="evidence-panel"
         ><mat-expansion-panel-header
           ><mat-panel-title
             >Exact completion contract</mat-panel-title
           ></mat-expansion-panel-header
         >
         <pre>{{contract() | json}}</pre>
-      </mat-expansion-panel>
+      </mat-expansion-panel>}
     </mat-card-content></mat-card
   >}
 <mat-card appearance="outlined"
     ><mat-card-header><h2>Accepted submission</h2></mat-card-header
     ><mat-card-content
-      >@if(submission()){<console-details [value]="submission()" />}@else{
+      >@if(submission()){@if(diagnosticsEnabled){<console-details [value]="submission()" />}@else{<p>Outcome: {{submission()?.outcomeKey}}</p><p>Submitted by {{submission()?.actorRef}}</p>@if(submission()?.comment){<p>{{submission()?.comment}}</p>}}}@else{
       <div class="empty-state small">
         <console-icon name="file" />
         <h3>No accepted submission</h3>

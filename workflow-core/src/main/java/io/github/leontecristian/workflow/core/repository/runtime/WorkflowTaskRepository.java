@@ -20,7 +20,7 @@ public interface WorkflowTaskRepository extends Repository<WorkflowTaskEntity, L
 
     String TASK_PAGE_SELECT = """
             select t.id as id, t.activityId as activityId, a.instanceId as instanceId,
-                a.taskTypeId as taskTypeId, t.taskKey as taskKey, t.assignedUserRef as assignedUserRef,
+                a.taskTypeId as taskTypeId, t.taskKey as taskKey, t.assignmentKind as assignmentKind, t.assignmentRef as assignmentRef,
                 t.status as status, t.outcomeKey as outcomeKey, t.createdAt as createdAt,
                 t.dueAt as dueAt, t.closedAt as closedAt, t.closedBy as closedBy,
                 t.closureReason as closureReason
@@ -36,14 +36,24 @@ public interface WorkflowTaskRepository extends Repository<WorkflowTaskEntity, L
     // SQL Server equality pads trailing spaces, including under BIN2. The byte count is
     // derived from validated UTF-16 input, not the driver's VARCHAR/NVARCHAR parameter binding.
     @Query(TASK_PAGE_SELECT + """
-            where t.assignedUserRef = :assignee
-              and function('datalength', t.assignedUserRef) = :assigneeBytes
+            where t.assignmentKind = io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER
+              and t.assignmentRef = :assignee
+              and function('datalength', t.assignmentRef) = :assigneeBytes
               and t.status = io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.OPEN
               and t.id > :afterId order by t.id asc
             """)
     List<RuntimeTaskRow> findAssignedPage(@Param("assignee") String assignee,
                                              @Param("assigneeBytes") int assigneeBytes,
                                              @Param("afterId") long afterId, Pageable pageable);
+
+    @Query(TASK_PAGE_SELECT + """
+            where t.status = io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.OPEN
+              and (t.assignmentKind <> io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER
+                or (t.assignmentRef = :actorRef and function('datalength', t.assignmentRef) = :actorRefBytes))
+              and t.id > :afterId order by t.id asc
+            """)
+    List<RuntimeTaskRow> findEligibleCandidatesPage(@Param("actorRef") String actorRef,
+            @Param("actorRefBytes") int actorRefBytes, @Param("afterId") long afterId, Pageable pageable);
 
     @Query("""
             select t from WorkflowTaskEntity t where t.activityId = :activityId

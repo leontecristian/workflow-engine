@@ -82,7 +82,7 @@ public class ConsoleSessionController {
                         "reviewer",
                         settings.reviewer,
                         "singleAssignments",
-                        settings.sample ? new String[] {"sandbox.singleReviewer"} : new String[] {},
+                        settings.sample ? new String[] {"sandbox.singleReviewer", "sandbox.sharedGroupReviewer", "sandbox.sharedRoleReviewer"} : new String[] {},
                         "taskTypes",
                         settings.sample
                                 ? Map.of("SANDBOX_REVIEW", new String[] {"COMPLETE", "APPROVE", "REJECT"})

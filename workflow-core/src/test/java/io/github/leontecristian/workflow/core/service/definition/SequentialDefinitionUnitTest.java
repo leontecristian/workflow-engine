@@ -99,16 +99,16 @@ class SequentialDefinitionUnitTest {
         when(catalog.findByCode("SANDBOX_REVIEW")).thenReturn(Optional.of(new TaskTypeView(1,"SANDBOX_REVIEW","Review",null,true,0)));
         when(catalog.findByCode("LATER")).thenReturn(Optional.of(new TaskTypeView(2,"LATER","Later",null,true,0)));
         var supported=new java.util.concurrent.atomic.AtomicReference<>(Set.of(new TaskTypeCapability("SANDBOX_REVIEW",Set.of("APPROVE","REJECT"))));
-        DefinitionCapabilityProvider provider=()->new DefinitionCapabilities(Set.of(new SingleAssignmentCapability("sandbox.singleReviewer")),supported.get());
+        DefinitionCapabilityProvider provider=()->new DefinitionCapabilities(Set.of(new SingleAssignmentCapability("sandbox.singleReviewer", java.util.Set.of(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER))),supported.get());
         ObjectProvider<DefinitionCapabilityProvider> providers=mock(ObjectProvider.class);
         when(providers.stream()).thenAnswer(call->java.util.stream.Stream.of(provider));
-        var validation=new DefinitionValidationService(catalog,providers,loader,mock(ServiceActionRegistry.class));
+        var validation=new DefinitionValidationService(catalog,providers,loader,mock(ServiceActionRegistry.class),mock(io.github.leontecristian.workflow.core.service.runtime.RuntimeHostSupport.class));
         var missing=validation.check(codec.ingest(root.toString()),false);
         assertThat(missing.report().diagnostics()).anyMatch(d->d.code().equals("WF_DEF_HOST_CAPABILITY_UNAVAILABLE"));
         supported.set(Set.of(new TaskTypeCapability("SANDBOX_REVIEW",Set.of("APPROVE","REJECT")),new TaskTypeCapability("LATER",Set.of("APPROVE","REJECT"))));
         var accepted=validation.check(codec.ingest(root.toString()),false);
         assertThat(accepted.report().diagnostics()).isEmpty();
         assertThat(accepted.contextHash()).isNotEqualTo(missing.contextHash());
-        assertThat(accepted.detailsJson()).contains("wf-sequential-human-validator-v1","MANAGER","PARTNER");
+        assertThat(accepted.detailsJson()).contains("wf-shared-assignment-validator-v1","MANAGER","PARTNER");
     }
 }

@@ -82,12 +82,12 @@ class HumanOutcomesUnitTest {
                 new io.github.leontecristian.workflow.core.dto.tasktype.TaskTypeView(1, "REVIEW", "Review", null, true, 0)));
         var supported = new java.util.concurrent.atomic.AtomicReference<>(java.util.Set.of("O0"));
         DefinitionCapabilityProvider provider = () -> new io.github.leontecristian.workflow.core.dto.definition.DefinitionCapabilities(
-                java.util.Set.of(new io.github.leontecristian.workflow.core.dto.definition.SingleAssignmentCapability("reviewer")),
+                java.util.Set.of(new io.github.leontecristian.workflow.core.dto.definition.SingleAssignmentCapability("reviewer", java.util.Set.of(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER))),
                 java.util.Set.of(new io.github.leontecristian.workflow.core.dto.definition.TaskTypeCapability("REVIEW", supported.get())));
         org.springframework.beans.factory.ObjectProvider<DefinitionCapabilityProvider> providers = mock(org.springframework.beans.factory.ObjectProvider.class);
         when(providers.stream()).thenAnswer(call -> java.util.stream.Stream.of(provider));
         var actions = mock(io.github.leontecristian.workflow.core.service.runtime.ServiceActionRegistry.class);
-        var validation = new DefinitionValidationService(catalog, providers, loader, actions);
+        var validation = new DefinitionValidationService(catalog, providers, loader, actions, mock(io.github.leontecristian.workflow.core.service.runtime.RuntimeHostSupport.class));
         var document = codec.ingest(fixture(2, "plain").toString());
         var unavailable = validation.check(document, false);
         assertThat(unavailable.report().diagnostics()).anyMatch(d -> d.code().equals("WF_DEF_HOST_CAPABILITY_UNAVAILABLE"));
@@ -95,7 +95,7 @@ class HumanOutcomesUnitTest {
         var ready = validation.check(document, false);
         assertThat(ready.report().diagnostics()).isEmpty();
         assertThat(ready.contextHash()).isNotEqualTo(unavailable.contextHash());
-        assertThat(json.readTree(ready.detailsJson()).path("provenance").path("validator").asText()).isEqualTo("wf-sequential-human-validator-v1");
+        assertThat(json.readTree(ready.detailsJson()).path("provenance").path("validator").asText()).isEqualTo("wf-shared-assignment-validator-v1");
         assertThat(json.readTree(ready.detailsJson()).path("provenance").path("structuralSchemaHash").asText()).isEqualTo(loader.schemaDigest(document.tree()));
         var model = loader.model(document, new DefinitionDiagnostics());
         var definition = new io.github.leontecristian.workflow.core.dto.definition.document.ExecutableDefinition(1, 1, "review", 1, "hash",

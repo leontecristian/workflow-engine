@@ -79,6 +79,8 @@ public class ConsoleSecurity {
                             .password(encoder.encode(settings.reviewerPassword))
                             .roles("CONSOLE_REVIEWER")
                             .build());
+            users.put(settings.reviewer2, User.withUsername(settings.reviewer2)
+                    .password(encoder.encode(settings.reviewer2Password)).roles("CONSOLE_REVIEWER").build());
         }
         return username -> {
             UserDetails user = users.get(username);

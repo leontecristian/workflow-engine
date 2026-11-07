@@ -40,9 +40,10 @@ test("completion captures original instance token and assignment-specific task I
   const { page } = component(t, TaskPage, {}, routeAt(), undefined, [
     { provide: CommandRecovery, useValue: commands },
   ]);
+  page.diagnosticsEnabled = true;
   page.id = "9223372036854775807";
   page.detail.set({ instanceId: "9007199254740993", status: "OPEN" });
-  page.contract.set({ instanceLockVersion: "9007199254740999", outcomes: [{key:"COMPLETE", label:"Complete", requiresComment:false}] });
+  page.contract.set({ instanceLockVersion: "9007199254740999", canComplete: true, outcomes: [{key:"COMPLETE", label:"Complete", requiresComment:false}] });
   page.outcome = "COMPLETE";
   page.comment = "Original";
   await page.complete("COMPLETE");
@@ -59,13 +60,14 @@ test("completion captures original instance token and assignment-specific task I
 test("outcome actions require their own comments, explicit keys and an open task", async (t) => {
   const buffer = new CommandBuffer();
   let calls = 0;
-  const commands = { buffer, async execute() { calls++; throw new Error("Unknown transport outcome"); } };
+  const commands = { buffer, observations: new Map(), async execute() { calls++; throw new Error("Unknown transport outcome"); } };
   const { page } = component(t, TaskPage, {}, routeAt(), undefined, [
     { provide: CommandRecovery, useValue: commands },
   ]);
+  page.diagnosticsEnabled = true;
   page.id = "3";
   page.detail.set({ instanceId: "1", status: "OPEN" });
-  page.contract.set({ instanceLockVersion: "2", outcomes: [
+  page.contract.set({ instanceLockVersion: "2", canComplete: true, outcomes: [
     { key: "REJECT", label: "Reject", requiresComment: true },
     { key: "APPROVE", label: "Approve", requiresComment: false },
   ] });
@@ -94,13 +96,14 @@ test("outcome actions require their own comments, explicit keys and an open task
 test("pending completion freezes one outcome and blocks other action clicks", async (t) => {
   const buffer = new CommandBuffer();
   let release;
-  const commands = { buffer, execute: () => new Promise((resolve) => { release = resolve; }) };
+  const commands = { buffer, observations: new Map(), execute: () => new Promise((resolve) => { release = resolve; }) };
   const { page } = component(t, TaskPage, {}, routeAt(), undefined, [
     { provide: CommandRecovery, useValue: commands },
   ]);
+  page.diagnosticsEnabled = true;
   page.id = "3";
   page.detail.set({ instanceId: "1", status: "OPEN" });
-  page.contract.set({ instanceLockVersion: "2", outcomes: [
+  page.contract.set({ instanceLockVersion: "2", canComplete: true, outcomes: [
     { key: "APPROVE", label: "Approve", requiresComment: false },
     { key: "REJECT", label: "Reject", requiresComment: true },
   ] });
@@ -155,4 +158,22 @@ test('read-only consumer has no execution provider and refuses completion',async
  page.detail.set({instanceId:'1',status:'OPEN'});page.contract.set({instanceLockVersion:'2',outcomes:[{key:'APPROVE',label:'Approve',requiresComment:false}]});
  await page.complete('APPROVE');assert.equal(page.commandProvider,null);assert.equal(executions,0);assert.equal(buffer.entries.length,0);
  page.messages={taskTitle:'Host task'};assert.equal(page.meta.title,'Host task');
+});
+
+test('normal completion refreshes and confirms; conflict refreshes; ineligible tasks cannot execute', async t => {
+ const buffer=new CommandBuffer(), observations=new Map(); let calls=0, reads=0, conflict=false;
+ const commands={buffer,observations,async execute(){calls++;if(conflict)throw Object.assign(new Error('conflict'),{httpStatus:409});}};
+ const api={async task(){reads++;return {instanceId:'1',status:'OPEN'};},async taskContract(){return {instanceLockVersion:'2',canComplete:true,outcomes:[{key:'OK',label:'OK',requiresComment:false}]};},async taskSubmission(){return null;}};
+ const {page}=component(t,TaskPage,api,routeAt(),undefined,[{provide:CommandRecovery,useValue:commands}]);
+ page.id='3';await page.load();page.contract.set({...page.contract(),canComplete:false});await page.complete('OK');assert.equal(calls,0);
+ page.contract.set({...page.contract(),canComplete:true});await page.complete('OK');assert.equal(reads,2);assert.equal(page.notice(),'Task completed.');assert.equal(page.diagnosticsEnabled,false);
+ conflict=true;await page.complete('OK');assert.equal(reads,3);assert.match(page.error(),/refreshed/);
+});
+
+test('uncertain completion retains its frozen command and blocks replacement', async t => {
+ const buffer=new CommandBuffer(),observations=new Map();let calls=0;
+ const commands={buffer,observations,async execute(){calls++;observations.set(buffer.command.body.commandId,{outcome:'UNKNOWN_OUTCOME'});throw new Error('network');}};
+ const {page}=component(t,TaskPage,{},routeAt(),undefined,[{provide:CommandRecovery,useValue:commands}]);
+ page.id='3';page.detail.set({instanceId:'1',status:'OPEN'});page.contract.set({instanceLockVersion:'2',canComplete:true,outcomes:[{key:'OK',label:'OK',requiresComment:false}]});
+ await page.complete('OK');const original=buffer.command;await page.complete('OK');assert.equal(calls,1);assert.equal(buffer.command,original);assert.match(page.error(),/outcome is uncertain/i);
 });

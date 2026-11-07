@@ -42,12 +42,12 @@ final class RuntimeHistoryBatch {
         WorkflowHistorySummary fact = new WorkflowHistorySummary(instanceId, sequence, type, commandId, context.correlationId(),
                 context.actorKind(), context.actorRef(), context.occurredAt(), activityId, taskId,
                 transition == null ? null : transition.from(), transition == null ? null : transition.to(),
-                transition == null ? null : transition.key(), (short) 2);
+                transition == null ? null : transition.key(), (short) ("TASK_CREATED".equals(type) ? 3 : 2));
         RuntimeInputs.require(json.encode(new io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistoryEvent(fact,encoded))
                 .getBytes(java.nio.charset.StandardCharsets.UTF_8).length<=8*1024*1024,
                 io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.LIMIT_EXCEEDED);
         entityManager.persist(new WorkflowHistoryEntity(fact, encoded));
-        var event=new WorkflowEvent((short) 1, instanceId + ":" + sequence, commandId, instanceId, definitionVersionId,
+        var event=new WorkflowEvent((short) ("TASK_CREATED".equals(type) ? 2 : 1), instanceId + ":" + sequence, commandId, instanceId, definitionVersionId,
                 sequence, type, context.actorKind(), context.actorRef(), context.occurredAt(), context.correlationId(),
                 activityId, taskId, fact.sourceNodeKey(), fact.targetNodeKey(), fact.transitionKey(), payload);
         json.evidence(event); events.add(event);

@@ -151,13 +151,22 @@ public class RuntimeJson {
         RuntimeInputs.require(receipt.getActorKind() == context.actorKind() && java.util.Objects.equals(receipt.getActorRef(), context.actorRef())
                 && operation.name().equals(receipt.getOperationType()), Category.COMMAND_ID_CONFLICT);
         RuntimeInputs.require(FINGERPRINT_VERSION.equals(receipt.getFingerprintVersion())
-                && Short.valueOf((short)3).equals(receipt.getResultSchemaVersion()),
+                && (Short.valueOf((short)3).equals(receipt.getResultSchemaVersion())
+                    || Short.valueOf((short)4).equals(receipt.getResultSchemaVersion())),
                 Category.UNSUPPORTED_VERSION);
         RuntimeInputs.require(Arrays.equals(receipt.getRequestFingerprint(), fingerprint), Category.COMMAND_ID_CONFLICT);
         JsonNode stored = tree(receipt.getResultJson());
         requireTimeStrings(stored);
         try {
-            WorkflowExecutionResult result = mapper.readValue(receipt.getResultJson(), WorkflowExecutionResult.class);
+            if (receipt.getResultSchemaVersion() == 3) {
+                RuntimeInputs.require(stored.path("task").isObject(), Category.HOST_CONFIGURATION);
+                ObjectNode task = (ObjectNode) stored.path("task");
+                RuntimeInputs.require(!task.has("assignment") && task.path("assignedUserRef").isTextual(), Category.HOST_CONFIGURATION);
+                String ref = task.remove("assignedUserRef").textValue();
+                ObjectNode assignment = object(); assignment.put("kind", "USER"); assignment.put("ref", ref);
+                task.set("assignment", assignment);
+            }
+            WorkflowExecutionResult result = mapper.treeToValue(stored, WorkflowExecutionResult.class);
             verifyResult(result, commandId, operation, receipt);
             return Optional.of(result);
         } catch (IOException | IllegalArgumentException failure) { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION); }
@@ -184,7 +193,8 @@ public class RuntimeJson {
                 && activity.requiredTaskCount() == 1 && activity.contributionOutcomeKey() == null
                 && (activity.reviewRevisionRef() == null || RuntimeInputs.text(activity.reviewRevisionRef(), 200, 200, true))
                 && validTime(activity.enteredAt()) && !activity.enteredAt().isBefore(instance.startedAt()) && activity.enteredAt().equals(task.createdAt())
-                && RuntimeInputs.key(task.taskKey()) && RuntimeInputs.text(task.assignedUserRef(), 200, 200, true) && task.dueAt() == null,
+                && RuntimeInputs.key(task.taskKey()) && task.assignment() != null && task.assignment().kind() != null
+                && RuntimeInputs.text(task.assignment().ref(), 200, 200, true) && task.dueAt() == null,
                 Category.HOST_CONFIGURATION);
         if (operation == WorkflowOperation.START_WORKFLOW) {
             RuntimeInputs.require(instance.status() == InstanceStatus.ACTIVE
@@ -210,7 +220,8 @@ public class RuntimeJson {
                     && activity.closedAt().equals(task.closedAt())
                     && receipt.getActorKind() == ActorKind.USER
                     && receipt.getActorRef().equals(activity.closedBy())
-                    && receipt.getActorRef().equals(task.closedBy()) && receipt.getActorRef().equals(task.assignedUserRef())
+                    && receipt.getActorRef().equals(task.closedBy()) && (task.assignment().kind() != io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER
+                        || receipt.getActorRef().equals(task.assignment().ref()))
                     && "TASK_OUTCOME".equals(activity.closureReason())
                     && task.closureReason() == TaskClosureReason.TASK_OUTCOME
                     && RuntimeInputs.key(task.outcomeKey()) && task.outcomeKey().equals(activity.outcomeKey())

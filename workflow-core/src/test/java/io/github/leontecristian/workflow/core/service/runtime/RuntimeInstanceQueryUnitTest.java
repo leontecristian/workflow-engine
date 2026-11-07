@@ -36,7 +36,7 @@ class RuntimeInstanceQueryUnitTest {
     private final RuntimeDefinitionPins pins = mock(RuntimeDefinitionPins.class);
     private final WorkflowRuntimeQueryService service =
             new WorkflowRuntimeQueryService(
-                    instances, activities, tasks, history, pins, new RuntimeJson(), mock(RuntimeVariables.class));
+                    instances, activities, tasks, history, pins, new RuntimeJson(), mock(RuntimeVariables.class), mock(WorkflowTaskEligibilityService.class));
 
     @Test
     void invalidBoundsFailBeforeAnyStorageWork() {

@@ -1,14 +1,15 @@
 package io.github.leontecristian.workflow.testhost.service.runtime;
 
-import io.github.leontecristian.workflow.web.integration.instance.WorkflowViewerAccess;
-import io.github.leontecristian.workflow.web.dto.instance.ViewerLinkReference;
-import io.github.leontecristian.workflow.web.exception.instance.WorkflowViewerException;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistorySummary;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.testhost.exception.console.ConsoleException;
-import java.util.Set;
+import io.github.leontecristian.workflow.web.dto.instance.ViewerLinkReference;
+import io.github.leontecristian.workflow.web.exception.instance.WorkflowViewerException;
+import io.github.leontecristian.workflow.web.integration.instance.WorkflowViewerAccess;
 import java.util.HashSet;
-import org.springframework.security.core.context.SecurityContextHolder;
+import java.util.Set;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 /** Maps both viewer grants to the sandbox's retained-assignment policy. */
 public class ConsoleViewerAccess implements WorkflowViewerAccess {
@@ -23,6 +24,14 @@ public class ConsoleViewerAccess implements WorkflowViewerAccess {
         catch (ConsoleException e) { throw new WorkflowViewerException(e.status(), e.code()); }
     }
     @Override public void requireHistoryRead(long id) { requireInstanceRead(id); }
+    @Override public void requireHistoryEventRead(WorkflowHistorySummary event) {
+        requireHistoryRead(event.instanceId());
+        if ("TASK_COMPLETED".equals(event.eventType())) {
+            if (event.taskId() == null) throw new WorkflowViewerException(500, "HOST_CONFIGURATION");
+            try { access.task(event.taskId()); }
+            catch (ConsoleException denied) { throw new WorkflowViewerException(denied.status(), denied.code()); }
+        }
+    }
     @Override public Set<ViewerLinkReference> readableLinks(long id, Set<ViewerLinkReference> candidates) {
         try { return links(id, candidates); }
         catch (ConsoleException e) { throw new WorkflowViewerException(e.status(), e.code()); }

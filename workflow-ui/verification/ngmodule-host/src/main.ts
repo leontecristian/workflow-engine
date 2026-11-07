@@ -71,8 +71,8 @@ function administrationFixture(): WorkflowAdministrationApi {
   };
 }
 
-const fixtureTask:TaskView={id:'30',instanceId:id,activityId:'20',taskTypeId:'1',taskKey:'REVIEW',assignedUserRef:'fixture',status:'OPEN',outcomeKey:null,createdAt:instance.startedAt,dueAt:null,closedAt:null,closedBy:null,closureReason:null};
-const fixtureContract:TaskContract={taskId:'30',instanceId:id,instanceLockVersion:instance.lockVersion,taskType:'REVIEW',outcomes:[{key:'APPROVE',label:'Host approve',requiresComment:true}]};
+const fixtureTask:TaskView={id:'30',instanceId:id,activityId:'20',taskTypeId:'1',taskKey:'REVIEW',assignment:{kind:'USER',ref:'fixture'},status:'OPEN',outcomeKey:null,createdAt:instance.startedAt,dueAt:null,closedAt:null,closedBy:null,closureReason:null};
+const fixtureContract:TaskContract={taskId:'30',instanceId:id,instanceLockVersion:instance.lockVersion,taskType:'REVIEW',canComplete:true,assignmentLabel:'Fixture reviewer',outcomes:[{key:'APPROVE',label:'Host approve',requiresComment:true}]};
 function fixtureResult(envelope:Envelope):CommandResult{return {replayed:false,execution:{commandId:envelope.body['commandId']!,operation:'COMPLETE',instance,activity:{id:'20',instanceId:id,nodeKey:'REVIEW',activationSequence:'1',taskTypeId:'1',completionPolicy:'SINGLE',contributionOutcomeKey:null,requiredTaskCount:1,reviewRevisionRef:null,status:'COMPLETED',outcomeKey:'APPROVE',enteredAt:instance.startedAt,closedAt:instance.startedAt,closedBy:'fixture',closureReason:null},task:{...fixtureTask,status:'COMPLETED'},firstHistorySequence:'5',lastHistorySequence:'6'}};}
 @Injectable() class RuntimeReads implements WorkflowRuntimeReads {
  private http=inject(HttpClient);

@@ -1,5 +1,7 @@
 # Workflow UI and REST library integration
 
+**Owner clarification — 2026-11-07:** command recovery screens/envelope controls are sandbox testing/diagnostics, not production end-user functionality. Backend idempotency and authorized own-command receipt recovery remain required. [F016 revision 2](../features/F016-shared-group-role-task-assignment/spec.md) implements default non-diagnostic task completion and sandbox opt-in; its handover records focused browser verification.
+
 **Date:** 2026-11-07. **Status:** AGREED architecture under constitution 6.0.0, following the owner's subsequent adoption of workflow-ui and workflow-web. **Scope:** documentation only; no implementation, dependency change, source move or F011 modification is authorized by this record. The [main design revision 0.11](workflow-engine-design.md) owns the consolidated architecture; this record retains integration evidence and details.
 
 ## Purpose and decision status

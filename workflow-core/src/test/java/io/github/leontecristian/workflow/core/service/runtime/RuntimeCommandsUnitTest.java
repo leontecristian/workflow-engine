@@ -70,8 +70,10 @@ class RuntimeCommandsUnitTest {
         var catalog=mock(TaskTypeCatalogService.class); var host=mock(RuntimeHostSupport.class);
         var registry=mock(ServiceActionRegistry.class); var action=mock(WorkflowServiceAction.class);
         var json=new RuntimeJson(); var variables=new RuntimeVariables(rows,em,json);
+        var eligibility=mock(WorkflowTaskEligibilityService.class);
+        when(eligibility.isEligible(any(),anyString())).thenReturn(true);
         var service=new WorkflowExecutionService(instances,activities,tasks,history,receipts,em,definitions,catalog,json,host,
-                new RuntimeDefinitionPins(definitions,history,json),variables,new RuntimeServiceProgression(registry,variables,json));
+                new RuntimeDefinitionPins(definitions,history,json),variables,new RuntimeServiceProgression(registry,variables,json),eligibility);
         var fields=Map.of("quantity",new ActionField("quantity",VariableValueType.LONG,false,false),"recordedQuantity",new ActionField("recordedQuantity",VariableValueType.LONG,false,false));
         var model=new MinimalWorkflowDefinition(new MinimalWorkflowDefinition.Node("BEGIN","START","Start",null),
                 new MinimalWorkflowDefinition.Human("REVIEW","SANDBOX_REVIEW",new MinimalWorkflowDefinition.Assignment("sandbox.singleReviewer"),List.of(new MinimalWorkflowDefinition.Outcome("COMPLETE","Complete",false))),
@@ -86,7 +88,7 @@ class RuntimeCommandsUnitTest {
         when(definitions.loadForStart(42)).thenReturn(definition); when(definitions.loadPinned(42)).thenReturn(definition);
         when(catalog.findByCode("SANDBOX_REVIEW")).thenReturn(Optional.of(new TaskTypeView(5,"SANDBOX_REVIEW","Review",null,false,0)));
         var resolver=mock(SingleTaskAssignmentResolver.class); when(host.resolver(anyString())).thenReturn(resolver);
-        when(host.resolve(eq(resolver),any())).thenReturn(new SingleAssignmentResult(List.of(new ResolvedTask("review","reviewer")),null));
+        when(host.resolve(eq(resolver),any())).thenReturn(new SingleAssignmentResult(List.of(new ResolvedTask("review",new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER,"reviewer"))),null));
         var recorder=mock(WorkflowEventRecorder.class); when(host.recorder()).thenReturn(recorder);
         when(registry.descriptor("sandbox.recordQuantity")).thenReturn(new ServiceActionDescriptor("sandbox.recordQuantity",List.of(new ActionField("quantity",VariableValueType.LONG,true,false)),List.of(new ActionField("recordedQuantity",VariableValueType.LONG,true,false))));
         when(registry.action(anyString())).thenReturn(action);
@@ -143,6 +145,6 @@ class RuntimeCommandsUnitTest {
         assertTrue(service.completeTask(complete,reviewer).replayed());
         assertThrows(RuntimeException.class,() -> service.start(start,new StartInputs(Map.of("quantity",new TextLiteral("1"))),context,null));
         verifyNoInteractions(action,definitions,em,host);
-        assertEquals(2,storedReceipts.size()); assertTrue(storedReceipts.values().stream().allMatch(r -> r.getResultSchemaVersion()==3));
+        assertEquals(2,storedReceipts.size()); assertTrue(storedReceipts.values().stream().allMatch(r -> r.getResultSchemaVersion()==4));
     }
 }

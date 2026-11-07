@@ -50,7 +50,7 @@ class ConsoleRuntimeUnitTest {
     @Test
     void losingCommandUsesOneReplayLookupWithOriginalInputAndDoesNotRetryMutation() {
         var tx = mock(ConsoleRuntimeTransaction.class);
-        var coordinator = new ConsoleRuntimeCoordinator(tx);
+        var coordinator = new ConsoleRuntimeCoordinator(tx, mock(ConsoleRuntimeAccess.class));
         var command = new SandboxStart(UUID.randomUUID(), 1, 2, 0);
         var context =
                 new WorkflowCommandContext(ActorKind.USER, "admin", Instant.EPOCH, "correlation");
@@ -71,7 +71,7 @@ class ConsoleRuntimeUnitTest {
     @Test
     void replayMissRetainsOriginalFailureAndOrdinaryCallbackFailureDoesNotRecover() {
         var tx = mock(ConsoleRuntimeTransaction.class);
-        var coordinator = new ConsoleRuntimeCoordinator(tx);
+        var coordinator = new ConsoleRuntimeCoordinator(tx, mock(ConsoleRuntimeAccess.class));
         var command = new SandboxStart(UUID.randomUUID(), 1, 2, 0);
         var conflict =
                 new WorkflowExecutionException(WorkflowExecutionException.Category.STALE_VERSION);
@@ -90,9 +90,9 @@ class ConsoleRuntimeUnitTest {
         var reads = mock(WorkflowRuntimeQueryService.class);
         var context = mock(ConsoleContext.class);
         when(context.actor()).thenReturn("reviewer");
-        var access = new ConsoleRuntimeAccess(reads, context);
+        var access = new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class));
         var task = mock(WorkflowTaskView.class);
-        when(task.assignedUserRef()).thenReturn("reviewer");
+        when(task.assignment()).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER, "reviewer"));
         when(task.status()).thenReturn(TaskStatus.COMPLETED);
         var instance = mock(WorkflowInstanceView.class);
         when(reads.findInstance(1)).thenReturn(Optional.of(instance));

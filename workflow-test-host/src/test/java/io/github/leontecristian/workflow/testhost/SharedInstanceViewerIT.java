@@ -116,7 +116,7 @@ class SharedInstanceViewerIT extends DatabaseIntegrationTest {
     private void advance(long instance) {
         var task = reads.listTasks(instance, 0, 100).items().stream().filter(t -> t.status() == TaskStatus.OPEN).findFirst().orElseThrow();
         tx().executeWithoutResult(status -> engine.completeTask(new CompleteWorkflowTask(UUID.randomUUID(), instance, task.id(),
-                reads.findInstance(instance).orElseThrow().lockVersion(), "APPROVE", "Viewer fixture {\"n\":9007199254740993,\"d\":12500.00}"), actor(task.assignedUserRef())));
+                reads.findInstance(instance).orElseThrow().lockVersion(), "APPROVE", "Viewer fixture {\"n\":9007199254740993,\"d\":12500.00}"), actor(task.assignment().ref())));
     }
     private MockHttpSession session(String actor, String role) {
         var session = new MockHttpSession();
@@ -180,10 +180,11 @@ class SharedInstanceViewerIT extends DatabaseIntegrationTest {
     }
     static ViewerFixtureHost viewerFixtureHost() { return new ViewerFixtureHost(); }
     static class ViewerFixtureHost implements DefinitionCapabilityProvider, SingleTaskAssignmentResolver, WorkflowServiceAction {
+        @Override public Set<io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind> targetKinds() { return Set.of(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER); }
         String code;
         public String identifier() { return "f013.reviewer"; }
-        public DefinitionCapabilities snapshot() { return new DefinitionCapabilities(Set.of(new SingleAssignmentCapability(identifier())), code == null ? Set.of() : Set.of(new TaskTypeCapability(code, Set.of("APPROVE", "REJECT")))); }
-        public SingleAssignmentResult resolve(AssignmentContext context) { return new SingleAssignmentResult(List.of(new ResolvedTask("review", context.humanNodeKey().equals("MANAGER") ? "f013-manager" : "f013-reviewer")), null); }
+        public DefinitionCapabilities snapshot() { return new DefinitionCapabilities(Set.of(new SingleAssignmentCapability(identifier(), Set.of(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER))), code == null ? Set.of() : Set.of(new TaskTypeCapability(code, Set.of("APPROVE", "REJECT")))); }
+        public SingleAssignmentResult resolve(AssignmentContext context) { return new SingleAssignmentResult(List.of(new ResolvedTask("review", new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER, context.humanNodeKey().equals("MANAGER") ? "f013-manager" : "f013-reviewer"))), null); }
         public ServiceActionDescriptor descriptor() { return new ServiceActionDescriptor("f013.quantity", List.of(new ActionField("quantity", VariableValueType.LONG, true, false)), List.of(new ActionField("recordedQuantity", VariableValueType.LONG, true, false))); }
         public ServiceActionResult execute(ServiceActionContext context, Map<String, WorkflowValue> inputs) { return new ServiceActionResult(Map.of("recordedQuantity", inputs.get("quantity"))); }
     }

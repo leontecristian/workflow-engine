@@ -98,6 +98,28 @@ class WorkflowRuntimeWebUnitTest {
             verifyNoInteractions(c.getBean(WorkflowRuntimeQueryService.class));
         }
     }
+    @Test void sharedAssignmentProjectionAndExactSubmissionFilterPreserveSourceContinuation() throws Exception {
+        try(var c=context(Host.class,Reads.class,WorkflowRuntimeReadConfiguration.class)) {
+            var reads=c.getBean(WorkflowRuntimeQueryService.class); var host=c.getBean(WorkflowRuntimeReadHost.class); var mvc=mvc(c);
+            var task=new io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView(5,2,1,3,"REVIEW",
+                    new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(
+                            io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.GROUP,"finance"),
+                    io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.OPEN,null,java.time.Instant.EPOCH,null,null,null,null);
+            when(host.task(5)).thenReturn(task);
+            mvc.perform(get("/custom/tasks/5")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.assignment.kind").value("GROUP"))
+                    .andExpect(jsonPath("$.assignment.ref").value("finance"))
+                    .andExpect(jsonPath("$.assignedUserRef").doesNotExist());
+            var submission=new io.github.leontecristian.workflow.core.dto.runtime.TaskSubmission(5,2,1,9,
+                    java.util.UUID.randomUUID(),io.github.leontecristian.workflow.core.dto.runtime.ActorKind.USER,
+                    "other",java.time.Instant.EPOCH,"APPROVE","private",java.util.Map.of());
+            when(reads.findTask(5)).thenReturn(Optional.of(task));
+            when(reads.listActivitySubmissions(2,0,50)).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.TaskSubmissionPage(List.of(submission),null));
+            when(host.canReadTask(task)).thenReturn(false);
+            mvc.perform(get("/custom/activities/2/submissions")).andExpect(status().isOk())
+                    .andExpect(content().json("{\"items\":[],\"nextAfterTaskId\":null}"));
+        }
+    }
     @Test void variableSnapshotAndExactValuesSurviveAndStalePagesFail() throws Exception {
         try(var c=context(Host.class,Reads.class,WorkflowRuntimeReadConfiguration.class)) {
             var reads=c.getBean(WorkflowRuntimeQueryService.class);var host=c.getBean(WorkflowRuntimeReadHost.class);var mvc=mvc(c);
@@ -145,9 +167,9 @@ class WorkflowRuntimeWebUnitTest {
                     .andExpect(status().isBadRequest());
             verifyNoInteractions(host);
             for(var category:List.of(WorkflowExecutionException.Category.STALE_VERSION,WorkflowExecutionException.Category.LIMIT_EXCEEDED,
-                    WorkflowExecutionException.Category.NOT_ASSIGNED,WorkflowExecutionException.Category.HOST_CONFIGURATION)) {
+                    WorkflowExecutionException.Category.NOT_ASSIGNED,WorkflowExecutionException.Category.ASSIGNMENT_LOOKUP_FAILED,WorkflowExecutionException.Category.HOST_CONFIGURATION)) {
                 doThrow(new WorkflowExecutionException(category)).when(host).complete(any(),any());
-                int status=category==WorkflowExecutionException.Category.STALE_VERSION?409:category==WorkflowExecutionException.Category.LIMIT_EXCEEDED?422:category==WorkflowExecutionException.Category.NOT_ASSIGNED?403:500;
+                int status=category==WorkflowExecutionException.Category.STALE_VERSION?409:category==WorkflowExecutionException.Category.LIMIT_EXCEEDED?422:category==WorkflowExecutionException.Category.NOT_ASSIGNED?403:category==WorkflowExecutionException.Category.ASSIGNMENT_LOOKUP_FAILED?503:500;
                 mvc.perform(post("/custom/instances/1/tasks/5/complete").contentType("application/json").header("X-Expected-Lock-Version","0")
                     .requestAttr("trusted","safe").content(body)).andExpect(status().is(status)).andExpect(jsonPath("$.correlationId").value("safe"));
             }

@@ -29,7 +29,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 class ConsoleRuntimeAdaptersUnitTest {
-    @Test void completeDoesNotReadAndReplayChecksAccessBeforeLookupWithoutMutation() {
+    @Test void completionAndReplayCheckAccessBeforeDispatchWithoutRecoveryMutation() {
         var commands=mock(ConsoleRuntimeCoordinator.class); var tx=mock(ConsoleRuntimeTransaction.class);
         var access=mock(ConsoleRuntimeAccess.class); var context=mock(ConsoleContext.class);
         var actor=mock(WorkflowCommandContext.class); when(context.runtime("trusted")).thenReturn(actor);
@@ -37,7 +37,7 @@ class ConsoleRuntimeAdaptersUnitTest {
         var command=new CompleteWorkflowTask(UUID.randomUUID(),1,5,9,"APPROVE",null);
         var result=new WorkflowCommandResult(true,null); when(commands.complete(command,actor)).thenReturn(result);
         assertThat(host.complete(command,"trusted")).isSameAs(result);
-        verifyNoInteractions(access,tx);
+        verify(access).task(5); verifyNoInteractions(tx); org.mockito.Mockito.clearInvocations(access);
         when(tx.replayComplete(command,actor)).thenReturn(Optional.empty());
         assertThat(host.replayComplete(command,"trusted")).isEmpty();
         var order=inOrder(access,tx);order.verify(access).task(5);order.verify(tx).replayComplete(command,actor);
@@ -63,15 +63,30 @@ class ConsoleRuntimeAdaptersUnitTest {
             assertThatThrownBy(operation::run).isInstanceOfSatisfying(WorkflowRuntimeException.class,
                 e->{assertThat(e.status()).isEqualTo(409);assertThat(e.code()).isEqualTo("SANDBOX_REQUEST_CONFLICT");});
     }
+    @Test void accessFilteredInstancePagesStopAtBudgetWithWorkingContinuation() {
+        var reads=mock(WorkflowRuntimeQueryService.class);var access=mock(ConsoleRuntimeAccess.class);var context=mock(ConsoleContext.class);
+        when(reads.listTasks(org.mockito.ArgumentMatchers.eq(1L),org.mockito.ArgumentMatchers.anyLong(),org.mockito.ArgumentMatchers.eq(50)))
+                .thenAnswer(invocation -> {
+                    long cursor=invocation.getArgument(1);
+                    var rows=new java.util.ArrayList<WorkflowTaskView>();
+                    for(long id=cursor+1;id<=cursor+50;id++) {
+                        var task=mock(WorkflowTaskView.class);when(task.id()).thenReturn(id);rows.add(task);
+                    }
+                    return new WorkflowTaskPage(rows,cursor+50);
+                });
+        var host=new ConsoleRuntimeReadHost(reads,access,context);
+        assertThat(host.listTasks(1,0,50)).isEqualTo(new WorkflowTaskPage(List.of(),500L));
+        verify(reads,times(10)).listTasks(org.mockito.ArgumentMatchers.eq(1L),org.mockito.ArgumentMatchers.anyLong(),org.mockito.ArgumentMatchers.eq(50));
+    }
     @Test void filteredPageRetainsSourceContinuationAndAssignedIdentityIsTrusted() {
         var reads=mock(WorkflowRuntimeQueryService.class);var access=mock(ConsoleRuntimeAccess.class);var context=mock(ConsoleContext.class);
         when(context.actor()).thenReturn("reviewer");var task=mock(WorkflowTaskView.class);
-        when(reads.listTasks(1,0,50)).thenReturn(new WorkflowTaskPage(List.of(task),77L));
+        when(reads.listTasks(1,0,50)).thenReturn(new WorkflowTaskPage(List.of(task),null));
         var host=new ConsoleRuntimeReadHost(reads,access,context);
-        assertThat(host.listTasks(1,0,50)).isEqualTo(new WorkflowTaskPage(List.of(),77L));
+        assertThat(host.listTasks(1,0,50)).isEqualTo(new WorkflowTaskPage(List.of(),null));
         verify(access).instance(1);
-        when(reads.listAssignedTasks("reviewer",77,1)).thenReturn(new WorkflowTaskPage(List.of(),null));
-        host.listAssignedTasks(77,1);verify(reads).listAssignedTasks("reviewer",77,1);
+        when(reads.listEligibleTasks(org.mockito.ArgumentMatchers.eq("reviewer"),org.mockito.ArgumentMatchers.eq(77L),org.mockito.ArgumentMatchers.eq(1),org.mockito.ArgumentMatchers.any())).thenReturn(new WorkflowTaskPage(List.of(),null));
+        host.listAssignedTasks(77,1);verify(reads).listEligibleTasks(org.mockito.ArgumentMatchers.eq("reviewer"),org.mockito.ArgumentMatchers.eq(77L),org.mockito.ArgumentMatchers.eq(1),org.mockito.ArgumentMatchers.any());
         assertThatThrownBy(()->host.listInstances(null)).isInstanceOfSatisfying(WorkflowRuntimeException.class,e->assertThat(e.status()).isEqualTo(403));
     }
 }

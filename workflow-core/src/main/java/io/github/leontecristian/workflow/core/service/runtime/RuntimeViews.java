@@ -46,12 +46,12 @@ final class RuntimeViews {
     }
     static WorkflowTaskView task(WorkflowTaskEntity entity, WorkflowActivityEntity activity) {
         return new WorkflowTaskView(entity.getId(), entity.getActivityId(), activity.getInstanceId(), activity.getTaskTypeId(),
-                entity.getTaskKey(), entity.getAssignedUserRef(), entity.getStatus(), entity.getOutcomeKey(),
+                entity.getTaskKey(), entity.getAssignment(), entity.getStatus(), entity.getOutcomeKey(),
                 instant(entity.getCreatedAt()), instant(entity.getDueAt()), instant(entity.getClosedAt()), entity.getClosedBy(), entity.getClosureReason());
     }
     static WorkflowTaskView task(RuntimeTaskRow row) {
         return new WorkflowTaskView(row.getId(), row.getActivityId(), row.getInstanceId(), row.getTaskTypeId(),
-                row.getTaskKey(), row.getAssignedUserRef(), row.getStatus(), row.getOutcomeKey(),
+                row.getTaskKey(), new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(row.getAssignmentKind(), row.getAssignmentRef()), row.getStatus(), row.getOutcomeKey(),
                 instant(row.getCreatedAt()), instant(row.getDueAt()), instant(row.getClosedAt()),
                 row.getClosedBy(), row.getClosureReason());
     }

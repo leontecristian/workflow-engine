@@ -30,7 +30,7 @@ const COLUMNS: Record<string, RecordColumn[]> = {
   tasks: [
     { key: "taskKey", label: "Task" },
     { key: "instanceId", label: "Instance" },
-    { key: "assignedUserRef", label: "Assigned to" },
+    { key: "assignment", label: "Assigned to" },
     { key: "status", label: "Status" },
   ],
 };
@@ -158,7 +158,7 @@ export class ConsoleRecords {
     return [...this.columns().map((column) => column.key), "actions"];
   }
   cell(row: any, key: string): any {
-    return row[key];
+    return key === "assignment" && row.assignment ? `${row.assignment.kind}: ${row.assignment.ref}` : row[key];
   }
   isStatus(key: string): boolean {
     return ["status"].includes(key);

@@ -15,4 +15,15 @@ public interface WorkflowRuntimeReadHost {
     WorkflowInstanceView instance(long id);
     WorkflowTaskView task(long id);
     WorkflowActivityView activity(long id);
+    /** Presentation hints only; command authorization is always checked again. */
+    default boolean canCompleteTask(WorkflowTaskView task) { return false; }
+    default String assignmentLabel(WorkflowTaskView task) { return task.assignment().ref(); }
+    /** Exact-task filtering is required even when the containing activity is readable. */
+    default boolean canReadTask(WorkflowTaskView task) {
+        try { task(task.id()); return true; }
+        catch (io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException denied) {
+            if (denied.status() == 404) return false;
+            throw denied;
+        }
+    }
 }
