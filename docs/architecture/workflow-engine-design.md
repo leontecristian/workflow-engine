@@ -14,11 +14,11 @@
 
 | Document field | Value |
 | --- | --- |
-| Version | 0.10 — Angular 19 alignment and proposed reusable UI/web integration |
+| Version | 0.11 — adopted Angular 19 UI and reusable web architecture |
 | Status | Authoritative architecture baseline; exact contracts still require specification |
 | Date | 2026-11-07 |
 | Initial host application | APOLO |
-| Development model | Current core/test-host project; proposed workflow-ui/workflow-web extraction; core later joins APOLO's Maven module structure |
+| Development model | Current core/test-host implementation; agreed core/web/test-host and Angular UI target; libraries consumed inside APOLO |
 | Persistence target | Microsoft SQL Server through JPA persistence inside workflow-core |
 | Definition formats | JSON workflows initially; JSON business decisions only with the optional later extension |
 | Expression implementation | Restricted Spring Expression Language (SpEL) |
@@ -34,13 +34,15 @@ Revision 0.9 records the owner's 2026-10-31 selection of ordered first-match wor
 
 Revision 0.10 incorporates the owner's 2026-11-07 Angular 19 alignment decision and proposed reusable UI/web architecture into this main design. Sections 2–4, 14–19 and 22 distinguish the current implementation boundary from the proposed target. The [integration reference record](workflow-ui-web-integration.md) retains supplied APOLO evidence and preparation details; this document owns the consolidated architecture. Angular 19 alignment is AGREED; library extraction and a third Maven module remain PROPOSED. No implementation, dependency change, source move or F011 modification is authorized by this revision.
 
+Revision 0.11 records the subsequent owner adoption on 2026-11-07: `workflow-ui`, `workflow-web`, the sandbox consumer shell and embedded designer packaging are now AGREED. Constitution 6.0.0 replaces the former two-module target with three Maven modules plus the Angular 19 library. This supersedes revision 0.10's proposal status, not its documentation-only boundary. Exact contracts and dependency versions remain OPEN; no implementation or F011 change is authorized.
+
 **Status convention:** This is the authoritative architecture document for the decisions confirmed on 2026-10-24 and the explicitly recorded later amendments. **AGREED** identifies confirmed direction; **PROPOSED** identifies illustrative contracts; **PROVISIONAL** identifies tentative preferences; **OPEN** identifies unresolved engine/integration details; **DEFERRED — APOLO** identifies business or infrastructure decisions owned by APOLO. The decision register in section 22 is the status reference. Exact names, interfaces, JSON fields, tables, limits, and API paths remain proposed unless stated otherwise.
 
 **AGREED platform baseline:** Java 17 compilation target and JDK 21 runtime, confirmed by the project owner. APOLO's Java 17 POM settings are current and correct. The compiler JDK/toolchain is a separate setting to verify; this document does not claim a Java 21 compilation target. Other framework and dependency versions require verification against the application.
 
 This revision supersedes the earlier JDBC persistence proposal and the `STATE`/`DECISION`/`FINAL` node model. Historical documents and examples must not override this baseline.
 
-**AGREED packaging revision:** use two Maven modules, `workflow-core` and `workflow-test-host`. Core is a Spring/JPA-based feature library containing persistence, expressions and integration configuration. This supersedes the earlier six-module proposal and the requirement for a framework-independent core artifact. Public integration contracts remain independent of APOLO and infrastructure-provider types. Core owns workflow changelogs; APOLO remains the single production migration owner.
+**AGREED packaging revision — 2026-11-07:** target three Maven modules, `workflow-core`, `workflow-web` and `workflow-test-host`, plus the separate Angular 19 `workflow-ui` library. The current implementation still has two Maven modules. Core remains a Spring/JPA library; web is an optional host-consumed HTTP adapter. This supersedes the former two-module constraint without reviving the earlier six-module proposal. Public core contracts remain independent of APOLO and infrastructure-provider types. Core owns workflow changelogs; APOLO remains the single production migration owner.
 
 **AGREED integration destination (F5):** independent development is the current phase, not a requirement for a permanently separate repository or independently published product. Eventually `workflow-core` becomes a Maven module inside APOLO, alongside `backend`, `frontend` and `configuration`. The source move's timing, final Maven coordinates and the test host's future location remain to be settled. No source move or POM reparenting into APOLO is implied by this documentation revision.
 
@@ -96,7 +98,7 @@ The initial workflow release includes immutable JSON workflow definitions; expli
 
 Restricted SpEL uses explicit #facts and #vars inputs. Guards remain registered host checks. No decision-table evaluator, FIRST/UNIQUE table policies, separate decision-definition lifecycle, standalone decision simulation or decision-table editor is implemented in this stage.
 
-First deliver a simple sandbox workflow, then one cross-team booking approval integration in APOLO. Planning-like examples are sandbox fixtures. The graphical workflow designer follows the first successful APOLO integration; its proposed packaging is a reusable Angular feature hosted by APOLO or a development shell (section 15). It does not require a business decision editor. Registry administration uses an API with versioned JSON import before the designer.
+First deliver a simple sandbox workflow, then one cross-team booking approval integration in APOLO. Planning-like examples are sandbox fixtures. The graphical workflow designer follows the first successful APOLO integration; its agreed packaging is a reusable Angular feature hosted by APOLO or a development shell (section 15). It does not require a business decision editor. Registry administration uses an API with versioned JSON import before the designer.
 
 ### 1.3 Deliberate exclusions
 
@@ -150,7 +152,7 @@ The engine runs inside the APOLO JVM. No network call is required between a busi
 
 At the agreed source-integration point, APOLO's root reactor includes `workflow-core` and backend declares a normal dependency on it. Core remains an ordinary JAR packaged into the backend application. Sharing a repository and release cycle does not allow core to depend on backend business entities, identity providers or messaging implementations.
 
-**Proposed shared UI/web deployment:** APOLO's Angular application consumes `workflow-ui`; APOLO's backend explicitly activates selected `workflow-web` controllers and supplies their required host adapters. Both libraries run within the existing application lifecycle. The supplied frontend POM builds Angular resources into a frontend JAR under `static`, which the backend WAR consumes. Workflow UI would participate in that frontend build rather than require a separate production application.
+**AGREED shared UI/web deployment:** APOLO's Angular application consumes `workflow-ui`; APOLO's backend explicitly activates selected `workflow-web` controllers and supplies their required host adapters. Both libraries run within the existing application lifecycle. The supplied frontend POM builds Angular resources into a frontend JAR under `static`, which the backend WAR consumes. Workflow UI participates in that frontend build rather than requiring a separate production application; this integration is not implemented yet.
 
 ```mermaid
 flowchart TB
@@ -164,7 +166,7 @@ flowchart TB
     Business --> DB
 ```
 
-This is a proposed dependency/deployment view, not a second server or a verified integration. Host transaction and durable-handoff rules remain mandatory. The sandbox would consume the same libraries through its existing console shell and sample adapters; production never imports sandbox login, fixtures or failure-injection controls.
+This is the agreed target dependency/deployment view, not a verified integration. Host transaction and durable-handoff rules remain mandatory. The sandbox will consume the same libraries through its existing console shell and sample adapters; production never imports sandbox login, fixtures or failure-injection controls.
 
 ### 2.3 Ownership boundaries
 
@@ -181,14 +183,15 @@ Git is the source of truth for development artifacts. The host database is the r
 
 ## 3. Modules and dependency direction
 
-### 3.1 Agreed initial modules
+### 3.1 Current implementation and agreed target modules
 
 | Module | Responsibility | Important dependencies |
 | --- | --- | --- |
 | workflow-core | Models, entities, repositories, workflow/task/registry services, restricted expressions, JSON codecs, integration interfaces/configuration and workflow Liquibase resources | Spring, Spring Data JPA, Jakarta Persistence and spring-expression; JSON/validation libraries as used |
+| workflow-web (agreed, not implemented) | Reusable HTTP controllers, transport mapping and scoped errors; explicit host activation | workflow-core and Spring MVC; required host policy adapters |
 | workflow-test-host | Executable development host, sample endpoints/adapters, datasource and transaction configuration, migration execution against a disposable local database | workflow-core, Spring Boot host starters, Liquibase and SQL Server JDBC driver; database test tooling belongs here |
 
-During separate development, the workflow root POM is the parent/aggregator with `packaging=pom`. Core produces an ordinary library JAR; only the test host produces an executable Spring Boot JAR. Preserve the current standalone root and development coordinates until the planned source move. Later, core joins APOLO's reactor and is intended to inherit its root parent after the effective build is reviewed. The Angular library has a separate frontend build and does not itself require a Maven module. Section 3.5 proposes a third Java module for HTTP reuse; the current two-module constraint remains in force until explicitly amended.
+During separate development, the workflow root POM is the parent/aggregator with `packaging=pom`. Core and web produce ordinary library JARs; only the test host produces an executable Spring Boot JAR. Preserve the current standalone root and development coordinates until the planned source move. Later, core joins APOLO's reactor and is intended to inherit its root parent after the effective build is reviewed. The Angular library has a separate frontend build and does not itself require a Maven module. Constitution 6.0.0 adopts the third Java module; the POM still lists two modules because implementation has not been requested.
 
 Keep models, persistence, services, expressions and integration concerns in separate packages within core. These are implementation boundaries, not separate Maven artifacts. A separate expression API, SpEL adapter artifact, persistence artifact or starter can be extracted later only when concrete reuse or dependency needs justify it. Implement expressions only as required for workflow routing.
 
@@ -200,7 +203,7 @@ Core owns workflow, task, task-type and runtime persistence, including JPA entit
 
 **Public API independence:** core interfaces, commands, results, events and context objects use Java standard types or workflow-owned models and identifiers. They must not expose APOLO classes, JPA entities, Keycloak objects, JWT implementation types, Spring Security `Authentication`, or infrastructure-specific types such as JMS messages, database connections or cache-provider objects. Host adapters translate authenticated identity and infrastructure data into these neutral contracts; the core never requires callers to supply provider-specific objects.
 
-Hosts own endpoint exposure and policy, JDBC drivers, connection pooling, migration runners, logging configuration and security/messaging infrastructure. Generic controller implementation may be shared through the proposed web adapter in section 3.5; core remains independent of HTTP. Core ships changelog resources without configuring a migration runner or requiring Liquibase as a runtime dependency solely to package those resources. Use normal direct Spring/JPA dependencies where needed rather than importing APOLO's backend or its application starters wholesale.
+Hosts own endpoint exposure and policy, JDBC drivers, connection pooling, migration runners, logging configuration and security/messaging infrastructure. Generic controller implementation may be shared through the agreed web adapter in section 3.5; core remains independent of HTTP. Core ships changelog resources without configuring a migration runner or requiring Liquibase as a runtime dependency solely to package those resources. Use normal direct Spring/JPA dependencies where needed rather than importing APOLO's backend or its application starters wholesale.
 
 ### 3.3 Optional later business decision extension
 
@@ -212,7 +215,7 @@ Do not introduce Spring Integration or a messaging broker as a mandatory library
 
 ### 3.4 Proposed internal components and dependency flow
 
-The original component map remains useful after adapting it to the two-module structure. These are suggested package responsibilities inside core, not additional Maven artifacts or finalized class names:
+The original component map remains useful after adapting it to the current two-module implementation. These are suggested package responsibilities inside core, not additional Maven artifacts or finalized class names:
 
 ```text
 workflow-core
@@ -234,11 +237,11 @@ workflow-test-host
   datasource/transaction infrastructure, durable-handoff adapter and migration runner
 ```
 
-Business controllers and business adapters belong in APOLO backend. The proposed web library shares only generic HTTP mapping and delegates host policy through explicit adapters. An application service coordinates the command transaction and calls focused execution/persistence components. The definition loader returns a typed graph, the executor dispatches by node type, and registered host contracts supply business behavior. Public contracts must not leak JPA entities. Avoid a second engine inside the sandbox, a service-locator context exposing all components, or new interfaces merely to mirror each class.
+Business controllers and business adapters belong in APOLO backend. The agreed web library shares only generic HTTP mapping and delegates host policy through explicit adapters. An application service coordinates the command transaction and calls focused execution/persistence components. The definition loader returns a typed graph, the executor dispatches by node type, and registered host contracts supply business behavior. Public contracts must not leak JPA entities. Avoid a second engine inside the sandbox, a service-locator context exposing all components, or new interfaces merely to mirror each class.
 
-### 3.5 Proposed reusable UI and web libraries
+### 3.5 Agreed reusable UI and web libraries
 
-| Component | Proposed responsibility | Boundary |
+| Component | Agreed responsibility | Boundary |
 | --- | --- | --- |
 | `workflow-core` | Existing execution, persistence, definitions and neutral contracts | Ordinary Java library; no dependency on HTTP adapter, UI or host implementation |
 | `workflow-web` | Spring MVC controllers, transport DTO mapping, request validation and scoped error handling | Ordinary JAR depending on core; host opts into API groups and supplies required identity/access/business integration |
@@ -246,9 +249,9 @@ Business controllers and business adapters belong in APOLO backend. The proposed
 | `workflow-test-host` and its console shell | Development application, sample domain/adapters, test infrastructure | Consume shared libraries; keep sandbox-specific operations outside reusable artifacts |
 | APOLO | Application navigation, business pages/endpoints, contextual authorization, infrastructure and delivery | Consumes libraries inside its existing frontend/backend deployment |
 
-Dependency direction is `host -> workflow-web -> workflow-core`, with a direct `host -> workflow-core` dependency when host business services call core. Frontend hosts consume `workflow-ui` separately. Core must never depend on web, Angular or APOLO. Do not restore the superseded six-module architecture or add an expression, persistence or starter artifact as part of this proposal.
+Dependency direction is `host -> workflow-web -> workflow-core`, with a direct `host -> workflow-core` dependency when host business services call core. Frontend hosts consume `workflow-ui` separately. Core must never depend on web, Angular or APOLO. Do not restore the superseded six-module architecture or add an expression, persistence or starter artifact as part of this adopted architecture.
 
-Adopting `workflow-web` requires a deliberate C03/CON-02 amendment from the current two Maven modules to three. Proposed module names do not authorize adding directories/POMs now. Exact public Java packages, DTOs, API groups and Angular entry points require feature specifications. Follow the layer-first Java package convention when planning those implementations.
+The owner adopted `workflow-web` through constitution 6.0.0 C03 and CON-02, replacing the two-module target with three. Adoption does not authorize adding implementation directories/POMs now. Exact public Java packages, DTOs, API groups and Angular entry points require feature specifications. Follow the layer-first Java package convention when planning those implementations.
 
 ## 4. Host responsibilities and dependency management
 
@@ -1157,17 +1160,17 @@ workflow.persistence.schema=wf
 workflow.execution.max-automatic-steps=50
 ```
 
-The current architecture places HTTP controllers in the sandbox and APOLO integration packages, delegating to application services; this does not claim that APOLO workflow endpoints are already implemented. The proposed `workflow-web` extraction shares generic controllers under explicit configuration imports, separate from the existing root `WorkflowConfiguration` marker. Importing web configuration must not narrow or replace core/host entity and repository scanning. Dependency presence alone must not expose routes.
+The current architecture places HTTP controllers in the sandbox and APOLO integration packages, delegating to application services; this does not claim that APOLO workflow endpoints are already implemented. The agreed `workflow-web` extraction shares generic controllers under explicit configuration imports, separate from the existing root `WorkflowConfiguration` marker. Importing web configuration must not narrow or replace core/host entity and repository scanning. Dependency presence alone must not expose routes.
 
-Enable runtime queries, administration and optional generic commands independently. Missing required host adapters must fail configuration rather than provide permissive defaults. Activation does not replace per-operation authorization. Keep workflow exception advice scoped to its controllers, preserve host HTTP/security configuration and require the host's transaction infrastructure. Exact configuration names and adapter signatures remain OPEN. Auto-configuration is deferred; explicit imports are the proposed first integration mechanism.
+Enable runtime queries, administration and optional generic commands independently. Missing required host adapters must fail configuration rather than provide permissive defaults. Activation does not replace per-operation authorization. Keep workflow exception advice scoped to its controllers, preserve host HTTP/security configuration and require the host's transaction infrastructure. Exact configuration names and adapter signatures remain OPEN. Auto-configuration is deferred; explicit imports are the agreed first integration mechanism.
 
-`workflow-core` and the proposed `workflow-web` are ordinary non-executable JARs. Only `workflow-test-host` is packaged as a standalone Spring Boot application in the workflow project. The UI is compiled through the frontend build; it is not a Java dependency of core or web.
+`workflow-core` and the agreed `workflow-web` are ordinary non-executable JARs. Only `workflow-test-host` is packaged as a standalone Spring Boot application in the workflow project. The UI is compiled through the frontend build; it is not a Java dependency of core or web.
 
 <a id="15-standalone-angular-designer"></a>
 
 ## 15. Reusable Angular UI and designer
 
-**PROPOSED packaging:** provide `workflow-ui` as an Angular 19-compatible feature library containing complete pages and individually embeddable components. APOLO supplies the application shell; the current sandbox console can evolve into its development shell. The designer becomes a later library feature rather than requiring a separate production application. This proposal revises the earlier standalone-designer packaging direction for review, without advancing designer delivery or changing the current build.
+**AGREED packaging:** provide `workflow-ui` as an Angular 19-compatible feature library containing complete pages and individually embeddable components. APOLO supplies the application shell; the current sandbox console will evolve into its development shell. The designer becomes a later library feature rather than requiring a separate production application. This supersedes the earlier standalone-production-designer packaging direction without advancing designer delivery or changing the current build.
 
 Generic UI includes definition administration, task metadata/list presentation, instance monitoring, history and graph views. Runtime, management and designer entry points are candidate boundaries, not finalized package exports. APOLO supplies booking review material, business-specific forms, navigation and business command submission. Reusable task controls must allow submission through APOLO's business endpoint rather than assuming a generic completion API.
 
@@ -1230,13 +1233,13 @@ Do not label execution of real business actions as a dry run merely because a tr
 
 The playground should expose a visible execution timeline early, even before the full graph editor. It is the primary way to inspect routing behavior while the language evolves.
 
-Under the proposed extraction, reuse the existing console as the shell consuming `workflow-ui` and connect it to `workflow-test-host` with `workflow-web` enabled as appropriate. Keep sample identities, sandbox requests, fixtures, service-effect inspection and failure injection host-specific. A new standalone playground application is not required merely to package the library. Extraction/alignment is separate from F011 and must preserve its implemented contracts and recorded evidence.
+Under the agreed extraction architecture, reuse the existing console as the shell consuming `workflow-ui` and connect it to `workflow-test-host` with `workflow-web` enabled as appropriate. Keep sample identities, sandbox requests, fixtures, service-effect inspection and failure injection host-specific. A new standalone playground application is not required merely to package the library. Extraction/alignment is separate from F011 and must preserve its implemented contracts and recorded evidence.
 
 ## 17. Application and HTTP APIs
 
 The reusable Java application services are the primary engine boundary. HTTP endpoints are host adapters.
 
-**PROPOSED shared adapter:** `workflow-web` supplies generic runtime query and definition/catalog administration controllers. Generic command APIs are optional and require a specified host contract covering all applicable business checks. APOLO retains booking endpoints and transactional application services; reusable UI can invoke them through a host adapter. No generic start/completion route may bypass approval-basis, membership, eligibility or authorization checks.
+**AGREED shared adapter:** `workflow-web` supplies generic runtime query and definition/catalog administration controllers. Generic command APIs are optional and require a specified host contract covering all applicable business checks. APOLO retains booking endpoints and transactional application services; reusable UI can invoke them through a host adapter. No generic start/completion route may bypass approval-basis, membership, eligibility or authorization checks.
 
 The supplied APOLO controller uses contextual checks through `@auth.hasAuthorization(principal, resource, scope, projectId)`. A workflow ID is not a project ID. APOLO must resolve authorized business context through its own associations; correlation fields are not access authority. The reusable library must not hard-code APOLO's auth bean, permission catalogue or Keycloak types into core contracts. Specify exact task/history/submission and receipt-replay access, plus authorization-aware pagination; filtering an already paginated unrestricted result is not a complete query policy.
 
@@ -1306,8 +1309,8 @@ workflow-engine/
 ├── AGENTS.md
 ├── workflow-core/                   # Ordinary library JAR; owns workflow changelogs
 ├── workflow-test-host/              # Executable Spring Boot host; runs migrations
-├── workflow-web/                    # PROPOSED ordinary HTTP adapter JAR
-├── workflow-ui/                     # PROPOSED Angular 19 library; later designer feature
+├── workflow-web/                    # AGREED target; HTTP adapter JAR, not implemented
+├── workflow-ui/                     # AGREED target; Angular 19 library, not implemented
 ├── dev/
 │   └── workspace-pom.example.xml
 └── docs/
@@ -1331,7 +1334,7 @@ workflow-engine/
             └── examples/
 ```
 
-This tree combines existing modules/governance documents with proposed library extraction, planned feature folders and an optional workspace file. The proposed library directories do not exist as implemented modules by this revision. The agreed source-repository layout nests feature work under `docs/features/`. Active engine designs live under `docs/architecture/` and are linked from `design-sources.md`; supporting APOLO documentation lives under `docs/integrations/apolo/`, and historical discussions under `docs/archive/`. Maintain one authoritative copy of each design. Business-decision artifacts are deferred. The current root POM still aggregates exactly `workflow-core` and `workflow-test-host`; adding web requires the section 3.5 amendment. UI has its own frontend build. Proposed JSON in section 7.4 does not establish implemented workflow behavior or a finalized schema.
+This tree combines existing modules/governance documents with agreed library extraction, planned feature folders and an optional workspace file. The agreed target library directories do not exist as implemented modules by this revision. The agreed source-repository layout nests feature work under `docs/features/`. Active engine designs live under `docs/architecture/` and are linked from `design-sources.md`; supporting APOLO documentation lives under `docs/integrations/apolo/`, and historical discussions under `docs/archive/`. Maintain one authoritative copy of each design. Business-decision artifacts are deferred. The current root POM still aggregates exactly `workflow-core` and `workflow-test-host`; adding web requires a separate implementation request and feature specification under section 3.5. UI has its own frontend build. Proposed JSON in section 7.4 does not establish implemented workflow behavior or a finalized schema.
 
 The eventual source/module destination is:
 
@@ -1344,7 +1347,7 @@ apolo/
 └── workflow-core/                  # Ordinary JAR; owns workflow code and changelogs
 ```
 
-Keep one authoritative copy of core after the move. `workflow-test-host` remains a development convenience with no production dependency from backend. Whether it moves into APOLO as an optional development module or remains outside the normal APOLO build is open; neither choice permits a second maintained copy of core. If the library proposal is adopted, backend also consumes `workflow-web` and frontend consumes `workflow-ui`; their exact source locations and coordinates remain OPEN. Do not maintain separate sandbox and production copies of the reusable implementations.
+Keep one authoritative copy of core after the move. `workflow-test-host` remains a development convenience with no production dependency from backend. Whether it moves into APOLO as an optional development module or remains outside the normal APOLO build is open; neither choice permits a second maintained copy of core. Under the adopted architecture, backend also consumes `workflow-web` and frontend consumes `workflow-ui`; their exact source locations and coordinates remain OPEN. Do not maintain separate sandbox and production copies of the reusable implementations.
 
 `README.md` is the entry point. This design document records architecture; specifications define exact contracts; decision records preserve choices and reasons; evidence records distinguish observed behavior from pending checks. Do not copy the complete architecture into every file. The current verification policy in [AGENTS.md](../../AGENTS.md) authorizes isolated unit tests and integration tests on the dedicated local `apolo_workflow_test` database. Other targets require task-specific authorization; acceptance requirements remain documented and unperformed checks are marked NOT RUN.
 
@@ -1436,7 +1439,7 @@ During separate development, use a combined reactor or locally installed artifac
 
 While builds span two repositories, pin both revisions for reproducibility and verify the supported host baseline. After source integration, APOLO's reactor builds core and backend from the same checkout/release revision, with core participating in APOLO's CI and release lifecycle. Preserve module boundaries and host compatibility checks. Artifact publication then follows APOLO's release policy; it does not require a separate workflow release process.
 
-Under the proposed library arrangement, `workflow-ui` has its own library build and is compiled into the consuming frontend. APOLO's existing Maven frontend packaging can include those resources in the application release; the later designer need not have a separate production deployment artifact. The sandbox shell remains a development application. Exact build ordering, package distribution and source locations require specification; no new build executions are introduced here.
+Under the agreed library arrangement, `workflow-ui` has its own library build and is compiled into the consuming frontend. APOLO's existing Maven frontend packaging can include those resources in the application release; the later designer need not have a separate production deployment artifact. The sandbox shell remains a development application. Exact build ordering, package distribution and source locations require specification; no new build executions are introduced here.
 
 ### 19.5 Planned source integration into APOLO
 
@@ -1479,7 +1482,7 @@ A simplified in-memory repository is useful for fast engine tests, but it is not
 | Security | No self-approval; host country/business checks; unauthorized actors cannot publish, simulate restricted facts, complete tasks, or execute transitions; overrides/reassignment audited |
 | Host configuration | No additional datasource/security chain; intended bean overrides and manager selection work |
 | Task registry | API/import works without the designer; DRAFT/PUBLISHED/RETIRED, equivalent reimports, conflicting published-content rejection and revision-checked draft updates verified; deployed-host capabilities checked at publication; existing references retained on retirement |
-| Proposed UI/web integration | Angular 19 library consumption in an NgModule host; routing, theme/localization and exact data/recovery behavior; explicitly activated API groups, missing-adapter failure, contextual authorization, filtered paging, shared-transaction rollback and durable handoff. NOT RUN by this design revision. |
+| Agreed UI/web integration (implementation pending) | Angular 19 library consumption in an NgModule host; routing, theme/localization and exact data/recovery behavior; explicitly activated API groups, missing-adapter failure, contextual authorization, filtered paging, shared-transaction rollback and durable handoff. NOT RUN by this design revision. |
 | Task screens | APOLO resolves taskType + taskTypeVersion; no formKey/formVersion in V1; unsupported versions fail visibly; domain data and validation remain host-owned |
 | Node model | Five explicit node types; synchronous service inputs/outputs validated; failures roll back; no transition business actions or automatic business-command retries; automatic-step limit enforced |
 | Designer round trip (later milestone) | Supported semantics preserved; unsupported definitions rejected visibly |
@@ -1532,15 +1535,15 @@ The Q identifiers trace the decision questionnaire; F1/F2/F3 reconcile the devel
 | Follow-up F1 | APOLO resolves screens/handlers from taskType + taskTypeVersion; no separate formKey/formVersion initially |
 | Follow-up F2 | Registry administration API with versioned JSON import before the designer; later UI uses the same contract |
 | Follow-up F3 | Workflow engine first; business decision engine optional and not implemented in the first stage. Expressions support simple workflow routing; no initial rules-module/storage/API/editor dependency |
-| Follow-up F4 | Exactly two Maven modules: workflow-core and workflow-test-host. Core is a Spring/JPA-based library owning entities, repositories, services, expressions, integration contracts/configuration and changelog resources. Test host executes migrations locally; APOLO includes the workflow master in its existing Liquibase master as the single production migration owner. Supersedes the framework-independent core artifact and separate expression/persistence/starter modules. |
+| Follow-up F4 (historical module count superseded by F6) | Originally exactly two Maven modules: workflow-core and workflow-test-host. Core is a Spring/JPA-based library owning entities, repositories, services, expressions, integration contracts/configuration and changelog resources. Test host executes migrations locally; APOLO includes the workflow master in its existing Liquibase master as the single production migration owner. Supersedes the framework-independent core artifact and separate expression/persistence/starter modules. |
 | Follow-up F5 | Separate development is the initial phase. workflow-core will become a source/Maven module inside APOLO, alongside backend, and participate in its build/release lifecycle. Backend depends on core; core has no backend code dependency. A permanently separate repository/publishing lifecycle is not required. Move timing, final coordinates and test-host placement remain open. |
 | UI baseline — 2026-11-07 | AGREED: align future reusable workflow UI with Angular 19, targeting APOLO's declared 19.2.x Angular/Material/CDK baseline. Exact patch/tool versions and compatibility require verification; no dependency changes are performed by this decision. |
 
-**Separate proposal — 2026-11-07:** reusable `workflow-ui` and optional `workflow-web`, embedded in the host deployment and consumed by the sandbox, remain PROPOSED under O12. Generic presentation/HTTP reuse preserves host business orchestration and policy. A third Maven module and embeddable designer packaging are not confirmed amendments to F4; they require explicit adoption and feature specifications before implementation.
+**Follow-up F6 — AGREED, 2026-11-07:** the owner adopted reusable `workflow-ui` and optional host-consumed `workflow-web`, embedded in the host deployment and consumed by the sandbox. Constitution 6.0.0 supersedes F4's two-module target with three Maven modules plus the Angular 19 library, and adopts embeddable designer packaging. Generic presentation/HTTP reuse preserves host business orchestration and policy. Exact contracts remain under O12; implementation is not authorized.
 
 Earlier boundaries still apply to workflows and task types: immutable published versions, pinned references, JSON definitions with relational runtime, SQL Server first and host-owned business entities. Equivalent business-decision versioning applies only if the optional component is later introduced. No independent production workflow microservice is planned.
 
-The sibling Maven workspace remains optional during separate development. The two workflow module names and core's eventual destination inside APOLO are agreed. The source-move timing, test-host placement, final coordinates, repository access and release responsibilities remain open. Any interim artifact registry is conditional on a need to distribute artifacts before the move.
+The sibling Maven workspace remains optional during separate development. The core/web/test-host target, Angular UI library and core's eventual destination inside APOLO are agreed. The source-move timing, test-host placement, final coordinates, repository access and release responsibilities remain open. Any interim artifact registry is conditional on a need to distribute artifacts before the move.
 
 <a id="222-unresolved-questions-and-ownership"></a>
 
@@ -1561,7 +1564,7 @@ The sibling Maven workspace remains optional during separate development. The tw
 | O9 | PARTLY AGREED — APOLO infrastructure | APOLO is the single production migration owner and includes core's workflow master in its existing Liquibase master (F4). Deployment-specific migration ordering/settings, durable-handoff adapter, delivery/recovery and retention/redaction remain deferred. Durability and atomicity remain mandatory. |
 | O10 | PARTLY AGREED — source integration and ownership | F5 establishes separate development now and workflow-core inside APOLO later. The current development group is io.github.leontecristian. Settle move timing, final coordinates, test-host placement, access and release/compatibility owners before the move; select an interim artifact registry only if needed. |
 | O11 | PARTLY AGREED — UI integration and later designer | Angular 19 alignment is selected on 2026-11-07; exact compatible versions/toolchain, theme/translation integration, graph library and detailed editor interactions remain OPEN. The designer remains after first APOLO integration. |
-| O12 | PROPOSED — shared UI/web packaging | Resolve the C03/CON-02 amendment, API activation groups, required host adapters, wire compatibility, authorization-aware queries, frontend package exports and source/build placement before extraction. No F011 change or implementation is authorized by revision 0.10. |
+| O12 | AGREED architecture; contracts OPEN | F6 and constitution 6.0.0 adopt web/UI and amend C03/CON-02. Specify API activation groups, required host adapters, wire compatibility, authorization-aware queries, frontend exports and source/build placement before extraction. No F011 change or implementation is authorized by revision 0.11. |
 
 Deferred capabilities include claiming/releasing, candidate assignment, delegation, task expiration, timers/reminders, collective approval, general parallel orchestration, subprocesses and live migration of active instances. Audited administrative reassignment does not imply a general delegation feature.
 

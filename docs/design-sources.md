@@ -1,6 +1,6 @@
 # Design sources and decision status
 
-**UI alignment and integration proposal — 2026-11-07:** the owner selected Angular 19 alignment and requested documentation of proposed `workflow-ui` and `workflow-web` libraries. The [architecture record](architecture/workflow-ui-web-integration.md) captures supplied APOLO reference evidence, responsibilities and open contracts. Angular 19 is the agreed future UI target; extraction, a third Maven module and designer packaging remain PROPOSED. No implementation or F011 change is authorized by this decision.
+**UI/web adoption — 2026-11-07:** after proposal review, the owner adopted `workflow-ui`, `workflow-web` and Angular 19 alignment. Constitution 6.0.0 and main design 0.11 supersede the former two-module target with core/web/test-host Maven modules plus the Angular library, including embedded designer packaging. The [integration record](architecture/workflow-ui-web-integration.md) captures APOLO evidence and open contracts. This is AGREED architecture, not implemented functionality; no implementation or F011 change is authorized.
 
 **F011 selected slice — 2026-11-07:** [Multiple sequential human stages](features/F011-sequential-human-stages/spec.md), IMPLEMENTED revision 1, extends F010 with successive/conditional SINGLE stages, one active position and atomic next-stage entry, following language sections 8–9/15. The subsequent owner request authorized implementation. See the [handover](features/F011-sequential-human-stages/implementation.md) for local verification and the interactive browser gap. Loops, ALL and APOLO policy remain outside this slice.
 
@@ -22,7 +22,7 @@
 
 **Native expression arithmetic clarification — owner correction, 2026-11-05:** L12 uses native SpEL numeric operators, promotion, floating-point approximation, division rounding and integral overflow. Exactness continues to apply to declared input decoding, transport, persistence and accepted submissions; it does not add exact-reference checks or lossless arithmetic to expressions. DECIMAL variables enter as BigDecimal from exact stored text, and literals keep native types. Native errors and resource limits still fail. This supersedes the mistaken rejection-of-inexact-arithmetic interpretation; [F008 revision 3](features/F008-restricted-expressions-routing/spec.md) records the implemented profile. The interpretation clarification leaves constitution version 3.0.0 unchanged.
 
-Updated **2026-11-06** for [constitution v5.0.0](constitution.md); earlier dated decisions retain their historical versions.
+Updated **2026-11-07** for [constitution v6.0.0](constitution.md); earlier dated decisions retain their historical versions.
 
 **Documentation consolidation — 2026-11-01:** the [roadmap](roadmap.md) is the current delivery plan; the [feature index](features/README.md) and feature handovers record implementation and acceptance status. APOLO requirements/references and historical discussions now live in this repository. Dated entries below preserve their original preparation/implementation context; earlier READY or missing-adapter statements are not the current F005/F006 status. No acceptance gate is closed by this consolidation.
 
@@ -46,7 +46,7 @@ Updated **2026-11-06** for [constitution v5.0.0](constitution.md); earlier dated
 
 The active engine architecture, database and workflow definition language designs live under `docs/architecture/`. Supporting APOLO requirements and references live under `docs/integrations/apolo/`; historical discussions and reconciliation live under `docs/archive/`. The relocation preserves source identity, historical `apolo-docs` commit references and decision precedence without requiring a sibling checkout for these documents.
 
-- [Consolidated design](architecture/workflow-engine-design.md): authoritative detailed architecture and section 22 decision register. The constitution was established from v0.7; v0.8 restored concrete design detail and a complete proposed example. Version 0.9 records the owner-selected ordered first-match routing revision without finalizing the remaining JSON contracts.
+- [Consolidated design](architecture/workflow-engine-design.md): authoritative detailed architecture and section 22 decision register. The constitution was established from v0.7; v0.8 restored concrete design detail and a complete proposed example. Version 0.9 records ordered first-match routing; version 0.11 adopts the Angular 19 UI and web libraries under constitution 6.0.0, with exact integration contracts still open.
 - [Database design v1.4](architecture/Workflow_Engine_Database_Design_v1.md): persistence design and owner decisions recorded on 24–25 October 2026. Sections 1 and 21 distinguish selected changes from proposed completion rules, physical details and verification gates. The v1.2 baseline was documentation-repository commit `f7e85c9` and v1.3 was `fe73107`; the 2.2.0 amendment incorporates the subsequent owner-selected JSON-variable revision. This records source identity, not a claim that the v1.4 edit is committed or implemented.
 - [Workflow definition language design](architecture/workflow-definition-language-design.md): design draft and input for later specification work; exact language contracts remain proposals unless explicitly identified as established decisions.
 - [Original-design reconciliation](archive/original-design-reconciliation.md): section-by-section account of retained, restored, adapted and deferred original ideas, including the updated five-node workflow example.
@@ -313,7 +313,7 @@ The owner supplied a review requesting that sections 3.2 and 15 demonstrate mana
 
 - **C01 — specification first:** Q19; design sections 20–22; development plan section 3. The repository workflow supplies the document/task/evidence convention for applying this direction.
 - **C02 — delivery scope:** Q1, Q4–Q9, F2/F3; design sections 1, 7, 9 and 21; task multiplicity superseded by database design sections 1 and 4.
-- **C03 — two modules and boundaries:** F4; design sections 2–4, 8 and 14; technical summary.
+- **C03 — core/web/UI and host boundaries:** F4's module count superseded by owner adoption F6 on 2026-11-07; design 0.11 sections 2–4, 14–19; technical summary. The implemented reactor remains two modules pending separately requested implementation.
 - **C04 — eventual APOLO module:** F5/O10; design sections 19.4–19.5; source-integration guidance in the development plan.
 - **C05 — migration ownership:** F4/O9; design section 11; approval capability persistence/migration requirements.
 - **C06 — command guarantees:** Q11/Q20/O1/O7/O9; design sections 7, 12 and 13; database design sections 9, 14 and 16 for numeric versions, aggregate coordination and host association atomicity.
@@ -339,7 +339,8 @@ Use the consolidated design's section 22 together with database design sections 
 - **O8 — DEFERRED, APOLO:** material fields, snapshots, country/tenant boundaries and concrete permissions/override rules. High-level authorization and material-change policies are already agreed.
 - **O9 — PARTLY AGREED:** single production migration owner is settled; production ordering/settings, durable-handoff adapter, delivery/recovery and retention/redaction details remain APOLO integration work.
 - **O10 — PARTLY AGREED:** core's future location inside APOLO is settled; timing, final coordinates, host placement and release/compatibility responsibilities remain open.
-- **O11 — OPEN, later milestone:** Angular baseline, graph library and detailed designer interactions.
+- **O11 — PARTLY AGREED:** Angular 19 alignment is selected; exact compatible versions/toolchain, theme/translation contracts, graph library and editor interactions remain OPEN. Designer delivery remains after first APOLO integration.
+- **O12 — AGREED architecture, contracts OPEN:** workflow-web/workflow-ui and three target Maven modules are adopted; API groups, adapters, wire compatibility, authorization-aware queries, package exports and source/build placement require specification. No implementation authorization is implied.
 - **Structured submission contract — SELECTED capability, specification pending:** schema language/features, immutable reference resolution, bounds, exact-value/null/default handling, canonicalization, API/errors and prior-activity bindings. Host review visibility, aggregation and retention/redaction remain explicit integration contracts; a JSON decision document does not determine how reviewed material is preserved.
 - **JSON execution data — SELECTED capability, specification pending:** declaration/binding/path syntax, exact encodings and numeric bounds, total instance/read/request/history budgets, null/default/unset semantics, persistence dirty tracking and expression safety. Older scalar contracts remain supported. Storage is not an indexed search contract.
 

@@ -116,12 +116,13 @@ The module should remain focused on the capabilities required by booking approva
 
 ## Agreed module responsibilities
 
-During separate development, the agreed structure has exactly two Maven modules under the workflow parent/aggregator POM:
+Under the 2026-11-07 adoption in constitution 6.0.0, the agreed target has three Maven modules under the workflow parent/aggregator POM. The current implementation still has two; this amendment starts no implementation:
 
 - **workflow-core:** a Spring/JPA-based library containing graph/task models, entities, repositories, workflow and registry services, restricted SpEL support, codecs, integration interfaces/configuration and workflow-specific Liquibase resources. Packages separate execution, persistence and integration responsibilities. Public service contracts remain independent of APOLO, JPA entities and security/messaging-provider types.
+- **workflow-web:** ordinary Spring MVC library JAR depending on core, with reusable controllers/transport mapping and explicitly activated API groups. APOLO supplies required identity/access and business integration; core-only consumption remains possible.
 - **workflow-test-host:** executable Spring Boot sandbox with sample business data, endpoints and reference adapters, host datasource/transaction configuration, JDBC driver, migration execution and SQL Server integration tests.
 
-This supersedes the framework-independent core artifact and the proposed separate expression, persistence and starter artifacts. APOLO and the test host depend on core's ordinary non-executable JAR; core depends on neither host. Only the test host uses executable Boot packaging. The Angular designer builds separately after the first APOLO integration. A business decision engine remains optional and deferred, with no placeholder module required.
+The separate **workflow-ui** Angular 19 library supplies generic pages/components and the later embedded designer, consumed by APOLO and the sandbox shell. It is not another Maven module. This retains the rejection of separate expression, persistence and starter artifacts. Core depends on neither host nor web/UI; web/core use ordinary JAR packaging, and only the test host uses executable Boot packaging in this project. The designer remains after first APOLO integration. A business decision engine remains optional and deferred. Exact web/UI contracts and source/build arrangements need specifications; host business rules and transaction/migration ownership remain unchanged.
 
 At the eventual source move, add core to APOLO's reactor and align its parent and dependency versions with the APOLO root build. Core remains a sibling module of backend, with dependency direction `backend -> workflow-core`; inheriting the root build parent does not authorize a dependency on backend classes. Keep one authoritative core source tree. A permanent independent publishing lifecycle is not required. The move's timing, final coordinates and whether the test host moves into APOLO as an optional development module remain open.
 
@@ -260,4 +261,4 @@ Business decision engine and decision tables; candidate claiming/releasing, gene
 
 ## Open-question reference
 
-The [authoritative decision and remaining-work register](../../architecture/workflow-engine-design.md#222-review-outcomes-remaining-specifications-and-ownership) tracks agreed O1/O2/O6 with specification work remaining, two-module/migration ownership F4, separate development then APOLO source integration F5, O7 pending verification, provisional adjustment behavior, deferred APOLO rules/infrastructure, and source-move/release details. Module names and core's eventual destination are agreed; exact API paths remain proposed. Planned v1 specifications and schemas have not been created by this update.
+The [authoritative decision and remaining-work register](../../architecture/workflow-engine-design.md#222-review-outcomes-remaining-specifications-and-ownership) tracks agreed engine contracts, migration ownership F4, source integration F5 and UI/web adoption F6 (superseding F4's module count), plus O7 verification and O12 integration contracts. APOLO policies, source-move and release details retain their recorded status. Architecture adoption does not finalize API paths or implement libraries.

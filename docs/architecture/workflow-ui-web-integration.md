@@ -1,6 +1,6 @@
 # Workflow UI and REST library integration
 
-**Date:** 2026-11-07. **Status:** PROPOSED architecture, with Angular 19 alignment AGREED by the owner. **Scope:** documentation only; no implementation, dependency change, source move or F011 modification is authorized by this record.
+**Date:** 2026-11-07. **Status:** AGREED architecture under constitution 6.0.0, following the owner's subsequent adoption of workflow-ui and workflow-web. **Scope:** documentation only; no implementation, dependency change, source move or F011 modification is authorized by this record. The [main design revision 0.11](workflow-engine-design.md) owns the consolidated architecture; this record retains integration evidence and details.
 
 ## Purpose and decision status
 
@@ -9,13 +9,13 @@ Allow APOLO to embed reusable workflow pages, components and REST adapters withi
 | Decision | Status and meaning |
 | --- | --- |
 | Align the reusable workflow UI with Angular 19 | AGREED on 2026-11-07. Target APOLO's declared 19.2.x line, including compatible Material/CDK dependencies. Exact patch versions and toolchain remain verification work. |
-| Extract `workflow-ui` as an Angular library | PROPOSED. Full feature pages and embeddable components; no independent production bootstrap or login. |
-| Extract `workflow-web` as an optional Spring MVC library JAR | PROPOSED. Reusable HTTP mapping, requiring host integration and explicit API activation. |
-| Retain a sandbox application shell | PROPOSED. Evolve the existing console to consume the UI library; a second playground application is not required. |
-| Introduce a third Maven module | PROPOSED architectural amendment, not an exception already in force. Current C03/CON-02 still require exactly two modules. |
-| Replace the later standalone production designer with an embeddable library feature | PROPOSED. A development shell remains useful; designer implementation still follows first APOLO integration. |
+| Extract `workflow-ui` as an Angular library | AGREED. Full feature pages and embeddable components; no independent production bootstrap or login. |
+| Extract `workflow-web` as an optional Spring MVC library JAR | AGREED. Reusable HTTP mapping, requiring host integration and explicit API activation. Optional means hosts may consume core directly without web. |
+| Retain a sandbox application shell | AGREED. Evolve the existing console to consume the UI library; a second playground application is not required. |
+| Introduce a third Maven module | AGREED target under C03/CON-02: core, web and test host. The implemented reactor still has two modules; implementation is not authorized. |
+| Replace the later standalone production designer with an embeddable library feature | AGREED. A development shell remains useful; designer implementation still follows first APOLO integration. |
 
-This is an architecture discussion record, not a READY implementation feature. Later extraction/alignment work needs its own four-document feature specification. Do not interpret it as a request to downgrade the existing console, alter F011 or change its acceptance baseline.
+This is an adopted architecture record, not a READY implementation feature. Later extraction/alignment work needs its own four-document feature specification and implementation request. Do not interpret adoption as a request to downgrade the existing console, alter F011 or change its acceptance baseline.
 
 Authority: [constitution](../constitution.md) C03–C10; [constraints](../constraints.md) CON-01–04/06–12; [assumptions](../assumptions.md) ASM-01–06/09; [source precedence](../design-sources.md). Engine language, publication, pinned versions, concurrency, exact JSON values and successful-command replay remain governed by existing feature contracts.
 
@@ -35,7 +35,7 @@ The owner supplied reference copies on 2026-11-07 in the separate `apolo-docs` r
 
 The current [console package](../../workflow-test-host/frontend/package.json) uses Angular 21.2.x. It remains unchanged. Alignment will require a deliberate audit of Angular/Material APIs, providers, templates, build configuration and tests; changing version strings alone is not an implementation plan.
 
-## Proposed dependency and deployment boundaries
+## Agreed dependency and deployment boundaries
 
 ```text
 APOLO frontend ──consumes──> workflow-ui (Angular library)
@@ -46,7 +46,7 @@ Sandbox Angular shell ────> workflow-ui
 workflow-test-host ────────> workflow-web and workflow-core
 ```
 
-APOLO declares core directly when its business services use core APIs. Core depends on neither web, UI nor a host. The proposed web module is an ordinary library JAR, with no server bootstrap. The UI package is an Angular build artifact, not a third Java runtime layer or a required Maven module.
+APOLO declares core directly when its business services use core APIs. Core depends on neither web, UI nor a host. The agreed web module is an ordinary library JAR, with no server bootstrap. The UI package is an Angular build artifact, not a third Java runtime layer or a required Maven module.
 
 Workflow UI is compiled into APOLO's frontend resources; workflow web/core run inside APOLO's backend deployment. Existing Maven frontend packaging can continue to assemble the resources into the application. No separate workflow production service, iframe, microfrontend runtime or additional authentication system is selected.
 
@@ -56,7 +56,7 @@ The source-integration direction remains one authoritative implementation, event
 
 Use Angular 19-compatible library compilation and Angular/Material/CDK peer dependencies appropriate to the selected supported versions. Verify against APOLO's installed dependency set before fixing exact versions. Do not bundle a second Angular runtime. Standalone library components can be consumed by an NgModule application; APOLO need not undergo an application-wide standalone migration. See [Angular library guidance](https://angular.dev/tools/libraries/creating-libraries) and [standalone interoperability](https://v17.angular.io/guide/standalone-components).
 
-The proposed library supplies generic definition administration, task metadata/list presentation, instance views, history and graph components. The later designer may become another entry point. Runtime, management and designer entry points are possible boundaries, not finalized package names or an instruction to create all three immediately.
+The library is intended to supply generic definition administration, task metadata/list presentation, instance views, history and graph components. The later designer may become another entry point. Runtime, management and designer entry points are possible boundaries, not finalized package names or an instruction to create all three immediately.
 
 APOLO supplies route prefixes, navigation/menu integration, login/session handling, authorized API access, business-object navigation, booking review material and business-specific forms. Proposed UI adapters distinguish API access from business command submission. A booking page may embed workflow controls and submit through APOLO's booking endpoint; reusable components must not force every completion through a generic endpoint.
 
@@ -66,7 +66,7 @@ Preserve the existing engine wire semantics: exact BIGINT identifiers/versions, 
 
 ## REST adapter responsibilities and activation
 
-`workflow-web` would contain reusable controllers, transport DTO mapping, bounded request validation and workflow-scoped exception handling. Core remains usable directly from Java without Spring MVC dependencies. Use the existing root WorkflowConfiguration marker for core integration; a proposed separate web configuration would explicitly import its controllers. Explicit configuration imports are supported by [Spring](https://docs.spring.io/spring-framework/reference/core/beans/java/composing-configuration-classes.html).
+`workflow-web` is intended to contain reusable controllers, transport DTO mapping, bounded request validation and workflow-scoped exception handling. Core remains usable directly from Java without Spring MVC dependencies. Use the existing root WorkflowConfiguration marker for core integration; a separate web configuration will explicitly import its controllers. Explicit configuration imports are supported by [Spring](https://docs.spring.io/spring-framework/reference/core/beans/java/composing-configuration-classes.html).
 
 Proposed API groups are runtime queries, definition/catalog administration and optional generic runtime commands. Hosts choose which groups to activate. Group activation is not authorization: every enabled operation still needs trusted actor/access integration. Missing required host adapters must fail configuration rather than fall back to permissive access. Exact configuration classes, URL prefixes, DTOs, adapter signatures and failure responses remain feature specification work. Boot auto-configuration is deferred; adding a dependency should not silently expose endpoints.
 
@@ -76,7 +76,7 @@ Keep APOLO's `auth` bean, permission names, project associations and Keycloak ob
 
 ## Business commands and transaction guarantees
 
-The proposed booking execution path is:
+The agreed booking execution boundary is:
 
 ```text
 Reusable controls in an APOLO business page
@@ -94,21 +94,23 @@ Core continues owning `db/changelog/workflow/workflow-master.xml`; APOLO runs it
 
 ## Relationship to existing architecture and F011
 
-The current two-module architecture is still authoritative for implementation. Adopting `workflow-web` would require an explicit amendment to C03/CON-02 and corresponding host-endpoint descriptions, while preserving C04–C10 guarantees. The proposed designer packaging also needs reconciliation with the roadmap's standalone-application wording. This proposal records those changes for review; it does not silently enact them.
+Constitution 6.0.0 and CON-02 now adopt the three-Maven-module target plus Angular 19 library, superseding the earlier two-module constraint. The main design and roadmap adopt embedded designer packaging while preserving its delivery milestone. C04–C10 guarantees remain. Current POMs and frontend dependencies are unchanged; architecture adoption is not implementation authorization.
 
-Angular 19 is the selected target for future UI alignment, not a claim that the current console has changed. F011 code, fixtures, tasks, dependency versions and acceptance evidence are outside this work. Do not modify or rerun F011 to satisfy this proposal. Coordinate extraction after its active work is complete, retaining its behavior and evidence as the starting baseline.
+Angular 19 is the selected target for future UI alignment, not a claim that the current console has changed. F011 code, fixtures, tasks, dependency versions and acceptance evidence are outside this work. Do not modify or rerun F011 to satisfy this architecture adoption. Coordinate extraction after its active work is complete, retaining its behavior and evidence as the starting baseline.
 
 ## Future specification and verification gates
 
 1. Specify Angular 19 alignment against the supplied APOLO reference baseline, selecting exact compatible framework/Material/compiler/tool versions and auditing current console APIs. Check package consumption in an NgModule host, translations, theme/overlays, routing, auth and exact data/recovery behavior.
-2. Resolve the proposed module/designer architecture amendments and specify the web/UI public contracts before extraction. Preserve the supported core boundary; use technical-layer-first packages in later Java plans. No feature ID or implementation date is assigned here.
+2. Specify the adopted web/UI architecture's public contracts before extraction. Preserve the supported core boundary; use technical-layer-first packages in later Java plans. The module/designer architecture decision is resolved, but no feature ID or implementation date is assigned here.
 3. Extract one bounded shared slice, such as authorized instance history/graph views and their API, and demonstrate it in the sandbox and APOLO. Library builds alone do not establish host integration.
 4. Add management/task execution slices only with defined authorization, business-command, audit and replay contracts. Verify denied operations, historical reads, pagination, shared-transaction rollback, concurrency and durable recovery in the actual host arrangement.
 
-Remaining OPEN items are exact installed frontend/effective backend versions, complete build profiles, API/wire compatibility policy, adapter signatures, theme/translation contracts, production identity topology, shared persistence wiring and durable delivery. These do not prevent documenting the proposal. No additional files are required from the owner for this discussion; request focused evidence when the relevant implementation decision is reached.
+Remaining OPEN items are exact installed frontend/effective backend versions, complete build profiles, API/wire compatibility policy, adapter signatures, theme/translation contracts, production identity topology, shared persistence wiring and durable delivery. These do not reopen the adopted architecture; they remain gates for implementation. No additional files are required from the owner for this discussion; request focused evidence when the relevant implementation decision is reached.
 
 ## Documentation handover
 
-This record and navigation/status notes document the 2026-11-07 owner request. Only Angular 19 alignment is newly AGREED; module extraction remains PROPOSED. No feature implementation, package installation, build, test, host startup, database access, commit or push is part of this task. Static content, local-link and whitespace checks are the applicable verification; they establish document consistency, not runtime compatibility.
+This record began as a proposal on 2026-11-07; the subsequent owner request adopted the UI/web architecture, reflected in constitution 6.0.0 and main design 0.11. Exact contracts remain OPEN. No feature implementation, package installation, build, test, host startup, database access, commit or push is part of the adoption task. Static content, local-link and whitespace checks establish document consistency, not runtime compatibility.
 
 Preparation verification on 2026-11-07: PASS — reviewed the documentation changes and decision-status distinctions; checked 103 local file links across six changed/new documents, including added-file whitespace; `git diff --check` passed. Builds, tests and runtime compatibility checks: NOT RUN (documentation only). No process was started or stopped. F011 feature files and application sources were not changed.
+
+Adoption verification on 2026-11-07: PASS — reconciled constitution/constraints 6.0.0, design 0.11, agent guidance and active navigation/integration records; checked 230 local file links across 13 changed Markdown files, whitespace and code fences. `git diff --check` passed. The change inventory contains no feature files, source code, POMs or dependency manifests. Builds/tests, host startup and database checks: NOT RUN (documentation only); no process was started or stopped. Changes remain uncommitted.

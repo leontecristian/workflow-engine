@@ -1,5 +1,7 @@
 # Workflow engine roadmap
 
+**Architecture adoption — 2026-11-07:** constitution 6.0.0 and main design 0.11 adopt Angular 19 `workflow-ui` and optional host-consumed `workflow-web`. The target has core/web/test-host Maven modules plus the Angular library; the existing reactor/console remain unchanged. Alignment/extraction needs a separate feature specification and implementation request and must not alter F011 scope or evidence. The designer remains after first APOLO integration, delivered within workflow-ui rather than as a separate production application.
+
 **Updated:** 2026-11-07, to record F011 implementation and its remaining interactive browser acceptance gap.
 
 This is the current delivery roadmap. It replaces the separate development plan formerly held in `apolo-docs`. The [feature index](features/README.md) tracks implemented features; each feature's tasks and implementation record own detailed progress and evidence. The [constitution](constitution.md), [constraints](constraints.md) and [design-source precedence](design-sources.md) govern behavior. This roadmap selects no new API, schema, business rule or release date.
@@ -73,7 +75,7 @@ Preserve Java 17 APIs/bytecode, JDK 21 runtime, ordinary JAR packaging and neutr
 
 ## 5. Graphical designer and release
 
-**Designer — after successful first APOLO integration:** deliver the standalone Angular authoring application for supported node types, stable task catalog selection, bindings, ordered routes, JSON inspection, backend validation and explicit publication. Define round-trip compatibility, unknown-feature handling, authoring permissions and preview semantics under CON-11. Diagram layout must not alter route priority; the frontend must not execute the workflow engine or SpEL. The F006 inspector does not close this milestone.
+**Designer — after successful first APOLO integration:** deliver the graphical authoring feature in the Angular 19 workflow-ui library, embedded in APOLO and available through the sandbox development shell for supported node types, stable task catalog selection, bindings, ordered routes, JSON inspection, backend validation and explicit publication. Define round-trip compatibility, unknown-feature handling, authoring permissions and preview semantics under CON-11. Diagram layout must not alter route priority; the frontend must not execute the workflow engine or SpEL. The F006 inspector does not close this milestone.
 
 **Release hardening — throughout delivery, mandatory before production:** verify compatible published-definition support, migrations/upgrades, authorization, expression safety, shared transactions, concurrency/replay, delivery restart/recovery and retention. Establish operational monitoring, recovery procedures and release ownership for APOLO. Final packaging/release arrangements follow the agreed source integration; production guarantees cannot be postponed until after the designer.
 

@@ -1,16 +1,16 @@
 # Project constraints
 
-**UI alignment — owner decision, 2026-11-07:** target Angular 19 for future workflow UI alignment with APOLO's declared 19.2.x line; exact versions/toolchain require compatibility verification. The [UI/web proposal](architecture/workflow-ui-web-integration.md) does not change current dependencies, F011 or CON-02's two-module implementation boundary. `workflow-ui`/`workflow-web` extraction remains proposed and is not implementation authorization.
+**Architecture adoption — owner decision, 2026-11-07:** `workflow-ui` and `workflow-web` are AGREED under constitution 6.0.0. Target Angular 19 with APOLO's 19.2.x line; exact versions/toolchain require verification. CON-02 now defines three target Maven modules plus a separate Angular library. The [integration record](architecture/workflow-ui-web-integration.md) distinguishes adopted architecture from pending implementation. Existing dependencies, POMs and F011 remain unchanged.
 
 **F009 test-baseline exception — owner decision, 2026-11-06:** [F009 revision 2, D17](features/F009-json-execution-variables/spec.md) removes backward-compatibility obligations for pre-F009 Java APIs, formats and existing test data. Core/test-host callers may change together; old readers, compatibility overloads, dual limit profiles and old-data conversion are unnecessary. D15 capacities remain, but fresh test-schema/rebaseline or migration setup may establish them instead of a mandatory preserving forward migration. New executions still require history/evidence, pinned immutable definitions, concurrency, transactions and authorized idempotent replay. This scoped exception supersedes contrary older wording below; it grants no production compatibility waiver and authorizes no code/data changes in this documentation-only task.
 
 **Owner correction — 2026-11-05:** expression arithmetic follows native SpEL numeric behavior, including floating-point approximation, promotion, rounding and integral overflow. Do not reject a result solely for precision loss or compare it with an exact reference calculation. Declared DECIMAL variables enter evaluation as BigDecimal; decimal literals retain native SpEL types. Native evaluation errors and resource limits still fail the command. Exact decoding, transport, persistence and accepted-submission rules remain unchanged. This supersedes earlier expression-arithmetic exactness wording and the misinterpreted numeric owner decision.
 
-**Version:** 5.0.0
+**Version:** 6.0.0
 
-**Recorded:** 2026-11-06
+**Recorded:** 2026-11-07
 
-**Applies to:** constitution v5.0.0 and the current separate-development phase
+**Applies to:** constitution v6.0.0 and the current separate-development phase
 
 Constraints are confirmed boundaries that specifications and implementations must satisfy. They are requirements, not evidence that the corresponding behavior already exists. This document makes the [constitution](constitution.md) operational without replacing the detailed [consolidated design](architecture/workflow-engine-design.md).
 
@@ -25,23 +25,26 @@ References below identify constitution principles and sections/decision IDs in t
 
 **Trace:** C03/C10; design sections 3–4; Q2/O7; [technical summary](integrations/apolo/apolo-technical-summary.md).
 
-## CON-02 — Two modules and the eventual source move
+## CON-02 — Three target Maven modules, Angular library and source integration
 
-- The separate project has exactly `workflow-core` and `workflow-test-host` Maven modules, with internal packages separating core responsibilities.
-- Core is an ordinary library JAR. The test host is the executable Spring Boot application and depends on core.
-- Core has no dependency on either host's implementation, the designer or a concrete optional decision engine.
+- The agreed target is exactly `workflow-core`, `workflow-web` and `workflow-test-host` Maven modules, with packages separating core responsibilities. The implemented reactor still has two modules; adoption authorizes no implementation.
+- Core and web are ordinary library JARs; web depends on core. The executable test host consumes them and provides sample policy/infrastructure. Hosts using core directly need not consume web.
+- `workflow-ui` is a separate Angular 19 library, targeting compatible 19.2.x Angular/Material/CDK versions. It supplies embeddable pages/components and the later designer, consumed by APOLO and the sandbox shell. It does not require another Maven module or production application.
+- Core has no dependency on web/UI, either host's implementation, the designer or a concrete optional decision engine. Hosts declare direct dependencies on the libraries they use.
 - Core will join APOLO as a sibling Maven module of backend, retaining its boundary and joining APOLO's build/release lifecycle. Review the effective root parent before reparenting; backend must not become core's parent.
-- Keep one authoritative core implementation. The test host stays outside backend's production dependency graph. The later Angular designer has a separate frontend build.
+- Keep one authoritative implementation of each reusable library. APOLO backend consumes web/core; its frontend compiles workflow-ui into its existing deployment. The test host stays outside backend's production dependency graph. Designer delivery remains after first APOLO integration.
 
 Move timing, final coordinates and the test host's future location remain open.
 
-**Trace:** C03/C04; design sections 3, 14, 18 and 19.5; F4/F5/O10.
+**Trace:** C03/C04; design sections 3, 14–19; F4 as amended by F6 on 2026-11-07, F5/O10/O12.
 
 ## CON-03 — Host ownership and neutral integration contracts
 
 Core owns reusable workflow behavior, persistence, expressions and integration contracts. Public commands, results, events and interfaces use workflow-owned or standard Java types. They must not expose JPA/APOLO entities, security-provider objects, JDBC connections or transport-provider classes.
 
 The host owns business data/rules, identity, authorization policy, domain endpoints, screens, datasource, transaction infrastructure, connection pool, runtime configuration and external delivery. Core must not silently create competing infrastructure or alter the host's global JSON mapper. External user/business references are stable logical identifiers, without JPA relationships or schema dependencies on APOLO entities.
+
+Web/UI share generic HTTP and presentation implementation while hosts retain activation and policy. Explicitly activate API groups and require host adapters; missing adapters must not grant access. Scope web error handling to its controllers. UI must respect host authentication, HTTP, routing, localization and theme configuration without importing APOLO implementation services. Backend checks remain authoritative, including authorized historical reads/replay and pagination. Preserve exact IDs/JSON values and frozen recovery payloads. Neither library adds a separate security chain, server, transaction manager, migration runner or application login.
 
 APOLO booking endpoints own business orchestration. Generic workflow endpoints must not bypass booking validation. Named extensions are registered capabilities, not class names or arbitrary bean access supplied by definition authors.
 

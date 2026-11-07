@@ -2,11 +2,11 @@
 
 **F009 test-baseline exception — owner decision, 2026-11-06:** [F009 revision 2, D17](features/F009-json-execution-variables/spec.md) removes backward-compatibility obligations for pre-F009 Java APIs, formats and existing test data. Core/test-host callers may change together; old readers, compatibility overloads, dual limit profiles and old-data conversion are unnecessary. D15 capacities remain, but fresh test-schema/rebaseline or migration setup may establish them instead of a mandatory preserving forward migration. New executions still require history/evidence, pinned immutable definitions, concurrency, transactions and authorized idempotent replay. This scoped exception supersedes contrary older wording below; it grants no production compatibility waiver and authorizes no code/data changes in this documentation-only task.
 
-**Version:** 5.0.0
+**Version:** 6.0.0
 
-**Recorded:** 2026-11-06
+**Recorded:** 2026-11-07
 
-**Applies to:** constitution v5.0.0 and planning for APOLO integration
+**Applies to:** constitution v6.0.0 and planning for APOLO integration
 
 An assumption is an expectation used for planning whose supporting evidence is incomplete. It must not be presented as a confirmed contract or an implemented guarantee. [Constraints](constraints.md) remain requirements even when the feasibility or mechanism for satisfying them needs verification.
 
@@ -15,6 +15,8 @@ The items below derive from the [consolidated design](architecture/workflow-engi
 No item is marked verified merely because it is plausible. Follow the [current verification policy](specification-driven-development.md#verification-and-current-no-tests-policy): isolated unit tests and guarded database integration tests on `localhost:1433/apolo_workflow_test` are authorized; other targets require task-specific authorization. Required evidence is still distinct from a passing test result.
 
 ## ASM-01 — A compatible shared dependency baseline can be established
+
+**UI/web adoption — 2026-11-07:** workflow-web and Angular 19 workflow-ui are agreed architecture, not verified compatibility. Supplied APOLO ranges identify the 19.2.x target, while the current console remains on Angular 21. Verify exact framework/Material/compiler/tool versions, NgModule library consumption, routing/theme/localization and HTTP/auth integration. Web still requires verified host security and shared transaction participation. Adoption closes no ASM verification gate and changes no F011 evidence.
 
 **Status:** PENDING VERIFICATION — O7.
 

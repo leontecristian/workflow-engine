@@ -1,6 +1,6 @@
 # Workflow project constitution
 
-**UI integration planning — 2026-11-07:** Angular 19 is the owner-selected target for future reusable workflow UI alignment. The [UI/web architecture proposal](architecture/workflow-ui-web-integration.md) records proposed libraries and host responsibilities. This does not amend C03's current two-module requirement or authorize implementation; adopting `workflow-web` requires a later explicit architectural amendment. Constitution 5.0.0 and F011 remain unchanged by this planning record.
+**UI/web architecture adoption — 2026-11-07:** the owner adopted `workflow-ui` and `workflow-web` as AGREED architecture. Version 6.0.0 supersedes C03's two-module target with three Maven modules plus an Angular 19 library, while retaining host business ownership and runtime guarantees. See the [integration record](architecture/workflow-ui-web-integration.md). This is documentation-only authorization: the implemented reactor still has two modules, the console remains on Angular 21, and F011 is unchanged.
 
 **F011 implementation — 2026-11-07:** [Multiple sequential human stages](features/F011-sequential-human-stages/spec.md), IMPLEMENTED revision 1, adds successive/conditional SINGLE stages under existing C06–C09. The [handover](features/F011-sequential-human-stages/implementation.md) separates local unit/build, guarded SQL and HTTP evidence from blocked interactive browser acceptance. Constitution 5.0.0 is unchanged; loops, ALL and APOLO policy remain outside this slice.
 
@@ -10,11 +10,11 @@
 
 **Owner correction — 2026-11-05:** expression arithmetic follows native SpEL numeric behavior, including floating-point approximation, promotion, rounding and integral overflow. Do not reject a result solely for precision loss or compare it with an exact reference calculation. Declared DECIMAL variables enter evaluation as BigDecimal; decimal literals retain native SpEL types. Native evaluation errors and resource limits still fail the command. Exact decoding, transport, persistence and accepted-submission rules remain unchanged. This supersedes earlier expression-arithmetic exactness wording and the misinterpreted numeric owner decision.
 
-**Version:** 5.0.0
+**Version:** 6.0.0
 
 **Established:** 2026-10-24
 
-**Last amended:** 2026-11-06 (F009 disposable test baseline; retain runtime evidence going forward)
+**Last amended:** 2026-11-07 (adopt reusable Angular 19 UI and optional web adapter; no implementation)
 
 **Basis:** consolidated design v0.9, database design v1.4 and subsequent owner decisions; see [design sources](design-sources.md) for precedence and proposal status
 
@@ -42,18 +42,21 @@ The standalone business decision engine is optional later work. Initial delivery
 
 Claim/release, candidate groups, general delegation, timers, expiration, advanced collective policies such as ANY/QUORUM, parallel orchestration, subprocesses and live migration of active instances remain deferred. Audited administrative reassignment does not authorize a general delegation feature. New capabilities require a concrete need and a specification; changes to this scope require an amendment.
 
-## C03 — Keep two modules and a clear host boundary
+## C03 — Reusable core, web and UI with a clear host boundary
 
-Develop separately now with exactly two Maven modules:
+The agreed target for separate development has exactly three Maven modules:
 
 - `workflow-core`: ordinary library JAR containing workflow models, JPA entities/repositories, services, expressions, codecs, neutral integration interfaces/configuration and workflow changelog resources.
+- `workflow-web`: ordinary Spring MVC library JAR depending on core, containing reusable HTTP controllers, transport mapping and scoped error handling. Hosts explicitly activate API groups and supply required integration adapters; consumption is optional for hosts using core directly.
 - `workflow-test-host`: executable Spring Boot development host containing sample endpoints/adapters and the infrastructure needed to run core locally.
 
-Use packages within core to separate responsibilities. Core MUST NOT depend on the test host, APOLO backend implementation, designer or a concrete optional business decision engine.
+`workflow-ui` is a separate Angular 19-compatible library, targeting APOLO's 19.2.x Angular/Material/CDK line; it is not an additional Maven module. It supplies reusable pages/components and the later designer within APOLO's application shell. The existing sandbox console will become a development consumer of the same library. Exact versions, adapters, exports and build arrangement require specification and verification. The implemented two-module reactor and Angular 21 console remain unchanged until separately requested implementation.
+
+Use packages within core to separate responsibilities. Core MUST NOT depend on web, UI, the test host, APOLO backend implementation, designer or a concrete optional business decision engine. Dependency direction is host → web → core, with direct host → core dependencies when used. Keep one authoritative implementation of each reusable library.
 
 Core may use Spring/JPA internally. Public integration contracts MUST use standard Java or workflow-owned types, without exposing JPA entities, APOLO entities, security-provider objects, JDBC connections or messaging-provider classes. External users and business objects are referenced by stable identifiers.
 
-Hosts own web endpoints, identity, authorization policy, business data/rules, datasource, transaction infrastructure, connection pooling, runtime configuration and external delivery. Core MUST NOT silently create another datasource, transaction manager, application context, security chain or web server, or mutate the host's global JSON mapper.
+Hosts own endpoint activation, identity, authorization policy, business data/rules and orchestration, navigation, business forms, datasource, transaction infrastructure, connection pooling, runtime configuration and external delivery. Web/UI share generic implementation, not host policy. Required adapters MUST NOT fall back to permissive authorization; generic commands MUST NOT bypass host business validation. The libraries MUST NOT create competing infrastructure, login/bootstrap or security chains, or mutate global host JSON/theme/provider settings. UI consumes host-approved APIs and preserves exact values and command recovery; backend enforcement remains authoritative.
 
 ## C04 — Prepare for source integration into APOLO
 
@@ -62,6 +65,8 @@ Hosts own web endpoints, identity, authorization policy, business data/rules, da
 The move MUST review APOLO's effective root parent, shared versions and plugin configuration before reparenting core. Backend is neither core's parent nor its code dependency. Preserve ordinary JAR packaging and avoid inheriting backend-only infrastructure dependencies.
 
 Move timing, final coordinates and the test host's future location remain open. The test host stays outside backend's production dependency graph. A permanently separate repository or publishing lifecycle is not required.
+
+The adopted web/UI libraries follow the same single-implementation principle: APOLO backend consumes web/core and its frontend compiles the Angular library into its existing application. Their final source locations, coordinates and distribution remain OPEN. This selects no separate production workflow server or frontend application; designer delivery remains after first APOLO integration.
 
 ## C05 — Core owns schema; the host owns migration execution
 
@@ -163,6 +168,7 @@ The consolidated design and database design remain the detailed architectural so
 
 ## Amendment history
 
+- **6.0.0 — 2026-11-07:** owner adopted workflow-ui and workflow-web. C03 replaces the two-module target with core/web/test-host Maven modules and a separate Angular 19 library; C04 records embedded host consumption and shared implementation. Host policy, transaction/migration ownership, exact data, replay and durable handoff remain mandatory. The major revision reflects the replaced architectural constraint, not a runtime/API release. Design 0.11, constraints, assumptions and active guidance are reconciled; exact integration contracts remain OPEN. No implementation, dependency edits or F011 changes.
 - **5.0.0 — 2026-11-06:** owner removed F009 old-API/format/test-data compatibility requirements. C10 records the scoped exception to prior baseline preservation; F009 revision 2 directly updates APIs/callers and may use fresh test-schema setup. History, pinned definitions, transactions, concurrency and idempotency remain required going forward. Governing designs/constraints/assumptions and F009 records are reconciled. No code, data deletion, migration execution or production compatibility waiver. Earlier dated decisions remain historical.
 
 - **4.0.0 — 2026-11-06:** owner deferred per-field structure schemas for JSON start/service/variable data to avoid maintaining a second DTO contract. C08 changes the previously mandatory validation scope, hence a major constitution version. CON-14, ASM-11, source precedence and architecture/language/database notes are reconciled; [F009](features/F009-json-execution-variables/spec.md) is DRAFT. Task-result schemas remain separate. Preserve scalar/F008 behavior and published definitions; future schemas must not retroactively constrain schema-free snapshots. Inspect existing json_value storage before proposing any migration. No runtime code, applied migration or historical evidence changes.

@@ -14,11 +14,11 @@ Read these documents in order:
 6. [Coding standards](coding-standards.md): practical clean-code guidance for Java, Spring, JPA and Lombok, applied during implementation and review.
 7. [Package structure](package-structure.md): agreed technical-layer-first Java hierarchy, dependency boundaries and exact F002 package assignments.
 
-The constitution is version **5.0.0**, established on **2026-10-24** and last amended on **2026-11-06** to permit a disposable F009 test baseline without backward compatibility, while retaining new-execution history and guarantees. The earlier JSON field-schema deferral remains. [F009](features/F009-json-execution-variables/spec.md) is IMPLEMENTED at revision 3; its handover records local automated evidence and remaining browser/APOLO gaps. Task-result schemas and existing scalar/F008 behavior remain unchanged. Earlier feature records retain their historical constitution baselines.
+The constitution is version **6.0.0**, established on **2026-10-24** and last amended on **2026-11-07** to adopt reusable workflow-web and Angular 19 workflow-ui libraries. The agreed target is core/web/test-host Maven modules plus the Angular library; implementation has not begun. Earlier F009 compatibility decisions and runtime guarantees remain unchanged. Earlier feature records retain their historical constitution baselines and acceptance evidence.
 
 ## Document responsibilities
 
-The [workflow UI and REST integration proposal](architecture/workflow-ui-web-integration.md) records the owner-selected Angular 19 target and proposed `workflow-ui`/`workflow-web` boundaries. This is documentation only; the current module structure and F011 work remain unchanged.
+The [workflow UI and REST integration record](architecture/workflow-ui-web-integration.md) records the agreed Angular 19 target and adopted `workflow-ui`/`workflow-web` boundaries, consolidated in main design revision 0.11. This is documentation only; implemented modules/dependencies and F011 remain unchanged.
 
 The constitution defines constraints that all feature specifications must respect. The [consolidated design](architecture/workflow-engine-design.md) remains the detailed architectural baseline, with scoped superseding decisions from [database design v1.4](architecture/Workflow_Engine_Database_Design_v1.md) documented in [design sources](design-sources.md). Active engine designs live in `docs/architecture/`, including the proposed [workflow definition language](architecture/workflow-definition-language-design.md). Feature specifications will define exact behavior within those constraints. Plans describe the intended approach; tasks track execution; implementation records what was built and actually checked.
 
