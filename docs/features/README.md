@@ -1,5 +1,7 @@
 # Feature specifications
 
+[F012 — Angular 19 frontend alignment](F012-angular-19-frontend-alignment/spec.md) is **READY revision 1** (2026-11-07), specification only. Align the existing console with Angular 19.2 while preserving exact data, command recovery and F011 behavior. Library extraction and APOLO runtime integration are excluded. See the [plan](F012-angular-19-frontend-alignment/plan.md), [tasks](F012-angular-19-frontend-alignment/tasks.md) and [handover](F012-angular-19-frontend-alignment/implementation.md). Implementation has not been requested or started.
+
 [F011 — Multiple sequential human stages](F011-sequential-human-stages/spec.md) is **IMPLEMENTED revision 1** (2026-11-07): successive/conditional SINGLE stages, atomic entry, exact historical contracts and stable completion/replay identity. Its [handover](F011-sequential-human-stages/implementation.md) records unit/build, guarded SQL and HTTP outcomes; interactive browser acceptance remains blocked. See the [plan](F011-sequential-human-stages/plan.md) and [tasks](F011-sequential-human-stages/tasks.md).
 
 [F010 — Human-task outcomes and outcome-based routing](F010-human-task-outcomes/spec.md) is **IMPLEMENTED revision 1** (2026-11-06): 1–16 outcomes and exact routes within one SINGLE human stage, per-outcome comments and pinned console actions. See its [plan](F010-human-task-outcomes/plan.md), [tasks](F010-human-task-outcomes/tasks.md) and [handover](F010-human-task-outcomes/implementation.md) for automated/HTTP verification and the completed Chrome walkthrough.

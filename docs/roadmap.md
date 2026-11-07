@@ -1,5 +1,7 @@
 # Workflow engine roadmap
 
+**Selected frontend preparation — 2026-11-07:** [F012 — Angular 19 frontend alignment](features/F012-angular-19-frontend-alignment/spec.md) is READY revision 1, documentation only. It aligns the existing sandbox before shared UI/web extraction, preserving F011 behavior and historical evidence. Its [plan](features/F012-angular-19-frontend-alignment/plan.md) defines dependency, bootstrap, build and browser gates; implementation requires a subsequent request. Shared instance-viewer extraction remains a later proposed slice, and existing acceptance gaps remain open.
+
 **Architecture adoption — 2026-11-07:** constitution 6.0.0 and main design 0.11 adopt Angular 19 `workflow-ui` and optional host-consumed `workflow-web`. The target has core/web/test-host Maven modules plus the Angular library; the existing reactor/console remain unchanged. Alignment/extraction needs a separate feature specification and implementation request and must not alter F011 scope or evidence. The designer remains after first APOLO integration, delivered within workflow-ui rather than as a separate production application.
 
 **Updated:** 2026-11-07, to record F011 implementation and its remaining interactive browser acceptance gap.
