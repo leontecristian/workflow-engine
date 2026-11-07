@@ -54,4 +54,23 @@ class RuntimeReceiptUnitTest {
             assertEquals(Category.UNSUPPORTED_VERSION,assertThrows(WorkflowExecutionException.class,() -> json.replay(invalid,id,op,ctx,new byte[32])).category());
         }
     }
+    @Test void completedTaskReceiptCanRetainAWaitingInstanceAndALaterEntryTime() throws Exception {
+        var root=(com.fasterxml.jackson.databind.node.ObjectNode)json.tree(resource("extended-complete.json"));
+        var instance=(com.fasterxml.jackson.databind.node.ObjectNode)root.get("instance");
+        var activity=(com.fasterxml.jackson.databind.node.ObjectNode)root.get("activity");
+        var task=(com.fasterxml.jackson.databind.node.ObjectNode)root.get("task");
+        activity.put("enteredAt","2026-01-01T12:00:00Z"); task.put("createdAt","2026-01-01T12:00:00Z");
+        for(boolean waiting:new boolean[]{false,true}) {
+            if(waiting) {
+                instance.put("status","ACTIVE").put("currentNodeKey","SUCCESSOR");
+                instance.putNull("resultKey").putNull("endedAt").putNull("endedBy");
+            }
+            var receipt=new WorkflowCommandReceiptEntity(id,1,WorkflowOperation.COMPLETE_TASK.name(),ActorKind.USER,"reviewer",new byte[32],
+                    RuntimeJson.FINGERPRINT_VERSION,LocalDateTime.parse("2026-01-02T00:00:00"),json.encode(root),(short)3);
+            var result=json.replay(receipt,id,WorkflowOperation.COMPLETE_TASK,context("reviewer"),new byte[32]).orElseThrow();
+            assertEquals(waiting?"ACTIVE":"COMPLETED",result.instance().status().name());
+            assertEquals("COMPLETED",result.task().status().name());
+            assertEquals("COMPLETED",result.activity().status().name());
+        }
+    }
 }

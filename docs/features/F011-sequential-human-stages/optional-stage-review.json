@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 1,
+  "key": "optionalStageReview",
+  "version": 1,
+  "name": "Optional partner after quantity service",
+  "startPolicy": {
+    "inputContract": [
+      {
+        "key": "quantity",
+        "type": "LONG",
+        "required": true,
+        "nullable": false
+      }
+    ],
+    "initialize": {
+      "quantity": {
+        "source": "startInput",
+        "key": "quantity"
+      }
+    }
+  },
+  "variables": [
+    {
+      "key": "quantity",
+      "type": "LONG",
+      "nullable": false
+    },
+    {
+      "key": "recordedQuantity",
+      "type": "LONG",
+      "nullable": false
+    }
+  ],
+  "nodes": [
+    {
+      "key": "BEGIN",
+      "type": "START",
+      "name": "Begin"
+    },
+    {
+      "key": "MANAGER",
+      "type": "HUMAN_TASK",
+      "name": "Manager review",
+      "taskType": "SANDBOX_REVIEW",
+      "assignment": {
+        "resolver": "sandbox.singleReviewer",
+        "inputs": {}
+      },
+      "completion": {
+        "policy": "SINGLE"
+      },
+      "inputContract": [],
+      "resultContract": {
+        "mode": "FORBIDDEN"
+      },
+      "outcomes": [
+        {
+          "key": "APPROVE",
+          "label": "Approve",
+          "requiresComment": false
+        },
+        {
+          "key": "REJECT",
+          "label": "Reject",
+          "requiresComment": true
+        }
+      ]
+    },
+    {
+      "key": "PARTNER",
+      "type": "HUMAN_TASK",
+      "name": "Partner review",
+      "taskType": "SANDBOX_REVIEW",
+      "assignment": {
+        "resolver": "sandbox.singleReviewer",
+        "inputs": {}
+      },
+      "completion": {
+        "policy": "SINGLE"
+      },
+      "inputContract": [],
+      "resultContract": {
+        "mode": "FORBIDDEN"
+      },
+      "outcomes": [
+        {
+          "key": "APPROVE",
+          "label": "Approve",
+          "requiresComment": false
+        },
+        {
+          "key": "REJECT",
+          "label": "Reject",
+          "requiresComment": true
+        }
+      ]
+    },
+    {
+      "key": "APPROVED",
+      "type": "END",
+      "name": "Approved",
+      "result": "APPROVED"
+    },
+    {
+      "key": "REJECTED",
+      "type": "END",
+      "name": "Rejected",
+      "result": "REJECTED"
+    },
+    {
+      "key": "RECORD",
+      "type": "SERVICE_TASK",
+      "name": "Record quantity",
+      "action": "sandbox.recordQuantity",
+      "inputs": {
+        "quantity": {
+          "source": "variable",
+          "key": "quantity"
+        }
+      },
+      "outputs": {
+        "recordedQuantity": {
+          "source": "actionOutput",
+          "key": "recordedQuantity"
+        }
+      }
+    },
+    {
+      "key": "ROUTE",
+      "type": "EXCLUSIVE_GATEWAY",
+      "name": "Partner required?"
+    }
+  ],
+  "transitions": [
+    {
+      "key": "begin",
+      "from": "BEGIN",
+      "to": "MANAGER"
+    },
+    {
+      "key": "managerApprove",
+      "from": "MANAGER",
+      "to": "RECORD",
+      "outcome": "APPROVE"
+    },
+    {
+      "key": "managerReject",
+      "from": "MANAGER",
+      "to": "REJECTED",
+      "outcome": "REJECT"
+    },
+    {
+      "key": "partnerApprove",
+      "from": "PARTNER",
+      "to": "APPROVED",
+      "outcome": "APPROVE"
+    },
+    {
+      "key": "partnerReject",
+      "from": "PARTNER",
+      "to": "REJECTED",
+      "outcome": "REJECT"
+    },
+    {
+      "key": "record",
+      "from": "RECORD",
+      "to": "ROUTE"
+    },
+    {
+      "key": "needsPartner",
+      "from": "ROUTE",
+      "to": "PARTNER",
+      "condition": "#vars.recordedQuantity > 10"
+    },
+    {
+      "key": "skipPartner",
+      "from": "ROUTE",
+      "to": "APPROVED",
+      "default": true
+    }
+  ]
+}

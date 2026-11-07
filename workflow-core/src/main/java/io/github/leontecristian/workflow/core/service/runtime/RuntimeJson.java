@@ -183,13 +183,14 @@ public class RuntimeJson {
                 && activity.completionPolicy() == CompletionPolicy.SINGLE
                 && activity.requiredTaskCount() == 1 && activity.contributionOutcomeKey() == null
                 && (activity.reviewRevisionRef() == null || RuntimeInputs.text(activity.reviewRevisionRef(), 200, 200, true))
-                && instance.startedAt().equals(activity.enteredAt()) && activity.enteredAt().equals(task.createdAt())
+                && validTime(activity.enteredAt()) && !activity.enteredAt().isBefore(instance.startedAt()) && activity.enteredAt().equals(task.createdAt())
                 && RuntimeInputs.key(task.taskKey()) && RuntimeInputs.text(task.assignedUserRef(), 200, 200, true) && task.dueAt() == null,
                 Category.HOST_CONFIGURATION);
         if (operation == WorkflowOperation.START_WORKFLOW) {
             RuntimeInputs.require(instance.status() == InstanceStatus.ACTIVE
                     && activity.status() == ActivityStatus.ACTIVE
                     && task.status() == TaskStatus.OPEN
+                    && instance.startedAt().equals(activity.enteredAt())
                     && instance.currentNodeKey().equals(activity.nodeKey()) && instance.resultKey() == null
                     && instance.endedAt() == null && instance.endedBy() == null && activity.outcomeKey() == null
                     && activity.closedAt() == null && activity.closedBy() == null && activity.closureReason() == null
@@ -197,18 +198,23 @@ public class RuntimeJson {
                     && instance.startedBy().equals(receipt.getActorRef()) && instance.startedAt().equals(RuntimeViews.instant(receipt.getRecordedAt())),
                     Category.HOST_CONFIGURATION);
         } else {
-            RuntimeInputs.require(instance.status() == InstanceStatus.COMPLETED
+            boolean terminal = instance.status() == InstanceStatus.COMPLETED;
+            RuntimeInputs.require((terminal || instance.status() == InstanceStatus.ACTIVE)
                     && activity.status() == ActivityStatus.COMPLETED
                     && task.status() == TaskStatus.COMPLETED
-                    && RuntimeInputs.key(instance.resultKey()) && validTime(instance.endedAt()) && !instance.endedAt().isBefore(instance.startedAt())
-                    && instance.endedAt().equals(activity.closedAt()) && activity.closedAt().equals(task.closedAt())
+                    && (terminal ? RuntimeInputs.key(instance.resultKey()) && validTime(instance.endedAt())
+                        && instance.endedAt().equals(activity.closedAt()) && receipt.getActorRef().equals(instance.endedBy())
+                        : instance.resultKey() == null && instance.endedAt() == null && instance.endedBy() == null
+                            && !instance.currentNodeKey().equals(activity.nodeKey()))
+                    && validTime(activity.closedAt()) && !activity.closedAt().isBefore(activity.enteredAt())
+                    && activity.closedAt().equals(task.closedAt())
                     && receipt.getActorKind() == ActorKind.USER
-                    && receipt.getActorRef().equals(instance.endedBy()) && receipt.getActorRef().equals(activity.closedBy())
+                    && receipt.getActorRef().equals(activity.closedBy())
                     && receipt.getActorRef().equals(task.closedBy()) && receipt.getActorRef().equals(task.assignedUserRef())
                     && "TASK_OUTCOME".equals(activity.closureReason())
                     && task.closureReason() == TaskClosureReason.TASK_OUTCOME
                     && RuntimeInputs.key(task.outcomeKey()) && task.outcomeKey().equals(activity.outcomeKey())
-                    && instance.endedAt().equals(RuntimeViews.instant(receipt.getRecordedAt())), Category.HOST_CONFIGURATION);
+                    && activity.closedAt().equals(RuntimeViews.instant(receipt.getRecordedAt())), Category.HOST_CONFIGURATION);
         }
     }
     private boolean validTime(java.time.Instant time) {

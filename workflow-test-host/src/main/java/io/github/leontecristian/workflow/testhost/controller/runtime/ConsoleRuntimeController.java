@@ -246,7 +246,7 @@ public class ConsoleRuntimeController {
                 reads.listTasks(
                         key, after(r.getParameter("afterId")), limit(r.getParameter("limit")));
         return wire.response(
-                wire.page(page.items(), page.nextAfterId(), "nextAfterId", WorkflowTaskView::id));
+                wire.page(page.items().stream().filter(access::canReadTask).toList(), page.nextAfterId(), "nextAfterId", WorkflowTaskView::id));
     }
 
     @GetMapping("/instances/{id}/history")

@@ -63,11 +63,12 @@ public class WorkflowDefinitionRuntimeReader {
         ServiceBindingValidation.check(definition.model(),actions,diagnostics);
         if (diagnostics.failed()) throw corrupt();
         var snapshot = capabilities.snapshot();
-        var human = definition.model().human();
-        if (snapshot == null || snapshot.taskTypes().stream().noneMatch(c -> c.taskType().equals(human.taskType())
-                && human.outcomes().stream().allMatch(outcome -> c.supportedOutcomes().contains(outcome.key())))
-                || (starting && snapshot.assignments().stream().noneMatch(c -> c.resolver().equals(human.assignment().resolver()))))
-            throw corrupt();
+        for (var human : definition.model().humans().values()) {
+            if (snapshot == null || snapshot.taskTypes().stream().noneMatch(c -> c.taskType().equals(human.taskType())
+                    && human.outcomes().stream().allMatch(outcome -> c.supportedOutcomes().contains(outcome.key())))
+                    || (starting && snapshot.assignments().stream().noneMatch(c -> c.resolver().equals(human.assignment().resolver()))))
+                throw corrupt();
+        }
     }
 
     private ExecutableDefinition inspect(WorkflowDefinitionVersionEntity version) {

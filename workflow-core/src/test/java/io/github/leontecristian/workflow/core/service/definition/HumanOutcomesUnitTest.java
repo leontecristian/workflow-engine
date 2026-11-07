@@ -56,9 +56,9 @@ class HumanOutcomesUnitTest {
             var diagnostics = new DefinitionDiagnostics();
             var model = loader.model(codec.ingest(root.toString()), diagnostics);
             assertThat(diagnostics.report().diagnostics()).isEmpty();
-            assertThat(model.human().outcomes()).hasSize(count);
-            assertThat(model.human().outcome("O0")).isPresent();
-            assertThat(model.human().outcome("o0")).isEmpty();
+            assertThat(model.humans().get("REVIEW").outcomes()).hasSize(count);
+            assertThat(model.humans().get("REVIEW").outcome("O0")).isPresent();
+            assertThat(model.humans().get("REVIEW").outcome("o0")).isEmpty();
         }
         for (int count : List.of(0, 17)) assertThat(check(fixture(count, variant)).failed()).isTrue();
     }
@@ -72,7 +72,7 @@ class HumanOutcomesUnitTest {
         var diagnostics = new DefinitionDiagnostics();
         var model = loader.model(codec.ingest(root.toString()), diagnostics);
         assertThat(diagnostics.failed()).isFalse();
-        assertThat(model.human().outcomes()).extracting(o -> o.key()).containsExactly("O1", "O0");
+        assertThat(model.humans().get("REVIEW").outcomes()).extracting(o -> o.key()).containsExactly("O1", "O0");
         assertThat(model.ends()).containsKeys("END", "OTHER");
     }
 
@@ -95,7 +95,7 @@ class HumanOutcomesUnitTest {
         var ready = validation.check(document, false);
         assertThat(ready.report().diagnostics()).isEmpty();
         assertThat(ready.contextHash()).isNotEqualTo(unavailable.contextHash());
-        assertThat(json.readTree(ready.detailsJson()).path("provenance").path("validator").asText()).isEqualTo("wf-human-outcome-validator-v1");
+        assertThat(json.readTree(ready.detailsJson()).path("provenance").path("validator").asText()).isEqualTo("wf-sequential-human-validator-v1");
         assertThat(json.readTree(ready.detailsJson()).path("provenance").path("structuralSchemaHash").asText()).isEqualTo(loader.schemaDigest(document.tree()));
         var model = loader.model(document, new DefinitionDiagnostics());
         var definition = new io.github.leontecristian.workflow.core.dto.definition.document.ExecutableDefinition(1, 1, "review", 1, "hash",

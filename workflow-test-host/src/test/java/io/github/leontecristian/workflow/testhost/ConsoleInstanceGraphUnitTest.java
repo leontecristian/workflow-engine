@@ -193,8 +193,26 @@ class ConsoleInstanceGraphUnitTest {
         when(context.actor()).thenReturn("reviewer");
         var task = mock(WorkflowTaskView.class);
         when(task.assignedUserRef()).thenReturn("reviewer");
+        when(task.activityId()).thenReturn(ACTIVITY);
         when(reads.listTasks(ID, 0, 100)).thenReturn(new WorkflowTaskPage(List.of(task), null));
         assertEquals(State.ACTIVE, graphs.find(ID).nodes().get(1).state());
+    }
+
+    @Test
+    void historicalReviewerDoesNotReceiveLinksToAnotherAssigneesTask() {
+        setup(InstanceStatus.ACTIVE, 4);
+        when(context.admin()).thenReturn(false);
+        when(context.actor()).thenReturn("earlier-reviewer");
+        var earlier = mock(WorkflowTaskView.class);
+        when(earlier.assignedUserRef()).thenReturn("earlier-reviewer");
+        var later = mock(WorkflowTaskView.class);
+        when(later.assignedUserRef()).thenReturn("later-reviewer");
+        when(reads.listTasks(ID, 0, 100)).thenReturn(new WorkflowTaskPage(List.of(earlier,later), null));
+        when(later.activityId()).thenReturn(ACTIVITY);
+        var node = graphs.find(ID).nodes().get(1);
+        assertEquals(State.ACTIVE,node.state());
+        org.junit.jupiter.api.Assertions.assertNull(node.taskId());
+        org.junit.jupiter.api.Assertions.assertNull(node.activityId());
     }
 
     @Test

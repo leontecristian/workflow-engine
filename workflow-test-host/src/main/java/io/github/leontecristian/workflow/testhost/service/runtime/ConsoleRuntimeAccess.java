@@ -26,6 +26,25 @@ public class ConsoleRuntimeAccess {
         return task;
     }
 
+    public boolean canReadTask(WorkflowTaskView task) {
+        return context.admin() || context.actor().equals(task.assignedUserRef());
+    }
+
+    /** Bounded bulk authorization for graph links; avoids an exact-task query per displayed node. */
+    public java.util.Set<Long> readableActivities(long instanceId, java.util.Set<Long> candidates) {
+        if (context.admin() || candidates.isEmpty()) return java.util.Set.copyOf(candidates);
+        var visible = new java.util.HashSet<Long>();
+        long cursor = 0;
+        for (int page = 0; page < 100; page++) {
+            var tasks = reads.listTasks(instanceId, cursor, 100);
+            for (var task : tasks.items())
+                if (candidates.contains(task.activityId()) && canReadTask(task)) visible.add(task.activityId());
+            if (tasks.nextAfterId() == null) return java.util.Set.copyOf(visible);
+            cursor = tasks.nextAfterId();
+        }
+        throw new ConsoleException(422, "LIMIT_EXCEEDED");
+    }
+
     public WorkflowInstanceView instance(long id) {
         var instance = reads.findInstance(id).orElseThrow(ConsoleException::missing);
         if (!context.admin()) assigned(id, null);

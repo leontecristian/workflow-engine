@@ -38,7 +38,7 @@ class GatewayRoutingUnitTest {
         edges.add(new Transition("positive","ROUTE","LOW",null,positive,false));
         var end=new Node("HIGH","END",null,"HIGH");
         return new MinimalWorkflowDefinition(new Node("BEGIN","START",null,null),
-                new Human("REVIEW","REVIEW",new Assignment("resolver"),List.of(new Outcome("COMPLETE","Complete",false))),
+                Map.of("REVIEW",new Human("REVIEW","REVIEW",new Assignment("resolver"),List.of(new Outcome("COMPLETE","Complete",false)))),
                 end,edges,Map.of(),Map.of("quantity",new ActionField("quantity",VariableValueType.LONG,false,true)),Map.of(),Map.of(),
                 Map.of("HIGH",end,"LOW",new Node("LOW","END",null,"LOW")),Set.of("ROUTE"));
     }

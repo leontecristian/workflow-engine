@@ -101,6 +101,14 @@ public class WorkflowInstanceEntity {
         currentNodeKey = java.util.Objects.requireNonNull(humanKey); lastHistorySequence = finalSequence;
     }
 
+    /** Continue an already claimed instance after atomically closing its previous activity. */
+    public void advanceToHuman(String humanKey, long finalSequence) {
+        if (status != InstanceStatus.ACTIVE || lastHistorySequence < 5 || finalSequence <= lastHistorySequence
+                || resultKey != null || endedAt != null)
+            throw new IllegalStateException("Claimed active instance required");
+        currentNodeKey = java.util.Objects.requireNonNull(humanKey); lastHistorySequence = finalSequence;
+    }
+
     public void complete(String endKey, String result, long finalSequence, LocalDateTime time, String actor) {
         if (status != InstanceStatus.ACTIVE || finalSequence <= lastHistorySequence || time.isBefore(startedAt))
             throw new IllegalStateException("Invalid completion");

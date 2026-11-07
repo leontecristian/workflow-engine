@@ -96,19 +96,41 @@
       }@if(commandExecution()){<console-details
         [value]="commandExecution()?.instance"
       />
+      <p class="field-note">
+        Task #{{commandExecution()!.task.id}}: {{commandExecution()!.task.status}}.
+        @if(commandExecution()!.instance.status === 'ACTIVE') {
+          This command left the workflow waiting at {{commandExecution()!.instance.currentNodeKey}}.
+        } @else {
+          This command finished the workflow: {{commandExecution()!.instance.resultKey}}.
+        }
+        Read current work below; this retained result does not refresh when later stages progress.
+      </p>
       <div class="actions spaced">
         <a
           mat-stroked-button
           [routerLink]="['/instance',commandExecution()!.instance.id]"
           >Read current instance</a
         ><a mat-button [routerLink]="['/task',commandExecution()!.task.id]"
-          >Current task / submission</a
+          >Command task / submission</a
+        ><a mat-button [routerLink]="['/instance-tasks',commandExecution()!.instance.id]"
+          >Read authorized current tasks</a
         ><a
           mat-button
           [routerLink]="['/history',commandExecution()!.instance.id]"
           >Current history</a
         >
       </div>
+      @if(currentInstance(); as current) {
+        <h3>Current workflow</h3>
+        <p>{{current.status}} at {{current.currentNodeKey}} @if(current.resultKey) { · {{current.resultKey}} }</p>
+        @for(task of currentTasks(); track task.id) {
+          <a mat-stroked-button [routerLink]="['/task',task.id]">Open assigned task #{{task.id}}</a>
+        }
+        @if(current.status === 'ACTIVE' && !currentTasks().length) {
+          <p>No open tasks are visible on this authorized page. Read current tasks for further pages.</p>
+        }
+      }
+      <button mat-button (click)="refresh()" [disabled]="busy()">Refresh current work</button>
       }<mat-expansion-panel class="evidence-panel"
         ><mat-expansion-panel-header
           ><mat-panel-title

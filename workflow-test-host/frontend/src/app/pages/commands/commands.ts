@@ -1,9 +1,10 @@
-import { Component, inject } from "@angular/core";
+import { Component, DestroyRef, inject, signal } from "@angular/core";
 import { Router } from "@angular/router";
 import { ConsoleApi } from "../../data/console-api";
 import { CommandRecovery } from "../../data/command-recovery";
 import { PAGE_IMPORTS } from "../../ui/page-imports";
 import { pageState } from "../../ui/page-state";
+import type { InstanceView, TaskView } from "../../data/dtos";
 @Component({
   selector: "console-commands",
   standalone: true,
@@ -28,7 +29,11 @@ export class CommandsPage {
   commands = inject(CommandRecovery);
   result = this.commands.result;
   envelope = "";
-  ngOnInit() {}
+  currentInstance = signal<InstanceView | null>(null);
+  currentTasks = signal<TaskView[]>([]);
+  private readonly destroyRef = inject(DestroyRef);
+  private readGeneration = 0;
+  ngOnInit() { void this.run(() => this.refreshCurrent()); }
   commandExecution() {
     return this.commands.execution();
   }
@@ -56,6 +61,7 @@ export class CommandsPage {
   restoreEnvelope() {
     try {
       this.commands.restore(this.envelope);
+      void this.run(() => this.refreshCurrent());
       this.error.set("");
       this.notice.set("Envelope restored. Find result does not execute it.");
     } catch (e) {
@@ -63,14 +69,34 @@ export class CommandsPage {
     }
   }
   clearCommand(): void {
+    this.readGeneration++;
+    this.currentInstance.set(null);
+    this.currentTasks.set([]);
     this.commands.clear();
     this.envelope = "";
   }
   selectCommand(id: string) {
     this.commands.select(id);
+    void this.run(() => this.refreshCurrent());
   }
+  async refreshCurrent() {
+    const generation = ++this.readGeneration;
+    this.currentInstance.set(null);
+    this.currentTasks.set([]);
+    const execution = this.commandExecution();
+    if (!execution) return;
+    const [instance, tasks] = await Promise.all([
+      this.api.instance(execution.instance.id),
+      this.api.instanceTasks(execution.instance.id),
+    ]);
+    if (this.destroyRef.destroyed || generation !== this.readGeneration) return;
+    this.currentInstance.set(instance);
+    this.currentTasks.set(tasks.items.filter(task => task.status === "OPEN"));
+  }
+  refresh() { void this.run(() => this.refreshCurrent()); }
   async issue(replay: boolean) {
     await this.commands.execute(replay);
+    await this.refreshCurrent();
     this.notice.set(
       replay
         ? "Replay-only lookup returned; no new command was executed."

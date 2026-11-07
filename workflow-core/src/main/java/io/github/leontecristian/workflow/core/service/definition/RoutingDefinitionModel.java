@@ -36,13 +36,31 @@ final class RoutingDefinitionModel {
         }
         Map<String,JsonNode> nodes = new LinkedHashMap<>();
         Map<String,Node> ends = new LinkedHashMap<>(); Set<String> gateways = new HashSet<>();
-        JsonNode start = null, human = null; int starts = 0, humans = 0, nodeIndex = 0, humanIndex = -1;
+        Map<String,Human> humans = new LinkedHashMap<>();
+        Map<String,Integer> humanIndices = new HashMap<>();
+        JsonNode start = null; int starts = 0, nodeIndex = 0;
         for (var n : root.path("nodes")) {
             String key = n.path("key").textValue();
             if (nodes.putIfAbsent(key,n) != null) d.error("DUPLICATE_KEY", DiagnosticStage.GRAPH, "Node keys must be distinct.", "/nodes/" + nodeIndex + "/key");
             switch (n.path("type").textValue()) {
                 case "START" -> { start=n; starts++; }
-                case "HUMAN_TASK" -> { human=n; humans++; humanIndex=nodeIndex; }
+                case "HUMAN_TASK" -> {
+                    var outcomes = new ArrayList<Outcome>();
+                    var outcomeKeys = new HashSet<String>();
+                    int outcomeIndex = 0;
+                    for (var declared : n.path("outcomes")) {
+                        String outcomeKey = declared.path("key").textValue();
+                        if (!outcomeKeys.add(outcomeKey)) d.error("DUPLICATE_KEY", DiagnosticStage.GRAPH,
+                                "Outcome keys must be distinct.", "/nodes/" + nodeIndex + "/outcomes/" + outcomeIndex + "/key");
+                        outcomes.add(new Outcome(outcomeKey, declared.path("label").textValue(), declared.path("requiresComment").asBoolean()));
+                        outcomeIndex++;
+                    }
+                    String resolver = n.path("assignment").path("resolver").textValue();
+                    if (!DefinitionInputs.text(resolver, 100, 400, true))
+                        d.error("INVALID_STRUCTURE", DiagnosticStage.CONTRACT, "Resolver must be a bounded logical identifier.", "/nodes/" + nodeIndex + "/assignment/resolver");
+                    humans.put(key,new Human(key,n.path("taskType").textValue(),new Assignment(resolver),outcomes));
+                    humanIndices.put(key,nodeIndex);
+                }
                 case "END" -> ends.put(key,new Node(key,"END",n.path("name").textValue(),n.path("result").textValue()));
                 case "EXCLUSIVE_GATEWAY" -> gateways.add(key);
                 case "SERVICE_TASK" -> { }
@@ -50,36 +68,22 @@ final class RoutingDefinitionModel {
             }
             nodeIndex++;
         }
-        if (starts!=1 || humans!=1 || ends.isEmpty()) graph(d,"/nodes");
+        if (starts!=1 || humans.isEmpty() || ends.isEmpty()) graph(d,"/nodes");
         if (d.failed()) return null;
-        String startKey=start.path("key").textValue(), humanKey=human.path("key").textValue();
-        var outcomes = new ArrayList<Outcome>();
-        var outcomeKeys = new HashSet<String>();
-        String outcomePointer = "/nodes/" + humanIndex + "/outcomes/";
-        int outcomeIndex = 0;
-        for (var declared : human.path("outcomes")) {
-            String key = declared.path("key").textValue();
-            if (!outcomeKeys.add(key)) d.error("DUPLICATE_KEY", DiagnosticStage.GRAPH,
-                    "Outcome keys must be distinct.", outcomePointer + outcomeIndex + "/key");
-            outcomes.add(new Outcome(key, declared.path("label").textValue(), declared.path("requiresComment").asBoolean()));
-            outcomeIndex++;
-        }
-        String resolver = human.path("assignment").path("resolver").textValue();
-        if (!DefinitionInputs.text(resolver, 100, 400, true))
-            d.error("INVALID_STRUCTURE", DiagnosticStage.CONTRACT, "Resolver must be a bounded logical identifier.", "/nodes/" + humanIndex + "/assignment/resolver");
+        String startKey=start.path("key").textValue();
         Map<String,List<Transition>> outgoing=new HashMap<>();
-        var transitions=new ArrayList<Transition>(); var keys=new HashSet<String>(); var routedOutcomes = new HashSet<String>(); int i=0;
+        var transitions=new ArrayList<Transition>(); var keys=new HashSet<String>(); int i=0;
         for (var t:root.path("transitions")) {
             String pointer="/transitions/"+i++;
             var edge=new Transition(t.path("key").textValue(),t.path("from").textValue(),t.path("to").textValue(),
                     DefinitionDocumentCodec.string(t,"outcome"),DefinitionDocumentCodec.string(t,"condition"),t.path("default").asBoolean());
             if (!keys.add(edge.key())) d.error("DUPLICATE_KEY", DiagnosticStage.GRAPH, "Transition keys must be distinct.", pointer + "/key");
             if (!nodes.containsKey(edge.from()) || !nodes.containsKey(edge.to()) || edge.to().equals(startKey)) graph(d,pointer);
-            if (edge.from().equals(humanKey) && !routedOutcomes.add(edge.outcome())) graph(d, pointer + "/outcome");
+            var human = humans.get(edge.from());
             boolean gateway=gateways.contains(edge.from());
             if (gateway) {
                 if (edge.outcome()!=null || (edge.condition()!=null)==edge.defaultRoute() || (edge.condition()!=null && edge.condition().isBlank())) graph(d,pointer);
-            } else if (t.has("condition") || t.has("default") || (edge.from().equals(humanKey) ? !outcomeKeys.contains(edge.outcome()) : edge.outcome()!=null)) graph(d,pointer);
+            } else if (t.has("condition") || t.has("default") || (human != null ? human.outcome(edge.outcome()).isEmpty() : edge.outcome()!=null)) graph(d,pointer);
             if (gateway && edge.condition()!=null) {
                 try { expressions.validate(edge.condition(),variables); }
                 catch (ExpressionException failure) {
@@ -95,33 +99,37 @@ final class RoutingDefinitionModel {
                 if (!edges.isEmpty()) graph(d,"/transitions");
             } else if (gateways.contains(key)) {
                 if (edges.isEmpty() || edges.stream().filter(Transition::defaultRoute).count()>1) graph(d,"/transitions");
-            } else if (edges.size() != (key.equals(humanKey) ? outcomes.size() : 1)) graph(d,"/transitions");
+            } else if (!humans.containsKey(key) && edges.size() != 1) graph(d,"/transitions");
         }
-        var humanEdges = outgoing.getOrDefault(humanKey, List.of());
-        for (int index = 0; index < outcomes.size(); index++) {
-            String key = outcomes.get(index).key();
-            if (humanEdges.stream().filter(edge -> key.equals(edge.outcome())).count() != 1)
-                graph(d, outcomePointer + index);
+        for (var human : humans.values()) {
+            var outcomes = human.outcomes();
+            String outcomePointer = "/nodes/" + humanIndices.get(human.key()) + "/outcomes/";
+            var humanEdges = outgoing.getOrDefault(human.key(), List.of());
+            for (int index = 0; index < outcomes.size(); index++) {
+                String key = outcomes.get(index).key();
+                if (humanEdges.stream().filter(edge -> key.equals(edge.outcome())).count() != 1)
+                    graph(d, outcomePointer + index);
+            }
         }
         if (d.failed()) return null;
         var colors=new HashMap<String,Integer>();
         for(String key:nodes.keySet()) if(cyclic(key,outgoing,colors)) { graph(d,"/transitions"); break; }
-        Set<String> reachable=reach(startKey,outgoing,null);
-        if(reachable.size()!=nodes.size() || reach(startKey,outgoing,humanKey).stream().anyMatch(ends::containsKey)) graph(d,"/transitions");
+        Set<String> reachable=reach(startKey,outgoing,Set.of());
+        if(reachable.size()!=nodes.size() || reach(startKey,outgoing,humans.keySet()).stream().anyMatch(ends::containsKey)) graph(d,"/transitions");
         Map<String,List<Transition>> reverse=new HashMap<>();
         for(var edge:transitions) reverse.computeIfAbsent(edge.to(),ignored->new ArrayList<>()).add(new Transition(edge.key(),edge.to(),edge.from(),null));
-        var reachesEnd=new HashSet<String>(); for(String end:ends.keySet()) reachesEnd.addAll(reach(end,reverse,null));
+        var reachesEnd=new HashSet<String>(); for(String end:ends.keySet()) reachesEnd.addAll(reach(end,reverse,Set.of()));
         if(reachesEnd.size()!=nodes.size()) graph(d,"/transitions");
         if(d.failed()) return null;
         return new MinimalWorkflowDefinition(new Node(startKey,"START",start.path("name").textValue(),null),
-                new Human(humanKey,human.path("taskType").textValue(),new Assignment(resolver), outcomes),
+                humans,
                 ends.values().iterator().next(),transitions,inputs,variables,initialize,services,ends,gateways);
     }
-    private static Set<String> reach(String start,Map<String,List<Transition>> outgoing,String stop) {
+    private static Set<String> reach(String start,Map<String,List<Transition>> outgoing,Set<String> stop) {
         var found=new HashSet<String>(); var pending=new ArrayDeque<String>(); pending.add(start);
         while(!pending.isEmpty()) {
             String key=pending.removeFirst();
-            if(!found.add(key) || key.equals(stop)) continue;
+            if(!found.add(key) || stop.contains(key)) continue;
             for(var edge:outgoing.getOrDefault(key,List.of())) pending.add(edge.to());
         }
         return found;

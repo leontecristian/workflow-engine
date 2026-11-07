@@ -4,16 +4,17 @@ import java.util.Map;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowLiteral;
 /** Internal validated subset; canonical source is retained separately, including all designer values. */
-public record MinimalWorkflowDefinition(Node start, Human human, Node end, List<Transition> transitions,
+public record MinimalWorkflowDefinition(Node start, Map<String,Human> humans, Node end, List<Transition> transitions,
         Map<String,Input> inputs, Map<String,ActionField> variables, Map<String,Binding> initialize,
         Map<String,Service> services, Map<String,Node> ends, java.util.Set<String> gateways) {
     public MinimalWorkflowDefinition {
+        humans = Map.copyOf(humans);
         transitions = List.copyOf(transitions); inputs=Map.copyOf(inputs); variables=Map.copyOf(variables);
         initialize=Map.copyOf(initialize); services=Map.copyOf(services); ends=Map.copyOf(ends); gateways=java.util.Set.copyOf(gateways);
     }
     public MinimalWorkflowDefinition(Node start, Human human, Node end, List<Transition> transitions,
             Map<String,Input> inputs, Map<String,ActionField> variables, Map<String,Binding> initialize, Map<String,Service> services) {
-        this(start,human,end,transitions,inputs,variables,initialize,services,end==null ? Map.of() : Map.of(end.key(),end),java.util.Set.of());
+        this(start,human == null ? Map.of() : Map.of(human.key(),human),end,transitions,inputs,variables,initialize,services,end==null ? Map.of() : Map.of(end.key(),end),java.util.Set.of());
     }
     public MinimalWorkflowDefinition(Node start, Human human, Node end, List<Transition> transitions) {
         this(start,human,end,transitions,Map.of(),Map.of(),Map.of(),Map.of());

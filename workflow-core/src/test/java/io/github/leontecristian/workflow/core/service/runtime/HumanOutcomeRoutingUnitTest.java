@@ -31,8 +31,8 @@ class HumanOutcomeRoutingUnitTest {
     private MinimalWorkflowDefinition model(List<Transition> edges) {
         var approved = new Node("APPROVED", "END", "Approved", "APPROVED");
         return new MinimalWorkflowDefinition(new Node("BEGIN", "START", "Start", null),
-                new Human("REVIEW", "REVIEW", new Assignment("resolver"), List.of(
-                        new Outcome("REJECT", "Reject", true), new Outcome("APPROVE", "Approve", false))),
+                Map.of("REVIEW",new Human("REVIEW", "REVIEW", new Assignment("resolver"), List.of(
+                        new Outcome("REJECT", "Reject", true), new Outcome("APPROVE", "Approve", false)))),
                 approved, edges, Map.of(), Map.of(), Map.of(), Map.of(),
                 Map.of("APPROVED", approved, "REJECTED", new Node("REJECTED", "END", "Rejected", "REJECTED")), java.util.Set.of());
     }

@@ -35,10 +35,10 @@ public class RuntimeServiceProgression {
             String current=cursor;
             var edge=model.gateways().contains(current) ? route(model,current,definitionHash,state,budget,batch)
                     : explicitRoute(model, current, selectedOutcome);
-            Map<String,String> detail=current.equals(model.human().key()) ? Map.of("outcomeKey",selectedOutcome) : Map.of();
+            Map<String,String> detail=model.humans().containsKey(current) ? Map.of("outcomeKey",selectedOutcome) : Map.of();
             batch.next("TRANSITION_TAKEN",null,null,edge,detail,detail);
             cursor=edge.to();
-            if (cursor.equals(stop)) return new MinimalWorkflowDefinition.Node(cursor,"HUMAN_TASK",null,null);
+            if (model.humans().containsKey(cursor)) return new MinimalWorkflowDefinition.Node(cursor,"HUMAN_TASK",null,null);
             if (model.ends().containsKey(cursor)) return model.ends().get(cursor);
             if (model.gateways().contains(cursor)) {
                 budget.visit(new MinimalWorkflowDefinition.Node(cursor,"EXCLUSIVE_GATEWAY",null,null),"EXCLUSIVE_GATEWAY");
@@ -74,7 +74,7 @@ public class RuntimeServiceProgression {
         }
     }
     private MinimalWorkflowDefinition.Transition explicitRoute(MinimalWorkflowDefinition model, String node, String selectedOutcome) {
-        boolean human = node.equals(model.human().key());
+        boolean human = model.humans().containsKey(node);
         RuntimeInputs.require(!human || selectedOutcome != null, Category.HOST_CONFIGURATION);
         var routes = model.transitions().stream().filter(edge -> edge.from().equals(node)
                 && (human ? selectedOutcome.equals(edge.outcome()) : edge.outcome() == null)).toList();

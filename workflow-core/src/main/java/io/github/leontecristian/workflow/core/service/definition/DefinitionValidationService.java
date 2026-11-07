@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 /** Internal publication-subset checker. No represented host function is ever executed. */
 @Component
 public class DefinitionValidationService {
-    static final String IDENTIFIER = "wf-human-outcome-validator-v1";
+    static final String IDENTIFIER = "wf-sequential-human-validator-v1";
     private final TaskTypeCatalogService catalog;
     private final DefinitionCapabilityProvider provider;
     private final ObjectMapper json = new ObjectMapper();
@@ -60,27 +60,33 @@ public class DefinitionValidationService {
             });
         }
         provenance.put("schemaVersion", 1); provenance.put("canonicalization", DefinitionContentCanonicalizer.IDENTIFIER);
-        provenance.putNull("task"); provenance.putNull("assignmentCapability"); provenance.putNull("taskCapability");
+        var humanContexts = provenance.putArray("humans");
         if (model != null) {
-            var human = model.human();
-            TaskTypeView task = (publication ? catalog.findByCodeForPublication(human.taskType()) : catalog.findByCode(human.taskType())).orElse(null);
-            if (task == null || !task.selectable()) diagnostics.error("TASK_TYPE_UNAVAILABLE", DiagnosticStage.HOST,
-                    "Referenced task type must exist and be selectable.", null);
-            if (task != null) {
-                ObjectNode descriptor = provenance.putObject("task"); descriptor.put("code", task.code());
-                descriptor.put("selectable", task.selectable()); descriptor.put("lockVersion", task.lockVersion());
+            for (var human : model.humans().values().stream().sorted(java.util.Comparator.comparing(MinimalWorkflowDefinition.Human::key)).toList()) {
+                var humanContext = humanContexts.addObject();
+                humanContext.put("nodeKey", human.key());
+                String pointer = null;
+                for (int index = 0; index < document.tree().path("nodes").size(); index++)
+                    if (human.key().equals(document.tree().path("nodes").get(index).path("key").asText())) pointer = "/nodes/" + index;
+                TaskTypeView task = (publication ? catalog.findByCodeForPublication(human.taskType()) : catalog.findByCode(human.taskType())).orElse(null);
+                if (task == null || !task.selectable()) diagnostics.error("TASK_TYPE_UNAVAILABLE", DiagnosticStage.HOST,
+                        "Referenced task type must exist and be selectable.", pointer + "/taskType");
+                if (task != null) {
+                    ObjectNode descriptor = humanContext.putObject("task"); descriptor.put("code", task.code());
+                    descriptor.put("selectable", task.selectable()); descriptor.put("lockVersion", task.lockVersion());
+                }
+                SingleAssignmentCapability assignment = capabilities == null ? null : capabilities.assignments().stream()
+                        .filter(c -> c.resolver().equals(human.assignment().resolver())).findFirst().orElse(null);
+                TaskTypeCapability presentation = capabilities == null ? null : capabilities.taskTypes().stream()
+                        .filter(c -> c.taskType().equals(human.taskType())).findFirst().orElse(null);
+                if (assignment != null) humanContext.putObject("assignmentCapability").put("resolver", assignment.resolver());
+                if (presentation != null) {
+                    ObjectNode descriptor = humanContext.putObject("taskCapability"); descriptor.put("taskType", presentation.taskType());
+                    var outcomes = descriptor.putArray("supportedOutcomes"); presentation.supportedOutcomes().stream().sorted().forEach(outcomes::add);
+                }
+                if (assignment == null || presentation == null || !human.outcomes().stream().allMatch(outcome -> presentation.supportedOutcomes().contains(outcome.key())))
+                    diagnostics.error("HOST_CAPABILITY_UNAVAILABLE", DiagnosticStage.HOST, "Required deployed host capability is unavailable.", pointer);
             }
-            SingleAssignmentCapability assignment = capabilities == null ? null : capabilities.assignments().stream()
-                    .filter(c -> c.resolver().equals(human.assignment().resolver())).findFirst().orElse(null);
-            TaskTypeCapability presentation = capabilities == null ? null : capabilities.taskTypes().stream()
-                    .filter(c -> c.taskType().equals(human.taskType())).findFirst().orElse(null);
-            if (assignment != null) provenance.putObject("assignmentCapability").put("resolver", assignment.resolver());
-            if (presentation != null) {
-                ObjectNode descriptor = provenance.putObject("taskCapability"); descriptor.put("taskType", presentation.taskType());
-                var outcomes = descriptor.putArray("supportedOutcomes"); presentation.supportedOutcomes().stream().sorted().forEach(outcomes::add);
-            }
-            if (assignment == null || presentation == null || !human.outcomes().stream().allMatch(outcome -> presentation.supportedOutcomes().contains(outcome.key())))
-                diagnostics.error("HOST_CAPABILITY_UNAVAILABLE", DiagnosticStage.HOST, "Required deployed host capability is unavailable.", null);
         } else if (capabilities == null) {
             diagnostics.error("HOST_CAPABILITY_UNAVAILABLE", DiagnosticStage.HOST, "Deployed host capability provider is unavailable.", null);
         }

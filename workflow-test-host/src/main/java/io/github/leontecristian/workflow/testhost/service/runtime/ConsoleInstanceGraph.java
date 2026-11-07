@@ -111,12 +111,15 @@ public class ConsoleInstanceGraph {
         require(started && position.equals(instance.currentNodeKey())
                 && (instance.status() != InstanceStatus.COMPLETED || ended));
         List<Node> displayedNodes = new ArrayList<>();
+        var readableActivities = access.readableActivities(id, latestLinks.values().stream()
+                .map(links -> links.activityId).collect(java.util.stream.Collectors.toSet()));
         for (String key : orderedKeys(start.key(), nodes, edges)) {
             var node = nodes.get(key); var links = latestLinks.get(key);
+            boolean readable = links != null && readableActivities.contains(links.activityId);
             State state = instance.status() == InstanceStatus.ACTIVE && key.equals(instance.currentNodeKey())
                     ? State.ACTIVE : completed.contains(key) ? State.COMPLETED : State.PENDING;
             displayedNodes.add(new Node(key, node.name(), node.type(), state,
-                    links == null ? null : links.activityId, links == null ? null : links.singleTaskId));
+                    readable ? links.activityId : null, readable ? links.singleTaskId : null));
         }
         var displayedEdges = edges.stream().map(e -> new Edge(e.key(), e.from(), e.to(), e.outcome(), traversed.contains(e.key()))).toList();
         var result = new InstanceGraphView(instance, displayedNodes, displayedEdges);

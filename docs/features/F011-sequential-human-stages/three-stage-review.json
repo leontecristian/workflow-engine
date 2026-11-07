@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "key": "threeStageReview",
+  "version": 1,
+  "name": "Three sequential reviews",
+  "startPolicy": {
+    "inputContract": []
+  },
+  "variables": [],
+  "nodes": [
+    {
+      "key": "BEGIN",
+      "type": "START",
+      "name": "Begin"
+    },
+    {
+      "key": "MANAGER",
+      "type": "HUMAN_TASK",
+      "name": "Manager review",
+      "taskType": "SANDBOX_REVIEW",
+      "assignment": {
+        "resolver": "sandbox.singleReviewer",
+        "inputs": {}
+      },
+      "completion": {
+        "policy": "SINGLE"
+      },
+      "inputContract": [],
+      "resultContract": {
+        "mode": "FORBIDDEN"
+      },
+      "outcomes": [
+        {
+          "key": "APPROVE",
+          "label": "Approve",
+          "requiresComment": false
+        },
+        {
+          "key": "REJECT",
+          "label": "Reject",
+          "requiresComment": true
+        }
+      ]
+    },
+    {
+      "key": "PARTNER",
+      "type": "HUMAN_TASK",
+      "name": "Partner review",
+      "taskType": "SANDBOX_REVIEW",
+      "assignment": {
+        "resolver": "sandbox.singleReviewer",
+        "inputs": {}
+      },
+      "completion": {
+        "policy": "SINGLE"
+      },
+      "inputContract": [],
+      "resultContract": {
+        "mode": "FORBIDDEN"
+      },
+      "outcomes": [
+        {
+          "key": "APPROVE",
+          "label": "Approve",
+          "requiresComment": false
+        },
+        {
+          "key": "REJECT",
+          "label": "Reject",
+          "requiresComment": true
+        }
+      ]
+    },
+    {
+      "key": "FINAL",
+      "type": "HUMAN_TASK",
+      "name": "Final review",
+      "taskType": "SANDBOX_REVIEW",
+      "assignment": {
+        "resolver": "sandbox.singleReviewer",
+        "inputs": {}
+      },
+      "completion": {
+        "policy": "SINGLE"
+      },
+      "inputContract": [],
+      "resultContract": {
+        "mode": "FORBIDDEN"
+      },
+      "outcomes": [
+        {
+          "key": "APPROVE",
+          "label": "Approve",
+          "requiresComment": false
+        },
+        {
+          "key": "REJECT",
+          "label": "Reject",
+          "requiresComment": true
+        }
+      ]
+    },
+    {
+      "key": "APPROVED",
+      "type": "END",
+      "name": "Approved",
+      "result": "APPROVED"
+    },
+    {
+      "key": "REJECTED",
+      "type": "END",
+      "name": "Rejected",
+      "result": "REJECTED"
+    }
+  ],
+  "transitions": [
+    {
+      "key": "begin",
+      "from": "BEGIN",
+      "to": "MANAGER"
+    },
+    {
+      "key": "managerApprove",
+      "from": "MANAGER",
+      "to": "PARTNER",
+      "outcome": "APPROVE"
+    },
+    {
+      "key": "managerReject",
+      "from": "MANAGER",
+      "to": "REJECTED",
+      "outcome": "REJECT"
+    },
+    {
+      "key": "partnerApprove",
+      "from": "PARTNER",
+      "to": "FINAL",
+      "outcome": "APPROVE"
+    },
+    {
+      "key": "partnerReject",
+      "from": "PARTNER",
+      "to": "REJECTED",
+      "outcome": "REJECT"
+    },
+    {
+      "key": "finalApprove",
+      "from": "FINAL",
+      "to": "APPROVED",
+      "outcome": "APPROVE"
+    },
+    {
+      "key": "finalReject",
+      "from": "FINAL",
+      "to": "REJECTED",
+      "outcome": "REJECT"
+    }
+  ]
+}
