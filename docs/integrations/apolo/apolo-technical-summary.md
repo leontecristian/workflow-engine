@@ -1,5 +1,7 @@
 # APOLO technical summary
 
+**Reference review and UI target — 2026-11-07:** owner-supplied frontend/build/controller snapshots now establish declared Angular/Material 19.2.x ranges, NgModule routing/bootstrap, host authentication/localization providers, Maven frontend JAR packaging and contextual controller authorization. These are source observations, not a fresh effective-build or deployment verification. Angular 19 alignment is selected for future workflow UI work. The [UI/web architecture proposal](../../architecture/workflow-ui-web-integration.md) records the detailed evidence and proposed libraries; no dependencies, module structure or F011 behavior change in this documentation task. Earlier OPEN compatibility obligations below still apply to exact versions and runtime integration.
+
 > **Updated 2026-10-24.** This document contains the current confirmed platform context and integration direction. Earlier reference material is preserved in the [architecture discussion archive](../../archive/apolo-architecture-discussion.md) and does not override the [consolidated design](../../architecture/workflow-engine-design.md).
 
 ## Confirmed Java baseline

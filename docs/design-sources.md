@@ -1,5 +1,7 @@
 # Design sources and decision status
 
+**UI alignment and integration proposal — 2026-11-07:** the owner selected Angular 19 alignment and requested documentation of proposed `workflow-ui` and `workflow-web` libraries. The [architecture record](architecture/workflow-ui-web-integration.md) captures supplied APOLO reference evidence, responsibilities and open contracts. Angular 19 is the agreed future UI target; extraction, a third Maven module and designer packaging remain PROPOSED. No implementation or F011 change is authorized by this decision.
+
 **F011 selected slice — 2026-11-07:** [Multiple sequential human stages](features/F011-sequential-human-stages/spec.md), IMPLEMENTED revision 1, extends F010 with successive/conditional SINGLE stages, one active position and atomic next-stage entry, following language sections 8–9/15. The subsequent owner request authorized implementation. See the [handover](features/F011-sequential-human-stages/implementation.md) for local verification and the interactive browser gap. Loops, ALL and APOLO policy remain outside this slice.
 
 **F010 current contract — 2026-11-06:** [Human-task outcomes and outcome-based routing](features/F010-human-task-outcomes/spec.md), IMPLEMENTED revision 1, supports multiple outcomes within one SINGLE human stage using existing language outcome/transition rules. See the [handover](features/F010-human-task-outcomes/implementation.md) for local automated/HTTP evidence and the completed Chrome walkthrough. Multiple stages, guards and structured submissions remain separate.

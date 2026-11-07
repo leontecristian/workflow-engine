@@ -1,5 +1,7 @@
 # Workflow project constitution
 
+**UI integration planning — 2026-11-07:** Angular 19 is the owner-selected target for future reusable workflow UI alignment. The [UI/web architecture proposal](architecture/workflow-ui-web-integration.md) records proposed libraries and host responsibilities. This does not amend C03's current two-module requirement or authorize implementation; adopting `workflow-web` requires a later explicit architectural amendment. Constitution 5.0.0 and F011 remain unchanged by this planning record.
+
 **F011 implementation — 2026-11-07:** [Multiple sequential human stages](features/F011-sequential-human-stages/spec.md), IMPLEMENTED revision 1, adds successive/conditional SINGLE stages under existing C06–C09. The [handover](features/F011-sequential-human-stages/implementation.md) separates local unit/build, guarded SQL and HTTP evidence from blocked interactive browser acceptance. Constitution 5.0.0 is unchanged; loops, ALL and APOLO policy remain outside this slice.
 
 **F010 implementation — 2026-11-06:** [Revision 1](features/F010-human-task-outcomes/spec.md) implements C07 human outcomes: 1–16 choices, per-outcome comments and exactly one route per outcome, retaining one SINGLE human stage. This follows existing language decisions and does not amend constitution 5.0.0. See the [handover](features/F010-human-task-outcomes/implementation.md) for unit/SQL/HTTP evidence and the completed Chrome walkthrough.

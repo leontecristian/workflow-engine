@@ -18,6 +18,8 @@ The constitution is version **5.0.0**, established on **2026-10-24** and last am
 
 ## Document responsibilities
 
+The [workflow UI and REST integration proposal](architecture/workflow-ui-web-integration.md) records the owner-selected Angular 19 target and proposed `workflow-ui`/`workflow-web` boundaries. This is documentation only; the current module structure and F011 work remain unchanged.
+
 The constitution defines constraints that all feature specifications must respect. The [consolidated design](architecture/workflow-engine-design.md) remains the detailed architectural baseline, with scoped superseding decisions from [database design v1.4](architecture/Workflow_Engine_Database_Design_v1.md) documented in [design sources](design-sources.md). Active engine designs live in `docs/architecture/`, including the proposed [workflow definition language](architecture/workflow-definition-language-design.md). Feature specifications will define exact behavior within those constraints. Plans describe the intended approach; tasks track execution; implementation records what was built and actually checked.
 
 The constraints register makes confirmed boundaries easy to reference. The assumptions register identifies expectations that need verification and keeps provisional business choices distinct from mandatory guarantees. Both derive from the existing design; they do not finalize its open contracts or change the constitution version.
