@@ -18,6 +18,8 @@
     </properties>
 
     <dependencies>
+        <dependency><groupId>org.slf4j</groupId><artifactId>slf4j-api</artifactId></dependency>
+        <dependency><groupId>io.github.leontecristian</groupId><artifactId>workflow-web</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-security</artifactId></dependency>
         <dependency><groupId>org.springframework</groupId><artifactId>spring-jdbc</artifactId></dependency>
         <dependency><groupId>org.springframework</groupId><artifactId>spring-tx</artifactId></dependency>
@@ -109,6 +111,8 @@
                     <configuration><workingDirectory>frontend</workingDirectory><installDirectory>${project.build.directory}/frontend</installDirectory></configuration>
                     <executions>
                         <execution><id>install-console-node</id><phase>generate-resources</phase><goals><goal>install-node-and-npm</goal></goals><configuration><nodeVersion>v22.22.0</nodeVersion><npmVersion>10.9.4</npmVersion></configuration></execution>
+                        <execution><id>viewer-library-ci</id><phase>generate-resources</phase><goals><goal>npm</goal></goals><configuration><workingDirectory>../workflow-ui</workingDirectory><arguments>ci --no-audit --no-fund</arguments></configuration></execution>
+                        <execution><id>viewer-library-build</id><phase>generate-resources</phase><goals><goal>npm</goal></goals><configuration><workingDirectory>../workflow-ui</workingDirectory><arguments>run build</arguments></configuration></execution>
                         <execution><id>console-npm-ci</id><phase>generate-resources</phase><goals><goal>npm</goal></goals><configuration><arguments>ci --no-audit --no-fund</arguments></configuration></execution>
                         <execution><id>console-build</id><phase>generate-resources</phase><goals><goal>npm</goal></goals><configuration><arguments>run build</arguments></configuration></execution>
                     </executions>

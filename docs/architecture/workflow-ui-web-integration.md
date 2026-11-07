@@ -12,10 +12,10 @@ Allow APOLO to embed reusable workflow pages, components and REST adapters withi
 | Extract `workflow-ui` as an Angular library | AGREED. Full feature pages and embeddable components; no independent production bootstrap or login. |
 | Extract `workflow-web` as an optional Spring MVC library JAR | AGREED. Reusable HTTP mapping, requiring host integration and explicit API activation. Optional means hosts may consume core directly without web. |
 | Retain a sandbox application shell | AGREED. Evolve the existing console to consume the UI library; a second playground application is not required. |
-| Introduce a third Maven module | AGREED target under C03/CON-02: core, web and test host. The implemented reactor still has two modules; implementation is not authorized. |
+| Introduce a third Maven module | AGREED target under C03/CON-02: core, web and test host. Implemented by F013 for the read-only instance viewer; scoped runtime acceptance is complete. Further feature extraction needs separate authorization. |
 | Replace the later standalone production designer with an embeddable library feature | AGREED. A development shell remains useful; designer implementation still follows first APOLO integration. |
 
-This is an adopted architecture record, not a READY implementation feature. Later extraction/alignment work needs its own four-document feature specification and implementation request. Do not interpret adoption as a request to downgrade the existing console, alter F011 or change its acceptance baseline.
+This is an adopted architecture record. [F013](../features/F013-shared-instance-viewer/implementation.md) supplies the bounded read-only implementation and its evidence/gaps; broader API groups below remain proposals. Later extraction/alignment work needs its own four-document feature specification and implementation request. Do not interpret adoption as a request to downgrade the existing console, alter F011 or change its acceptance baseline.
 
 Authority: [constitution](../constitution.md) C03–C10; [constraints](../constraints.md) CON-01–04/06–12; [assumptions](../assumptions.md) ASM-01–06/09; [source precedence](../design-sources.md). Engine language, publication, pinned versions, concurrency, exact JSON values and successful-command replay remain governed by existing feature contracts.
 
@@ -94,7 +94,7 @@ Core continues owning `db/changelog/workflow/workflow-master.xml`; APOLO runs it
 
 ## Relationship to existing architecture and F011
 
-Constitution 6.0.0 and CON-02 now adopt the three-Maven-module target plus Angular 19 library, superseding the earlier two-module constraint. The main design and roadmap adopt embedded designer packaging while preserving its delivery milestone. C04–C10 guarantees remain. Current POMs and frontend dependencies are unchanged; architecture adoption is not implementation authorization.
+Constitution 6.0.0 and CON-02 now adopt the three-Maven-module target plus Angular 19 library, superseding the earlier two-module constraint. The main design and roadmap adopt embedded designer packaging while preserving its delivery milestone. C04–C10 guarantees remain. F013 subsequently implements the third Maven module and Angular 19.2 package for the read-only viewer; architecture adoption itself remains separate from implementation authorization.
 
 Angular 19 is the selected target for future UI alignment, not a claim that the current console has changed. F011 code, fixtures, tasks, dependency versions and acceptance evidence are outside this work. Do not modify or rerun F011 to satisfy this architecture adoption. Coordinate extraction after its active work is complete, retaining its behavior and evidence as the starting baseline.
 

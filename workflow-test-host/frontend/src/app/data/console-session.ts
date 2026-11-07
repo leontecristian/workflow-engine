@@ -6,6 +6,7 @@ export class ConsoleSession {
   readonly session = signal<Session | null>(null);
   readonly capabilities = signal<Capabilities | null>(null);
   readonly identityChanges = new Subject<string | null>();
+  readonly viewerScope = signal<object | null>(null);
   private initializing: Promise<void> | null = null;
   get admin() {
     return !!this.session()?.roles.includes("CONSOLE_ADMIN");
@@ -18,6 +19,7 @@ export class ConsoleSession {
   private async load() {
     const session = await this.call<Session>("/session");
     this.session.set(session);
+    this.viewerScope.set({});
     this.identityChanges.next(session.actorRef);
     this.capabilities.set(
       this.admin ? await this.call<Capabilities>("/capabilities") : null,
@@ -83,8 +85,21 @@ export class ConsoleSession {
     if (value && typeof value === "object") Object.defineProperty(value, "exactJson", {value: text});
     return value;
   }
+  async viewerRead<T>(path: string, signal: AbortSignal): Promise<T> {
+    const response = await fetch('/console/api'+path, {credentials:'same-origin',signal});
+    if(response.status === 401) this.clear();
+    let value: unknown;
+    try { value = await response.json(); } catch { throw new Error('Invalid read response'); }
+    if(!response.ok) {
+      const error=value as {code?:string;correlationId?:string}|null;
+      throw Object.assign(new Error('Read failed'), {httpStatus:response.status,code:error?.code,correlationId:error?.correlationId});
+    }
+    if(value === null || typeof value !== 'object') throw new Error('Invalid read response');
+    return value as T;
+  }
   clear() {
     this.session.set(null);
+    this.viewerScope.set(null);
     this.capabilities.set(null);
     this.identityChanges.next(null);
   }

@@ -2,6 +2,8 @@
 
 Targets [READY specification revision 5](spec.md). T02 readiness reconciliation is complete; implementation requires a subsequent request. F012 acceptance is complete at `943a51f`; use its recorded evidence and the dependency matrix in implementation.md as the baseline. Follow [development workflow](../../specification-driven-development.md), [coding standards](../../coding-standards.md) and [package conventions](../../package-structure.md), including the 2026-11-07 focused-verification and stopping rules.
 
+Implementation authorization received 2026-11-07 for T03�T07. Engineering choices and actual checks are recorded in implementation.md; revision 5 behavior/P04 scope remain unchanged.
+
 ## P01 — Reconcile the completed baseline
 
 R08; AC04/07/12. Record implementation-start HEAD, git status and package/tool versions. Use F012's final acceptance at `943a51f`, not its superseded partial/blocked entries. Read scoped source/test files and map applicable prior evidence to the affected viewer behavior. Do not repeat a pre-extraction browser baseline: use matched F012 observations and existing fixtures. Retain F011 fixtures and evidence unchanged.
@@ -67,6 +69,8 @@ Build the UI package before its consumers. During T04, select and record one rep
 
 ## P04 — Verification
 
+Logging correction — 2026-11-07: add exception logging to the viewer and sandbox 500 handlers. Verify both with isolated error-handler tests covering unexpected/configuration failures, retained causes and correlation, unchanged safe envelopes and no error logging for expected 4xx. Reuse prior browser/integration evidence for unchanged routes; no database run or frontend rebuild is needed.
+
 Record actual commands/results and reused evidence in implementation.md. Do not execute these during specification preparation. Verification follows the changed viewer boundary, not the full console acceptance matrix.
 
 ### Evidence reuse and stopping rule
@@ -90,3 +94,5 @@ Once the focused checks pass, finish. Repeat only checks invalidated by a later 
 T02 has reconciled observable contracts and readiness with the completed F012 source/evidence and current repository rules. During authorized T03/T04, document exact member signatures before their consumers and select library-build pins/package-consumption commands before dependency edits. These bounded engineering choices are not extra prerequisites requiring owner decisions or runtime execution during documentation review. A change to host visibility, payloads, limits or scope requires specification reconciliation.
 
 F013 acceptance demonstrates the shared sandbox slice and a generic NgModule consumer. A subsequent APOLO integration feature must implement real identity/business-link adapters, effective dependency/theme/localization checks and host-specific runtime evidence. It must not interpret F013 as verification of booking commands, shared write transactions or production readiness.
+
+P03 engineering reconciliation: the existing host definition preview consumes the same pure graph layout and scoped Sass. Export `layoutGraph`/its layout types and package the existing stylesheet at `@workflow-engine/ui/styles/graph.scss`; switch only its host imports. This preserves one implementation and unchanged authoring behavior. The affected topology suite and final package build cover this discovered dependency.

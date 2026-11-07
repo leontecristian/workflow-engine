@@ -50,6 +50,7 @@ for (const name of [
     await import("@angular/material/" + name),
   );
 modules.set("@angular/cdk/layout", await import("@angular/cdk/layout"));
+modules.set('@workflow-engine/ui', await import('@workflow-engine/ui'));
 const cache = new Map();
 export function loadTs(url) {
   const file = typeof url === "string" ? resolve(url) : fileURLToPath(url);

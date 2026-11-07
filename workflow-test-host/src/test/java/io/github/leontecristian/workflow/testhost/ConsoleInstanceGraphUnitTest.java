@@ -25,13 +25,15 @@ import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
-import io.github.leontecristian.workflow.testhost.controller.runtime.ConsoleInstanceGraphController;
-import io.github.leontecristian.workflow.testhost.dto.runtime.InstanceGraphView.State;
-import io.github.leontecristian.workflow.testhost.exception.console.ConsoleException;
+import io.github.leontecristian.workflow.web.controller.instance.WorkflowInstanceViewerController;
+import io.github.leontecristian.workflow.web.configuration.WorkflowViewerOptions;
+import io.github.leontecristian.workflow.web.dto.instance.InstanceGraphView.State;
+import io.github.leontecristian.workflow.web.exception.instance.WorkflowViewerException;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
-import io.github.leontecristian.workflow.testhost.service.console.ConsoleWire;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleInstanceGraph;
+import io.github.leontecristian.workflow.web.service.instance.ViewerWire;
+import io.github.leontecristian.workflow.web.service.instance.WorkflowInstanceGraphService;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeAccess;
+import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleViewerAccess;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -63,10 +65,16 @@ class ConsoleInstanceGraphUnitTest {
     private final WorkflowRuntimeQueryService reads = mock(WorkflowRuntimeQueryService.class);
     private final WorkflowDefinitionService definitions = mock(WorkflowDefinitionService.class);
     private final ConsoleContext context = mock(ConsoleContext.class);
-    private final ConsoleWire wire = new ConsoleWire();
-    private final ConsoleInstanceGraph graphs =
-            new ConsoleInstanceGraph(
-                    new ConsoleRuntimeAccess(reads, context), definitions, reads, wire);
+    @org.junit.jupiter.api.BeforeEach void authenticated() {
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+            org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated("unit", "unused", List.of()));
+        when(reads.listTasks(anyLong(), anyLong(), anyInt())).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage(List.of(), null));
+    }
+    @org.junit.jupiter.api.AfterEach void clearSecurity() { org.springframework.security.core.context.SecurityContextHolder.clearContext(); }
+    private final ViewerWire wire = new ViewerWire();
+    private final WorkflowInstanceGraphService graphs =
+            new WorkflowInstanceGraphService(
+                    new ConsoleViewerAccess(new ConsoleRuntimeAccess(reads, context), reads), definitions, reads, wire);
 
     private WorkflowInstanceView instance(InstanceStatus status, long sequence) {
         return new WorkflowInstanceView(
@@ -91,6 +99,9 @@ class ConsoleInstanceGraphUnitTest {
 
     private void setup(InstanceStatus status, long sequence) {
         when(context.admin()).thenReturn(true);
+        var linkTask = mock(WorkflowTaskView.class); when(linkTask.id()).thenReturn(TASK);
+        when(linkTask.activityId()).thenReturn(ACTIVITY);
+        when(reads.listTasks(ID, 0, 100)).thenReturn(new WorkflowTaskPage(List.of(linkTask), null));
         when(reads.findInstance(ID)).thenReturn(Optional.of(instance(status, sequence)));
         var summary = mock(DefinitionVersionSummary.class);
         when(summary.id()).thenReturn(7L);
@@ -173,7 +184,7 @@ class ConsoleInstanceGraphUnitTest {
                                 null));
         assertEquals(
                 "HOST_CONFIGURATION",
-                assertThrows(ConsoleException.class, () -> graphs.find(ID)).code());
+                assertThrows(WorkflowViewerException.class, () -> graphs.find(ID)).code());
     }
 
     @Test
@@ -181,7 +192,7 @@ class ConsoleInstanceGraphUnitTest {
         when(reads.findInstance(ID)).thenReturn(Optional.of(instance(InstanceStatus.ACTIVE, 4)));
         when(context.actor()).thenReturn("other");
         when(reads.listTasks(ID, 0, 100)).thenReturn(new WorkflowTaskPage(List.of(), null));
-        assertEquals(404, assertThrows(ConsoleException.class, () -> graphs.find(ID)).status());
+        assertEquals(404, assertThrows(WorkflowViewerException.class, () -> graphs.find(ID)).status());
         verifyNoInteractions(definitions);
         verify(reads, never()).listHistory(anyLong(), anyLong(), anyInt());
     }
@@ -220,7 +231,7 @@ class ConsoleInstanceGraphUnitTest {
         setup(InstanceStatus.ACTIVE, 4);
         when(reads.listHistory(ID, 0, 100))
                 .thenReturn(new WorkflowHistoryPage(facts().subList(1, 4), null));
-        assertEquals(500, assertThrows(ConsoleException.class, () -> graphs.find(ID)).status());
+        assertEquals(500, assertThrows(WorkflowViewerException.class, () -> graphs.find(ID)).status());
         when(reads.listHistory(ID, 0, 100))
                 .thenReturn(
                         new WorkflowHistoryPage(
@@ -230,14 +241,29 @@ class ConsoleInstanceGraphUnitTest {
                                         facts().get(2),
                                         facts().get(3)),
                                 null));
-        assertEquals(500, assertThrows(ConsoleException.class, () -> graphs.find(ID)).status());
+        assertEquals(500, assertThrows(WorkflowViewerException.class, () -> graphs.find(ID)).status());
+    }
+
+    @Test
+    void activityGrantDoesNotImplyTheRecordedExactTaskGrant() {
+        setup(InstanceStatus.ACTIVE, 4);
+        when(context.admin()).thenReturn(false);
+        when(context.actor()).thenReturn("reviewer");
+        var assigned = mock(WorkflowTaskView.class);
+        when(assigned.id()).thenReturn(TASK + 1);
+        when(assigned.activityId()).thenReturn(ACTIVITY);
+        when(assigned.assignedUserRef()).thenReturn("reviewer");
+        when(reads.listTasks(ID, 0, 100)).thenReturn(new WorkflowTaskPage(List.of(assigned), null));
+        var node = graphs.find(ID).nodes().get(1);
+        assertEquals(ACTIVITY, node.activityId());
+        org.junit.jupiter.api.Assertions.assertNull(node.taskId());
     }
 
     @Test
     void historyWorkIsBoundedBeforeDefinitionRead() {
         when(context.admin()).thenReturn(true);
         when(reads.findInstance(ID)).thenReturn(Optional.of(instance(InstanceStatus.ACTIVE, 12_001)));
-        assertEquals(422, assertThrows(ConsoleException.class, () -> graphs.find(ID)).status());
+        assertEquals(422, assertThrows(WorkflowViewerException.class, () -> graphs.find(ID)).status());
         verifyNoInteractions(definitions);
     }
 
@@ -250,20 +276,20 @@ class ConsoleInstanceGraphUnitTest {
                         Optional.of(
                                 new DefinitionVersionView(
                                         pinned.summary(), "invalid stored JSON", null)));
-        assertEquals(500, assertThrows(ConsoleException.class, () -> graphs.find(ID)).status());
+        assertEquals(500, assertThrows(WorkflowViewerException.class, () -> graphs.find(ID)).status());
         when(definitions.findVersion(7)).thenReturn(Optional.of(new DefinitionVersionView(pinned.summary(), DOCUMENT.replace("SINGLE", "ALL"), null)));
         assertEquals(State.ACTIVE, graphs.find(ID).nodes().get(1).state());
         when(definitions.findVersion(7)).thenReturn(Optional.of(pinned));
         when(pinned.summary().contentHash()).thenReturn("different-hash");
         assertEquals(
                 "HOST_CONFIGURATION",
-                assertThrows(ConsoleException.class, () -> graphs.find(ID)).code());
+                assertThrows(WorkflowViewerException.class, () -> graphs.find(ID)).code());
     }
 
     @Test
     void wireKeepsExactIdentifiersAndExcludesPrivateDefinitionContent() {
         setup(InstanceStatus.ACTIVE, 4);
-        var controller = new ConsoleInstanceGraphController(graphs, wire);
+        var controller = new WorkflowInstanceViewerController(null, graphs, wire, new WorkflowViewerOptions("/console/api", null));
         var json = controller.graph(Long.toString(ID), new MockHttpServletRequest()).getBody();
         assertTrue(json.contains("\"id\":\"9007199254740993\""));
         assertTrue(json.contains("\"taskId\":\"9007199254740995\""));
@@ -283,7 +309,7 @@ class ConsoleInstanceGraphUnitTest {
         assertEquals(
                 400,
                 assertThrows(
-                                ConsoleException.class,
+                                WorkflowViewerException.class,
                                 () -> controller.graph(Long.toString(ID), invalid))
                         .status());
     }
@@ -294,7 +320,7 @@ class ConsoleInstanceGraphUnitTest {
         when(reads.findInstance(ID)).thenReturn(Optional.of(instance(InstanceStatus.CANCELLED, 4)));
         assertEquals(
                 "HOST_CONFIGURATION",
-                assertThrows(ConsoleException.class, () -> graphs.find(ID)).code());
+                assertThrows(WorkflowViewerException.class, () -> graphs.find(ID)).code());
         verifyNoInteractions(definitions);
         assertEquals(
                 InstanceStatus.CANCELLED,

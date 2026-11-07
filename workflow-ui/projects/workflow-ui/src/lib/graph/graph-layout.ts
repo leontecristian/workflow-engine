@@ -1,4 +1,4 @@
-import type { InstanceGraph, InstanceGraphEdge, InstanceGraphNode } from "../../../data/dtos";
+import type { InstanceGraph, InstanceGraphEdge, InstanceGraphNode } from "../models";
 
 export interface PositionedNode {
   node: InstanceGraphNode;

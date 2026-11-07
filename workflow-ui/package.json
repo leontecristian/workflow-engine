@@ -1,0 +1,33 @@
+{
+  "name": "workflow-ui-workspace",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "22.22.0",
+    "npm": "10.9.4"
+  },
+  "scripts": {
+    "build": "ng-packagr -p projects/workflow-ui/ng-package.json -c tsconfig.lib.json",
+    "test:unit": "node --experimental-strip-types --test projects/workflow-ui/src/lib/*.test.mjs projects/workflow-ui/src/lib/graph/*.test.mjs"
+  },
+  "devDependencies": {
+    "@angular/cdk": "19.2.19",
+    "@angular/common": "19.2.25",
+    "@angular/compiler": "19.2.25",
+    "@angular/core": "19.2.25",
+    "@angular/forms": "19.2.25",
+    "@angular/material": "19.2.19",
+    "@angular/platform-browser": "19.2.25",
+    "@angular/router": "19.2.25",
+    "jsonc-parser": "3.3.1",
+    "rxjs": "7.8.2",
+    "tslib": "2.8.1",
+    "zone.js": "0.15.1",
+    "@angular/build": "19.2.27",
+    "@angular/cli": "19.2.27",
+    "@angular/compiler-cli": "19.2.25",
+    "typescript": "5.8.3",
+    "ng-packagr": "19.2.2"
+  }
+}

@@ -1,4 +1,4 @@
-package io.github.leontecristian.workflow.testhost.dto.runtime;
+package io.github.leontecristian.workflow.web.dto.instance;
 
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView;
 

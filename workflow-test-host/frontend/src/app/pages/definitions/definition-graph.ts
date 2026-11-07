@@ -10,7 +10,7 @@ import { definitionTopology } from "./definition-topology";
   standalone: true,
   imports: [MatButtonModule, FormsModule, MatInputModule],
   templateUrl: "./definition-graph.html",
-  styleUrl: "../runtime/graph/instance-graph.scss",
+  styleUrl: "./definition-graph.scss",
   styles: [
     ".node { cursor: pointer; } .node.selected rect { stroke: #5b45b8; stroke-width: 3; }",
     ".object-json { width: 100%; box-sizing: border-box; font-family: monospace; }",

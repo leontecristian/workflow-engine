@@ -42,7 +42,7 @@ Revision 0.11 records the subsequent owner adoption on 2026-11-07: `workflow-ui`
 
 This revision supersedes the earlier JDBC persistence proposal and the `STATE`/`DECISION`/`FINAL` node model. Historical documents and examples must not override this baseline.
 
-**AGREED packaging revision — 2026-11-07:** target three Maven modules, `workflow-core`, `workflow-web` and `workflow-test-host`, plus the separate Angular 19 `workflow-ui` library. The current implementation still has two Maven modules. Core remains a Spring/JPA library; web is an optional host-consumed HTTP adapter. This supersedes the former two-module constraint without reviving the earlier six-module proposal. Public core contracts remain independent of APOLO and infrastructure-provider types. Core owns workflow changelogs; APOLO remains the single production migration owner.
+**AGREED packaging revision — 2026-11-07:** target three Maven modules, `workflow-core`, `workflow-web` and `workflow-test-host`, plus the separate Angular 19 `workflow-ui` library. F013 implements the three-module reactor and the shared read-only viewer; scoped runtime acceptance is complete. Core remains a Spring/JPA library; web is an optional host-consumed HTTP adapter. This supersedes the former two-module constraint without reviving the earlier six-module proposal. Public core contracts remain independent of APOLO and infrastructure-provider types. Core owns workflow changelogs; APOLO remains the single production migration owner.
 
 **AGREED integration destination (F5):** independent development is the current phase, not a requirement for a permanently separate repository or independently published product. Eventually `workflow-core` becomes a Maven module inside APOLO, alongside `backend`, `frontend` and `configuration`. The source move's timing, final Maven coordinates and the test host's future location remain to be settled. No source move or POM reparenting into APOLO is implied by this documentation revision.
 
@@ -191,7 +191,7 @@ Git is the source of truth for development artifacts. The host database is the r
 | workflow-web (agreed, not implemented) | Reusable HTTP controllers, transport mapping and scoped errors; explicit host activation | workflow-core and Spring MVC; required host policy adapters |
 | workflow-test-host | Executable development host, sample endpoints/adapters, datasource and transaction configuration, migration execution against a disposable local database | workflow-core, Spring Boot host starters, Liquibase and SQL Server JDBC driver; database test tooling belongs here |
 
-During separate development, the workflow root POM is the parent/aggregator with `packaging=pom`. Core and web produce ordinary library JARs; only the test host produces an executable Spring Boot JAR. Preserve the current standalone root and development coordinates until the planned source move. Later, core joins APOLO's reactor and is intended to inherit its root parent after the effective build is reviewed. The Angular library has a separate frontend build and does not itself require a Maven module. Constitution 6.0.0 adopts the third Java module; the POM still lists two modules because implementation has not been requested.
+During separate development, the workflow root POM is the parent/aggregator with `packaging=pom`. Core and web produce ordinary library JARs; only the test host produces an executable Spring Boot JAR. Preserve the current standalone root and development coordinates until the planned source move. Later, core joins APOLO's reactor and is intended to inherit its root parent after the effective build is reviewed. The Angular library has a separate frontend build and does not itself require a Maven module. Constitution 6.0.0 adopts the third Java module; F013 now registers all three modules, with the read-only viewer extracted and scoped runtime acceptance complete.
 
 Keep models, persistence, services, expressions and integration concerns in separate packages within core. These are implementation boundaries, not separate Maven artifacts. A separate expression API, SpEL adapter artifact, persistence artifact or starter can be extracted later only when concrete reuse or dependency needs justify it. Implement expressions only as required for workflow routing.
 
@@ -1298,7 +1298,7 @@ The host task shell renders this authorized projection and obtains business form
 
 ## 18. Repository and documentation structure
 
-The current project documentation is organized as shown in the [documentation guide](../README.md#documentation-and-feature-structure). The source project has its parent POM and two modules directly under the repository root. The tree below extends that standalone structure with planned artifacts; it is not the complete current layout or the final APOLO layout.
+The current project documentation is organized as shown in the [documentation guide](../README.md#documentation-and-feature-structure). The source project has its parent POM and three modules directly under the repository root. The tree below extends that standalone structure with planned artifacts; it is not the complete current layout or the final APOLO layout.
 
 Use one independent engine repository initially, with separate Maven and frontend build lifecycles:
 

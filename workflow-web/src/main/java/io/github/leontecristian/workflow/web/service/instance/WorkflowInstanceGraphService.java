@@ -1,16 +1,19 @@
-package io.github.leontecristian.workflow.testhost.service.runtime;
+package io.github.leontecristian.workflow.web.service.instance;
+
+import io.github.leontecristian.workflow.web.integration.instance.WorkflowViewerAccess;
+import io.github.leontecristian.workflow.web.dto.instance.ViewerLinkReference;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistorySummary;
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
-import io.github.leontecristian.workflow.testhost.dto.runtime.InstanceGraphView;
-import io.github.leontecristian.workflow.testhost.dto.runtime.InstanceGraphView.Edge;
-import io.github.leontecristian.workflow.testhost.dto.runtime.InstanceGraphView.Node;
-import io.github.leontecristian.workflow.testhost.dto.runtime.InstanceGraphView.State;
-import io.github.leontecristian.workflow.testhost.exception.console.ConsoleException;
-import io.github.leontecristian.workflow.testhost.service.console.ConsoleWire;
+import io.github.leontecristian.workflow.web.dto.instance.InstanceGraphView;
+import io.github.leontecristian.workflow.web.dto.instance.InstanceGraphView.Edge;
+import io.github.leontecristian.workflow.web.dto.instance.InstanceGraphView.Node;
+import io.github.leontecristian.workflow.web.dto.instance.InstanceGraphView.State;
+import io.github.leontecristian.workflow.web.exception.instance.WorkflowViewerException;
+import io.github.leontecristian.workflow.web.service.instance.ViewerWire;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -21,22 +24,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Service;
+
+
 import org.springframework.transaction.annotation.Transactional;
 
 /** Authorized topology and retained progress, independent of executable node capabilities. */
-@Service
-@ConditionalOnProperty(name = "workflow.console.enabled", havingValue = "true")
-public class ConsoleInstanceGraph {
+
+
+public class WorkflowInstanceGraphService {
     private static final long MAX_HISTORY = 12_000;
-    private final ConsoleRuntimeAccess access;
+    private final WorkflowViewerAccess access;
     private final WorkflowDefinitionService definitions;
     private final WorkflowRuntimeQueryService reads;
-    private final ConsoleWire wire;
+    private final ViewerWire wire;
 
-    public ConsoleInstanceGraph(ConsoleRuntimeAccess access, WorkflowDefinitionService definitions,
-            WorkflowRuntimeQueryService reads, ConsoleWire wire) {
+    public WorkflowInstanceGraphService(WorkflowViewerAccess access, WorkflowDefinitionService definitions,
+            WorkflowRuntimeQueryService reads, ViewerWire wire) {
         this.access = access;
         this.definitions = definitions;
         this.reads = reads;
@@ -46,25 +49,26 @@ public class ConsoleInstanceGraph {
     @Transactional(readOnly = true)
     public InstanceGraphView find(long id) {
         // Authorize first, before disclosing pinned topology or reading retained evidence.
-        var instance = access.instance(id);
+        access.requireInstanceRead(id);
+        var instance = reads.findInstance(id).orElseThrow(WorkflowViewerException::missing);
         require(instance.status() == InstanceStatus.ACTIVE || instance.status() == InstanceStatus.COMPLETED);
         long watermark = instance.lastHistorySequence();
-        if (watermark > MAX_HISTORY) throw new ConsoleException(422, "LIMIT_EXCEEDED");
+        if (watermark > MAX_HISTORY) throw new WorkflowViewerException(422, "LIMIT_EXCEEDED");
         require(watermark > 0);
-        var version = definitions.findVersion(instance.definitionVersionId()).orElseThrow(ConsoleInstanceGraph::unavailable);
+        var version = definitions.findVersion(instance.definitionVersionId()).orElseThrow(WorkflowInstanceGraphService::unavailable);
         require(version.summary().id() == instance.definitionVersionId()
                 && Objects.equals(version.summary().contentHash(), instance.definitionHash())
                 && Objects.equals(version.summary().key(), instance.definitionKey())
                 && version.summary().version() == instance.definitionVersion());
         JsonNode document;
         try { document = wire.tree(version.documentJson()); }
-        catch (ConsoleException invalid) {
+        catch (WorkflowViewerException invalid) {
             var failure = unavailable(); failure.initCause(invalid); throw failure;
         }
         var nodes = displayNodes(document);
         var edges = displayEdges(document, nodes);
         require(nodes.containsKey(instance.currentNodeKey()));
-        var start = nodes.values().stream().filter(n -> "START".equals(n.type())).findFirst().orElseThrow(ConsoleInstanceGraph::unavailable);
+        var start = nodes.values().stream().filter(n -> "START".equals(n.type())).findFirst().orElseThrow(WorkflowInstanceGraphService::unavailable);
         var edgesByKey = new HashMap<String, Edge>();
         edges.forEach(e -> edgesByKey.put(e.key(), e));
         Set<String> completed = new HashSet<>(), traversed = new HashSet<>();
@@ -111,19 +115,26 @@ public class ConsoleInstanceGraph {
         require(started && position.equals(instance.currentNodeKey())
                 && (instance.status() != InstanceStatus.COMPLETED || ended));
         List<Node> displayedNodes = new ArrayList<>();
-        var readableActivities = access.readableActivities(id, latestLinks.values().stream()
-                .map(links -> links.activityId).collect(java.util.stream.Collectors.toSet()));
+        var candidates = latestLinks.values().stream()
+                .map(links -> new ViewerLinkReference(links.activityId, links.singleTaskId))
+                .collect(java.util.stream.Collectors.toSet());
+        var readable = access.readableLinks(id, Set.copyOf(candidates));
+        require(readable != null && readable.stream().allMatch(grant -> candidates.stream().anyMatch(candidate ->
+                candidate.activityId() == grant.activityId()
+                && (grant.taskId() == null || Objects.equals(candidate.taskId(), grant.taskId())))));
         for (String key : orderedKeys(start.key(), nodes, edges)) {
             var node = nodes.get(key); var links = latestLinks.get(key);
-            boolean readable = links != null && readableActivities.contains(links.activityId);
+            boolean activityReadable = links != null && readable.contains(new ViewerLinkReference(links.activityId, null));
+            boolean taskReadable = links != null && links.singleTaskId != null
+                    && readable.contains(new ViewerLinkReference(links.activityId, links.singleTaskId));
             State state = instance.status() == InstanceStatus.ACTIVE && key.equals(instance.currentNodeKey())
                     ? State.ACTIVE : completed.contains(key) ? State.COMPLETED : State.PENDING;
             displayedNodes.add(new Node(key, node.name(), node.type(), state,
-                    readable ? links.activityId : null, readable ? links.singleTaskId : null));
+                    activityReadable ? links.activityId : null, taskReadable ? links.singleTaskId : null));
         }
         var displayedEdges = edges.stream().map(e -> new Edge(e.key(), e.from(), e.to(), e.outcome(), traversed.contains(e.key()))).toList();
         var result = new InstanceGraphView(instance, displayedNodes, displayedEdges);
-        if (!wire.fits(wire.json(result), 1024 * 1024)) throw new ConsoleException(422, "LIMIT_EXCEEDED");
+        if (!wire.fits(wire.json(result), 1024 * 1024)) throw new WorkflowViewerException(422, "LIMIT_EXCEEDED");
         return result;
     }
 
@@ -195,7 +206,7 @@ public class ConsoleInstanceGraph {
         String value = text(node, field); require(value.matches("[A-Za-z][A-Za-z0-9._-]{0,99}")); return value;
     }
     private static void require(boolean condition) { if (!condition) throw unavailable(); }
-    private static ConsoleException unavailable() { return new ConsoleException(500, "HOST_CONFIGURATION"); }
+    private static WorkflowViewerException unavailable() { return new WorkflowViewerException(500, "HOST_CONFIGURATION"); }
 
     private static final class Links {
         private final long activityId;

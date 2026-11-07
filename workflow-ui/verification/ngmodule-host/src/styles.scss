@@ -1,0 +1,6 @@
+@use '@angular/material' as mat;
+@include mat.core();
+$theme: mat.define-theme((color:(primary:mat.$violet-palette),typography:(plain-family:Arial,brand-family:Arial),density:(scale:0)));
+html { @include mat.all-component-themes($theme); }
+body { margin:1rem; font-family:Arial,sans-serif; background:#faf7ff; color:#222; }
+.viewers{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,34rem),1fr));gap:1rem} button{margin:.3rem}

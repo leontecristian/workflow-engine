@@ -1,8 +1,10 @@
 # F013 — Shared instance viewer extraction
 
-**Status:** READY, revision 5 — 2026-11-07. **Owner:** Workflow project owner. **Constitution:** 6.0.0. **Authorization:** specification preparation, review, readiness reconciliation and the subsequently requested documentation-only commit; no implementation, installs, builds, runtime execution, push or APOLO changes. READY means the bounded slice is specified; implementation still requires a subsequent request.
+**Status:** IMPLEMENTED, revision 5; runtime acceptance COMPLETE — 2026-11-07. **Owner:** Workflow project owner. **Constitution:** 6.0.0. **Authorization:** owner implementation request authorizes T03�T07; no commit, push or APOLO changes. The readiness-only descriptions below are historical. T07 focused runtime acceptance is complete; see implementation.md.
 
 The owner moved these four documents from local staging to `docs/features/F013-shared-instance-viewer/`. F012 final acceptance and its dialog follow-up are complete at `943a51f`. T02 baseline/contract reconciliation is complete; reuse that evidence for unchanged behavior. This readiness decision authorizes no implementation.
+
+Implementation request received 2026-11-07: T03�T07 are authorized. Earlier authorization/readiness wording records the specification-preparation scope. Required behavior is unchanged. See implementation.md for current verification.
 
 ## Purpose and authority
 
@@ -94,6 +96,8 @@ All library-authored visible labels and accessibility messages use a reactive me
 Viewer errors retain the envelope `{code, message, diagnostics, correlationId}`. Selected mappings are 400 INVALID_INPUT, 401 UNAUTHENTICATED, 404 NOT_FOUND, 422 LIMIT_EXCEEDED, 500 HOST_CONFIGURATION for inconsistent graph evidence/configuration and 500 HOST_FAILURE for unexpected runtime failure. Messages contain safe category text; diagnostics are empty for this slice, and correlation is a host-supplied string or null, never a private exception dump. Startup configuration failures are startup errors, not successful HTTP responses.
 
 Scope advice and serialization to viewer controllers. A host controller throwing an unrelated error must retain its own handling. Preserve the sandbox security headers, CSP, session handling and command CSRF behavior. GETs do not mutate workflow/business state, create receipts/events or advance instance versions. No schema or migration changes are needed.
+
+Owner correction — 2026-11-07: handled 500 responses must log the original exception with its stack trace/cause chain, error code and trusted correlation ID in server logs. The sandbox error handler follows the same rule. Client envelopes stay unchanged; expected 4xx responses do not gain error-level exception logging.
 
 ### R08 — Baseline, packaging and evidence
 

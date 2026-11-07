@@ -38,3 +38,8 @@ workflow-test-host/frontend/node_modules/
 workflow-test-host/frontend/.angular/
 workflow-test-host/frontend/dist/
 /.codex/
+
+# F013 generated library and verification consumer
+workflow-ui/**/node_modules/
+workflow-ui/**/dist/
+workflow-ui/**/.angular/

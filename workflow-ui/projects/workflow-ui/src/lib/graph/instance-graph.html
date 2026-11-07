@@ -1,21 +1,20 @@
-<div class="graph-legend" aria-label="Workflow graph legend">
-  <span><i class="dot active"></i>Current step</span>
-  <span><i class="dot completed"></i>Completed</span>
-  <span><i class="dot pending"></i>Not reached</span>
+<div class="graph-legend" [attr.aria-label]="messages().legend">
+  <span><i class="dot active"></i>{{messages().current}}</span>
+  <span><i class="dot completed"></i>{{messages().completed}}</span>
+  <span><i class="dot pending"></i>{{messages().pending}}</span>
 </div>
-<div class="graph-controls" aria-label="Graph zoom controls">
-  <button mat-stroked-button type="button" (click)="changeZoom(-0.25)" [disabled]="zoom() <= 0.25" aria-label="Zoom out">&minus;</button>
+<div class="graph-controls" [attr.aria-label]="messages().zoomControls">
+  <button mat-stroked-button type="button" (click)="changeZoom(-0.25)" [disabled]="zoom() <= 0.25" [attr.aria-label]="messages().zoomOut">&minus;</button>
   <span aria-live="polite">{{zoomPercent()}}%</span>
-  <button mat-stroked-button type="button" (click)="changeZoom(0.25)" [disabled]="zoom() >= 2" aria-label="Zoom in">+</button>
-  <button mat-button type="button" (click)="zoom.set(defaultZoom)">Reset zoom</button>
+  <button mat-stroked-button type="button" (click)="changeZoom(0.25)" [disabled]="zoom() >= 2" [attr.aria-label]="messages().zoomIn">+</button>
+  <button mat-button type="button" (click)="zoom.set(defaultZoom)">{{messages().resetZoom}}</button>
 </div>
-<div class="graph-scroll" tabindex="0" aria-label="Workflow graph. Scroll horizontally or vertically to explore all steps.">
+<div class="graph-scroll" tabindex="0" [attr.aria-label]="messages().explore">
   <svg [attr.viewBox]="'0 0 ' + layout().width + ' ' + layout().height"
        [attr.width]="layout().width * zoom()" [attr.height]="layout().height * zoom()"
-       role="group" aria-label="Pinned workflow graph">
-    <title>Workflow {{graph().instance.definitionKey}} &middot; version {{graph().instance.definitionVersion}}</title>
-    <desc>Read-only graph of the pinned definition. Arrows show direction; green arrows were traversed.
-      Nodes show recorded state. Select a node to open its recorded task, activity or history.</desc>
+       role="group" [attr.aria-label]="messages().pinned">
+    <title>{{messages().graph}} {{graph().instance.definitionKey}} &middot; {{graph().instance.definitionVersion}}</title>
+    <desc>{{messages().description}}</desc>
     <defs>
       <marker [attr.id]="arrowId(false)" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
         <path d="M 0 0 L 10 5 L 0 10 z" fill="#a5afbe" />
@@ -27,14 +26,14 @@
     @for(route of layout().edges; track route.edge.key){
       @let edge = route.edge;
       <g class="edge" [class.traversed]="edge.traversed">
-        <title>{{edge.key}}: {{edge.from}} &rarr; {{edge.to}}. {{edge.traversed ? 'Traversed' : 'Not traversed'}}{{edge.outcome ? ' - ' + edge.outcome : ''}}</title>
+        <title>{{edge.key}}: {{edge.from}} &rarr; {{edge.to}}. {{edge.traversed ? messages().traversed : messages().notTraversed}}{{edge.outcome ? ' - ' + edge.outcome : ''}}</title>
         <path [attr.d]="route.path" [attr.marker-end]="arrow(edge.traversed)" />
         <text [attr.x]="route.labelX" [attr.y]="route.labelY" text-anchor="middle">{{shortName(edge.outcome || edge.key)}}</text>
       </g>
     }
     @for(item of layout().nodes; track item.node.key){
       @let node = item.node;
-      <a [routerLink]="route(node)" tabindex="0" [attr.aria-label]="accessibleName(node)"
+      <a [routerLink]="route(node)" [attr.tabindex]="route(node) ? 0 : null" [attr.aria-label]="accessibleName(node)"
          [attr.transform]="'translate(' + item.x + ' ' + item.y + ')'"
          class="node" [class.active]="node.state==='ACTIVE'" [class.completed]="node.state==='COMPLETED'">
         <title>{{node.name}} &middot; {{node.key}} &middot; {{node.type}} &middot; {{label(node)}}</title>
@@ -46,15 +45,15 @@
     }
   </svg>
 </div>
-<ol class="graph-node-details" aria-label="Workflow steps and recorded links">
+<ol class="graph-node-details" [attr.aria-label]="messages().steps">
   @for(node of graph().nodes; track node.key){
     <li>
       <a [routerLink]="route(node)">{{node.name}}</a>
       <span class="node-key">{{node.key}} &middot; {{node.type}}</span>
       <span>{{label(node)}}</span>
-      @if(node.activityId){<a [routerLink]="['/activity',node.activityId]">Activity #{{node.activityId}}</a>}
+      @if(node.activityId){<a [routerLink]="activityRoute(node.activityId)">{{messages().activity}} #{{node.activityId}}</a>}
     </li>
   }
 </ol>
-<p class="graph-note">Recorded through history sequence <code>{{graph().instance.lastHistorySequence}}</code>.
-  Refresh to read the latest state.</p>
+<p class="graph-note">{{messages().recordedThrough}} <code>{{graph().instance.lastHistorySequence}}</code>.
+  {{messages().refreshHint}}</p>

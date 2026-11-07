@@ -18,7 +18,6 @@ import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmission;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
-import io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistorySummary;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceQuery;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceSummary;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
@@ -232,11 +231,6 @@ public class ConsoleRuntimeController {
                         WorkflowInstanceSummary::id));
     }
 
-    @GetMapping("/instances/{id}")
-    public ResponseEntity<String> instance(@PathVariable String id) {
-        return wire.response(access.instance(decimal(id, false)));
-    }
-
     @GetMapping("/instances/{id}/tasks")
     public ResponseEntity<String> tasks(@PathVariable String id, HttpServletRequest r) {
         query(r, "afterId", "limit");
@@ -247,34 +241,6 @@ public class ConsoleRuntimeController {
                         key, after(r.getParameter("afterId")), limit(r.getParameter("limit")));
         return wire.response(
                 wire.page(page.items().stream().filter(access::canReadTask).toList(), page.nextAfterId(), "nextAfterId", WorkflowTaskView::id));
-    }
-
-    @GetMapping("/instances/{id}/history")
-    public ResponseEntity<String> history(@PathVariable String id, HttpServletRequest r) {
-        query(r, "afterSequence", "limit");
-        long key = decimal(id, false);
-        access.instance(key);
-        var page =
-                reads.listHistory(
-                        key,
-                        after(r.getParameter("afterSequence")),
-                        limit(r.getParameter("limit")));
-        return wire.response(
-                wire.page(
-                        page.items(),
-                        page.nextAfterSequence(),
-                        "nextAfterSequence",
-                        WorkflowHistorySummary::historySequence));
-    }
-
-    @GetMapping("/instances/{id}/history/{sequence}")
-    public ResponseEntity<String> historyEvent(
-            @PathVariable String id, @PathVariable String sequence) {
-        long key = decimal(id, false);
-        access.instance(key);
-        return wire.response(
-                reads.findHistoryEvent(key, decimal(sequence, false))
-                        .orElseThrow(ConsoleException::missing));
     }
 
     @GetMapping("/tasks/mine")

@@ -16,6 +16,7 @@
     <description>Parent build for the workflow library and its standalone test host</description>
     <modules>
         <module>workflow-core</module>
+        <module>workflow-web</module>
         <module>workflow-test-host</module>
     </modules>
     <properties>

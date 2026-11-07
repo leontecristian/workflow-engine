@@ -106,7 +106,7 @@ public class ConsoleErrors {
         }
         if (status == 500)
             LoggerFactory.getLogger(ConsoleErrors.class)
-                    .error("Console failure {} ({})", correlation(request), code);
+                    .error("Console failure {} ({})", correlation(request), code, failure);
         return ResponseEntity.status(status)
                 .header("Content-Type", "application/json")
                 .body(wire.json(new Failure(code, code, diagnostics, correlation(request))));

@@ -1,13 +1,11 @@
+import type { InstanceStatus, InstanceSummary, InstanceView, InstanceGraphNode, InstanceGraphEdge, InstanceGraph, HistorySummary, HistoryEvent, HistoryPage } from "@workflow-engine/ui";
+export type { InstanceStatus, InstanceSummary, InstanceView, InstanceGraphNode, InstanceGraphEdge, InstanceGraph, HistorySummary, HistoryEvent, HistoryPage } from "@workflow-engine/ui";
 /** HTTP contracts only. BIGINT identifiers, tokens and sequences are never JS numbers. */
 export type Decimal = string;
 export type JsonText = string;
 export interface Page<T> {
   items: T[];
   nextAfterId: Decimal | null;
-}
-export interface HistoryPage {
-  items: HistorySummary[];
-  nextAfterSequence: Decimal | null;
 }
 export interface SubmissionPage {
   items: TaskSubmission[];
@@ -112,48 +110,6 @@ export interface SandboxRequestSummary {
 export interface SandboxRequest extends SandboxRequestSummary {
   requestDataJson: string | null;
 }
-export type InstanceStatus = "ACTIVE" | "COMPLETED" | "CANCELLED";
-export interface InstanceSummary {
-  id: Decimal;
-  definitionVersionId: Decimal;
-  definitionKey: string;
-  definitionVersion: number;
-  status: InstanceStatus;
-  currentNodeKey: string;
-  resultKey: string | null;
-  businessType: string | null;
-  businessId: string | null;
-  startedAt: string;
-  startedBy: string;
-  endedAt: string | null;
-  lastHistorySequence: Decimal;
-  lockVersion: Decimal;
-}
-export interface InstanceView extends InstanceSummary {
-  definitionHash: string;
-  endedBy: string | null;
-  terminationReason: string | null;
-}
-export interface InstanceGraphNode {
-  key: string;
-  name: string;
-  type: string;
-  state: "ACTIVE" | "COMPLETED" | "PENDING";
-  activityId: Decimal | null;
-  taskId: Decimal | null;
-}
-export interface InstanceGraphEdge {
-  key: string;
-  from: string;
-  to: string;
-  outcome: string | null;
-  traversed: boolean;
-}
-export interface InstanceGraph {
-  instance: InstanceView;
-  nodes: InstanceGraphNode[];
-  edges: InstanceGraphEdge[];
-}
 export interface TaskView {
   id: Decimal;
   activityId: Decimal;
@@ -194,26 +150,6 @@ export interface ActivityView {
   closedAt: string | null;
   closedBy: string | null;
   closureReason: string | null;
-}
-export interface HistorySummary {
-  instanceId: Decimal;
-  historySequence: Decimal;
-  eventType: string;
-  commandId: string;
-  correlationId: string;
-  actorKind: string;
-  actorRef: string;
-  occurredAt: string;
-  activityId: Decimal | null;
-  taskId: Decimal | null;
-  sourceNodeKey: string | null;
-  targetNodeKey: string | null;
-  transitionKey: string | null;
-  detailsSchemaVersion: number;
-}
-export interface HistoryEvent {
-  summary: HistorySummary;
-  detailsJson: JsonText;
 }
 export interface TaskSubmission {
   taskId: Decimal;

@@ -25,13 +25,14 @@ import io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistorySummary
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView;
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
-import io.github.leontecristian.workflow.testhost.dto.runtime.InstanceGraphView;
-import io.github.leontecristian.workflow.testhost.dto.runtime.InstanceGraphView.State;
-import io.github.leontecristian.workflow.testhost.exception.console.ConsoleException;
+import io.github.leontecristian.workflow.web.dto.instance.InstanceGraphView;
+import io.github.leontecristian.workflow.web.dto.instance.InstanceGraphView.State;
+import io.github.leontecristian.workflow.web.exception.instance.WorkflowViewerException;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
-import io.github.leontecristian.workflow.testhost.service.console.ConsoleWire;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleInstanceGraph;
+import io.github.leontecristian.workflow.web.service.instance.ViewerWire;
+import io.github.leontecristian.workflow.web.service.instance.WorkflowInstanceGraphService;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeAccess;
+import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleViewerAccess;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,8 +46,22 @@ class ConsoleGeneralGraphUnitTest {
     private final WorkflowRuntimeQueryService reads = mock(WorkflowRuntimeQueryService.class);
     private final WorkflowDefinitionService definitions = mock(WorkflowDefinitionService.class);
     private final ConsoleContext context = mock(ConsoleContext.class);
-    private final ConsoleWire wire = new ConsoleWire();
-    private final ConsoleInstanceGraph graphs = new ConsoleInstanceGraph(new ConsoleRuntimeAccess(reads, context), definitions, reads, wire);
+    @org.junit.jupiter.api.BeforeEach void authenticated() {
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+            org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated("unit", "unused", List.of()));
+        when(reads.listTasks(anyLong(), anyLong(), anyInt())).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage(List.of(), null));
+    }
+    @org.junit.jupiter.api.AfterEach void clearSecurity() { org.springframework.security.core.context.SecurityContextHolder.clearContext(); }
+    private final ViewerWire wire = new ViewerWire();
+    private final WorkflowInstanceGraphService graphs = new WorkflowInstanceGraphService(new io.github.leontecristian.workflow.web.integration.instance.WorkflowViewerAccess() {
+        public void requireInstanceRead(long id) {}
+        public void requireHistoryRead(long id) { throw new AssertionError("Graph must not require HISTORY"); }
+        public java.util.Set<io.github.leontecristian.workflow.web.dto.instance.ViewerLinkReference> readableLinks(long id, java.util.Set<io.github.leontecristian.workflow.web.dto.instance.ViewerLinkReference> candidates) {
+            var grants = new java.util.HashSet<>(candidates);
+            candidates.forEach(c -> grants.add(new io.github.leontecristian.workflow.web.dto.instance.ViewerLinkReference(c.activityId(), null)));
+            return grants;
+        }
+    }, definitions, reads, wire);
 
     private ObjectNode document(String... pairs) {
         var root = json.createObjectNode(); var nodes = root.putArray("nodes"); root.putArray("transitions");
@@ -156,22 +171,22 @@ class ConsoleGeneralGraphUnitTest {
         setup(doc, facts, InstanceStatus.ACTIVE, "REVIEW", 153);
         assertEquals(State.PENDING, node(graphs.find(1), "DONE").state()); verify(reads).listHistory(1, 100, 100);
         when(reads.listHistory(1, 100, 100)).thenReturn(new WorkflowHistoryPage(facts.subList(101, 153), null));
-        assertEquals(500, assertThrows(ConsoleException.class, () -> graphs.find(1)).status());
+        assertEquals(500, assertThrows(WorkflowViewerException.class, () -> graphs.find(1)).status());
         when(reads.listHistory(1, 100, 100)).thenReturn(new WorkflowHistoryPage(List.of(event(154, "OTHER")), 100L));
-        assertEquals(500, assertThrows(ConsoleException.class, () -> graphs.find(1)).status());
+        assertEquals(500, assertThrows(WorkflowViewerException.class, () -> graphs.find(1)).status());
     }
 
     @Test void malformedTopologyAndInconsistentRecordedRouteFailClosed() {
         var doc = document("BEGIN", "START", "REVIEW", "HUMAN_TASK", "DONE", "END"); edge(doc, "enter", "BEGIN", "REVIEW"); edge(doc, "end", "REVIEW", "DONE");
         var facts = List.of(event(1, "INSTANCE_STARTED"), transition(2, "enter", "REVIEW", "BEGIN"));
-        setup(doc, facts, InstanceStatus.ACTIVE, "REVIEW", 2); assertThrows(ConsoleException.class, () -> graphs.find(1));
+        setup(doc, facts, InstanceStatus.ACTIVE, "REVIEW", 2); assertThrows(WorkflowViewerException.class, () -> graphs.find(1));
         ((ObjectNode) doc.path("transitions").get(0)).put("to", "MISSING");
-        setup(doc, List.of(event(1, "INSTANCE_STARTED")), InstanceStatus.ACTIVE, "BEGIN", 1); assertThrows(ConsoleException.class, () -> graphs.find(1));
+        setup(doc, List.of(event(1, "INSTANCE_STARTED")), InstanceStatus.ACTIVE, "BEGIN", 1); assertThrows(WorkflowViewerException.class, () -> graphs.find(1));
         ((ObjectNode) doc.path("transitions").get(0)).put("to", "REVIEW");
         ((ArrayNode) doc.get("nodes")).add(doc.path("nodes").get(0));
-        setup(doc, List.of(event(1, "INSTANCE_STARTED")), InstanceStatus.ACTIVE, "BEGIN", 1); assertThrows(ConsoleException.class, () -> graphs.find(1));
+        setup(doc, List.of(event(1, "INSTANCE_STARTED")), InstanceStatus.ACTIVE, "BEGIN", 1); assertThrows(WorkflowViewerException.class, () -> graphs.find(1));
         var tooMany = document("BEGIN", "START"); for (int i = 0; i < 200; i++) ((ArrayNode) tooMany.get("nodes")).addObject().put("key", "N" + i).put("type", "SERVICE_TASK").put("name", "Node");
-        setup(tooMany, List.of(event(1, "INSTANCE_STARTED")), InstanceStatus.ACTIVE, "BEGIN", 1); assertThrows(ConsoleException.class, () -> graphs.find(1));
+        setup(tooMany, List.of(event(1, "INSTANCE_STARTED")), InstanceStatus.ACTIVE, "BEGIN", 1); assertThrows(WorkflowViewerException.class, () -> graphs.find(1));
     }
 
     @Test void completeResponseByteBudgetIsCheckedAfterAllowlisting() {
@@ -187,6 +202,6 @@ class ConsoleGeneralGraphUnitTest {
             ((ObjectNode) doc.path("transitions").get(i)).put("outcome", "O".repeat(100));
         }
         setup(doc, List.of(event(1, "INSTANCE_STARTED")), InstanceStatus.ACTIVE, keys.get(0), 1);
-        assertEquals(422, assertThrows(ConsoleException.class, () -> graphs.find(1)).status());
+        assertEquals(422, assertThrows(WorkflowViewerException.class, () -> graphs.find(1)).status());
     }
 }

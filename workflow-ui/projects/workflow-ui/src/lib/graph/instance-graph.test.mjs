@@ -4,18 +4,16 @@ import { readFileSync } from "node:fs";
 import {
   loadTs,
   component,
-  routeAt,
-  router,
   tick,
 } from "../../../../../unit/component-loader.mjs";
-const { InstanceGraphComponent } = loadTs(
+const { WorkflowInstanceGraphComponent } = loadTs(
   new URL("./instance-graph.ts", import.meta.url),
 );
-const { InstancePage } = loadTs(new URL("../instance.ts", import.meta.url));
+const { WorkflowInstanceViewerComponent } = loadTs(new URL("../instance-viewer.ts", import.meta.url));
 const id = "9007199254740993";
 const fixture = (status = "ACTIVE") => ({
   instance: {
-    id,
+    id, definitionVersionId:"7", definitionHash:"hash", lockVersion:"1", businessType:null,businessId:null,resultKey:null,endedAt:null,endedBy:null,terminationReason:null,startedAt:"2026-11-07T00:00:00Z",startedBy:"actor",
     definitionKey: "review",
     definitionVersion: 2,
     status,
@@ -68,15 +66,15 @@ const fixture = (status = "ACTIVE") => ({
 
 test("overlapping refreshes keep the newest snapshot and its loading state", async (t) => {
   const pending = [];
-  const { page } = component(t, InstancePage, {
+  const { page } = component(t, WorkflowInstanceViewerComponent, {
     async instance() {
       return fixture().instance;
     },
-    instanceGraph() {
+    graph() {
       return new Promise((resolve) => pending.push(resolve));
     },
   });
-  page.id = id;
+  page.instanceId = id;
   const first = page.load();
   await tick();
   const second = page.load();
@@ -93,33 +91,33 @@ test("overlapping refreshes keep the newest snapshot and its loading state", asy
 
 test("denied instance read never requests definition graph metadata", async (t) => {
   let graphReads = 0;
-  const { page } = component(t, InstancePage, {
+  const { page } = component(t, WorkflowInstanceViewerComponent, {
     async instance() {
-      throw new Error("404 NOT_FOUND");
+      throw Object.assign(new Error(),{httpStatus:404});
     },
-    async instanceGraph() {
+    async graph() {
       graphReads++;
     },
   });
-  page.id = id;
+  page.instanceId = id;
   await page.load();
   assert.equal(graphReads, 0);
   assert.equal(page.graph(), null);
-  assert.match(page.error(), /404 NOT_FOUND/);
+  assert.equal(page.error().category, "NOT_FOUND");
   assert.equal(page.busy(), false);
 });
 test("graph labels and links distinguish active, completed and future steps with exact IDs", (t) => {
-  const { page } = component(t, InstanceGraphComponent);
+  const { page } = component(t, WorkflowInstanceGraphComponent);
   let model = fixture();
   page.graph = () => model;
   assert.equal(page.label(model.nodes[0]), "Completed");
   assert.equal(page.label(model.nodes[1]), "Current step");
   assert.equal(page.label(model.nodes[2]), "Not reached");
   assert.deepEqual(Array.from(page.route(model.nodes[1])), [
-    "/task",
+    "task",
     "9007199254740995",
   ]);
-  assert.deepEqual(Array.from(page.route(model.nodes[0])), ["/history", id]);
+  assert.deepEqual(Array.from(page.route(model.nodes[0])), ["history", id]);
   assert.match(
     page.accessibleName(model.nodes[1]),
     /Review <script>.*Current step/,
@@ -129,7 +127,7 @@ test("graph labels and links distinguish active, completed and future steps with
   assert.ok(model.nodes.every((n) => page.label(n) !== "Current step"));
 });
 test("layout follows node keys and truncates only visible labels without damaging Unicode", (t) => {
-  const { page } = component(t, InstanceGraphComponent);
+  const { page } = component(t, WorkflowInstanceGraphComponent);
   page.graph = () => fixture();
   const positions = page.layout().nodes;
   assert.equal(positions[0].node.key, "BEGIN");
@@ -153,7 +151,7 @@ test("graph uses text bindings, keyboard links, state labels and scoped mobile s
   assert.match(template, /\[routerLink\]="route\(node\)"/);
   assert.match(template, /aria-label/);
   assert.match(template, /tabindex="0"/);
-  assert.match(template, /\['\/activity',node.activityId\]/);
+  assert.match(template, /activityRoute\(node.activityId\)/);
   assert.match(style, /overflow-x:\s*auto/);
   assert.match(style, /:focus/);
 });
@@ -161,18 +159,18 @@ test("instance refresh adopts graph metadata and highlighted state from one snap
   let status = "ACTIVE";
   const { page } = component(
     t,
-    InstancePage,
+    WorkflowInstanceViewerComponent,
     {
       async instance() {
         return fixture().instance;
       },
-      async instanceGraph() {
+      async graph() {
         return fixture(status);
       },
     },
-    routeAt({ id }),
+
   );
-  page.ngOnInit();
+  page.ngOnChanges({instanceId:true});
   await tick();
   assert.equal(page.graph().nodes[1].state, "ACTIVE");
   status = "COMPLETED";
@@ -184,35 +182,35 @@ test("instance refresh adopts graph metadata and highlighted state from one snap
 test("graph failure preserves ordinary detail without inventing progress", async (t) => {
   const { page } = component(
     t,
-    InstancePage,
+    WorkflowInstanceViewerComponent,
     {
       async instance() {
         return fixture().instance;
       },
-      async instanceGraph() {
+      async graph() {
         throw new Error("500 HOST_CONFIGURATION");
       },
     },
-    routeAt({ id }),
+
   );
-  page.ngOnInit();
+  page.ngOnChanges({instanceId:true});
   await tick();
   assert.equal(page.detail().id, id);
   assert.equal(page.graph(), null);
-  assert.match(page.graphError(), /HOST_CONFIGURATION/);
-  assert.equal(page.error(), "");
+  assert.equal(page.graphError().category, 'FAILED');
+  assert.equal(page.error(), null);
   assert.equal(page.busy(), false);
 });
 test("late graph responses cannot replace a reused or destroyed instance route", async (t) => {
   let release;
-  const { page, route, injector } = component(
+  const { page, injector } = component(
     t,
-    InstancePage,
+    WorkflowInstanceViewerComponent,
     {
       async instance(instanceId) {
         return { ...fixture().instance, id: instanceId };
       },
-      instanceGraph(instanceId) {
+      graph(instanceId) {
         if (instanceId === id) return new Promise((r) => (release = r));
         return Promise.resolve({
           ...fixture(),
@@ -220,18 +218,16 @@ test("late graph responses cannot replace a reused or destroyed instance route",
         });
       },
     },
-    routeAt({ id }),
+
   );
-  page.ngOnInit();
+  page.ngOnChanges({instanceId:true});
   await tick();
-  route.paramMap.next(router.convertToParamMap({ id: "2" }));
+  page.instanceId="2"; page.ngOnChanges({instanceId:true});
   await tick();
   release(fixture("COMPLETED"));
   await tick();
   assert.equal(page.detail().id, "2");
   assert.equal(page.graph().instance.id, "2");
-  injector.destroy();
-  route.paramMap.next(router.convertToParamMap({ id: "3" }));
-  await tick();
-  assert.equal(page.detail().id, "2");
+  page.ngOnDestroy();
+  assert.equal(page.detail(), null);
 });

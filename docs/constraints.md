@@ -27,7 +27,7 @@ References below identify constitution principles and sections/decision IDs in t
 
 ## CON-02 — Three target Maven modules, Angular library and source integration
 
-- The agreed target is exactly `workflow-core`, `workflow-web` and `workflow-test-host` Maven modules, with packages separating core responsibilities. The implemented reactor still has two modules; adoption authorizes no implementation.
+- The agreed target is exactly `workflow-core`, `workflow-web` and `workflow-test-host` Maven modules, with packages separating core responsibilities. F013 now implements that reactor and the separate Angular library; its scoped runtime acceptance is complete. Architecture adoption alone authorizes no further extraction.
 - Core and web are ordinary library JARs; web depends on core. The executable test host consumes them and provides sample policy/infrastructure. Hosts using core directly need not consume web.
 - `workflow-ui` is a separate Angular 19 library, targeting compatible 19.2.x Angular/Material/CDK versions. It supplies embeddable pages/components and the later designer, consumed by APOLO and the sandbox shell. It does not require another Maven module or production application.
 - Core has no dependency on web/UI, either host's implementation, the designer or a concrete optional decision engine. Hosts declare direct dependencies on the libraries they use.

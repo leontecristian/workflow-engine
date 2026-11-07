@@ -1,5 +1,5 @@
 import type { InstanceGraph } from "../../data/dtos";
-import { layoutGraph } from "../runtime/graph/graph-layout";
+import { layoutGraph } from "@workflow-engine/ui";
 
 export interface DefinitionTransition {
   key: string;
