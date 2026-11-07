@@ -7,13 +7,13 @@ import {
   router,
   tick,
   rxjs,
-} from "../../../../unit/component-loader.mjs";
+} from "../../../../unit/administration-component.mjs";
 const { MatDialog } = await import("@angular/material/dialog");
-const { DefinitionsPage } = loadTs(
-  new URL("./definitions.ts", import.meta.url),
+const { WorkflowDefinitionsComponent: DefinitionsPage } = loadTs(
+  new URL("../../../../../../workflow-ui/projects/workflow-ui/administration/src/lib/definition/definitions.ts", import.meta.url),
 );
-const { FamilyPage } = loadTs(new URL("./family.ts", import.meta.url));
-const { VersionPage } = loadTs(new URL("./version.ts", import.meta.url));
+const { WorkflowDefinitionFamilyComponent: FamilyPage } = loadTs(new URL("../../../../../../workflow-ui/projects/workflow-ui/administration/src/lib/definition/family.ts", import.meta.url));
+const { WorkflowDefinitionVersionComponent: VersionPage } = loadTs(new URL("../../../../../../workflow-ui/projects/workflow-ui/administration/src/lib/definition/version.ts", import.meta.url));
 test("import passes duplicate properties and exact numbers as unchanged raw text", async (t) => {
   let received;
   const { page, router } = component(t, DefinitionsPage, {
@@ -247,4 +247,23 @@ test("diagram uses submitted text when editor changes while save is pending", as
   await saving;
   assert.equal(page.savedDocument(), '{"submitted":true}');
   assert.equal(page.dirty, true);
+});
+
+
+test('late mutation and upload cannot restore a cleared or replacement session',async t=>{
+ for(const invalidate of [page=>{page.sessionScope=null;page.ngOnChanges({sessionScope:true});},page=>{page.sessionScope={};page.versionId='2';page.ngOnChanges({versionId:true});}]){
+  let finish;const {page}=component(t,VersionPage,{saveDocument(){return new Promise(resolve=>finish=resolve);},async version(){return {summary:{id:'2',lockVersion:'1'},documentJson:'{}'};}});
+  page.id='1';page.detail.set({summary:{lockVersion:'7'}});page.document='{"private":true}';const pending=page.saveDocument();invalidate(page);finish({changed:true,after:{lockVersion:'8'}});await pending;
+  assert.notEqual(page.detail()?.summary?.lockVersion,'8');assert.notEqual(page.savedDocument(),'{"private":true}');assert.equal(page.notice(),'');
+ }
+ let finish;const {page}=component(t,DefinitionsPage);const pending=page.upload({target:{files:[{size:2,text:()=>new Promise(resolve=>finish=resolve)}]}});page.sessionScope=null;page.ngOnChanges({sessionScope:true});finish('{}');await pending;assert.equal(page.document,'');assert.equal(page.dirty,false);
+});
+
+test('successful lifecycle write retains its result when follow-up refresh fails',async t=>{
+ const {page}=component(t,VersionPage,{async checkVersion(){return {change:{after:{lockVersion:'9'}},report:{valid:true},published:true};},async version(){throw new Error('Read unavailable');}});
+ page.id='1';page.detail.set({summary:{lockVersion:'7'}});await page.lifecycle('publish');assert.equal(page.detail().summary.lockVersion,'9');assert.equal(page.lastResponse().published,true);assert.equal(page.error(),'');assert.equal(page.refreshError(),'Read unavailable');assert.match(page.notice(),/published=true/);
+});
+
+test('administration denial clears protected text and distinguishes the denied message',async t=>{
+ const {page}=component(t,VersionPage,{async saveDocument(){throw Object.assign(new Error('Denied'),{httpStatus:403});}});page.id='1';page.detail.set({summary:{lockVersion:'7'}});page.document='private';page.dirty=true;await page.saveDocument();assert.equal(page.detail(),null);assert.equal(page.document,'');assert.equal(page.dirty,false);assert.equal(page.error(),'Administration access denied.');assert.equal(page.busy(),false);
 });

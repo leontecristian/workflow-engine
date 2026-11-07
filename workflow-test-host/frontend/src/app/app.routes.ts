@@ -1,8 +1,4 @@
 import { Routes } from "@angular/router";
-import { DefinitionsPage } from "./pages/definitions/definitions";
-import { FamilyPage } from "./pages/definitions/family";
-import { VersionPage } from "./pages/definitions/version";
-import { CatalogPage } from "./pages/catalog/catalog";
 import { RequestsPage } from "./pages/sandbox/requests";
 import { RequestPage } from "./pages/sandbox/request";
 import { InstancesPage } from "./pages/runtime/instances";
@@ -25,10 +21,10 @@ import { CapabilitiesPage } from "./pages/operations/capabilities";
 import { NotFoundPage } from "./pages/not-found/not-found";
 export const APP_ROUTES: Routes = [
   { path: "", redirectTo: "my-tasks", pathMatch: "full" },
-  { path: "definitions", component: DefinitionsPage },
-  { path: "definition/:id", component: FamilyPage },
-  { path: "version/:id", component: VersionPage },
-  { path: "catalog", component: CatalogPage },
+  { path: "definitions", loadComponent: () => import("./pages/definitions/definitions").then(m => m.DefinitionsPage) },
+  { path: "definition/:id", loadComponent: () => import("./pages/definitions/family").then(m => m.FamilyPage) },
+  { path: "version/:id", loadComponent: () => import("./pages/definitions/version").then(m => m.VersionPage) },
+  { path: "catalog", loadComponent: () => import("./pages/catalog/catalog").then(m => m.CatalogPage) },
   { path: "requests", component: RequestsPage },
   { path: "request/:id", component: RequestPage },
   { path: "instances", component: InstancesPage },

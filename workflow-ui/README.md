@@ -1,6 +1,6 @@
 # Workflow instance viewer
 
-`@workflow-engine/ui` is an Angular 19.2 partial-compiled library. It owns read-only instance metadata, pinned graphs, ordered history and exact events. It has no application bootstrap, authentication, HTTP providers, routes, translation service or global theme. Angular, Router, Material, CDK and RxJS are peers.
+`@workflow-engine/ui` is an Angular 19.2 partial-compiled library. It owns read-only instance metadata, pinned graphs, ordered history, exact events, and definition/catalog administration components. It has no application bootstrap, authentication, HTTP providers, routes, translation service or global theme. Angular (including Forms), Router, Material, CDK, RxJS and jsonc-parser are peers.
 
 From the repository root, select Node 22.22.0/npm 10.9.4, then:
 
@@ -45,4 +45,14 @@ Optionally supply `WORKFLOW_VIEWER_NAVIGATION` with `destination(intent): UrlTre
 
 Exact event downloads use the original `detailsJson` string. Derived routing presentation does not replace retained evidence. Render labels and details as text.
 
-The sandbox definition preview also consumes the exported pure `layoutGraph` function/layout types and the existing `@workflow-engine/ui/styles/graph.scss` Sass asset. That host-owned preview does not become a library authoring feature.
+The definition graph/fragment editor is part of the shared administration implementation. The exported pure `layoutGraph` function/layout types and `@workflow-engine/ui/styles/graph.scss` Sass asset remain available.
+
+## Administration components
+
+Import `WorkflowCatalogComponent`, `WorkflowDefinitionsComponent`, `WorkflowDefinitionFamilyComponent` and `WorkflowDefinitionVersionComponent` from `@workflow-engine/ui/administration`. API tokens, models, messages and shared helpers remain exported from `@workflow-engine/ui`. The sandbox lazy-loads its four administration wrappers so these pages do not enter the initial bundle. Provide `WORKFLOW_ADMINISTRATION_API` with the typed `WorkflowAdministrationApi` host transport, including raw document writes and text export. Every operation receives an `AbortSignal`; cancellation does not mean a mutation rolled back. Preserve HTTP status, code, diagnostics and correlation on errors, and use uncertain-write wording without automatic retry advice.
+
+All components accept `sessionScope` (nonnull opaque login generation; null clears protected content) and partial `WorkflowAdministrationMessages`. Family/version components additionally take `definitionId`/`versionId`. The catalog's `initialCode` defaults to empty; sample defaults belong to hosts. Supply the existing `WORKFLOW_VIEWER_NAVIGATION` adapter for definition/version destination intents. The sandbox wrappers supply session, routes and `SANDBOX_REVIEW`; its transport owns CSRF and credentials.
+
+The existing dirty-editor feedback, explicit save/lifecycle actions, saved graph, fragment application and Material reload confirmation are retained. Only explicit discard reloads dirty text. Late responses are ignored after input/session changes or destruction; failed writes retain input/token, and a successful write followed by failed refresh has separate feedback. No general route-leave guard or runtime-command recovery is installed.
+
+The public exact-text formatting functions and shared presentation helpers also serve the sandbox's remaining host pages. Their names retain the original `Console*` names for those consumers; they contain no sandbox policy or transport.

@@ -1,5 +1,7 @@
 # Workflow engine roadmap
 
+**F014 implementation — 2026-11-07:** [Definition/catalog administration extraction](features/F014-definition-catalog-administration/implementation.md) is implemented with focused acceptance complete. Shared HTTP/page implementations are consumed by sandbox adapters, preserving host access, CSRF, transaction and audit boundaries. No engine, schema or APOLO change; later authoring/designer and production integration remain separate.
+
 **F013 implementation � 2026-11-07:** [Shared instance viewer extraction](features/F013-shared-instance-viewer/implementation.md) supplies the three-module reactor and Angular package consumed by the sandbox. T03�T06 and the NgModule browser pass are complete. T07 guarded read integration and backend-served production-console acceptance are complete, preserving F012 acceptance. No engine commands, migrations or APOLO implementation changed.
 
 

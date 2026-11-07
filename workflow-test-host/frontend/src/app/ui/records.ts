@@ -4,8 +4,8 @@ import { RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
 import { MatTableModule } from "@angular/material/table";
 import { MatTooltipModule } from "@angular/material/tooltip";
-import { ConsoleIcon } from "./icon";
-import { ConsoleStatus } from "./status";
+import { ConsoleIcon } from "@workflow-engine/ui";
+import { ConsoleStatus } from "@workflow-engine/ui";
 export interface RecordColumn {
   key: string;
   label: string;

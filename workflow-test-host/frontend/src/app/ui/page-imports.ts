@@ -9,12 +9,12 @@ import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
 import { MatSelectModule } from "@angular/material/select";
 import { MatTooltipModule } from "@angular/material/tooltip";
-import { ConsolePageHeader } from "./page-header";
-import { ConsoleFeedback } from "./feedback";
+import { ConsolePageHeader } from "@workflow-engine/ui";
+import { ConsoleFeedback } from "@workflow-engine/ui";
 import { ConsoleCollection } from "./collection";
-import { ConsoleIcon } from "./icon";
-import { ConsoleStatus } from "./status";
-import { ConsoleDetails } from "./details";
+import { ConsoleIcon } from "@workflow-engine/ui";
+import { ConsoleStatus } from "@workflow-engine/ui";
+import { ConsoleDetails } from "@workflow-engine/ui";
 export const PAGE_IMPORTS = [
   CommonModule,
   FormsModule,

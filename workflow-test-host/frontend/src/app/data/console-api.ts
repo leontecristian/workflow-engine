@@ -5,12 +5,6 @@ import type {
   Page,
   DefinitionView,
   VersionSummary,
-  VersionDetails,
-  DefinitionChange,
-  DefinitionCheck,
-  Change,
-  TaskTypeView,
-  TaskTypeInput,
   SandboxRequest,
   SandboxRequestSummary,
   InstanceSummary,
@@ -63,92 +57,10 @@ export class ConsoleApi {
       "/definitions" + pageQuery(cursor, limit),
     );
   }
-  definition(id: string) {
-    return this.transport.call<DefinitionView>("/definitions/" + segment(id));
-  }
-  saveMetadata(
-    id: string,
-    name: string,
-    description: string | null,
-    token: string,
-  ) {
-    return this.transport.call<Change<DefinitionView>>(
-      "/definitions/" + segment(id),
-      "PUT",
-      { name, description },
-      token,
-    );
-  }
   listVersions(id: string, status = "", cursor?: string, limit = 50) {
     return this.transport.call<Page<VersionSummary>>(
       `/definitions/${segment(id)}/versions` +
         pageQuery(cursor, limit, status ? { status } : {}),
-    );
-  }
-  version(id: string) {
-    return this.transport.call<VersionDetails>("/versions/" + segment(id));
-  }
-  lookupVersion(key: string, version: string) {
-    return this.transport.call<VersionDetails>(
-      "/versions/lookup?" + new URLSearchParams({ key, version }),
-    );
-  }
-  importDraft(document: string) {
-    return this.transport.call<DefinitionChange>(
-      "/versions/import",
-      "POST",
-      document,
-      null,
-      true,
-    );
-  }
-  saveDocument(id: string, document: string, token: string) {
-    return this.transport.call<DefinitionChange>(
-      `/versions/${segment(id)}/document`,
-      "PUT",
-      document,
-      token,
-      true,
-    );
-  }
-  checkVersion(id: string, action: "validate" | "publish", token: string) {
-    return this.transport.call<DefinitionCheck>(
-      `/versions/${segment(id)}/${action}`,
-      "POST",
-      undefined,
-      token,
-    );
-  }
-  retireVersion(id: string, token: string) {
-    return this.transport.call<DefinitionChange>(
-      `/versions/${segment(id)}/retire`,
-      "POST",
-      undefined,
-      token,
-    );
-  }
-  listTaskTypes(filter: string, cursor?: string, limit = 50) {
-    return this.transport.call<Page<TaskTypeView>>(
-      "/task-types" + pageQuery(cursor, limit, { filter }),
-    );
-  }
-  createTaskType(
-    body: TaskTypeInput & {
-      code: string;
-    },
-  ) {
-    return this.transport.call<Change<TaskTypeView>>(
-      "/task-types",
-      "POST",
-      body,
-    );
-  }
-  updateTaskType(id: string, body: TaskTypeInput, token: string) {
-    return this.transport.call<Change<TaskTypeView>>(
-      "/task-types/" + segment(id),
-      "PUT",
-      body,
-      token,
     );
   }
   listRequests(cursor?: string, limit = 50) {

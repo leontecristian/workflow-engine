@@ -2,6 +2,8 @@ package io.github.leontecristian.workflow.testhost.service.definition;
 
 import io.github.leontecristian.workflow.core.dto.definition.CheckWorkflowDefinition;
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionChange;
+import io.github.leontecristian.workflow.core.dto.definition.DefinitionMetadataChange;
+import io.github.leontecristian.workflow.core.dto.definition.DefinitionCheckResult;
 import io.github.leontecristian.workflow.core.dto.definition.ImportWorkflowDraft;
 import io.github.leontecristian.workflow.core.dto.definition.ReplaceWorkflowDraft;
 import io.github.leontecristian.workflow.core.dto.definition.RetireWorkflowDefinition;
@@ -49,7 +51,7 @@ public class ConsoleManagement {
     }
 
     @Transactional
-    public Object importDraft(String document, String correlation) {
+    public DefinitionChange importDraft(String document, String correlation) {
         var result =
                 definitions.importDraft(new ImportWorkflowDraft(document), context.management());
         audit(result, correlation);
@@ -57,7 +59,7 @@ public class ConsoleManagement {
     }
 
     @Transactional
-    public Object replace(long id, long token, String document, String correlation) {
+    public DefinitionChange replace(long id, long token, String document, String correlation) {
         var result =
                 definitions.replaceDraft(
                         new ReplaceWorkflowDraft(id, token, document), context.management());
@@ -66,7 +68,7 @@ public class ConsoleManagement {
     }
 
     @Transactional
-    public Object metadata(
+    public DefinitionMetadataChange metadata(
             long id, long token, String name, String description, String correlation) {
         var result =
                 definitions.updateMetadata(
@@ -84,32 +86,35 @@ public class ConsoleManagement {
     }
 
     @Transactional
-    public Object lifecycle(long id, long token, String action, String correlation) {
-        if (action.equals("retire")) {
-            var result =
-                    definitions.retire(
-                            new RetireWorkflowDefinition(id, token), context.management());
-            audit(result, correlation);
-            return result;
-        }
-        var command = new CheckWorkflowDefinition(id, token);
-        var result =
-                action.equals("publish")
-                        ? definitions.publish(command, context.management())
-                        : definitions.validateDraft(command, context.management());
+    public DefinitionChange retire(long id, long token, String correlation) {
+        var result = definitions.retire(new RetireWorkflowDefinition(id, token), context.management());
+        audit(result, correlation);
+        return result;
+    }
+
+    @Transactional
+    public DefinitionCheckResult validate(long id, long token, String correlation) {
+        var result = definitions.validateDraft(new CheckWorkflowDefinition(id, token), context.management());
         audit(result.change(), correlation);
         return result;
     }
 
     @Transactional
-    public Object createTaskType(CreateTaskType command, String correlation) {
+    public DefinitionCheckResult publish(long id, long token, String correlation) {
+        var result = definitions.publish(new CheckWorkflowDefinition(id, token), context.management());
+        audit(result.change(), correlation);
+        return result;
+    }
+
+    @Transactional
+    public TaskTypeChange createTaskType(CreateTaskType command, String correlation) {
         var result = catalog.create(command);
         auditTask(result, "CREATE_TASK_TYPE", correlation);
         return result;
     }
 
     @Transactional
-    public Object updateTaskType(UpdateTaskType command, String correlation) {
+    public TaskTypeChange updateTaskType(UpdateTaskType command, String correlation) {
         var result = catalog.update(command);
         auditTask(result, "UPDATE_TASK_TYPE", correlation);
         return result;

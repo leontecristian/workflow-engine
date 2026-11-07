@@ -1,5 +1,7 @@
 # Feature specifications
 
+[F014 — Definition and catalog administration](F014-definition-catalog-administration/spec.md) is **IMPLEMENTED revision 3**. Existing administration is shared through workflow-web and the workflow-ui administration entry point; sandbox policy and transaction/audit remain host-owned. Focused unit/build, guarded changed-write/audit and packaged-browser checks pass; see the [handover](F014-definition-catalog-administration/implementation.md).
+
 [F013 � Shared instance viewer extraction](F013-shared-instance-viewer/spec.md) is **IMPLEMENTED revision 5; runtime acceptance COMPLETE**. T03�T06 and the focused NgModule browser pass are complete. Guarded SQL/GET and backend-served production-console browser checks now pass; see the [handover](F013-shared-instance-viewer/implementation.md). Applicable F012 evidence is reused.
 
 [F012 — Angular 19 frontend alignment](F012-angular-19-frontend-alignment/spec.md) is **IMPLEMENTED revision 1; sandbox acceptance complete** (2026-11-07). Dependency, isolated-test, production-build and Maven gates pass. Browser acceptance covers exact scalar/JSON downloads, sequential/skipped stages, uncertain-response recovery, failed/delayed reads, role/logout behavior, narrow-screen controls and packaged serving under host CSP. Library extraction and APOLO runtime integration remain excluded. See the [plan](F012-angular-19-frontend-alignment/plan.md), [tasks](F012-angular-19-frontend-alignment/tasks.md) and [handover](F012-angular-19-frontend-alignment/implementation.md).

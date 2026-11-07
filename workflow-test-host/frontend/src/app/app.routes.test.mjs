@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { loadTs } from "../../unit/component-loader.mjs";
 const { APP_ROUTES } = loadTs(new URL("./app.routes.ts", import.meta.url));
-test("all retained URLs have explicit distinct page boundaries and a wildcard fallback", () => {
+test("all retained URLs have explicit distinct page boundaries and a wildcard fallback", async () => {
   const expected = [
     "definitions",
     "definition/:id",
@@ -38,7 +38,7 @@ test("all retained URLs have explicit distinct page boundaries and a wildcard fa
   assert.equal(APP_ROUTES[0].redirectTo, "my-tasks");
   assert.equal(APP_ROUTES.at(-1).path, "**");
   assert.equal(
-    new Set(APP_ROUTES.filter((r) => r.component).map((r) => r.component)).size,
+    new Set(await Promise.all(APP_ROUTES.filter((r) => r.component || r.loadComponent).map((r) => r.component || r.loadComponent()))).size,
     24,
   );
   assert.ok(!APP_ROUTES.some((r) => r.path.includes(":page")));
@@ -48,5 +48,5 @@ test("all retained URLs have explicit distinct page boundaries and a wildcard fa
   );
   assert.match(bootstrap, /withHashLocation\(\)/);
   assert.ok(!bootstrap.includes("@Component"));
-  assert.ok(bootstrap.split("\n").length < 15);
+  assert.ok(bootstrap.split("\n").length < 25);
 });

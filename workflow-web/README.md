@@ -1,6 +1,6 @@
 # Workflow viewer web adapter
 
-Ordinary Java 17 library JAR; built with JDK 21. It depends on core's public read contracts and supplies only four GET operations. It installs no Boot auto-configuration, security, datasource, migration runner, transaction manager, global codec or advice.
+Ordinary Java 17 library JAR; built with JDK 21. It depends on core's public contracts and supplies independently enabled viewer and administration groups. It installs no Boot auto-configuration, security, datasource, migration runner, transaction manager, global codec or advice.
 
 Explicitly `@Import(WorkflowViewerConfiguration.class)` in the host and supply:
 
@@ -15,3 +15,13 @@ Routes relative to the configured mount are `/instances/{id}`, `/instances/{id}/
 History defaults to cursor zero and 50 rows, maximum 100. Summary pages preserve complete rows within dual 1 MiB limits. Exact events preserve stored details within dual 4 MiB and final UTF-8 envelope within 8 MiB; they are never truncated. Numeric Java longs serialize as strings. Graph pin, contiguous-prefix watermark and existing size/shape checks remain in the projection service.
 
 The sandbox's gated configuration and `ConsoleViewerAccess` illustrate composition. APOLO integration and production security/dependency acceptance are separate work.
+
+## Definition and catalog administration
+
+Explicitly import `WorkflowAdministrationConfiguration` and provide `WorkflowAdministrationOptions(basePath, correlationAttribute)` plus `WorkflowAdministrationHost`. The trusted correlation attribute must be nonblank and populated by the host; the sandbox uses `console.correlation`. Viewer activation and package scanning do not enable administration. Missing required adapters fail configuration.
+
+Every administration operation invokes `requireAdministrationAccess()` once before reading or parsing its request. This single grant covers the complete definition/catalog collection. The host supplies authentication and mutation CSRF protection; throw `WorkflowAdministrationException` for 401/403 denial. UI visibility never grants access.
+
+Reads use core's `WorkflowDefinitionService` and `TaskTypeCatalogService`. Typed writes delegate to the host adapter, which must return only after its transaction commits. Preserve trusted actor/time and same-transaction audit behind that adapter; the library installs neither. The sandbox's `ConsoleAdministrationHost` delegates to the existing `ConsoleManagement` transaction proxy.
+
+Routes are the existing `/task-types`, `/definitions` and `/versions` operations listed in [F014](../docs/features/F014-definition-catalog-administration/spec.md). IDs/tokens remain decimal strings; raw document import/replacement retains its 4 MiB UTF-8 limit, ordinary bodies 16 KiB, and exports return stored text. Local handlers retain management error categories and diagnostics, including 403 rather than viewer concealment. No task-type deletion, new authoring semantics or automatic write retries are supplied.

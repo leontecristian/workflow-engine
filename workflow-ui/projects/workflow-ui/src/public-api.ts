@@ -6,3 +6,12 @@ export { WorkflowHistoryEventComponent } from './lib/history-event';
 export { WorkflowInstanceGraphComponent } from './lib/graph/instance-graph';
 export { layoutGraph } from './lib/graph/graph-layout';
 export type { PositionedNode, RoutedEdge, GraphLayout } from './lib/graph/graph-layout';
+export * from './lib/administration/contracts';
+export type { AdministrationPage, DefinitionView, VersionSummary, VersionDetails, Change,
+  DefinitionChange, Diagnostic, ValidationReport, DefinitionCheck, TaskTypeView, TaskTypeInput } from './lib/administration/models';
+export { rawDocument, prettyDocument } from './lib/administration/support/document-text';
+export { ConsolePageHeader } from './lib/administration/support/page-header';
+export { ConsoleFeedback } from './lib/administration/support/feedback';
+export { ConsoleIcon } from './lib/administration/support/icon';
+export { ConsoleStatus } from './lib/administration/support/status';
+export { ConsoleDetails } from './lib/administration/support/details';

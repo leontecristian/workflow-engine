@@ -1,3 +1,4 @@
+import "@angular/compiler";
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CommandBuffer, parseScalarInputs, commandRequest } from '../src/app/command-buffer.ts';

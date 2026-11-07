@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadTs, component } from '../../../../unit/component-loader.mjs';
-const { selectedObjectJson, applyFragment } = loadTs(new URL('./definition-fragment.ts', import.meta.url));
-const { VersionPage } = loadTs(new URL('./version.ts', import.meta.url));
+import { loadTs, component } from '../../../../unit/administration-component.mjs';
+const { selectedObjectJson, applyFragment } = loadTs(new URL('../../../../../../workflow-ui/projects/workflow-ui/administration/src/lib/definition/definition-fragment.ts', import.meta.url));
+const { WorkflowDefinitionVersionComponent: VersionPage } = loadTs(new URL('../../../../../../workflow-ui/projects/workflow-ui/administration/src/lib/definition/version.ts', import.meta.url));
 const source = '{"version":9007199254740993,"nodes":[{"key":"A","value":900719925474099312345}],"transitions":[{"key":"go","from":"A","to":"A","condition":"#vars.n > 10"}],"other":"\\u0041"}';
 test('extract and splice selected object without changing exact surrounding tokens', () => {
  const original = selectedObjectJson(source,'nodes','A');
@@ -34,7 +34,7 @@ test('draft apply marks full editor dirty; published apply is blocked; stale sou
 
 test('node selection exposes exact fragment; only editable drafts emit application', async t => {
  const {signal}=await import('@angular/core');
- const {DefinitionGraphComponent}=loadTs(new URL('./definition-graph.ts',import.meta.url));
+ const {DefinitionGraphComponent}=loadTs(new URL('../../../../../../workflow-ui/projects/workflow-ui/administration/src/lib/definition/definition-graph.ts',import.meta.url));
  const {page}=component(t,DefinitionGraphComponent);
  page.document=signal(source);
  page.editable=signal(false);

@@ -1,3 +1,4 @@
+import "@angular/compiler";
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import { prettyDocument } from "../src/app/command-buffer.ts";

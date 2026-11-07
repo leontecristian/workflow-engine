@@ -1,0 +1,30 @@
+<div class="list-toolbar">
+  <mat-form-field
+    appearance="outline"
+    class="page-size"
+    subscriptSizing="dynamic"
+    ><mat-label>Rows per page</mat-label
+    ><mat-select [ngModel]="size()" (ngModelChange)="sizeChange.emit($event)"
+      ><mat-option [value]="1">1</mat-option
+      ><mat-option [value]="10">10</mat-option
+      ><mat-option [value]="50">50</mat-option
+      ><mat-option [value]="100">100</mat-option></mat-select
+    ></mat-form-field
+  ><span class="muted">Ascending order · exact identifiers</span
+  ><span class="action-spacer"></span
+  ><button
+    mat-icon-button
+    (click)="reload.emit()"
+    [disabled]="busy()"
+    matTooltip="Reload first page"
+    aria-label="Reload first page"
+  >
+    <console-icon name="refresh" /></button
+  ><button
+    mat-stroked-button
+    (click)="advance.emit()"
+    [disabled]="!next() || busy()"
+  >
+    Next page <console-icon name="chevron" />
+  </button>
+</div>

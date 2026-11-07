@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadTs } from '../../../../unit/component-loader.mjs';
-const { definitionTopology } = loadTs(new URL('./definition-topology.ts', import.meta.url));
+import { loadTs } from '../../../../unit/administration-component.mjs';
+const { definitionTopology } = loadTs(new URL('../../../../../../workflow-ui/projects/workflow-ui/administration/src/lib/definition/definition-topology.ts', import.meta.url));
 const source = { schemaVersion: 1, nodes: [{key:'S',name:'Start',type:'START'},{key:'G',name:'Route',type:'EXCLUSIVE_GATEWAY'},{key:'E',name:'End',type:'END'}], transitions: [{key:'a',from:'S',to:'G'},{key:'b',from:'G',to:'E'},{key:'loop',from:'G',to:'G'}] };
 test('saved topology uses existing bounded layout without runtime state or evaluation', () => {
  const original=JSON.stringify(source); const view=definitionTopology(original);
@@ -16,7 +16,7 @@ test('invalid, oversized and ambiguous topology fails locally', () => {
 test('transition inspection preserves saved conditions and clears when source changes', async (t) => {
  const { component } = await import('../../../../unit/component-loader.mjs');
  const { signal } = await import('@angular/core');
- const { DefinitionGraphComponent } = loadTs(new URL('./definition-graph.ts', import.meta.url));
+ const { DefinitionGraphComponent } = loadTs(new URL('../../../../../../workflow-ui/projects/workflow-ui/administration/src/lib/definition/definition-graph.ts', import.meta.url));
  const { page } = component(t, DefinitionGraphComponent);
  const condition = "#vars.quantity > 10 and '<script>' != ''";
  const doc = {...source, transitions:[{key:'a',from:'S',to:'G',outcome:'NEXT'},{key:'b',from:'G',to:'E',condition},{key:'fallback',from:'G',to:'E',default:true}]};

@@ -1,5 +1,6 @@
 # Workflow engine
 
+**Definition/catalog extraction — 2026-11-07:** [F014](docs/features/F014-definition-catalog-administration/implementation.md) moves existing administration routes and pages into workflow-web and workflow-ui, with thin sandbox adapters/wrappers. One host administration check protects the explicitly activated group; transaction/audit orchestration remains host-owned. Focused isolated, guarded write/audit, package and browser checks pass. Engine behavior, migrations and APOLO sources are unchanged.
 **Shared viewer extraction � 2026-11-07:** [F013](docs/features/F013-shared-instance-viewer/implementation.md) implements three Maven modules (`workflow-core`, ordinary `workflow-web`, executable `workflow-test-host`) plus the Angular 19.2 `workflow-ui` library. The sandbox consumes shared read-only instance metadata/history/graph; variables, tasks, commands and business policy stay host-owned. Unit/package, NgModule, guarded test-database and backend-served production-console browser checks pass; F013 scoped acceptance is complete. APOLO integration is separate. See the [library entry points](workflow-ui/README.md) and [web activation](workflow-web/README.md).
 
 [F011 — Sequential human stages](docs/features/F011-sequential-human-stages/spec.md) adds successive and conditional SINGLE reviews in one pinned instance. Import the [two-stage](docs/features/F011-sequential-human-stages/sequential-review.json), [optional-stage](docs/features/F011-sequential-human-stages/optional-stage-review.json) or [three-stage](docs/features/F011-sequential-human-stages/three-stage-review.json) sample with SANDBOX_REVIEW selectable. Completion results identify the submitted task; the console separately refreshes authorized current work. See the [handover](docs/features/F011-sequential-human-stages/implementation.md) for verification and the remaining interactive browser gap.
@@ -16,9 +17,10 @@ Import the [complete booking-review example](docs/features/F009-json-execution-v
 
 See the [project roadmap](docs/roadmap.md) for current priorities and the path from the F006 sandbox to APOLO integration and the designer. The [feature index](docs/features/README.md) tracks delivery status and links to acceptance evidence.
 
-Two Maven modules, targeting Java 17 and intended to run on JDK 21:
+Three Maven modules, targeting Java 17 and intended to run on JDK 21:
 
 - `workflow-core`: ordinary library JAR. Owns workflow entities, repositories, services, restricted expressions, integration interfaces/configuration and workflow changelog resources as they are implemented.
+- `workflow-web`: optional ordinary Spring MVC adapter JAR; explicitly activated viewer and administration groups with required host adapters.
 - `workflow-test-host`: executable Spring Boot development host. Supplies web endpoints, datasource/transaction infrastructure, JDBC driver and Liquibase execution.
 
 The root `pom.xml` is the parent/aggregator. It manages dependency versions without adding host dependencies to core. Spring Boot 3.4.5 is the current build baseline; compatibility with APOLO's effective dependency versions remains to be verified.

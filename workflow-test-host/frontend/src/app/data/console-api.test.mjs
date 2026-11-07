@@ -5,7 +5,9 @@ import {
   ConsoleApi,
   ConsoleSession,
   CommandRecovery,
+  loadTs,
 } from "../../../unit/component-loader.mjs";
+const {ConsoleAdministrationApi}=loadTs(new URL('./administration-adapters.ts',import.meta.url));
 const identity = {
   actorRef: "admin",
   roles: ["CONSOLE_ADMIN"],
@@ -49,15 +51,16 @@ test("typed API keeps document text and exact expected token while adding CSRF",
       text: async () => '{"after":{"id":"9007199254740993"}}',
     };
   });
-  const injector = services(t),
+  const injector = services(t, [ConsoleAdministrationApi]),
     session = injector.get(ConsoleSession);
   session.session.set(identity);
-  const api = injector.get(ConsoleApi);
+  const api = injector.get(ConsoleAdministrationApi);
   const raw = ' {"a":1,"a":900719925474099312345} ';
   const result = await api.saveDocument(
     "9007199254740993",
     raw,
     "9007199254740999",
+    new AbortController().signal,
   );
   assert.equal(calls[0].url, "/console/api/versions/9007199254740993/document");
   assert.equal(calls[0].options.body, raw);
@@ -75,12 +78,12 @@ test("query methods use explicit bounded cursors and encode identity segments", 
     calls.push(url);
     return { ok: true, text: async () => '{"items":[],"nextAfterId":null}' };
   });
-  const injector = services(t);
+  const injector = services(t, [ConsoleAdministrationApi]);
   injector.get(ConsoleSession).session.set(identity);
   const api = injector.get(ConsoleApi);
   await api.history("9007199254740993", "9007199254740995", 10);
   await api.submissions("2", "9223372036854775807", 1);
-  await api.lookupVersion("key with/&", "3");
+  await injector.get(ConsoleAdministrationApi).lookupVersion("key with/&", "3", new AbortController().signal);
   await api.outboxEvent("15:4");
   await api.instanceGraph("9007199254740993");
   assert.match(calls[0], /afterSequence=9007199254740995/);

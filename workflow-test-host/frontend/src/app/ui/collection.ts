@@ -1,5 +1,5 @@
 import { Component, input, output } from "@angular/core";
-import { ConsoleIcon } from "./icon";
+import { ConsoleIcon } from "@workflow-engine/ui";
 import { ConsoleRecords } from "./records";
 import { ConsolePagination } from "./pagination";
 @Component({

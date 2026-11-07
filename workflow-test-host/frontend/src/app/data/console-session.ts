@@ -97,6 +97,48 @@ export class ConsoleSession {
     if(value === null || typeof value !== 'object') throw new Error('Invalid read response');
     return value as T;
   }
+  /** Administration transport retains HTTP diagnostics without runtime-command retry advice. */
+  async administrationCall<T>(
+    path: string, signal: AbortSignal, method = "GET", body?: unknown,
+    token?: string | null, raw = false, textResponse = false,
+  ): Promise<T> {
+    const scope = this.viewerScope();
+    const session = this.session();
+    const headers: Record<string, string> = {};
+    if (method !== "GET") {
+      headers[session?.csrfHeaderName || "X-CSRF-TOKEN"] = session?.csrfToken || "";
+      if (body !== undefined) headers["Content-Type"] = "application/json";
+    }
+    if (token !== undefined && token !== null) headers["X-Expected-Lock-Version"] = token;
+    let response: Response;
+    let text: string;
+    try {
+      response = await fetch("/console/api" + path, {
+        method, signal, credentials: "same-origin", headers,
+        body: body === undefined ? undefined : raw ? body as string : JSON.stringify(body),
+      });
+      text = await response.text();
+    } catch (error) {
+      if (signal.aborted) throw error;
+      throw new Error(method === "GET" ? "Read failed. Refresh to try again."
+        : "Write outcome unknown. Keep your text and inspect stored state before another write.");
+    }
+    if (response.status === 401 && this.viewerScope() === scope) this.clear();
+    let value: unknown;
+    try { value = response.ok && textResponse ? text : text ? JSON.parse(text) : null; }
+    catch {
+      throw new Error(method === "GET" ? "Invalid read response."
+        : "Write response unavailable. Inspect stored state before another write.");
+    }
+    if (!response.ok) {
+      const failure = value as { code?: string; diagnostics?: unknown[]; correlationId?: string } | null;
+      throw Object.assign(new Error(`${response.status} ${failure?.code || "REQUEST_FAILED"} ${JSON.stringify(failure?.diagnostics || [])} [${failure?.correlationId || ""}]`), {
+        httpStatus: response.status, code: failure?.code,
+        diagnostics: failure?.diagnostics || [], correlationId: failure?.correlationId,
+      });
+    }
+    return value as T;
+  }
   clear() {
     this.session.set(null);
     this.viewerScope.set(null);

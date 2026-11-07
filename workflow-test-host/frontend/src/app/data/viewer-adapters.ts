@@ -25,6 +25,8 @@ export class ConsoleViewerNavigation implements WorkflowViewerNavigation {
       case 'event': return this.router.createUrlTree(['/history-event',intent.instanceId,intent.sequence]);
       case 'task': return this.router.createUrlTree(['/task',intent.id]);
       case 'activity': return this.router.createUrlTree(['/activity',intent.id]);
+      case 'definition': return this.router.createUrlTree(['/definition',intent.id]);
+      case 'version': return this.router.createUrlTree(['/version',intent.id]);
     }
   }
 }

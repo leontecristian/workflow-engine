@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadTs, component } from "../../../../unit/component-loader.mjs";
-const { CatalogPage } = loadTs(new URL("./catalog.ts", import.meta.url));
+import { loadTs, component } from "../../../../unit/administration-component.mjs";
+const { WorkflowCatalogComponent: CatalogPage } = loadTs(new URL("../../../../../../workflow-ui/projects/workflow-ui/administration/src/lib/tasktype/catalog.ts", import.meta.url));
 test("consecutive catalog edits use the latest committed version", async (t) => {
   let stored = {
     id: "9007199254740993",

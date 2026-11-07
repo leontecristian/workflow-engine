@@ -51,6 +51,7 @@ for (const name of [
   );
 modules.set("@angular/cdk/layout", await import("@angular/cdk/layout"));
 modules.set('@workflow-engine/ui', await import('@workflow-engine/ui'));
+modules.set('@workflow-engine/ui/administration', await import('@workflow-engine/ui/administration'));
 const cache = new Map();
 export function loadTs(url) {
   const file = typeof url === "string" ? resolve(url) : fileURLToPath(url);
@@ -82,6 +83,7 @@ export function loadTs(url) {
         return modules.get(name);
       },
       console,
+      AbortController,
       URL,
       URLSearchParams,
       Blob,

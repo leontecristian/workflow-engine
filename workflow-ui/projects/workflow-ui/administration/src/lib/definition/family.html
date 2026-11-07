@@ -1,0 +1,67 @@
+<console-page-header context="Workflow administration" [meta]="{title:messages.familyTitle,eyebrow:meta.eyebrow,description:meta.description,icon:meta.icon}"  /><console-feedback
+  [busy]="busy()"
+  [error]="error()"
+  [notice]="notice()"
+/>
+@if(refreshError()){<p class="feedback feedback-warning" role="alert">{{messages.refreshFailed}} {{refreshError()}}</p>}
+
+<div class="two-column">
+  <mat-card appearance="outlined"
+    ><mat-card-header
+      ><div>
+        <div class="eyebrow">FAMILY #{{ id }}</div>
+        <h2>Family metadata</h2>
+        <p>These details are separate from version content.</p>
+      </div></mat-card-header
+    ><mat-card-content>
+      <mat-form-field appearance="outline" class="full-width"
+        ><mat-label>Name</mat-label><input matInput [(ngModel)]="name"
+      /></mat-form-field>
+      <mat-form-field appearance="outline" class="full-width"
+        ><mat-label>Description</mat-label
+        ><textarea matInput [(ngModel)]="description" rows="3"></textarea>
+      </mat-form-field>
+      <button mat-flat-button (click)="metadata()" [disabled]="busy()">
+        Save metadata
+      </button>
+    </mat-card-content></mat-card
+  >
+  <mat-card appearance="outlined"
+    ><mat-card-header><h2>Family identity</h2></mat-card-header
+    ><mat-card-content><console-details [value]="detail()" /></mat-card-content
+  ></mat-card>
+</div>
+<mat-card appearance="outlined"
+  ><mat-card-header
+    ><div class="card-heading">
+      <div>
+        <h2>Versions</h2>
+        <p>Every explicit version, including retained retired versions.</p>
+      </div>
+      <mat-form-field
+        appearance="outline"
+        subscriptSizing="dynamic"
+        class="compact-field"
+        ><mat-label>Status</mat-label
+        ><mat-select [(ngModel)]="filter" (selectionChange)="load()"
+          ><mat-option value="">All statuses</mat-option
+          ><mat-option value="DRAFT">Draft</mat-option
+          ><mat-option value="PUBLISHED">Published</mat-option
+          ><mat-option value="RETIRED">Retired</mat-option></mat-select
+        ></mat-form-field
+      >
+    </div></mat-card-header
+  ><mat-card-content
+    ><console-collection
+      [rows]="rows()"
+      kind="definition"
+      label="Workflow family"
+      icon="workflow"
+      [busy]="busy()"
+      [size]="pageSize"
+      [next]="next"
+      (sizeChange)="pageSize=$event;load()"
+      (reload)="load()"
+      (advance)="nextPage()"
+      (inspect)="open($event)" /></mat-card-content
+></mat-card>
