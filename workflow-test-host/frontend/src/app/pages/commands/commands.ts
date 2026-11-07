@@ -3,7 +3,7 @@ import { Router } from "@angular/router";
 import { ConsoleApi } from "../../data/console-api";
 import { CommandRecovery } from "../../data/command-recovery";
 import { PAGE_IMPORTS } from "../../ui/page-imports";
-import { pageState } from "../../ui/page-state";
+import { destroyedState, pageState } from "../../ui/page-state";
 import type { InstanceView, TaskView } from "../../data/dtos";
 @Component({
   selector: "console-commands",
@@ -32,6 +32,7 @@ export class CommandsPage {
   currentInstance = signal<InstanceView | null>(null);
   currentTasks = signal<TaskView[]>([]);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly isDestroyed = destroyedState(this.destroyRef);
   private readGeneration = 0;
   ngOnInit() { void this.run(() => this.refreshCurrent()); }
   commandExecution() {
@@ -89,7 +90,7 @@ export class CommandsPage {
       this.api.instance(execution.instance.id),
       this.api.instanceTasks(execution.instance.id),
     ]);
-    if (this.destroyRef.destroyed || generation !== this.readGeneration) return;
+    if (this.isDestroyed() || generation !== this.readGeneration) return;
     this.currentInstance.set(instance);
     this.currentTasks.set(tasks.items.filter(task => task.status === "OPEN"));
   }

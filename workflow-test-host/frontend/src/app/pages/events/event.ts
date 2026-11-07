@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from "@angular/router";
 import { ConsoleApi } from "../../data/console-api";
 import type { OutboxEvent } from "../../data/dtos";
 import { PAGE_IMPORTS } from "../../ui/page-imports";
-import { pageState } from "../../ui/page-state";
+import { destroyedState, pageState } from "../../ui/page-state";
 @Component({
   selector: "console-event",
   standalone: true,
@@ -30,6 +30,7 @@ export class EventPage {
   detail = signal<OutboxEvent | null>(null);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly isDestroyed = destroyedState(this.destroyRef);
   ngOnInit() {
     this.route.paramMap
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -42,7 +43,7 @@ export class EventPage {
     const id = this.id;
     await this.run(async () => {
       const d = await this.api.outboxEvent(id);
-      if (!this.destroyRef.destroyed && this.id === id) this.detail.set(d);
+      if (!this.isDestroyed() && this.id === id) this.detail.set(d);
     });
   }
   async redeliver() {

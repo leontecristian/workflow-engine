@@ -12,6 +12,25 @@ const { TaskPage } = loadTs(new URL("./task.ts", import.meta.url));
 const { CommandBuffer } = loadTs(
   new URL("../../command-buffer.ts", import.meta.url),
 );
+
+test("a destroyed task view ignores a pending read through the Angular destruction lifecycle", async (t) => {
+  let resolveTask;
+  const task = new Promise(resolve => { resolveTask = resolve; });
+  const { page, injector } = component(t, TaskPage, {
+    task: () => task,
+    taskContract: async () => ({ outcomes: [{ key: "APPROVE" }] }),
+    taskSubmission: async () => null,
+  }, routeAt(), undefined, [
+    { provide: CommandRecovery, useValue: {} },
+  ]);
+  page.id = "9007199254740993";
+  const pending = page.load();
+  injector.destroy();
+  resolveTask({ id: page.id, status: "OPEN" });
+  await pending;
+  assert.equal(page.detail(), null);
+  assert.equal(page.contract(), null);
+});
 test("completion captures original instance token and assignment-specific task IDs", async (t) => {
   const buffer = new CommandBuffer();
   const commands = {

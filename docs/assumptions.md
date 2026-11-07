@@ -16,7 +16,7 @@ No item is marked verified merely because it is plausible. Follow the [current v
 
 ## ASM-01 — A compatible shared dependency baseline can be established
 
-**UI/web adoption — 2026-11-07:** workflow-web and Angular 19 workflow-ui are agreed architecture, not verified compatibility. Supplied APOLO ranges identify the 19.2.x target, while the current console remains on Angular 21. Verify exact framework/Material/compiler/tool versions, NgModule library consumption, routing/theme/localization and HTTP/auth integration. Web still requires verified host security and shared transaction participation. Adoption closes no ASM verification gate and changes no F011 evidence.
+**UI/web adoption — 2026-11-07:** workflow-web and Angular 19 workflow-ui are agreed architecture, not verified compatibility. Supplied APOLO ranges identify the 19.2.x target, while the standalone console is now aligned with Angular 19.2 by [F012](features/F012-angular-19-frontend-alignment/implementation.md), without library extraction. Verify exact framework/Material/compiler/tool versions, NgModule library consumption, routing/theme/localization and HTTP/auth integration. Web still requires verified host security and shared transaction participation. Adoption closes no ASM verification gate and changes no F011 evidence.
 
 **Status:** PENDING VERIFICATION — O7.
 

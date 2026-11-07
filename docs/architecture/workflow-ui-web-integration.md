@@ -33,7 +33,7 @@ The owner supplied reference copies on 2026-11-07 in the separate `apolo-docs` r
 | `ProjectController.java` | Controllers delegate to business services. Selected operations use `@auth.hasAuthorization(principal, resource, scope, projectId)` through `@PreAuthorize`. Missing method annotations do not establish absent security; other layers were not supplied. Lists use host paging conventions. |
 | `APOLO_Technical_Documentation_v1.0.docx`, sections 7–9 | Contextual permissions, shared application deployment and non-persistent Artemis messaging are documented. Standalone Keycloak remains migration history rather than confirmed production topology. Broker presence alone does not supply durable workflow handoff. |
 
-The current [console package](../../workflow-test-host/frontend/package.json) uses Angular 21.2.x. It remains unchanged. Alignment will require a deliberate audit of Angular/Material APIs, providers, templates, build configuration and tests; changing version strings alone is not an implementation plan.
+The current [console package](../../workflow-test-host/frontend/package.json) uses Angular 19.2 after the separately requested [F012 alignment](../features/F012-angular-19-frontend-alignment/implementation.md), which audits Angular/Material APIs, lifecycle guards, providers, templates, build configuration and tests. This is standalone sandbox alignment, not library extraction or demonstrated APOLO consumption.
 
 ## Agreed dependency and deployment boundaries
 

@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from "@angular/router";
 import { ConsoleApi } from "../../data/console-api";
 import type { HistoryEvent } from "../../data/dtos";
 import { PAGE_IMPORTS } from "../../ui/page-imports";
-import { pageState } from "../../ui/page-state";
+import { destroyedState, pageState } from "../../ui/page-state";
 import { routingEvidence } from "../../data/routing-evidence";
 import { downloadJson } from "../../ui/download-json";
 @Component({
@@ -40,6 +40,7 @@ export class HistoryEventPage {
   }
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly isDestroyed = destroyedState(this.destroyRef);
   ngOnInit() {
     this.route.paramMap
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -55,7 +56,7 @@ export class HistoryEventPage {
     await this.run(async () => {
       const d = await this.api.historyEvent(id, sequence);
       if (
-        !this.destroyRef.destroyed &&
+        !this.isDestroyed() &&
         this.id === id &&
         this.sequence === sequence
       )

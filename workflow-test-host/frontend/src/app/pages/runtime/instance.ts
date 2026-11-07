@@ -1,3 +1,4 @@
+import { destroyedState } from "../../ui/page-state";
 import { Component, DestroyRef, computed, inject, signal } from "@angular/core";
 import { findNodeAtLocation, parseTree } from "jsonc-parser";
 import { prettyDocument } from "../../command-buffer";
@@ -66,9 +67,9 @@ export class InstancePage {
     const previous=this.variables(); this.variableError.set("");
     try {
       const result=await this.api.variables(id,next ? previous?.nextAfterKey || undefined : undefined,next ? previous?.lockVersion : undefined);
-      if(!this.destroyRef.destroyed && id===this.id && generation===this.variableGeneration) this.variables.set(result);
+      if(!this.isDestroyed() && id===this.id && generation===this.variableGeneration) this.variables.set(result);
     } catch(error) {
-      if(!this.destroyRef.destroyed && id===this.id && generation===this.variableGeneration) {
+      if(!this.isDestroyed() && id===this.id && generation===this.variableGeneration) {
         this.variables.set(null); this.variableError.set(String(error)+". Refresh variables to restart paging.");
       }
     }
@@ -77,11 +78,12 @@ export class InstancePage {
     const id=this.id; this.effectError.set("");
     try {
       const result=await this.api.serviceEffects(id,next ? this.effects()?.nextAfterId || undefined : undefined);
-      if(!this.destroyRef.destroyed && id===this.id) this.effects.set(result);
+      if(!this.isDestroyed() && id===this.id) this.effects.set(result);
     } catch(error) { if(id===this.id) this.effectError.set(String(error)); }
   }
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly isDestroyed = destroyedState(this.destroyRef);
   ngOnInit() {
     this.route.paramMap
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -94,7 +96,7 @@ export class InstancePage {
     const id = this.id;
     const generation = ++this.readGeneration;
     const current = () =>
-      !this.destroyRef.destroyed &&
+      !this.isDestroyed() &&
       this.id === id &&
       this.readGeneration === generation;
     this.busy.set(true);

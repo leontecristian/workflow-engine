@@ -1,6 +1,6 @@
 # Workflow engine
 
-**Agreed architecture, implementation pending — 2026-11-07:** [constitution 6.0.0](docs/constitution.md) adopts `workflow-web` as a reusable HTTP adapter and `workflow-ui` as an Angular 19 library, consumed inside APOLO and the sandbox. The target is three Maven modules plus the Angular library. The two-module build and Angular 21 console described below remain the actual implementation; this documentation decision starts no extraction or dependency changes. See the [main design](docs/architecture/workflow-engine-design.md).
+**Agreed architecture, implementation pending — 2026-11-07:** [constitution 6.0.0](docs/constitution.md) adopts `workflow-web` as a reusable HTTP adapter and `workflow-ui` as an Angular 19 library, consumed inside APOLO and the sandbox. The target is three Maven modules plus the Angular library. The actual implementation remains two Maven modules; F012 aligns the standalone console with Angular 19.2 without starting library extraction. See the [main design](docs/architecture/workflow-engine-design.md).
 
 [F011 — Sequential human stages](docs/features/F011-sequential-human-stages/spec.md) adds successive and conditional SINGLE reviews in one pinned instance. Import the [two-stage](docs/features/F011-sequential-human-stages/sequential-review.json), [optional-stage](docs/features/F011-sequential-human-stages/optional-stage-review.json) or [three-stage](docs/features/F011-sequential-human-stages/three-stage-review.json) sample with SANDBOX_REVIEW selectable. Completion results identify the submitted task; the console separately refreshes authorized current work. See the [handover](docs/features/F011-sequential-human-stages/implementation.md) for verification and the remaining interactive browser gap.
 
@@ -167,7 +167,7 @@ Preserve the workflow changelog classpath paths and already-applied changeset id
 
 The console is a development tool. Its writes persist in the configured database; it has no reset/delete endpoint. Startup applies the five host-only F006 changesets even when the console is disabled, but creates no catalog, accounts or sandbox records. Never include the test-host master in APOLO production migrations.
 
-Toolchain: JDK 21 compiling Java 17 bytecode; Angular 21.2.25, Material/CDK 21.2.14, CLI/build 21.2.29, TypeScript 5.9.3, RxJS 7.8.2, Node 22.22.0, npm 10.9.4. See the [official Angular compatibility table](https://angular.dev/reference/versions). The profile installs pinned Node/npm locally under `workflow-test-host/target/frontend`; global Node is unnecessary for packaging.
+Toolchain: JDK 21 compiling Java 17 bytecode; Angular 19.2.25, Material/CDK 19.2.19, CLI/build 19.2.27, TypeScript 5.8.3, Zone.js 0.15.1, RxJS 7.8.2, Node 22.22.0, npm 10.9.4. See the [official Angular compatibility table](https://angular.dev/reference/versions). The profile installs pinned Node/npm locally under `workflow-test-host/target/frontend`; global Node is unnecessary for packaging.
 
 From the repository root, with JAVA_HOME pointing to an installed JDK 21:
 

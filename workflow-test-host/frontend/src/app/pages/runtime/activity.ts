@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from "@angular/router";
 import { ConsoleApi } from "../../data/console-api";
 import type { ActivityView } from "../../data/dtos";
 import { PAGE_IMPORTS } from "../../ui/page-imports";
-import { pageState } from "../../ui/page-state";
+import { destroyedState, pageState } from "../../ui/page-state";
 @Component({
   selector: "console-activity",
   standalone: true,
@@ -29,6 +29,7 @@ export class ActivityPage {
   detail = signal<ActivityView | null>(null);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly isDestroyed = destroyedState(this.destroyRef);
   ngOnInit() {
     this.route.paramMap
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -41,7 +42,7 @@ export class ActivityPage {
     const id = this.id;
     await this.run(async () => {
       const d = await this.api.activity(id);
-      if (!this.destroyRef.destroyed && this.id === id) this.detail.set(d);
+      if (!this.isDestroyed() && this.id === id) this.detail.set(d);
     });
   }
 }

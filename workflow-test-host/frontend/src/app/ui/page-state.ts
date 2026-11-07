@@ -1,4 +1,10 @@
-import { signal } from "@angular/core";
+import { DestroyRef, signal } from "@angular/core";
+/** Angular 19-compatible destruction predicate for async responses outside RxJS subscriptions. */
+export function destroyedState(destroyRef: DestroyRef): () => boolean {
+  let destroyed = false;
+  destroyRef.onDestroy(() => { destroyed = true; });
+  return () => destroyed;
+}
 /** Per-component async feedback only; forms, queries and paging belong to the page. */
 export function pageState() {
   const busy = signal(false),

@@ -12,7 +12,7 @@ import type {
 import { DefinitionGraphComponent } from "./definition-graph";
 import { applyFragment, type FragmentEdit } from "./definition-fragment";
 import { PAGE_IMPORTS } from "../../ui/page-imports";
-import { pageState } from "../../ui/page-state";
+import { destroyedState, pageState } from "../../ui/page-state";
 @Component({
   selector: "console-version",
   standalone: true,
@@ -42,6 +42,7 @@ export class VersionPage {
   lastResponse = signal<DefinitionChange | DefinitionCheck | null>(null);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly isDestroyed = destroyedState(this.destroyRef);
   ngOnInit() {
     this.route.paramMap
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -56,7 +57,7 @@ export class VersionPage {
     const id = this.id;
     await this.run(async () => {
       const d = await this.api.version(id);
-      if (this.destroyRef.destroyed || this.id !== id) return;
+      if (this.isDestroyed() || this.id !== id) return;
       this.detail.set(d);
       this.document = prettyDocument(d.documentJson);
       this.savedDocument.set(this.document);

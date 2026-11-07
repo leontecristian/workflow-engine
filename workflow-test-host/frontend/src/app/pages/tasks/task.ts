@@ -5,7 +5,7 @@ import { ConsoleApi } from "../../data/console-api";
 import { CommandRecovery } from "../../data/command-recovery";
 import type { TaskView, TaskContract, TaskSubmission } from "../../data/dtos";
 import { PAGE_IMPORTS } from "../../ui/page-imports";
-import { pageState } from "../../ui/page-state";
+import { destroyedState, pageState } from "../../ui/page-state";
 @Component({
   selector: "console-task",
   standalone: true,
@@ -36,6 +36,7 @@ export class TaskPage {
   commands = inject(CommandRecovery);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly isDestroyed = destroyedState(this.destroyRef);
   ngOnInit() {
     this.route.paramMap
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -59,7 +60,7 @@ export class TaskPage {
         this.api.taskContract(id),
         this.api.taskSubmission(id),
       ]);
-      if (this.destroyRef.destroyed || this.id !== id) return;
+      if (this.isDestroyed() || this.id !== id) return;
       this.detail.set(d);
       this.contract.set(c);
       this.submission.set(s);

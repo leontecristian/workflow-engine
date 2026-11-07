@@ -1,6 +1,6 @@
 # F012 — Angular 19 frontend alignment
 
-**Status:** READY, revision 1 — 2026-11-07. **Owner:** Workflow project owner. **Constitution:** [6.0.0](../../constitution.md). **Authorization:** specification preparation only. READY describes the specified scope; implementation requires a subsequent request.
+**Status:** IN PROGRESS against READY revision 1 — 2026-11-07. T02–T05 implemented and verified; T06 browser acceptance remains open. **Owner:** Workflow project owner. **Constitution:** [6.0.0](../../constitution.md). **Authorization:** subsequent owner request authorizes T02–T06; no commit or push. See [actual results and gaps](implementation.md).
 
 ## Purpose and authority
 

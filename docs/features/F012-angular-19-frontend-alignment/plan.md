@@ -1,6 +1,6 @@
 # Plan — F012 Angular 19 frontend alignment
 
-Targets [specification revision 1](spec.md). This plan authorizes no implementation. Follow [development workflow](../../specification-driven-development.md), [coding standards](../../coding-standards.md) and [package boundaries](../../package-structure.md).
+Targets [specification revision 1](spec.md). The subsequent owner request authorizes T02–T06 within this plan; the plan itself grants no additional scope. Follow [development workflow](../../specification-driven-development.md), [coding standards](../../coding-standards.md) and [package boundaries](../../package-structure.md).
 
 ## P01 — Establish the comparison baseline
 
@@ -17,6 +17,8 @@ Change package.json and regenerate package-lock.json using the selected npm; ver
 R02–05; AC02–07. Add compatible Zone.js loading and explicit application-level zone configuration in src/main.ts/angular.json as appropriate, once only. Inspect required Angular 19 Material animation providers and configure only those actually needed by existing controls. Keep these bootstrap responsibilities in the application, not reusable component helpers.
 
 Audit imports, standalone declarations, signals/inputs/outputs, template control flow, forms and async rendering. Check src/styles.scss and component styles against Material 19 without redesigning screens. Inspect unit/component-loader.mjs: it uses real Angular modules with mocked HTTP/navigation/DOM and does not bootstrap the application. Adapt framework-specific harness details without weakening behavior assertions or representing it as browser rendering evidence.
+
+Implementation discovery: Angular 19's public `DestroyRef` exposes `onDestroy`, not the later `destroyed` property used by current pages. Retain the same pending-read guards using a shared callback-backed predicate exported from the existing `src/app/ui/page-state.ts`; keep `takeUntilDestroyed` and route/generation checks. This is a compatibility implementation of R02/R03, not a change to read or command behavior. Add a focused pending-task-read check through the real Angular destruction lifecycle.
 
 Affected files are bounded to workflow-test-host/frontend/package.json, package-lock.json, angular.json, tsconfig.json, src/main.ts, src/styles.scss, existing src/app/{shell,data,ui,pages} sources/templates/styles and existing unit/component tests where compatibility requires it. Existing app.routes.ts remains the route contract. scripts/check-build.mjs remains the CSP guard. workflow-test-host/pom.xml is inspected for packaging consistency; its pinned Node/npm and copy path are expected to remain unchanged. No Java package, core source, controller, schema or new Maven module is planned.
 
