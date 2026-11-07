@@ -17,6 +17,8 @@ Do not repeat requirements, architecture or status narratives across files. Plan
 
 Small fixes, simple repository changes and maintenance may use a concise change description with relevant verification instead of a new feature folder. Within a substantive feature, omit irrelevant sections and keep unchanged material linked. Add detail only where complexity, risk or handover needs justify it.
 
+**Owner delivery clarification — 2026-11-07:** specification-driven work must stay proportional to the requested change. Preserving an existing guarantee does not automatically require new functionality or fresh verification of that guarantee. The focused-verification rules below govern new plans and reconciliation of older broad checklists; they do not erase historical evidence or waive constitutional behavior and production obligations.
+
 ## 1. Specify the behavior
 
 In spec.md, identify the feature, revision/date, status, owner and applicable constitution version. Describe the problem and intended outcome, scope, requirements, observable behavior and acceptance scenarios. Include business rules, inputs/results, errors, constraints and unresolved decisions where relevant.
@@ -24,6 +26,8 @@ In spec.md, identify the feature, revision/date, status, owner and applicable co
 Use stable requirement/scenario IDs for substantial behavior. Reference applicable [CON constraints](constraints.md), [ASM assumptions](assumptions.md) and [design sources](design-sources.md). Keep AGREED, PROPOSED, PROVISIONAL, OPEN and DEFERRED distinct; examples are not automatically contracts. An acceptance scenario describes a required property and does not authorize an automated test.
 
 Resolve material ambiguity before dependent implementation while continuing independent work. Choose routine engineering details within the agreed contract. Readiness requires clear affected contracts and acceptance criteria, not resolution of unrelated APOLO policies or later designer decisions.
+
+Include only behavior and abstractions needed by the selected slice. A hypothetical future consumer is not sufficient reason to add adapters, permission models, configuration frameworks or new modules. Reference unchanged contracts instead of copying them into new deliverables. Keep historical verification debt in its owning feature; make it a dependency only when the current slice actually relies on the unresolved guarantee, and state that dependency explicitly.
 
 Feature-document statuses remain DRAFT, READY, IMPLEMENTED and SUPERSEDED. IMPLEMENTED means the specified code is present; it does not imply every behavior has been verified or that production acceptance is complete.
 
@@ -34,6 +38,18 @@ In plan.md, reference the specification revision and explain the technical appro
 Review only applicable constitutional concerns and record material findings or open gates. In particular, preserve core/host ownership, the shared transaction and migration boundary, version pinning and catalog compatibility, aggregate concurrency/idempotency, authorization/history/durable handoff, exact data and expression semantics, and platform compatibility. Refer to project guidance rather than copying the full architecture checklist into every feature. Follow the [package conventions](package-structure.md) and [coding standards](coding-standards.md).
 
 Resolve a conflict through a compliant design or the constitution's amendment process before dependent implementation. No additional approval ceremony is needed for ordinary choices within an agreed contract.
+
+### Focused verification and evidence reuse
+
+Keep the verification plan short: identify the changed behavior/boundary, applicable existing evidence, fresh checks needed and the stopping condition. No additional process document or exhaustive traceability matrix is required.
+
+- Reuse evidence for unchanged behavior with a source section/revision and a brief applicability explanation. Mark it REUSED rather than claiming a fresh run. A new commit alone is not a reason to repeat a check. Review relevant code, dependency, configuration and environment differences; old evidence cannot prove a newly introduced boundary or behavior.
+- Select focused existing suites before adding tests. Add a test only for changed behavior or a concrete uncovered regression risk, not to mirror implementation details or duplicate another check. Preserve existing test sources and assertions.
+- Match the verification method to the change. Documentation needs content/link/whitespace checks; a dialog fix needs its affected interactions; a read-only extraction needs read access, rendering, serialization and package/host wiring. A command fingerprint or receipt change justifies relevant idempotency tests; a transaction/persistence change may need database integration evidence. Do not run those suites merely because a new feature mentions preserving their guarantees.
+- Browser observations are required where fresh rendering/integration evidence matters, not for every unchanged workflow. Use automated tests for detailed combinations, prepared fixture state for views and prior acceptance for unchanged behavior. Do not replay an entire workflow or command-recovery scenario just to inspect a changed screen. Avoid repeating the same browser matrix in multiple consumers when one focused host-integration observation suffices for the difference.
+- A build already executed successfully by a packaging command counts as that build; do not repeat it for a separate checklist entry. Broader integration/release acceptance is a separately selected milestone with a reason for its scope, not an automatic per-feature gate.
+
+**Stop when the requested change and its relevant checks pass.** Repeat or expand verification only after a relevant change, failure or concrete uncovered requirement invalidates the existing result; record the reason. Small follow-up fixes repeat affected checks only. A required blocked check stays open without triggering unrelated testing or reopening completed acceptance. If an older plan mandates unrelated checks, reconcile its scope/tasks under this owner clarification before execution rather than silently omitting requirements or doing unnecessary work.
 
 ## 3. Track execution
 
@@ -61,7 +77,7 @@ Use this structure proportionately; empty sections and repeated inventories are 
 The Verification section records:
 
 - Checks actually performed, with relevant commands/manual actions, environment and artifacts.
-- Requirement/scenario coverage and PASS, FAIL, NOT RUN or BLOCKED outcomes with reasons.
+- Requirement/scenario coverage and PASS, FAIL, NOT RUN or BLOCKED outcomes with reasons; applicable earlier evidence is labelled REUSED with its source and scope, not a newly executed PASS.
 - Build results, behavioral observations and known verification gaps, clearly separated.
 - Process cleanup and outstanding integration or production gates when relevant.
 
@@ -87,7 +103,7 @@ For authorized implementation builds, select JDK 21 and use the root wrapper:
 
 Do not build for documentation-only changes; inspect content, links and whitespace. Run application/database checks only within the task's scope. Host startup runs Liquibase and can modify the development database. Record and stop temporary processes you start unless asked to leave them running, after checking their identities. Report final process state.
 
-Keep implementation completion and verified behavior separate. Required rollback, concurrency, idempotency, expression restrictions, authorization and durable recovery need appropriate evidence before production acceptance.
+Keep implementation completion and verified behavior separate. Required rollback, concurrency, idempotency, expression restrictions, authorization and durable recovery need appropriate evidence before production acceptance. That is an integration/release obligation, not an instruction to freshly test every guarantee during every feature. Reuse applicable evidence and execute only remaining relevant checks at the selected milestone.
 
 ## Feature navigation
 

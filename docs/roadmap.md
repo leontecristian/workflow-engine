@@ -4,11 +4,13 @@
 
 **Architecture adoption — 2026-11-07:** constitution 6.0.0 and main design 0.11 adopt Angular 19 `workflow-ui` and optional host-consumed `workflow-web`. The target has core/web/test-host Maven modules plus the Angular library; the current reactor still has two Maven modules and F012 aligns its existing console. Extraction needs a separate feature specification and implementation request and must not alter F011 scope or evidence. The designer remains after first APOLO integration, delivered within workflow-ui rather than as a separate production application.
 
-**Updated:** 2026-11-07, to record F011 implementation and its remaining interactive browser acceptance gap.
+**Updated:** 2026-11-07, to record focused delivery/verification rules and distinguish historical evidence reconciliation from new-feature prerequisites.
 
 This is the current delivery roadmap. It replaces the separate development plan formerly held in `apolo-docs`. The [feature index](features/README.md) tracks implemented features; each feature's tasks and implementation record own detailed progress and evidence. The [constitution](constitution.md), [constraints](constraints.md) and [design-source precedence](design-sources.md) govern behavior. This roadmap selects no new API, schema, business rule or release date.
 
 The agreed delivery direction is **working sandbox → first APOLO booking integration → graphical designer**, with reliability required before any production deployment. The future feature breakdown below is **PROPOSED**; the underlying V1 capabilities already selected by the constitution remain agreed. Assign feature IDs when their specifications begin, rather than treating roadmap entries as READY features.
+
+**Delivery rule — owner clarification, 2026-11-07:** keep each slice limited to its requested behavior and real dependencies. Do not add speculative functionality for hypothetical consumers or copy global guarantees into a fresh full-system test campaign. Follow [focused verification and evidence reuse](specification-driven-development.md#focused-verification-and-evidence-reuse): reuse applicable evidence, check changed boundaries and stop once the scoped work/checks pass. Repeat only checks invalidated by a relevant change, failure or identified gap. Unrelated idempotency/replay tests and broad browser walkthroughs are not routine feature gates.
 
 ## 1. Where we are
 
@@ -23,18 +25,18 @@ See the [feature index](features/README.md) and [F006 handover](features/F006-te
 
 F007–F009 implement service actions, explicit scalar/JSON bindings and restricted expression routing. F010 adds 1–16 outcomes with exact routes within one SINGLE human stage. F011 implements multiple sequential/conditional SINGLE stages; local unit/SQL/HTTP checks are recorded, with interactive browser acceptance blocked. Structured results, collective review and cancellation/reassignment remain future work. The console's read-only graph is not the graphical designer.
 
-## 2. Immediate priority: accept the existing baseline
+## 2. Historical acceptance reconciliation
 
-Complete this work under the existing features rather than creating a new capability merely to close evidence gaps.
+This is verification debt owned by the existing features, not a blanket prerequisite for every new slice. Reconcile it when a selected feature depends on an unresolved guarantee or when planning the applicable integration/release gate. First map existing evidence, including F012's completed acceptance, and run only genuinely uncovered relevant checks. Do not create functionality merely to close evidence gaps or repeat already applicable observations.
 
 **Progress — 2026-11-01:** the owner completed all six browser walkthrough points, including two-tab editing, two-account completion, instance graph inspection, exported-command recovery/replay, local event delivery/duplicate suppression and logout clearing. See [the recorded observations](features/F006-test-host-definition-console/implementation.md#owner-browser-acceptance-progress--2026-11-01). The next action is to reconcile these and the earlier API/database evidence against the full feature scenarios, identifying only uncovered checks; the walkthrough does not automatically close every task below.
 
-1. **F006 browser acceptance:** finish T08/T09/T12/T13 against the intended packaged revision, covering administrator/reviewer navigation, two-tab conflicts and unsaved text, command recovery, instance monitoring, graph refresh/failure behavior, keyboard use and responsive layout. Cover the remaining portions of AC01–AC30 as applicable; preserve API-only and isolated-test results as such.
-2. **Revision 5 live acceptance:** verify the graph endpoint, pinned-version/history display and authorization using the real host. Confirm the running artifact actually includes revision 5 before relying on it.
+1. **F006 browser acceptance:** map the existing walkthrough and applicable F012 observations to T08/T09/T12/T13 and AC01–AC30 before selecting any new browser work. Retain only uncovered checks relevant to the scheduled reconciliation. Do not repeat the full administrator/reviewer, command recovery or layout matrix by default; preserve evidence types and revision boundaries.
+2. **Revision 5 live acceptance:** reconcile available graph endpoint, pinned-version/history and authorization evidence against the relevant implementation revision. Request a fresh observation only where an identified coverage/environment difference requires it; do not restart a host simply because this historical item remains listed.
 3. **F005 evidence reconciliation:** map F006's observed scenarios to F005 AC01–AC14, identify uncovered requirements and complete the remaining authorized checks before closing T11. F006 now supplies the adapters absent at the original F005 handover; that changes the dependency, not the acceptance result.
 4. **Earlier-feature reconciliation:** map relevant F006 management/persistence observations to F002–F004, retaining any unmatched race, rollback, hydration or paging gaps. Record new evidence in the owning implementation records without rewriting historical results.
 
-**Exit:** applicable scenarios have explicit outcomes and revision/environment references; required gaps are resolved before claiming baseline acceptance. This roadmap update itself closes no task. Independent specification work can continue while environment-dependent acceptance is pending.
+**Exit for the scheduled reconciliation:** relevant scenarios have outcomes or reused evidence with revision/environment references; actual remaining gaps stay explicit. This roadmap update closes no historical task. Independent implementation as well as specification work may proceed unless a stated dependency requires the unresolved evidence. Reconciliation is not a requirement to reproduce every historical run.
 
 ## 3. Next engine increments
 
@@ -42,7 +44,7 @@ Complete this work under the existing features rather than creating a new capabi
 
 **Latest delivered slice:** [F011 — Multiple sequential human stages](features/F011-sequential-human-stages/spec.md), IMPLEMENTED revision 1. The subsequent 2026-11-07 request authorized successive/conditional SINGLE stages in an acyclic graph, one active stage, atomic entry, exact historical contracts and stable receipts. Its [handover](features/F011-sequential-human-stages/implementation.md) records local evidence and the blocked browser walkthrough. Earlier acceptance reconciliation and the proposed increments below remain independent work; no next feature is selected here.
 
-The proposed sequence grows from the accepted minimal workflow to a useful branching sandbox, then richer reviews. Each increment should include its core contract, real test-host adapter/UI support where needed, and its own acceptance evidence. Extend the F006 graph only for shapes it can represent correctly; retain an explicit unavailable state for unsupported shapes.
+The proposed sequence grows from the accepted minimal workflow to a useful branching sandbox, then richer reviews. Each increment includes only the contracts and host/UI support needed by that slice, with focused fresh checks and applicable reused evidence. Unchanged engine guarantees remain constraints, not automatically new tests or deliverables. Extend the F006 graph only for shapes it can represent correctly; retain an explicit unavailable state for unsupported shapes.
 
 | Proposed increment | Dependency and scope | Exit condition |
 | --- | --- | --- |
@@ -80,6 +82,8 @@ Preserve Java 17 APIs/bytecode, JDK 21 runtime, ordinary JAR packaging and neutr
 **Designer — after successful first APOLO integration:** deliver the graphical authoring feature in the Angular 19 workflow-ui library, embedded in APOLO and available through the sandbox development shell for supported node types, stable task catalog selection, bindings, ordered routes, JSON inspection, backend validation and explicit publication. Define round-trip compatibility, unknown-feature handling, authoring permissions and preview semantics under CON-11. Diagram layout must not alter route priority; the frontend must not execute the workflow engine or SpEL. The F006 inspector does not close this milestone.
 
 **Release hardening — throughout delivery, mandatory before production:** verify compatible published-definition support, migrations/upgrades, authorization, expression safety, shared transactions, concurrency/replay, delivery restart/recovery and retention. Establish operational monitoring, recovery procedures and release ownership for APOLO. Final packaging/release arrangements follow the agreed source integration; production guarantees cannot be postponed until after the designer.
+
+This release scope is distinct from feature acceptance and historical verification debt. At the integration/release milestone, reuse applicable evidence and select fresh checks for actual host/environment changes or unresolved gaps. Do not impose the whole release checklist on a small UI fix or read-only extraction. Relevant command/transaction changes can require targeted idempotency or rollback checks; unrelated changes do not.
 
 **Exit:** designer acceptance is demonstrated separately from production readiness, and every production deployment has the required host-specific reliability and operational evidence.
 
