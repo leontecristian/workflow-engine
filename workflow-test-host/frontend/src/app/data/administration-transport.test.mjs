@@ -39,3 +39,15 @@ test('late unauthorized response cannot clear a replacement session',async t=>{
   assert.equal(session.viewerScope(),replacement);
   assert.equal(session.session(),identity);
 });
+
+test('Definitions page requests newest families first on every page with exact descending cursors',async t=>{
+ const {loadTs}=await import('../../../unit/component-loader.mjs');
+ const {ConsoleAdministrationApi}=loadTs(new URL('./administration-adapters.ts',import.meta.url));
+ const calls=[];
+ t.mock.method(globalThis,'fetch',async(url)=>{calls.push(url);return {ok:true,status:200,text:async()=>'{"items":[],"nextAfterId":null}'};});
+ const injector=services(t,[ConsoleAdministrationApi]),api=injector.get(ConsoleAdministrationApi);
+ const signal=new AbortController().signal;
+ await api.listDefinitions(undefined,2,signal);await api.listDefinitions('9007199254740993',2,signal);
+ assert.equal(calls[0],'/console/api/definitions?limit=2&order=DESC');
+ assert.equal(calls[1],'/console/api/definitions?limit=2&order=DESC&afterId=9007199254740993');
+});

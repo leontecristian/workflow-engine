@@ -18,6 +18,10 @@ public interface WorkflowDefinitionRepository extends Repository<WorkflowDefinit
     java.util.List<WorkflowDefinitionEntity> findPage(@org.springframework.data.repository.query.Param("afterId") long afterId,
                                                     org.springframework.data.domain.Pageable pageable);
 
+    @org.springframework.data.jpa.repository.Query("select d from WorkflowDefinitionEntity d where (:afterId = 0 or d.id < :afterId) order by d.id desc")
+    java.util.List<WorkflowDefinitionEntity> findNewestPage(@org.springframework.data.repository.query.Param("afterId") long afterId,
+                                                          org.springframework.data.domain.Pageable pageable);
+
     Optional<WorkflowDefinitionEntity> findById(Long id);
 
     Optional<WorkflowDefinitionEntity> findByWorkflowKey(String workflowKey);

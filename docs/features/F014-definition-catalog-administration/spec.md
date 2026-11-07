@@ -90,3 +90,9 @@ One focused sandbox administration browser pass and an extension of the existing
 ## Readiness
 
 The extraction scope and simple administration policy are selected here. F014 is READY after reconciliation with completed F013 at `9a82eea` through T02; only gaps affecting those reused boundaries block readiness, not unrelated historical acceptance debt. Do not freeze a parallel design against its changing worktree. Exact class/member names consistent with these contracts are routine implementation choices. Actual APOLO policy/distribution and later graphical designer functionality remain separate work.
+
+## Follow-up — Newest definitions first, 2026-11-07
+
+The sandbox Definitions table requests descending definition-family ID order so the most recently created families appear first across all pages. GET /definitions accepts optional order=ASC|DESC; omission retains ASC for existing consumers, including the separate host start chooser. The existing afterId/nextAfterId fields remain opaque continuation values: DESC starts at zero/omitted and continues with IDs strictly less than the last returned ID. Page bounds, exact decimal IDs, authorization and URLs remain unchanged. Unknown/duplicate order input is 400. Core's existing two-argument DefinitionQuery constructor retains ascending behavior. No schema or workflow execution change.
+
+Acceptance: first DESC page contains the highest IDs; following pages contain successively older families with no skipped/duplicated boundary row, including BIGINT IDs beyond JavaScript safe precision. Existing omitted-order paging remains ascending. Focused query-service, MVC and host-adapter checks cover the changed boundary; unchanged authoring/command guarantees retain prior evidence.

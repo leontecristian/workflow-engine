@@ -8,6 +8,7 @@ import static io.github.leontecristian.workflow.web.service.administration.Admin
 import static io.github.leontecristian.workflow.web.service.administration.AdministrationWire.token;
 
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionQuery;
+import io.github.leontecristian.workflow.core.dto.definition.DefinitionOrder;
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionStatus;
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionVersionQuery;
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionVersionSummary;
@@ -49,11 +50,16 @@ public class WorkflowDefinitionController {
     @GetMapping("/definitions")
     public ResponseEntity<String> definitions(HttpServletRequest r) {
         management.requireAdministrationAccess();
-        query(r, "afterId", "limit");
+        query(r, "afterId", "limit", "order");
+        DefinitionOrder order = DefinitionOrder.ASC;
+        if (r.getParameter("order") != null) {
+            try { order = DefinitionOrder.valueOf(r.getParameter("order")); }
+            catch (IllegalArgumentException invalid) { throw WorkflowAdministrationException.invalid(); }
+        }
         var page =
                 definitions.listDefinitions(
                         new DefinitionQuery(
-                                after(r.getParameter("afterId")), limit(r.getParameter("limit"))));
+                                after(r.getParameter("afterId")), limit(r.getParameter("limit")), order));
         return wire.response(
                 wire.page(page.items(), page.nextAfterId(), "nextAfterId", DefinitionView::id));
     }

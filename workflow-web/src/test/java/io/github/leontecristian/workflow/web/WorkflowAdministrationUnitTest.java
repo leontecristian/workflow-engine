@@ -181,6 +181,13 @@ class WorkflowAdministrationUnitTest {
             mvc.perform(get("/custom/manage/task-types?afterId=9007199254740993&limit=100"))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.nextAfterId").value("9007199254740993"));
             mvc.perform(get("/custom/manage/definitions")).andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
+            verify(definitions).listDefinitions(new io.github.leontecristian.workflow.core.dto.definition.DefinitionQuery(0, 50));
+            mvc.perform(get("/custom/manage/definitions?order=DESC&afterId=9007199254740993&limit=2"))
+                    .andExpect(status().isOk());
+            verify(definitions).listDefinitions(new io.github.leontecristian.workflow.core.dto.definition.DefinitionQuery(
+                    9007199254740993L, 2, io.github.leontecristian.workflow.core.dto.definition.DefinitionOrder.DESC));
+            mvc.perform(get("/custom/manage/definitions?order=newest")).andExpect(status().isBadRequest());
+            mvc.perform(get("/custom/manage/definitions?order=DESC&order=ASC")).andExpect(status().isBadRequest());
             mvc.perform(get("/custom/manage/definitions/42/versions?status=DRAFT")).andExpect(status().isOk());
             mvc.perform(get("/custom/manage/versions/42/export?existingIgnoredQuery=x"))
                     .andExpect(status().isOk()).andExpect(header().string("Content-Disposition", "attachment; filename=\"workflow-version-42.json\""))

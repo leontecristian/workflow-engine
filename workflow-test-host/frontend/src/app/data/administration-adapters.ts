@@ -9,7 +9,7 @@ export class ConsoleAdministrationApi implements WorkflowAdministrationApi {
  listTaskTypes(filter:string,cursor:string|undefined,limit:number,signal:AbortSignal){return this.session.administrationCall<AdministrationPage<TaskTypeView>>('/task-types'+pageQuery(cursor,limit,{filter}),signal);}
  createTaskType(body:TaskTypeInput&{code:string},signal:AbortSignal){return this.session.administrationCall<Change<TaskTypeView>>('/task-types',signal,'POST',body);}
  updateTaskType(id:string,body:TaskTypeInput,token:string,signal:AbortSignal){return this.session.administrationCall<Change<TaskTypeView>>('/task-types/'+segment(id),signal,'PUT',body,token);}
- listDefinitions(cursor:string|undefined,limit:number,signal:AbortSignal){return this.session.administrationCall<AdministrationPage<DefinitionView>>('/definitions'+pageQuery(cursor,limit),signal);}
+ listDefinitions(cursor:string|undefined,limit:number,signal:AbortSignal){return this.session.administrationCall<AdministrationPage<DefinitionView>>('/definitions'+pageQuery(cursor,limit,{order:'DESC'}),signal);}
  definition(id:string,signal:AbortSignal){return this.session.administrationCall<DefinitionView>('/definitions/'+segment(id),signal);}
  saveMetadata(id:string,name:string,description:string|null,token:string,signal:AbortSignal){return this.session.administrationCall<Change<DefinitionView>>('/definitions/'+segment(id),signal,'PUT',{name,description},token);}
  listVersions(id:string,status:string,cursor:string|undefined,limit:number,signal:AbortSignal){return this.session.administrationCall<AdministrationPage<VersionSummary>>('/definitions/'+segment(id)+'/versions'+pageQuery(cursor,limit,status?{status}:{}),signal);}

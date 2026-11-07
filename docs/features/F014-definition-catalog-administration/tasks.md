@@ -8,3 +8,8 @@ Specification revision 3, IMPLEMENTED. Implementation and focused verification a
 - [x] **T04 — Extract administration pages.** P03; R01/R05; AC04–06. Depends on T02; implementation authorized. Reuse F013 package/conventions, move four page groups and existing authoring aids, retain simple dirty-state integration and host-supplied sample defaults.
 - [x] **T05 — Switch sandbox and verify the changed boundaries.** P02–04; AC01–07. Depends on T03/T04. Remove duplicate extracted implementations, run focused suites, one changed-write/audit integration check and required builds, then the short sandbox/consumer observations in P04. Reuse applicable F012/F013 evidence; do not turn the acceptance table into repeated checks at every layer. No runtime idempotency/replay or broad engine/browser campaign.
 - [x] **T06 — Handover.** P04 step 5; AC07. Depends on T05. Record fresh/REUSED results and remaining gaps, update active navigation as needed, inspect final diff and clean owned processes/fixtures. Required blocked checks remain open; do not claim APOLO compatibility. No commit/push unless separately requested.
+
+## Follow-up — Newest definitions first, 2026-11-07
+
+- [x] Specify descending family ordering/cursor compatibility and implement query, HTTP and sandbox adapter changes.
+- [x] Verify focused unit/MVC/frontend checks, real test-database cursor paging and production frontend compilation; record outcomes and review the final diff.
