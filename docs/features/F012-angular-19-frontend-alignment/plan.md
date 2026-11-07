@@ -24,6 +24,8 @@ Affected files are bounded to workflow-test-host/frontend/package.json, package-
 
 ## P04 — Verify the aligned artifact
 
+Owner follow-up — 2026-11-07: add a focused standalone reload-confirmation component beside `pages/definitions/version.ts`, using existing Material dialog/button packages. Load the component and dialog service lazily to preserve the initial bundle budget. Keep one dialog per editor, subscribe through `takeUntilDestroyed`, close it on editor destruction, and check the captured version identity before reloading. Adapt the existing isolated reload test to dialog results and cover duplicate opening/destruction/navigation; run frontend units/build and verify Cancel/Escape/explicit reload, focus and narrow-screen presentation in the running development browser. This changes presentation only; backend contracts and saved content remain unchanged.
+
 R01–06; AC01–10. Run only after implementation is requested. Record actual commands, revision, tools, suite discovery, counts and outcomes in implementation.md.
 
 1. In the frontend directory, verify node --version and npm --version, then npm ci, npm ls for the Angular/tooling/Material/Zone.js dependency set, npm run test:unit and npm run build. The existing tests use Node's test runner/type stripping; inspect test discovery after any script adaptation. Add focused behavior tests only for compatibility changes that existing tests do not cover.

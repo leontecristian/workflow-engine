@@ -1,5 +1,6 @@
-import { Component, DestroyRef, inject, signal } from "@angular/core";
+import { Component, DestroyRef, Injector, inject, signal } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
+import type { MatDialogRef } from "@angular/material/dialog";
 import { ActivatedRoute, Router } from "@angular/router";
 import { ConsoleApi } from "../../data/console-api";
 import { prettyDocument, rawDocument } from "../../command-buffer";
@@ -13,6 +14,7 @@ import { DefinitionGraphComponent } from "./definition-graph";
 import { applyFragment, type FragmentEdit } from "./definition-fragment";
 import { PAGE_IMPORTS } from "../../ui/page-imports";
 import { destroyedState, pageState } from "../../ui/page-state";
+import type { ReloadDefinitionDialog } from "./reload-dialog";
 @Component({
   selector: "console-version",
   standalone: true,
@@ -22,6 +24,9 @@ import { destroyedState, pageState } from "../../ui/page-state";
 export class VersionPage {
   api = inject(ConsoleApi);
   router = inject(Router);
+  private readonly injector = inject(Injector);
+  private openingReloadDialog = false;
+  private reloadDialog?: MatDialogRef<ReloadDefinitionDialog, boolean>;
   private readonly state = pageState();
   busy = this.state.busy;
   error = this.state.error;
@@ -43,6 +48,9 @@ export class VersionPage {
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   private readonly isDestroyed = destroyedState(this.destroyRef);
+  constructor() {
+    this.destroyRef.onDestroy(() => this.reloadDialog?.close());
+  }
   ngOnInit() {
     this.route.paramMap
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -113,9 +121,32 @@ export class VersionPage {
       this.notice.set("Draft saved");
     });
   }
-  reloadEditor(): void {
-    if (!this.dirty || confirm("Discard unsaved document text and reload?"))
+  async reloadEditor(): Promise<void> {
+    if (this.busy() || this.reloadDialog || this.openingReloadDialog) return;
+    if (!this.dirty) {
       void this.load();
+      return;
+    }
+    const id = this.id;
+    this.openingReloadDialog = true;
+    try {
+      const { MatDialog, ReloadDefinitionDialog } = await import("./reload-dialog");
+      if (this.isDestroyed() || this.id !== id) return;
+      const dialog = this.injector.get(MatDialog).open<ReloadDefinitionDialog, undefined, boolean>(
+        ReloadDefinitionDialog,
+        { width: "440px", maxWidth: "calc(100vw - 32px)", autoFocus: "first-tabbable" },
+      );
+      this.reloadDialog = dialog;
+      dialog.afterClosed().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((discard) => {
+        this.reloadDialog = undefined;
+        if (discard === true && !this.isDestroyed() && this.id === id) void this.load();
+      });
+    } catch {
+      if (!this.isDestroyed() && this.id === id)
+        this.error.set("Cannot open the reload confirmation. Your unsaved text is unchanged. Try again.");
+    } finally {
+      this.openingReloadDialog = false;
+    }
   }
   applySelectedObject(edit: FragmentEdit): void {
     this.error.set("");

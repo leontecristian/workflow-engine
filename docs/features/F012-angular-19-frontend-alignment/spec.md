@@ -1,6 +1,6 @@
 # F012 — Angular 19 frontend alignment
 
-**Status:** IN PROGRESS against READY revision 1 — 2026-11-07. T02–T05 implemented and verified; T06 browser acceptance remains open. **Owner:** Workflow project owner. **Constitution:** [6.0.0](../../constitution.md). **Authorization:** subsequent owner request authorizes T02–T06; no commit or push. See [actual results and gaps](implementation.md).
+**Status:** IMPLEMENTED revision 1 — 2026-11-07. T01–T07 complete; F012 sandbox acceptance AC01–AC10 is verified by the combined automated, packaging and browser evidence. **Owner:** Workflow project owner. **Constitution:** [6.0.0](../../constitution.md). **Authorization:** subsequent owner requests authorize implementation, browser testing, the isolated closing harness and a reviewed F012-only commit; no push. See [actual results and scope](implementation.md). APOLO integration and library extraction remain separate gates.
 
 ## Purpose and authority
 
@@ -39,6 +39,8 @@ Keep IDs/versions exact strings, scalar encodings and JSON numeric text unchange
 For F011, completion receipts identify the submitted task, while separate authorized reads identify the current stage. Preserve pinned per-stage outcomes/comments, historical task contracts and correct graph highlighting through successive and skipped stages. A rendering or refresh error must not imply that a committed completion failed or trigger another completion.
 
 ### R04 — Preserve usable Material presentation
+
+Owner follow-up — 2026-11-07: replace the definition editor's native reload confirmation with an Angular Material dialog. Cancel, Escape and backdrop dismissal retain unsaved text without reading the server; only explicit **Discard and reload** reloads saved content. Focus starts on Cancel and returns to Reload when dismissed. A clean editor reloads directly. Closing a dialog after navigation/destruction must not reload another version.
 
 Adapt only Angular/Material-incompatible APIs, templates and styles. Preserve readable forms, validation messages, tables, dialogs/overlays, navigation and graph controls, including keyboard focus and narrow-screen usability. Pixel-identical output is not required; missing controls, clipped actions, invisible overlays or unreadable state distinctions are regressions. Keep current styling intent and do not add a new widget framework or redesign the console.
 

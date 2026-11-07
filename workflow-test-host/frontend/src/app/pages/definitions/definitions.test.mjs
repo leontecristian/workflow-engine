@@ -6,7 +6,9 @@ import {
   routeAt,
   router,
   tick,
+  rxjs,
 } from "../../../../unit/component-loader.mjs";
+const { MatDialog } = await import("@angular/material/dialog");
 const { DefinitionsPage } = loadTs(
   new URL("./definitions.ts", import.meta.url),
 );
@@ -87,18 +89,82 @@ test("version load and reload display formatted JSON without unsaved changes", a
 });
 
 test("explicit editor reload requires confirmation when dirty", async (t) => {
-  const { page } = component(t, VersionPage);
+  let closed;
+  let opens = 0;
+  const { page } = component(t, VersionPage, {}, undefined, undefined, [
+    { provide: MatDialog, useValue: { open() {
+      opens++;
+      closed = new rxjs.Subject();
+      return { afterClosed: () => closed, close() { closed.next(undefined); } };
+    } } },
+  ]);
   let loads = 0;
   page.load = () => {
     loads++;
   };
   page.dirty = true;
-  t.mock.method(globalThis, "confirm", () => false);
-  page.reloadEditor();
+  const opening = page.reloadEditor();
+  await page.reloadEditor();
+  await opening;
+  assert.equal(opens, 1);
+  closed.next(false);
+  closed.complete();
   assert.equal(loads, 0);
-  globalThis.confirm = () => true;
-  page.reloadEditor();
+  await page.reloadEditor();
+  closed.next(undefined);
+  closed.complete();
+  assert.equal(loads, 0);
+  await page.reloadEditor();
+  closed.next(true);
+  closed.complete();
   assert.equal(loads, 1);
+  page.dirty = false;
+  await page.reloadEditor();
+  assert.equal(loads, 2);
+  assert.equal(opens, 3);
+});
+
+test("reload confirmation cannot load after version navigation or destruction", async (t) => {
+  let closed;
+  let closes = 0;
+  const { page, injector } = component(t, VersionPage, {}, undefined, undefined, [
+    { provide: MatDialog, useValue: { open() {
+      closed = new rxjs.Subject();
+      return { afterClosed: () => closed, close() { closes++; closed.next(true); } };
+    } } },
+  ]);
+  let loads = 0;
+  page.load = () => { loads++; };
+  page.dirty = true;
+  page.id = "1";
+  await page.reloadEditor();
+  page.id = "2";
+  closed.next(true);
+  closed.complete();
+  assert.equal(loads, 0);
+  await page.reloadEditor();
+  injector.destroy();
+  assert.equal(closes, 1);
+  assert.equal(loads, 0);
+});
+
+test("unavailable reload dialog preserves unsaved text and allows another attempt", async (t) => {
+  let opens = 0;
+  const { page } = component(t, VersionPage, {}, undefined, undefined, [
+    { provide: MatDialog, useValue: { open() {
+      opens++;
+      throw new Error("Dialog unavailable");
+    } } },
+  ]);
+  page.document = "unsaved text";
+  page.dirty = true;
+  page.load = () => { assert.fail("must not reload without confirmation"); };
+  await page.reloadEditor();
+  assert.match(page.error(), /Cannot open the reload confirmation/);
+  assert.equal(page.document, "unsaved text");
+  assert.equal(page.dirty, true);
+  await page.reloadEditor();
+  assert.equal(opens, 2);
 });
 test("destroyed family components stop reacting to route parameter changes", async (t) => {
   const route = routeAt({ id: "1" });

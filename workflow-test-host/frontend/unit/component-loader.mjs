@@ -33,6 +33,7 @@ for (const name of [
   "button",
   "card",
   "checkbox",
+  "dialog",
   "expansion",
   "form-field",
   "input",
@@ -138,6 +139,9 @@ export function component(
       { provide: ConsoleApi, useValue: api },
       { provide: router.ActivatedRoute, useValue: route },
       { provide: router.Router, useValue: navigate },
+      { provide: modules.get("@angular/material/dialog").MatDialog, useValue: {
+        open() { throw new Error("Provide a dialog double for dialog interactions"); },
+      } },
       ...extra,
     ],
     null,

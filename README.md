@@ -169,6 +169,8 @@ The console is a development tool. Its writes persist in the configured database
 
 Toolchain: JDK 21 compiling Java 17 bytecode; Angular 19.2.25, Material/CDK 19.2.19, CLI/build 19.2.27, TypeScript 5.8.3, Zone.js 0.15.1, RxJS 7.8.2, Node 22.22.0, npm 10.9.4. See the [official Angular compatibility table](https://angular.dev/reference/versions). The profile installs pinned Node/npm locally under `workflow-test-host/target/frontend`; global Node is unnecessary for packaging.
 
+[F012 sandbox acceptance is complete](docs/features/F012-angular-19-frontend-alignment/implementation.md), including production assets under host CSP, exact downloads, command recovery and read-failure behavior. This does not establish APOLO library/runtime integration.
+
 From the repository root, with JAVA_HOME pointing to an installed JDK 21:
 
 ```powershell
