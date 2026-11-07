@@ -1,4 +1,5 @@
 package io.github.leontecristian.workflow.testhost;
+
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -11,13 +12,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
 import io.github.leontecristian.workflow.core.dto.runtime.NullLiteral;
-import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionContext;
 import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
 import io.github.leontecristian.workflow.testhost.controller.runtime.ConsoleRuntimeController;
 import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
@@ -68,7 +70,7 @@ class ConsoleScalarServiceUnitTest {
     }
     @Test void startTransportKeepsTokensAndRejectsScalarNumbersNullDuplicateAndUnknownFields() {
         var commands=mock(ConsoleRuntimeCoordinator.class); var context=mock(ConsoleContext.class);
-        var controller=new ConsoleRuntimeController(null,null,null,commands,null,context,new ConsoleWire(),null);
+        var controller=new ConsoleRuntimeController(null,commands,null,context,new ConsoleWire(),null);
         String prefix="{\"commandId\":\"12345678-1234-1234-1234-123456789abc\",\"definitionVersionId\":\"42\",\"requestId\":\"1\",\"expectedRequestVersion\":\"0\"";
         controller.start(request(prefix+",\"inputs\":{\"quantity\":\"9007199254740993\",\"flag\":true,\"note\":null}}"));
         var captured=ArgumentCaptor.forClass(SandboxStart.class); verify(commands).start(captured.capture(),any());
@@ -86,7 +88,7 @@ class ConsoleScalarServiceUnitTest {
     @Test void jsonHttpTokensRemainExactOrdinaryJsonAndStartIngressCountsActualBytes() {
         var commands=mock(ConsoleRuntimeCoordinator.class); var context=mock(ConsoleContext.class);
         var wire=new ConsoleWire();
-        var controller=new ConsoleRuntimeController(null,null,null,commands,null,context,wire,null);
+        var controller=new ConsoleRuntimeController(null,commands,null,context,wire,null);
         String prefix="{\"commandId\":\"12345678-1234-1234-1234-123456789abc\",\"definitionVersionId\":\"42\",\"requestId\":\"1\",\"expectedRequestVersion\":\"0\",\"inputs\":{";
         controller.start(request(prefix+"\"booking\":{\"amount\":9007199254740993.00,\"exponent\":1E+2,\"values\":[null,1.00]}}}"));
         var captured=ArgumentCaptor.forClass(SandboxStart.class); verify(commands).start(captured.capture(),any());

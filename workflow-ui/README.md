@@ -1,6 +1,6 @@
-# Workflow instance viewer
+# Workflow UI library
 
-`@workflow-engine/ui` is an Angular 19.2 partial-compiled library. It owns read-only instance metadata, pinned graphs, ordered history, exact events, and definition/catalog administration components. It has no application bootstrap, authentication, HTTP providers, routes, translation service or global theme. Angular (including Forms), Router, Material, CDK, RxJS and jsonc-parser are peers.
+`@workflow-engine/ui` is an Angular 19.2 partial-compiled library. It owns read-only instance metadata, pinned graphs, ordered history, exact events, definition/catalog administration, runtime inspection and optional task/recovery components. It has no application bootstrap, authentication, HTTP providers, routes, translation service or global theme. Angular (including Forms), Router, Material, CDK, RxJS and jsonc-parser are peers.
 
 From the repository root, select Node 22.22.0/npm 10.9.4, then:
 
@@ -53,6 +53,18 @@ Import `WorkflowCatalogComponent`, `WorkflowDefinitionsComponent`, `WorkflowDefi
 
 All components accept `sessionScope` (nonnull opaque login generation; null clears protected content) and partial `WorkflowAdministrationMessages`. Family/version components additionally take `definitionId`/`versionId`. The catalog's `initialCode` defaults to empty; sample defaults belong to hosts. Supply the existing `WORKFLOW_VIEWER_NAVIGATION` adapter for definition/version destination intents. The sandbox wrappers supply session, routes and `SANDBOX_REVIEW`; its transport owns CSRF and credentials.
 
-The existing dirty-editor feedback, explicit save/lifecycle actions, saved graph, fragment application and Material reload confirmation are retained. Only explicit discard reloads dirty text. Late responses are ignored after input/session changes or destruction; failed writes retain input/token, and a successful write followed by failed refresh has separate feedback. No general route-leave guard or runtime-command recovery is installed.
+The existing dirty-editor feedback, explicit save/lifecycle actions, saved graph, fragment application and Material reload confirmation are retained. Only explicit discard reloads dirty text. Late responses are ignored after input/session changes or destruction; failed writes retain input/token, and a successful write followed by failed refresh has separate feedback. Administration components install no general route-leave guard or command-recovery behavior.
 
 The public exact-text formatting functions and shared presentation helpers also serve the sandbox's remaining host pages. Their names retain the original `Console*` names for those consumers; they contain no sandbox policy or transport.
+
+## Runtime components and recovery
+
+Import runtime components lazily from `@workflow-engine/ui/runtime`: `WorkflowInstancesComponent`, `WorkflowAssignedTasksComponent`, `WorkflowInstanceTasksComponent`, `WorkflowTaskComponent`, `WorkflowActivityComponent`, `WorkflowSubmissionsComponent`, `WorkflowVariablesComponent` and `WorkflowCommandsComponent`. Root exports provide runtime models, tokens, messages, `CommandBuffer` and `CommandRecovery`. Supply `WORKFLOW_RUNTIME_READS` with typed host-authorized methods and cancellation. Components accept opaque `sessionScope`, partial runtime messages, and `id` where applicable; use a new scope object for every login, including same-user reauthentication. Null clears private view state.
+
+Task inspection needs no command provider. To enable completion controls, provide `WORKFLOW_RUNTIME_COMMANDS` with `complete(envelope, signal)` and replay-only `replayComplete(envelope, signal)`. Host transport may use business endpoints and owns credentials/CSRF. Shared controls validate the pinned choice/comment and freeze the UUID, IDs, comment and expected token before dispatch. No command is automatically retried.
+
+`CommandRecovery` retains frozen requests and observations across route destruction in memory. The host must call `setScope` whenever its session changes, even when no runtime component is mounted; the sandbox's `ConsoleRuntimeSessionBridge` demonstrates synchronous session invalidation. Shared components also supply their input scope. Clear/log-out/session replacement removes private entries; no browser persistence is installed. Retry submits original values; Find result only looks up a receipt. Original results and separately refreshed current work are labelled independently, and refresh failures retain committed evidence.
+
+Optional `WorkflowRuntimeCommands.start` supplies `freezeBody`, `execute` and `replay` for the host's existing start envelopes. Shared code knows no sandbox request fields. Without this adapter, start restore fails before insertion; completion remains available. Exported envelopes retain `kind`, `body` and `expectedToken`, including raw start-input text. Start forms, validation, exact serialization and business linking remain host-owned.
+
+Navigation adds `commands`, `instanceTasks` and `submissions` intents to the existing host adapter; hosts may return null. Runtime recovery also uses `WORKFLOW_VIEWER_READS` for separate current-instance reads. The existing NgModule fixture demonstrates alternate transport, headings/navigation and a task consumer with no command provider.

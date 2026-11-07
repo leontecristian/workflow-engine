@@ -1,6 +1,5 @@
 import { Injectable, inject } from "@angular/core";
 import { ConsoleSession } from "./console-session";
-import { commandRequest, type Envelope } from "../command-buffer";
 import type {
   Page,
   DefinitionView,
@@ -79,19 +78,8 @@ export class ConsoleApi {
       requestDataJson,
     });
   }
-  listInstances(status: string, cursor?: string, limit = 50) {
-    return this.transport.call<Page<InstanceSummary>>(
-      "/instances" + pageQuery(cursor, limit, { status }),
-    );
-  }
   instance(id: string) {
     return this.transport.call<InstanceView>("/instances/" + segment(id));
-  }
-  variables(id:string, afterKey?:string, expectedLockVersion?:string) {
-    const params=new URLSearchParams({limit:"50"});
-    if(afterKey) params.set("afterKey",afterKey);
-    if(expectedLockVersion) params.set("expectedLockVersion",expectedLockVersion);
-    return this.transport.call<import("./dtos").VariablePage>("/instances/"+segment(id)+"/variables?"+params);
   }
   serviceEffects(id:string,cursor?:string) {
     return this.transport.call<Page<import("./dtos").ServiceEffect>>("/instances/"+segment(id)+"/service-effects"+pageQuery(cursor,50));
@@ -100,30 +88,6 @@ export class ConsoleApi {
     return this.transport.call<InstanceGraph>(
       `/instances/${segment(id)}/graph`,
     );
-  }
-  assignedTasks(cursor?: string, limit = 50) {
-    return this.transport.call<Page<TaskView>>(
-      "/tasks/mine" + pageQuery(cursor, limit),
-    );
-  }
-  instanceTasks(id: string, cursor?: string, limit = 50) {
-    return this.transport.call<Page<TaskView>>(
-      `/instances/${segment(id)}/tasks` + pageQuery(cursor, limit),
-    );
-  }
-  task(id: string) {
-    return this.transport.call<TaskView>("/tasks/" + segment(id));
-  }
-  taskContract(id: string) {
-    return this.transport.call<TaskContract>(`/tasks/${segment(id)}/contract`);
-  }
-  taskSubmission(id: string) {
-    return this.transport.call<TaskSubmission | null>(
-      `/tasks/${segment(id)}/submission`,
-    );
-  }
-  activity(id: string) {
-    return this.transport.call<ActivityView>("/activities/" + segment(id));
   }
   history(id: string, cursor?: string, limit = 50) {
     return this.transport.call<HistoryPage>(
@@ -134,12 +98,6 @@ export class ConsoleApi {
   historyEvent(id: string, sequence: string) {
     return this.transport.call<HistoryEvent>(
       `/instances/${segment(id)}/history/${segment(sequence)}`,
-    );
-  }
-  submissions(id: string, cursor?: string, limit = 50) {
-    return this.transport.call<SubmissionPage>(
-      `/activities/${segment(id)}/submissions` +
-        pageQuery(cursor, limit, {}, "afterTaskId"),
     );
   }
   outbox(status: string, cursor?: string, limit = 50) {
@@ -180,14 +138,5 @@ export class ConsoleApi {
   getCapabilities() {
     return this.transport.call<Capabilities>("/capabilities");
   }
-  executeCommand(envelope: Envelope, replay: boolean) {
-    const request = commandRequest(envelope, replay);
-    return this.transport.call<CommandResult | ReplayResult>(
-      request.path,
-      "POST",
-      request.body,
-      request.token,
-      envelope.kind === 'start',
-    );
-  }
+
 }

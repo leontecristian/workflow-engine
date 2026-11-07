@@ -199,3 +199,36 @@ test("catalog and version failures are retryable without retaining a previous wo
   assert.equal(page.versionError(), "");
   assert.equal(page.versionId, "10");
 });
+
+test('same-user session replacement clears host start text and suppresses late command navigation',async t=>{
+ const {ConsoleSession}=loadTs(new URL('../../data/console-session.ts',import.meta.url));
+ let resolve;
+ const {page,injector,router}=component(t,RequestsPage,{async listRequests(){return {items:[],nextAfterId:null};},async listDefinitions(){return {items:[],nextAfterId:null};}},undefined,undefined,[{provide:CommandRecovery,useValue:{execute:()=>new Promise(r=>resolve=r)}}]);
+ page.ngOnInit();page.inputsText='{"private":9007199254740993.00}';page.requestDataText='{"private":true}';page.requestId='9007199254740993';
+ const pending=page.issue(false),session=injector.get(ConsoleSession);
+ session.viewerScope.set({});session.identityChanges.next('same-user');
+ assert.equal(page.inputsText,'{}');assert.equal(page.requestDataText,'');assert.equal(page.requestId,'');
+ resolve({replayed:false,execution:{}});await pending;assert.equal(router.calls.length,0);assert.equal(page.notice(),'');
+});
+
+test('late old-session request reads and creation cannot repopulate cleared start context',async t=>{
+ const {ConsoleSession}=loadTs(new URL('../../data/console-session.ts',import.meta.url));
+ let rows,workflows,created;
+ const {page,injector}=component(t,RequestsPage,{listRequests:()=>new Promise(r=>rows=r),listDefinitions:()=>new Promise(r=>workflows=r),createRequest:()=>new Promise(r=>created=r)},undefined,undefined,[{provide:CommandRecovery,useValue:commands}]);
+ page.ngOnInit();const creating=page.createRequest(),session=injector.get(ConsoleSession);
+ const oldRows=rows,oldWorkflows=workflows;
+ session.viewerScope.set({});session.identityChanges.next('same-user');
+ oldRows({items:[{id:'old'}],nextAfterId:'old'});oldWorkflows({items:[{id:'old'}],nextAfterId:'old'});created({id:'old',lockVersion:'9'});
+ rows({items:[],nextAfterId:null});workflows({items:[],nextAfterId:null});
+ await creating;await new Promise(setImmediate);
+ assert.equal(page.rows().length,0);assert.equal(page.workflows().length,0);assert.equal(page.requestId,'');assert.equal(page.requestToken,'0');assert.equal(page.notice(),'');assert.equal(page.busy(),false);assert.equal(page.workflowsLoading(),false);
+});
+
+test('initial session arrival loads host start options and retains explicit deep-link selection',async t=>{
+ const {ConsoleSession}=loadTs(new URL('../../data/console-session.ts',import.meta.url));
+ const {core,rxjs}=await import('../../../../unit/component-loader.mjs');
+ const session={viewerScope:core.signal(null),identityChanges:new rxjs.Subject()};let requestReads=0,workflowReads=0;
+ const {page}=component(t,RequestsPage,{async listRequests(){requestReads++;return {items:[],nextAfterId:null};},async listDefinitions(){workflowReads++;return {items:[{id:'1'}],nextAfterId:null};}},routeAt({},{requestId:'9007199254740993',requestVersion:'5'}),undefined,[{provide:ConsoleSession,useValue:session},{provide:CommandRecovery,useValue:commands}]);
+ page.ngOnInit();assert.equal(requestReads,0);session.viewerScope.set({});session.identityChanges.next('admin');await new Promise(setImmediate);
+ assert.equal(requestReads,1);assert.equal(workflowReads,1);assert.equal(page.workflows().length,1);assert.equal(page.requestId,'9007199254740993');assert.equal(page.requestToken,'5');
+});

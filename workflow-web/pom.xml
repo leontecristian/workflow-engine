@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <parent><groupId>io.github.leontecristian</groupId><artifactId>workflow-engine</artifactId><version>0.0.1-SNAPSHOT</version></parent>
   <artifactId>workflow-web</artifactId>
-  <description>Explicitly activated read-only workflow instance viewer</description>
+  <description>Explicitly activated workflow viewer, administration and runtime adapters</description>
   <dependencies>
     <dependency><groupId>org.slf4j</groupId><artifactId>slf4j-api</artifactId></dependency>
     <dependency><groupId>io.github.leontecristian</groupId><artifactId>workflow-core</artifactId></dependency>

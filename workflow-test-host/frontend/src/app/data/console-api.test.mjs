@@ -6,7 +6,10 @@ import {
   ConsoleSession,
   CommandRecovery,
   loadTs,
+  core,
 } from "../../../unit/component-loader.mjs";
+const {ConsoleRuntimeReads}=loadTs(new URL("./runtime-read-adapters.ts",import.meta.url));
+const {ConsoleRuntimeCommands,ConsoleRuntimeSessionBridge}=loadTs(new URL('./runtime-command-adapters.ts',import.meta.url));
 const {ConsoleAdministrationApi}=loadTs(new URL('./administration-adapters.ts',import.meta.url));
 const identity = {
   actorRef: "admin",
@@ -33,14 +36,15 @@ test("JSON start transport and variable inspection retain exact numeric text", a
   t.mock.method(globalThis,"fetch",async(url,options)=>{
     calls.push({url,options}); return {ok:true,text:async()=>url.includes("/variables?") ? exact : '{}'};
   });
-  const injector=services(t); injector.get(ConsoleSession).session.set(identity);
+  const injector=services(t,[ConsoleRuntimeReads,ConsoleRuntimeCommands]); injector.get(ConsoleSession).session.set(identity); injector.get(ConsoleSession).viewerScope.set({});
   const api=injector.get(ConsoleApi);
   const inputs='{"booking":{"amount":9007199254740993.00,"exponent":1E+2}}';
   const envelope={kind:'start',body:{commandId:'12345678-1234-1234-1234-123456789abc',definitionVersionId:'42',requestId:'1',expectedRequestVersion:'0',inputs},expectedToken:null};
-  await api.executeCommand(envelope,false); await api.executeCommand(envelope,true);
+  const commands=injector.get(ConsoleRuntimeCommands),signal=new AbortController().signal;
+  await commands.start.execute(envelope,signal); await commands.start.replay(envelope,signal);
   assert.ok(calls[0].options.body.includes(inputs)); assert.equal(calls[0].options.body,calls[1].options.body);
   assert.equal(calls[0].options.headers['X-CSRF-TOKEN'],'server-token');
-  const page=await api.variables('1'); assert.equal(page.exactJson,exact);
+  const page=await injector.get(ConsoleRuntimeReads).variables('1',undefined,undefined,signal); assert.equal(page.exactJson,exact);
 });
 test("typed API keeps document text and exact expected token while adding CSRF", async (t) => {
   const calls = [];
@@ -78,11 +82,11 @@ test("query methods use explicit bounded cursors and encode identity segments", 
     calls.push(url);
     return { ok: true, text: async () => '{"items":[],"nextAfterId":null}' };
   });
-  const injector = services(t, [ConsoleAdministrationApi]);
+  const injector = services(t, [ConsoleAdministrationApi,ConsoleRuntimeReads]);
   injector.get(ConsoleSession).session.set(identity);
   const api = injector.get(ConsoleApi);
   await api.history("9007199254740993", "9007199254740995", 10);
-  await api.submissions("2", "9223372036854775807", 1);
+  await injector.get(ConsoleRuntimeReads).submissions("2", "9223372036854775807", 1,new AbortController().signal);
   await injector.get(ConsoleAdministrationApi).lookupVersion("key with/&", "3", new AbortController().signal);
   await api.outboxEvent("15:4");
   await api.instanceGraph("9007199254740993");
@@ -107,9 +111,11 @@ test("concurrent initialization shares one session request and 401 clears privat
   const injector = services(t);
   const session = injector.get(ConsoleSession);
   const commands = injector.get(CommandRecovery);
+  core.runInInjectionContext(injector,()=>new ConsoleRuntimeSessionBridge());
   await Promise.all([session.initialize(), session.initialize()]);
   assert.equal(sessionReads, 1);
-  assert.equal(commands.buffer.actor, "admin");
+  commands.buffer.remember({kind:'complete',body:{commandId:'12345678-1234-1234-1234-123456789abc',instanceId:'1',taskId:'2',outcomeKey:'COMPLETE',comment:null},expectedToken:'1'});
+  assert.equal(commands.buffer.entries.length,1);
   t.mock.method(globalThis, "fetch", async () => ({
     ok: false,
     status: 401,
@@ -120,6 +126,6 @@ test("concurrent initialization shares one session request and 401 clears privat
     /401 UNAUTHENTICATED/,
   );
   assert.equal(session.session(), null);
-  assert.equal(commands.buffer.actor, null);
+  assert.equal(commands.buffer.entries.length, 0);
   assert.equal(commands.result(), null);
 });

@@ -52,6 +52,7 @@ for (const name of [
 modules.set("@angular/cdk/layout", await import("@angular/cdk/layout"));
 modules.set('@workflow-engine/ui', await import('@workflow-engine/ui'));
 modules.set('@workflow-engine/ui/administration', await import('@workflow-engine/ui/administration'));
+modules.set('@workflow-engine/ui/runtime', await import('@workflow-engine/ui/runtime'));
 const cache = new Map();
 export function loadTs(url) {
   const file = typeof url === "string" ? resolve(url) : fileURLToPath(url);
@@ -140,6 +141,7 @@ export function component(
   const injector = core.createEnvironmentInjector(
     [
       { provide: ConsoleApi, useValue: api },
+      { provide: ConsoleSession, useValue: { viewerScope: core.signal({}), identityChanges: new rxjs.Subject() } },
       { provide: router.ActivatedRoute, useValue: route },
       { provide: router.Router, useValue: navigate },
       { provide: modules.get("@angular/material/dialog").MatDialog, useValue: {

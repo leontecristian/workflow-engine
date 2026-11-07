@@ -1,5 +1,7 @@
 # Feature specifications
 
+[F015 — Runtime task, command and recovery extraction](F015-runtime-task-instance-extraction/spec.md) is **IMPLEMENTED revision 2**. Runtime reads, complete task UI, immutable buffering and recovery are shared; independently activated completion mapping delegates to required host adapters. Read-only consumption needs no command provider. Business starts and transactional orchestration remain host-owned; see the [handover](F015-runtime-task-instance-extraction/implementation.md).
+
 [F014 — Definition and catalog administration](F014-definition-catalog-administration/spec.md) is **IMPLEMENTED revision 3**. Existing administration is shared through workflow-web and the workflow-ui administration entry point; sandbox policy and transaction/audit remain host-owned. Focused unit/build, guarded changed-write/audit and packaged-browser checks pass; see the [handover](F014-definition-catalog-administration/implementation.md).
 
 [F013 � Shared instance viewer extraction](F013-shared-instance-viewer/spec.md) is **IMPLEMENTED revision 5; runtime acceptance COMPLETE**. T03�T06 and the focused NgModule browser pass are complete. Guarded SQL/GET and backend-served production-console browser checks now pass; see the [handover](F013-shared-instance-viewer/implementation.md). Applicable F012 evidence is reused.

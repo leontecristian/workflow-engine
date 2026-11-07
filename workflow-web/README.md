@@ -1,6 +1,6 @@
-# Workflow viewer web adapter
+# Workflow web adapter
 
-Ordinary Java 17 library JAR; built with JDK 21. It depends on core's public contracts and supplies independently enabled viewer and administration groups. It installs no Boot auto-configuration, security, datasource, migration runner, transaction manager, global codec or advice.
+Ordinary Java 17 library JAR; built with JDK 21. It depends on core's public contracts and supplies independently enabled viewer, administration, runtime-read and optional completion-command groups. It installs no Boot auto-configuration, security, datasource, migration runner, transaction manager, global codec or advice.
 
 Explicitly `@Import(WorkflowViewerConfiguration.class)` in the host and supply:
 
@@ -25,3 +25,11 @@ Every administration operation invokes `requireAdministrationAccess()` once befo
 Reads use core's `WorkflowDefinitionService` and `TaskTypeCatalogService`. Typed writes delegate to the host adapter, which must return only after its transaction commits. Preserve trusted actor/time and same-transaction audit behind that adapter; the library installs neither. The sandbox's `ConsoleAdministrationHost` delegates to the existing `ConsoleManagement` transaction proxy.
 
 Routes are the existing `/task-types`, `/definitions` and `/versions` operations listed in [F014](../docs/features/F014-definition-catalog-administration/spec.md). IDs/tokens remain decimal strings; raw document import/replacement retains its 4 MiB UTF-8 limit, ordinary bodies 16 KiB, and exports return stored text. Local handlers retain management error categories and diagnostics, including 403 rather than viewer concealment. No task-type deletion, new authoring semantics or automatic write retries are supplied.
+
+## Runtime reads and optional completion mapping
+
+F015 adds two independent explicit imports: `WorkflowRuntimeReadConfiguration` and `WorkflowRuntimeCommandConfiguration`. Supply `WorkflowRuntimeOptions(basePath, correlationAttribute)` and the corresponding required `WorkflowRuntimeReadHost` / `WorkflowRuntimeCommandHost`. Neither import activates the other; broad package scanning remains inert. The read group additionally uses core query/definition services. The host owns authentication, CSRF, access policy and transaction infrastructure.
+
+Read routes cover monitor, variables, assigned/instance tasks, exact task/contract/submission and activity/submissions, as inventoried in [F015](../docs/features/F015-runtime-task-instance-extraction/spec.md). The host supplies authorized pages and exact-resource access. `requireMonitorAccess()` runs before monitor query parsing. A filtered page may be empty with continuation; consumers must retain it. IDs/tokens remain decimal strings and pinned contracts retain existing fields.
+
+The optional command group maps only completion and completion replay. `complete(CompleteWorkflowTask, correlation)` delegates without a preliminary exact-read check; hosts must preserve receipt-before-current-state validation. `replayComplete` returns an optional original result and must never execute on absence. The host creates trusted context and owns business validation, assignment, transaction, audit, durable handoff and post-rollback receipt lookup. Sandbox start/replay routes and request linking remain host-owned. See the sandbox runtime adapters for the existing coordinator/transaction proxy delegation.

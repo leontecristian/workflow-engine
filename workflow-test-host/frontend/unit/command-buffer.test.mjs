@@ -1,9 +1,8 @@
 import "@angular/compiler";
+import {CommandBuffer,freezeEnvelope} from '@workflow-engine/ui';
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  CommandBuffer,
-  freezeEnvelope,
   exactDecimal,
   rawDocument,
   commandRequest,

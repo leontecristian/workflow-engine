@@ -1,0 +1,54 @@
+<console-page-header [meta]="meta" /><console-feedback
+  [busy]="busy()"
+  [error]="error()"
+  [notice]="notice()"
+/>
+
+<mat-card appearance="outlined">
+  <mat-card-header
+    ><div class="card-heading">
+      <div>
+        <div class="eyebrow">CURRENT STATE</div>
+        <h2>
+          Workflow instances
+          <span class="count-badge">{{rows().length}} on this page</span>
+        </h2>
+        <p>
+          Running workflows have ACTIVE status, including those waiting for a
+          human task.
+        </p>
+      </div>
+      <button mat-stroked-button (click)="load()" [disabled]="busy()">
+        <console-icon name="refresh" /> Refresh instances
+      </button>
+    </div></mat-card-header
+  >
+  <mat-card-content
+    ><div class="filter-row">
+      <mat-form-field
+        appearance="outline"
+        class="compact-field"
+        subscriptSizing="dynamic"
+        ><mat-label>Instance status</mat-label
+        ><mat-select [(ngModel)]="filter" (selectionChange)="load()"
+          ><mat-option value="ACTIVE">Running (ACTIVE)</mat-option
+          ><mat-option value="COMPLETED">Completed</mat-option
+          ><mat-option value="CANCELLED">Cancelled</mat-option
+          ><mat-option value="ALL">All statuses</mat-option></mat-select
+        ></mat-form-field
+      >
+    </div>
+    <console-collection
+      [rows]="rows()"
+      kind="instances"
+      label="Workflow instances"
+      icon="workflow"
+      [busy]="busy()"
+      [size]="pageSize"
+      [next]="next"
+      (sizeChange)="pageSize=$event;load()"
+      (reload)="load()"
+      (advance)="nextPage()"
+      (inspect)="open($event)"
+  /></mat-card-content>
+</mat-card>

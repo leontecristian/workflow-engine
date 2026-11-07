@@ -1,16 +1,1 @@
-<console-page-header [meta]="meta" [admin]="api.admin" /><console-feedback
-  [busy]="busy()"
-  [error]="error()"
-  [notice]="notice()"
-/>
-<mat-card appearance="outlined"
-  ><mat-card-header
-    ><h2>{{meta.title}} <span class="muted">#{{id}}</span></h2></mat-card-header
-  ><mat-card-content
-    ><console-details [value]="detail()" /><a
-      mat-stroked-button
-      class="spaced"
-      [routerLink]="['/submissions',id]"
-      >Accepted submissions
-      <console-icon name="chevron" /></a></mat-card-content
-></mat-card>
+<workflow-activity [sessionScope]="session.viewerScope()" [id]="id" />

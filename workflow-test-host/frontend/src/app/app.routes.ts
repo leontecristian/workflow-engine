@@ -1,16 +1,8 @@
 import { Routes } from "@angular/router";
 import { RequestsPage } from "./pages/sandbox/requests";
 import { RequestPage } from "./pages/sandbox/request";
-import { InstancesPage } from "./pages/runtime/instances";
-import { AssignedTasksPage } from "./pages/tasks/assigned-tasks";
-import { InstanceTasksPage } from "./pages/tasks/instance-tasks";
-import { TaskPage } from "./pages/tasks/task";
-import { InstancePage } from "./pages/runtime/instance";
-import { ActivityPage } from "./pages/runtime/activity";
 import { HistoryPage } from "./pages/runtime/history";
 import { HistoryEventPage } from "./pages/runtime/history-event";
-import { SubmissionsPage } from "./pages/runtime/submissions";
-import { CommandsPage } from "./pages/commands/commands";
 import { OutboxPage } from "./pages/events/outbox";
 import { EventPage } from "./pages/events/event";
 import { InboxPage } from "./pages/events/inbox";
@@ -27,16 +19,16 @@ export const APP_ROUTES: Routes = [
   { path: "catalog", loadComponent: () => import("./pages/catalog/catalog").then(m => m.CatalogPage) },
   { path: "requests", component: RequestsPage },
   { path: "request/:id", component: RequestPage },
-  { path: "instances", component: InstancesPage },
-  { path: "my-tasks", component: AssignedTasksPage },
-  { path: "instance-tasks/:id", component: InstanceTasksPage },
-  { path: "task/:id", component: TaskPage },
-  { path: "instance/:id", component: InstancePage },
-  { path: "activity/:id", component: ActivityPage },
+  { path: "instances", loadComponent: () => import("./pages/runtime/instances").then(m => m.InstancesPage) },
+  { path: "my-tasks", loadComponent: () => import("./pages/tasks/assigned-tasks").then(m => m.AssignedTasksPage) },
+  { path: "instance-tasks/:id", loadComponent: () => import("./pages/tasks/instance-tasks").then(m => m.InstanceTasksPage) },
+  { path: "task/:id", loadComponent: () => import("./pages/tasks/task").then(m => m.TaskPage) },
+  { path: "instance/:id", loadComponent: () => import("./pages/runtime/instance").then(m => m.InstancePage) },
+  { path: "activity/:id", loadComponent: () => import("./pages/runtime/activity").then(m => m.ActivityPage) },
   { path: "history/:id", component: HistoryPage },
   { path: "history-event/:id/:sequence", component: HistoryEventPage },
-  { path: "submissions/:id", component: SubmissionsPage },
-  { path: "commands", component: CommandsPage },
+  { path: "submissions/:id", loadComponent: () => import("./pages/runtime/submissions").then(m => m.SubmissionsPage) },
+  { path: "commands", loadComponent: () => import("./pages/commands/commands").then(m => m.CommandsPage) },
   { path: "events", component: OutboxPage },
   { path: "event/:id", component: EventPage },
   { path: "inbox", component: InboxPage },

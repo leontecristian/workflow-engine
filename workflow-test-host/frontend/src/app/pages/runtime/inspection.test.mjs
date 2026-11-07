@@ -2,13 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   loadTs,
+  runtimeType,
   component,
   routeAt,
   tick,
-} from "../../../../unit/component-loader.mjs";
-const { SubmissionsPage } = loadTs(
-  new URL("./submissions.ts", import.meta.url),
-);
+} from "../../../../unit/runtime-component.mjs";
+const { WorkflowSubmissionsComponent: SubmissionsPage } = runtimeType("submissions");
 test("submissions use task cursors and link to exact task instead of activity", async (t) => {
   const calls = [];
   const { page, router } = component(
@@ -25,7 +24,7 @@ test("submissions use task cursors and link to exact task instead of activity", 
     },
     routeAt({ id: "9007199254740993" }),
   );
-  page.ngOnInit();
+  page.ngOnChanges({id:{currentValue:page.id}});
   await tick();
   page.nextPage();
   await tick();

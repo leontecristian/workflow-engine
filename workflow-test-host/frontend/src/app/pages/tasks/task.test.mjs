@@ -1,17 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  loadTs,
+  CommandBuffer,
+  runtimeType,
   component,
   CommandRecovery,
   routeAt,
   router,
   tick,
-} from "../../../../unit/component-loader.mjs";
-const { TaskPage } = loadTs(new URL("./task.ts", import.meta.url));
-const { CommandBuffer } = loadTs(
-  new URL("../../command-buffer.ts", import.meta.url),
-);
+} from "../../../../unit/runtime-component.mjs";
+const { WorkflowTaskComponent: TaskPage } = runtimeType("task");
 
 test("a destroyed task view ignores a pending read through the Angular destruction lifecycle", async (t) => {
   let resolveTask;
@@ -131,20 +129,30 @@ test("reused task route resets completion input and destroyed pages ignore later
     },
   };
   const { page, injector } = component(t, TaskPage, api, route, undefined, [
-    { provide: CommandRecovery, useValue: { result: () => null } },
+    { provide: CommandRecovery, useValue: { result: () => null, setScope(){} } },
   ]);
-  page.ngOnInit();
+  page.ngOnChanges({id:{currentValue:page.id}});
   await tick();
   page.outcome = "OLD";
   page.comment = "Prior task";
-  route.paramMap.next(router.convertToParamMap({ id: "2" }));
+  page.id="2";page.ngOnChanges({id:{currentValue:"2"}});
   await tick();
   assert.equal(page.outcome, "");
   assert.equal(page.comment, "");
   assert.equal(page.detail().id, "2");
   injector.destroy();
   reads = 0;
-  route.paramMap.next(router.convertToParamMap({ id: "3" }));
+  page.id="3";page.ngOnChanges({id:{currentValue:"3"}});
   await tick();
   assert.equal(reads, 0);
+});
+
+
+test('read-only consumer has no execution provider and refuses completion',async t=>{
+ const {WORKFLOW_RUNTIME_COMMANDS}=await import('@workflow-engine/ui');
+ const buffer=new CommandBuffer();let executions=0;
+ const {page}=component(t,TaskPage,{},undefined,undefined,[{provide:WORKFLOW_RUNTIME_COMMANDS,useValue:null},{provide:CommandRecovery,useValue:{buffer,execute(){executions++;}}}]);
+ page.detail.set({instanceId:'1',status:'OPEN'});page.contract.set({instanceLockVersion:'2',outcomes:[{key:'APPROVE',label:'Approve',requiresComment:false}]});
+ await page.complete('APPROVE');assert.equal(page.commandProvider,null);assert.equal(executions,0);assert.equal(buffer.entries.length,0);
+ page.messages={taskTitle:'Host task'};assert.equal(page.meta.title,'Host task');
 });

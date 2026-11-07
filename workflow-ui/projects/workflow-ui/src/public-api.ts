@@ -15,3 +15,7 @@ export { ConsoleFeedback } from './lib/administration/support/feedback';
 export { ConsoleIcon } from './lib/administration/support/icon';
 export { ConsoleStatus } from './lib/administration/support/status';
 export { ConsoleDetails } from './lib/administration/support/details';
+export * from './lib/runtime/contracts';
+export * from './lib/runtime/models';
+export * from './lib/runtime/command/command-buffer';
+export { CommandRecovery } from './lib/runtime/command/command-recovery';

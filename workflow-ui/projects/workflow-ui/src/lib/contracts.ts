@@ -12,7 +12,8 @@ export interface WorkflowViewerReads {
 export const WORKFLOW_VIEWER_READS = new InjectionToken<WorkflowViewerReads>('Workflow viewer reads');
 export type ViewerDestination = { kind: 'instance' | 'history'; instanceId: string }
   | { kind: 'event'; instanceId: string; sequence: string }
-  | { kind: 'task' | 'activity' | 'definition' | 'version'; id: string };
+  | { kind: 'task' | 'activity' | 'definition' | 'version' | 'instanceTasks' | 'submissions'; id: string }
+  | { kind: 'commands' };
 export interface WorkflowViewerNavigation { destination(intent: ViewerDestination): UrlTree | null; }
 export const WORKFLOW_VIEWER_NAVIGATION = new InjectionToken<WorkflowViewerNavigation>('Workflow viewer navigation');
 export type ViewerReadCategory = 'CANCELLED' | 'UNAUTHENTICATED' | 'NOT_FOUND' | 'LIMIT_EXCEEDED' | 'FAILED';

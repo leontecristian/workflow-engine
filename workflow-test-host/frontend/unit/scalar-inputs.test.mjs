@@ -1,12 +1,13 @@
 import "@angular/compiler";
+import {CommandBuffer} from '@workflow-engine/ui';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CommandBuffer, parseScalarInputs, commandRequest } from '../src/app/command-buffer.ts';
+import { freezeStartBody, parseScalarInputs, commandRequest } from '../src/app/command-buffer.ts';
 const body = {commandId:'12345678-1234-1234-1234-123456789abc',definitionVersionId:'42',requestId:'1',expectedRequestVersion:'0'};
 test('raw JSON inputs survive export, restoration, retry and transport without numeric conversion', () => {
   const inputs='{"booking":{"amount":9007199254740993.00,"exponent":1E+2},"scalar":"12.50","optional":null}';
-  const buffer=new CommandBuffer(); buffer.remember({kind:'start',body:{...body,inputs:parseScalarInputs(inputs)},expectedToken:null});
-  const restored=new CommandBuffer(); restored.restore(buffer.export());
+  const buffer=new CommandBuffer({freezeBody:freezeStartBody}); buffer.remember({kind:'start',body:{...body,inputs:parseScalarInputs(inputs)},expectedToken:null});
+  const restored=new CommandBuffer({freezeBody:freezeStartBody}); restored.restore(buffer.export());
   assert.deepEqual(restored.command,buffer.command);
   const request=commandRequest(restored.command,false);
   assert.equal(typeof request.body,'string');
@@ -22,6 +23,6 @@ test('raw input editor accepts nested values and rejects malformed objects and d
     assert.throws(() => parseScalarInputs(input),input);
 });
 test('empty start requests still send an input object', () => {
-  const buffer=new CommandBuffer(); buffer.remember({kind:'start',body,expectedToken:null});
+  const buffer=new CommandBuffer({freezeBody:freezeStartBody}); buffer.remember({kind:'start',body,expectedToken:null});
   assert.ok(commandRequest(buffer.command,false).body.endsWith(',"inputs":{}}'));
 });

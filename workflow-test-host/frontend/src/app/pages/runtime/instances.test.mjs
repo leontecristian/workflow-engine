@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadTs, component, tick } from "../../../../unit/component-loader.mjs";
-const { InstancesPage } = loadTs(new URL("./instances.ts", import.meta.url));
+import { loadTs, runtimeType, component, tick } from "../../../../unit/runtime-component.mjs";
+const { WorkflowInstancesComponent: InstancesPage } = runtimeType("instances");
 test("monitor defaults ACTIVE and retains exact cursor/filter independently", async (t) => {
   const calls = [];
   const { page, router } = component(t, InstancesPage, {
@@ -13,7 +13,7 @@ test("monitor defaults ACTIVE and retains exact cursor/filter independently", as
       };
     },
   });
-  page.ngOnInit();
+  page.ngOnChanges({id:{currentValue:page.id}});
   await tick();
   assert.equal(calls[0][0], "ACTIVE");
   page.nextPage();

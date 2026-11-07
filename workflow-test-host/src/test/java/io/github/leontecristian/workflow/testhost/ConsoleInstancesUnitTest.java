@@ -14,26 +14,31 @@ import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstancePage;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceQuery;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceSummary;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
-import io.github.leontecristian.workflow.testhost.controller.runtime.ConsoleRuntimeController;
-import io.github.leontecristian.workflow.testhost.exception.console.ConsoleException;
-import io.github.leontecristian.workflow.testhost.service.console.ConsoleWire;
-
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.aop.framework.ProxyFactory;
-import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.security.authentication.TestingAuthenticationToken;
-import org.springframework.security.authorization.method.AuthorizationManagerBeforeMethodInterceptor;
-import org.springframework.security.core.context.SecurityContextHolder;
-
+import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
+import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeReadHost;
+import io.github.leontecristian.workflow.web.controller.runtime.WorkflowRuntimeReadController;
+import io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException;
+import io.github.leontecristian.workflow.web.service.runtime.RuntimeWire;
 import java.time.Instant;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
-/** Real method-security advisor, no application context/database/live HTTP. */
+/** Real sandbox role policy through the extracted host adapter; no database/live HTTP. */
 class ConsoleInstancesUnitTest {
     private final WorkflowRuntimeQueryService reads = mock(WorkflowRuntimeQueryService.class);
-    private final ConsoleRuntimeController controller =
-            new ConsoleRuntimeController(reads, null, null, null, null, null, new ConsoleWire(), null);
+    private final ConsoleContext context = new ConsoleContext(java.time.Clock.systemUTC());
+    private final WorkflowRuntimeReadController controller = new WorkflowRuntimeReadController(
+            reads, null, new ConsoleRuntimeReadHost(reads, null, context), new RuntimeWire(), null);
+
+    @BeforeEach
+    void administrator() {
+        SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken("admin", "unit-only", "ROLE_CONSOLE_ADMIN"));
+    }
 
     @AfterEach
     void cleanup() {
@@ -88,30 +93,31 @@ class ConsoleInstancesUnitTest {
             request.addParameter("status", value);
             assertEquals(
                     400,
-                    assertThrows(ConsoleException.class, () -> controller.instances(request))
+                    assertThrows(WorkflowRuntimeException.class, () -> controller.instances(request))
                             .status());
         }
         var duplicate = new MockHttpServletRequest();
         duplicate.addParameter("status", "ACTIVE", "ALL");
-        assertThrows(ConsoleException.class, () -> controller.instances(duplicate));
+        assertThrows(WorkflowRuntimeException.class, () -> controller.instances(duplicate));
         var unsupported = new MockHttpServletRequest();
         unsupported.addParameter("assignee", "reviewer");
-        assertThrows(ConsoleException.class, () -> controller.instances(unsupported));
+        assertThrows(WorkflowRuntimeException.class, () -> controller.instances(unsupported));
         verifyNoInteractions(reads);
     }
 
     @Test
     void reviewerCannotInvokeTheGlobalListButAdministratorCan() {
-        var factory = new ProxyFactory(controller);
-        factory.addAdvisor(AuthorizationManagerBeforeMethodInterceptor.preAuthorize());
-        var secured = (ConsoleRuntimeController) factory.getProxy();
+        var secured = controller;
         SecurityContextHolder.getContext()
                 .setAuthentication(
                         new TestingAuthenticationToken(
                                 "reviewer", "unit-only", "ROLE_CONSOLE_REVIEWER"));
         assertThrows(
-                org.springframework.security.access.AccessDeniedException.class,
+                WorkflowRuntimeException.class,
                 () -> secured.instances(new MockHttpServletRequest()));
+        var malformed = new MockHttpServletRequest();
+        malformed.addParameter("unknown", "1");
+        assertEquals(403, assertThrows(WorkflowRuntimeException.class, () -> secured.instances(malformed)).status());
         verifyNoInteractions(reads);
         SecurityContextHolder.getContext()
                 .setAuthentication(

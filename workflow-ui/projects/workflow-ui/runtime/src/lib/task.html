@@ -1,0 +1,92 @@
+<console-page-header [meta]="meta" /><console-feedback
+  [busy]="busy()"
+  [error]="error()"
+  [notice]="notice()"
+/>
+
+<mat-card appearance="outlined"
+  ><mat-card-header
+    ><div class="card-heading">
+      <div>
+        <div class="eyebrow">TASK #{{id}}</div>
+        <h2>{{detail()?.taskKey}}</h2>
+        <p>Assigned to <strong>{{detail()?.assignedUserRef}}</strong></p>
+      </div>
+      <console-status [value]="detail()?.status" /></div></mat-card-header
+  ><mat-card-content
+    ><div class="actions">
+      <a mat-stroked-button [routerLink]="detail() ? link({kind:'instance',instanceId:detail()!.instanceId}) : null"
+        >Instance #{{detail()?.instanceId}}</a
+      ><a mat-button [routerLink]="detail() ? link({kind:'activity',id:detail()!.activityId}) : null"
+        >Activity #{{detail()?.activityId}}</a
+      ><button mat-button (click)="load()" [disabled]="busy()">
+        <console-icon name="refresh" /> Refresh
+      </button>
+    </div>
+    <console-details [value]="detail()" />
+    @if(commands.buffer.command){<a mat-button [routerLink]="link({kind:'commands'})">Command recovery</a>}</mat-card-content
+></mat-card>
+@if(!commandProvider){<mat-card appearance="outlined"><mat-card-header><h2>Pinned contract</h2></mat-card-header><mat-card-content><console-details [value]="contract()" /></mat-card-content></mat-card>}
+<div class="two-column">
+@if(commandProvider){
+  <mat-card appearance="outlined"
+    ><mat-card-header
+      ><div>
+        <div class="eyebrow">PINNED CONTRACT · {{contract()?.taskType}}</div>
+        <h2>Complete your task</h2>
+        <p>
+          Your stored assignment and the current instance token are checked by
+          the engine.
+        </p>
+      </div></mat-card-header
+    ><mat-card-content>
+      <mat-form-field appearance="outline" class="full-width"
+        ><mat-label>Comment</mat-label
+        ><textarea
+          matInput
+          [disabled]="busy() || !sessionScope || !detail() || !contract() || detail()?.status !== 'OPEN'"
+          [(ngModel)]="comment"
+          maxlength="2000"
+          rows="4"
+        ></textarea
+        ><mat-hint align="end"
+          >{{comment.length}} / 2000</mat-hint
+        ></mat-form-field
+      >
+      <div class="form-footer">
+        <span class="muted"
+          >Expected token <code>{{contract()?.instanceLockVersion}}</code></span
+        >
+      </div>
+      <div class="actions">
+        @for(o of contract()?.outcomes || []; track o.key) {
+          <button mat-flat-button (click)="complete(o.key)"
+            [disabled]="busy() || !contract() || detail()?.status !== 'OPEN' || (o.requiresComment && commentBlank())">
+            {{o.label}}{{o.requiresComment ? ' - comment required' : ''}}
+          </button>
+        }
+      </div>
+      <p class="muted">Actions marked "comment required" need a reason in the shared comment field.</p>
+      <mat-expansion-panel class="evidence-panel"
+        ><mat-expansion-panel-header
+          ><mat-panel-title
+            >Exact completion contract</mat-panel-title
+          ></mat-expansion-panel-header
+        >
+        <pre>{{contract() | json}}</pre>
+      </mat-expansion-panel>
+    </mat-card-content></mat-card
+  >}
+<mat-card appearance="outlined"
+    ><mat-card-header><h2>Accepted submission</h2></mat-card-header
+    ><mat-card-content
+      >@if(submission()){<console-details [value]="submission()" />}@else{
+      <div class="empty-state small">
+        <console-icon name="file" />
+        <h3>No accepted submission</h3>
+        <p>A submission appears after successful completion.</p>
+      </div>
+      }</mat-card-content
+    ></mat-card
+  >
+</div>

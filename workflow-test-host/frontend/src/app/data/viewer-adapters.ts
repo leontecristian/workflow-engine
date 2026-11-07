@@ -20,6 +20,9 @@ export class ConsoleViewerNavigation implements WorkflowViewerNavigation {
   private readonly router=inject(Router);
   destination(intent:ViewerDestination) {
     switch(intent.kind) {
+      case 'commands': return this.router.createUrlTree(['/commands']);
+      case 'instanceTasks': return this.router.createUrlTree(['/instance-tasks',intent.id]);
+      case 'submissions': return this.router.createUrlTree(['/submissions',intent.id]);
       case 'instance': return this.router.createUrlTree(['/instance',intent.instanceId]);
       case 'history': return this.router.createUrlTree(['/history',intent.instanceId]);
       case 'event': return this.router.createUrlTree(['/history-event',intent.instanceId,intent.sequence]);
