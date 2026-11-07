@@ -13,7 +13,7 @@
       ></a
     >
     <nav aria-label="Main navigation">
-      <p class="nav-group-label">WORKSPACE</p>
+      <p class="nav-group-label">Workflow engine</p>
       <mat-nav-list>
         <a
           mat-list-item
@@ -63,6 +63,11 @@
             >Task types</span
           ></a
         >
+        }
+      </mat-nav-list>
+      @if(api.admin){
+      <p class="nav-group-label secondary-group">Test host</p>
+      <mat-nav-list>
         <a
           mat-list-item
           routerLink="/requests"
@@ -72,11 +77,6 @@
             >Requests & start</span
           ></a
         >
-        }
-      </mat-nav-list>
-      @if(api.admin){
-      <p class="nav-group-label secondary-group">OBSERVABILITY</p>
-      <mat-nav-list>
         <a
           mat-list-item
           routerLink="/audit"
