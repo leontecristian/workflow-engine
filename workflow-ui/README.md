@@ -16,7 +16,7 @@ npm start
 
 Both consumers use `install-links=true` and a copied `file:` dependency on `workflow-ui/dist/workflow-ui`. Build the library before installing a consumer. After changing library sources, rebuild it and run consumer `npm ci` again. There are no TypeScript aliases into source or runtime symlinks. The Maven `console-ui` profile performs these steps before the sandbox production build.
 
-For routine sandbox development after this initial setup, `npm run start:console` in `workflow-test-host/frontend` builds the library, refreshes just its installed package copy and starts the dev server without reinstalling dependencies. IntelliJ's **Workflow console frontend** configuration uses this command. Stop that dev server before running it again. The backend's **Workflow console (local)** configuration compiles Java only; production packaging remains manual.
+For routine sandbox development after this initial setup, `npm run start:console` in `workflow-test-host/frontend` builds the library, refreshes its installed package copy, clears Angular's cache and starts the dev server without reinstalling dependencies. IntelliJ's **Workflow console frontend** configuration uses this command. Restart that frontend after shared library edits to rebuild and load them. The backend's **Workflow console (local)** configuration compiles Java only. Production packaging remains manual.
 
 The isolated tests exercise methods/signals with real Angular DI and doubles for HTTP/DOM; they do not replace browser observations. The verification NgModule host has its own lockfile:
 

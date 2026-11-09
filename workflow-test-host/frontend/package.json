@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "ng serve",
-    "start:console": "npm run build:viewer && npm start",
+    "start:console": "npm run build:viewer && ng cache clean && npm start",
     "build:viewer": "npm --prefix ../../workflow-ui run build && node scripts/sync-viewer-library.mjs",
     "build": "ng build && node scripts/check-build.mjs",
     "test:unit": "node --experimental-strip-types --test unit/*.test.mjs src/app/**/*.test.mjs"
