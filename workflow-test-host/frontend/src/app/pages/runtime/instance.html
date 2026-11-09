@@ -1,5 +1,4 @@
 <console-page-header [meta]="meta" [admin]="api.admin" />
-<a mat-button [routerLink]="['/instance-tasks',id]">Tasks</a>
 <workflow-instance-viewer [instanceId]="id" [sessionScope]="session.viewerScope()" />
 <workflow-variables [id]="id" [sessionScope]="session.viewerScope()" />
 @if(api.admin) {
@@ -7,6 +6,7 @@
   <button mat-stroked-button (click)="loadEffects()">Refresh effects</button>
   @if(effects(); as page) {
     @for(item of page.items; track item.id) { <console-details [value]="item" /> }
+    @empty { <p>No service effects on this page.</p> }
     @if(page.nextAfterId) { <button mat-button (click)="loadEffects(true)">Next effect page</button> }
   }
   @if(effectError()) { <p role="alert">{{effectError()}}</p> }

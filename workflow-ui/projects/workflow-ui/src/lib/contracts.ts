@@ -45,4 +45,14 @@ export const DEFAULT_VIEWER_MESSAGES = {
   routingHint: 'Only evaluated conditions and actual reads are recorded.', shortCircuit: 'Evaluation stopped at the first true condition.',
   defaultHint: 'Default selected after the conditions; no condition returned true.'
 };
-export type WorkflowViewerMessages = typeof DEFAULT_VIEWER_MESSAGES;
+export const DEFAULT_VIEWER_PRESENTATION = {
+  tasks: 'Tasks', version: 'Version', active: 'Active', cancelled: 'Cancelled',
+  started: 'Started', finished: 'Finished', technical: 'Technical details',
+  backToInstance: 'Back to instance', viewDetails: 'View details',
+  eventLabel: (code: string) => /^[A-Z]+(?:_[A-Z]+)*$/.test(code)
+    ? code[0] + code.slice(1).toLowerCase().replaceAll('_', ' ')
+    : code,
+};
+export type WorkflowViewerMessages = typeof DEFAULT_VIEWER_MESSAGES & {
+  presentation?: Partial<typeof DEFAULT_VIEWER_PRESENTATION>;
+};

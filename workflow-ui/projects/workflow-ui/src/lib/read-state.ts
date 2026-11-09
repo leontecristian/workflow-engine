@@ -1,5 +1,5 @@
 import { Directive, Input, OnChanges, OnDestroy, inject, signal } from '@angular/core';
-import { WORKFLOW_VIEWER_READS, WORKFLOW_VIEWER_NAVIGATION, DEFAULT_VIEWER_MESSAGES, normalizeViewerReadError } from './contracts';
+import { WORKFLOW_VIEWER_READS, WORKFLOW_VIEWER_NAVIGATION, DEFAULT_VIEWER_MESSAGES, DEFAULT_VIEWER_PRESENTATION, normalizeViewerReadError } from './contracts';
 import type { WorkflowViewerMessages, ViewerReadError } from './contracts';
 
 /** Shared lifecycle for the three request-owning components, with no shared response state. */
@@ -8,6 +8,7 @@ export abstract class ViewerReadState implements OnChanges, OnDestroy {
   @Input() instanceId = '';
   @Input() sessionScope: unknown = null;
   @Input() messages: WorkflowViewerMessages = DEFAULT_VIEWER_MESSAGES;
+  get presentation() { return { ...DEFAULT_VIEWER_PRESENTATION, ...this.messages.presentation }; }
   readonly reads = inject(WORKFLOW_VIEWER_READS);
   readonly navigation = inject(WORKFLOW_VIEWER_NAVIGATION, {optional: true});
   readonly busy = signal(false);
