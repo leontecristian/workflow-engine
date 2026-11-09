@@ -1,10 +1,10 @@
 # Tasks — F017
 
-Specification revision 3 is READY. Implementation is not authorized by this planning request.
+The owner authorized implementation of revision 3 through focused verification and handover. The [implementation record](implementation.md) records the completed checks.
 
-- [x] T01 — Record agreed decisions, requirements, open contracts and focused plan. Complete when the four feature records and project navigation distinguish planned behavior from F016's implemented baseline.
-- [x] T02 — Close O01–O06 under P01. Revision 3 records accepted product choices and exact definition, command, authorization, storage/evidence and compatibility contracts. Specification and plan are READY; implementation authorization remains separate.
-- [ ] T03 — After implementation authorization and T02, implement P02 policy/model and preserving migration, covering R01/R06. Complete when specified defaults, validation and storage are implemented with focused checks.
-- [ ] T04 — After T03, implement P03 claim/release, completion enforcement and authorization/replay, covering R02–R06. Complete when core consumers use the same enforced rules and changed transactional scenarios pass.
-- [ ] T05 — After T02 fixes transport/access contracts, implement P04 shared web/UI and sandbox, integrating with T04. Web/UI work may be delegated independently against the closed contract. Complete when R07 and scoped authorization/actions work through the normal entry points.
-- [ ] T06 — After T03–T05, complete P05 focused integration/browser/package checks and handover. Record reused evidence, actual outcomes and limitations, review final diff and process cleanup. Stop when scoped acceptance passes.
+- [x] T01 — Record the requirements, decisions and focused plan.
+- [x] T02 — Close O01–O06 under P01.
+- [x] T03 — Implement policy and preserving storage under P02. All three parser paths passed isolated checks. Migration 005, its representative backfill and Hibernate schema validation passed on the guarded database.
+- [x] T04 — Implement core claim/release, exclusive completion, authorization and replay under P03. Focused isolated and guarded checks passed, including races, recorder rollback and persisted compatibility.
+- [x] T05 — Implement shared web/UI and sandbox adapters under P04. Scoped Java and frontend checks passed. The live sandbox browser verified reviewer, peer and administrator interactions.
+- [x] T06 — Complete independent review, focused corrections, packaging, guarded verification, live browser verification and cleanup. See the implementation record for outcomes and the deployment boundary.

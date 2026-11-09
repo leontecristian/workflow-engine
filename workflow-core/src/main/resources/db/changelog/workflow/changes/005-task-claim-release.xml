@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+    <!-- Stop existing writers before applying; mixed old/new writers are unsupported. -->
+    <changeSet id="005-task-claim-release" author="workflow" runInTransaction="true">
+        <sql>ALTER TABLE wf.workflow_task ADD assignee_ref NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL;</sql>
+        <sql><![CDATA[
+            UPDATE wf.workflow_task
+            SET assignee_ref = assignment_ref
+            WHERE status = 'OPEN' AND assignment_kind = 'USER';
+        ]]></sql>
+        <sql><![CDATA[
+            ALTER TABLE wf.workflow_task WITH CHECK ADD CONSTRAINT ck_workflow_task_assignee CHECK (
+                (assignee_ref IS NULL OR DATALENGTH(assignee_ref) BETWEEN 2 AND 400)
+                AND (assignment_kind <> 'USER' OR status <> 'OPEN' OR assignee_ref IS NOT NULL)
+                AND (assignment_kind <> 'USER' OR assignee_ref IS NULL OR
+                    (assignee_ref = assignment_ref AND DATALENGTH(assignee_ref) = DATALENGTH(assignment_ref)))
+            );
+        ]]></sql>
+    </changeSet>
+</databaseChangeLog>

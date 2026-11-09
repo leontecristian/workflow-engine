@@ -10,7 +10,8 @@
       <div>
         <div class="eyebrow">TASK #{{id}}</div>
         <h2>{{detail()?.taskKey}}</h2>
-        <p>Assigned to <strong>{{detail()?.assignment?.kind}}: {{contract()?.assignmentLabel || detail()?.assignment?.ref}}</strong></p>
+        <p>Assignment: <strong>{{detail()?.assignment?.kind}}: {{contract()?.assignmentLabel || detail()?.assignment?.ref}}</strong></p>
+        <p>Assignee: <strong>{{detail()?.assigneeRef || "Unassigned"}}</strong> · Claim policy: {{contract()?.claimPolicy}}</p>
       </div>
       <console-status [value]="detail()?.status" /></div></mat-card-header
   ><mat-card-content
@@ -27,6 +28,15 @@
     @if(diagnosticsEnabled && commands.buffer.command){<a mat-button [routerLink]="link({kind:'commands'})">Command recovery</a>}</mat-card-content
 ></mat-card>
 @if(!commandProvider && diagnosticsEnabled){<mat-card appearance="outlined"><mat-card-header><h2>Pinned contract</h2></mat-card-header><mat-card-content><console-details [value]="contract()" /></mat-card-content></mat-card>}
+@if(commandProvider?.ownership && detail()?.assignment?.kind !== 'USER' && detail()?.status === 'OPEN') {
+<mat-card appearance="outlined"><mat-card-header><h2>Task ownership</h2></mat-card-header><mat-card-content>
+  <div class="actions">
+    @if(contract()?.canClaim){<button mat-flat-button (click)="ownership('claim')" [disabled]="busy() || uncertain">Claim</button>}
+    @if(contract()?.canRelease){<button mat-stroked-button (click)="ownership('release')" [disabled]="busy() || uncertain">Release</button>}
+  </div>
+  @if(contract()?.canAdminRelease){<mat-form-field appearance="outline" class="full-width"><mat-label>Administrative release reason</mat-label><textarea matInput [(ngModel)]="reason" maxlength="1000" [disabled]="busy() || uncertain"></textarea><mat-hint>{{reason.length}} / 1000</mat-hint></mat-form-field>
+  <button mat-stroked-button (click)="ownership('admin-release')" [disabled]="busy() || uncertain || reasonBlank()">Administrative release</button>}
+</mat-card-content></mat-card>}
 <div class="two-column">
 @if(commandProvider){
   <mat-card appearance="outlined"

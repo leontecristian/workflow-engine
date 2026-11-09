@@ -86,7 +86,7 @@ class RuntimeReceiptUnitTest {
             var result=json.replay(receipt,id,WorkflowOperation.COMPLETE_TASK,context("reviewer"),new byte[32]).orElseThrow();
             assertEquals(kind,result.task().assignment().kind().name());
             assertEquals("reviewer",result.task().closedBy());
-            assertEquals(bytes,json.evidence(result));
+            assertEquals(null,result.task().assigneeRef());
             assertEquals(bytes,receipt.getResultJson());
         }
     }
@@ -114,6 +114,39 @@ class RuntimeReceiptUnitTest {
                         () -> json.replay(receipt,id,WorkflowOperation.COMPLETE_TASK,context("reviewer"),new byte[32])).category());
             }
         }
+    }
+
+    @Test void ownershipReceiptsRequireAnExactOpenSnapshotAndSupportedVersion() throws Exception {
+        for (var operation : java.util.List.of(WorkflowOperation.CLAIM_TASK, WorkflowOperation.RELEASE_TASK,
+                WorkflowOperation.ADMIN_RELEASE_TASK)) {
+            var root = (com.fasterxml.jackson.databind.node.ObjectNode) json.tree(resource("extended-start.json"));
+            root.put("operation", operation.name()).put("firstHistorySequence", "10").put("lastHistorySequence", "10");
+            ((com.fasterxml.jackson.databind.node.ObjectNode) root.path("instance")).put("lastHistorySequence", "10");
+            var task = (com.fasterxml.jackson.databind.node.ObjectNode) root.path("task");
+            task.remove("assignedUserRef");
+            task.set("assignment", json.object().put("kind", "GROUP").put("ref", "finance"));
+            String assignee = operation == WorkflowOperation.CLAIM_TASK ? "reviewer" : null;
+            task.put("assigneeRef", assignee);
+            var accepted = ownershipReceipt(root, operation, (short) 5);
+            assertEquals(assignee, json.replay(accepted, id, operation, context("reviewer"), new byte[32])
+                    .orElseThrow().task().assigneeRef());
+            for (String bad : java.util.List.of("different", "")) {
+                task.put("assigneeRef", bad);
+                assertEquals(Category.HOST_CONFIGURATION, assertThrows(WorkflowExecutionException.class,
+                        () -> json.replay(ownershipReceipt(root, operation, (short) 5),
+                                id, operation, context("reviewer"), new byte[32])).category());
+            }
+            task.put("assigneeRef", assignee);
+            assertEquals(Category.UNSUPPORTED_VERSION, assertThrows(WorkflowExecutionException.class,
+                    () -> json.replay(ownershipReceipt(root, operation, (short) 4),
+                            id, operation, context("reviewer"), new byte[32])).category());
+        }
+    }
+
+    private WorkflowCommandReceiptEntity ownershipReceipt(com.fasterxml.jackson.databind.node.ObjectNode root,
+            WorkflowOperation operation, short version) {
+        return new WorkflowCommandReceiptEntity(id, 1, operation.name(), ActorKind.USER, "reviewer", new byte[32],
+                RuntimeJson.FINGERPRINT_VERSION, LocalDateTime.parse("2026-01-02T00:00:00"), json.encode(root), version);
     }
 
 }

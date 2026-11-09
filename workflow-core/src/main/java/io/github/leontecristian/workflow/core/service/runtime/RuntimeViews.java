@@ -47,13 +47,13 @@ final class RuntimeViews {
     static WorkflowTaskView task(WorkflowTaskEntity entity, WorkflowActivityEntity activity) {
         return new WorkflowTaskView(entity.getId(), entity.getActivityId(), activity.getInstanceId(), activity.getTaskTypeId(),
                 entity.getTaskKey(), entity.getAssignment(), entity.getStatus(), entity.getOutcomeKey(),
-                instant(entity.getCreatedAt()), instant(entity.getDueAt()), instant(entity.getClosedAt()), entity.getClosedBy(), entity.getClosureReason());
+                instant(entity.getCreatedAt()), instant(entity.getDueAt()), instant(entity.getClosedAt()), entity.getClosedBy(), entity.getClosureReason(), entity.getAssigneeRef());
     }
     static WorkflowTaskView task(RuntimeTaskRow row) {
         return new WorkflowTaskView(row.getId(), row.getActivityId(), row.getInstanceId(), row.getTaskTypeId(),
                 row.getTaskKey(), new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(row.getAssignmentKind(), row.getAssignmentRef()), row.getStatus(), row.getOutcomeKey(),
                 instant(row.getCreatedAt()), instant(row.getDueAt()), instant(row.getClosedAt()),
-                row.getClosedBy(), row.getClosureReason());
+                row.getClosedBy(), row.getClosureReason(), row.getAssigneeRef());
     }
     static WorkflowHistorySummary history(WorkflowHistoryEntity entity) {
         return new WorkflowHistorySummary(entity.getId().getInstanceId(), entity.getId().getSequenceNumber(), entity.getEventType(),

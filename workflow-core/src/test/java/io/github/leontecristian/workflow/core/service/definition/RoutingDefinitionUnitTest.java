@@ -3,7 +3,9 @@ package io.github.leontecristian.workflow.core.service.definition;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy;
 import java.util.List;
+import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -64,5 +66,62 @@ class RoutingDefinitionUnitTest {
             String actual=new String(getClass().getResourceAsStream("/schemas/workflow-definition/"+resource).readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
             assertThat(loader.schemaDigest(resource.startsWith("scalar"))).isEqualTo(DefinitionContentCanonicalizer.hex(DefinitionContentCanonicalizer.hash(actual)));
         }
+    }
+
+    @Test void claimPolicyDefaultsAndValidatesAcrossAllDefinitionSchemasWithoutRewritingSource() throws Exception {
+        var documents = List.of(minimalFixture(),
+                (ObjectNode) json.readTree(getClass().getResourceAsStream("/f007/service-review.json")), fixture());
+        for (var source : documents) {
+            var original = codec.ingest(source.toString());
+            var diagnostics = new DefinitionDiagnostics();
+            var model = loader.model(original, diagnostics);
+            assertThat(diagnostics.failed()).isFalse();
+            assertThat(model.humans().get("REVIEW").claimPolicy()).isEqualTo(TaskClaimPolicy.OPTIONAL);
+
+            var required = (ObjectNode) json.readTree(original.canonical());
+            reviewNode(required).put("claimPolicy", "REQUIRED");
+            diagnostics = new DefinitionDiagnostics();
+            model = loader.model(codec.ingest(required.toString()), diagnostics);
+            assertThat(diagnostics.failed()).isFalse();
+            assertThat(model.humans().get("REVIEW").claimPolicy()).isEqualTo(TaskClaimPolicy.REQUIRED);
+
+            var explicitOptional = (ObjectNode) json.readTree(original.canonical());
+            reviewNode(explicitOptional).put("claimPolicy", "OPTIONAL");
+            var explicit = codec.ingest(explicitOptional.toString());
+            assertThat(explicit.canonical()).contains("\"claimPolicy\":\"OPTIONAL\"");
+            assertThat(Arrays.equals(explicit.hash(), original.hash())).isFalse();
+            assertThat(codec.ingest(original.canonical()).canonical()).isEqualTo(original.canonical());
+
+            for (String invalid : List.of("null", "\"AUTO\"")) {
+                var invalidPolicy = (ObjectNode) json.readTree(original.canonical());
+                reviewNode(invalidPolicy).set("claimPolicy", json.readTree(invalid));
+                assertThat(check(invalidPolicy).failed()).as(invalid).isTrue();
+            }
+            var misplaced = (ObjectNode) json.readTree(original.canonical());
+            ((ObjectNode) misplaced.path("nodes").get(0)).put("claimPolicy", "REQUIRED");
+            assertThat(check(misplaced).failed()).isTrue();
+        }
+    }
+
+    private ObjectNode reviewNode(ObjectNode document) {
+        for (var node : document.path("nodes")) {
+            if ("REVIEW".equals(node.path("key").asText())) return (ObjectNode) node;
+        }
+        throw new AssertionError("Missing review fixture");
+    }
+
+    private ObjectNode minimalFixture() throws Exception {
+        return (ObjectNode) json.readTree("""
+                {"schemaVersion":1,"key":"sample.workflow","version":1,"name":"Sample",
+                 "startPolicy":{"inputContract":[]},"variables":[],"nodes":[
+                   {"key":"BEGIN","type":"START","name":"Start"},
+                   {"key":"REVIEW","type":"HUMAN_TASK","name":"Review","taskType":"REVIEW",
+                    "assignment":{"resolver":"reviewer","inputs":{}},"completion":{"policy":"SINGLE"},
+                    "inputContract":[],"resultContract":{"mode":"FORBIDDEN"},
+                    "outcomes":[{"key":"COMPLETE","label":"Complete","requiresComment":false}]},
+                   {"key":"DONE","type":"END","name":"Done","result":"COMPLETED"}],
+                 "transitions":[{"key":"start","from":"BEGIN","to":"REVIEW"},
+                                {"key":"finish","from":"REVIEW","to":"DONE","outcome":"COMPLETE"}]}
+                """);
     }
 }

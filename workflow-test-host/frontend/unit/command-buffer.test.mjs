@@ -104,3 +104,15 @@ test("new actions retain earlier commands and conflicting pasted UUIDs cannot ov
   b.setActor(null);
   assert.equal(b.entries.length, 0);
 });
+
+test('ownership envelopes preserve exact inputs and map mutation and replay routes', () => {
+ for(const kind of ['claim','release','admin-release']) {
+  const body={commandId:command.body.commandId,instanceId:'9007199254740993',taskId:'3',...(kind==='admin-release'?{reason:'  exact reason  '}: {})};
+  const envelope=freezeEnvelope({kind,body,expectedToken:'8'});
+  assert.equal(commandRequest(envelope,false).path,`/instances/9007199254740993/tasks/3/${kind}`);
+  assert.deepEqual(commandRequest(envelope,false).body,kind==='admin-release'?{commandId:body.commandId,reason:body.reason}:{commandId:body.commandId});
+  assert.deepEqual(commandRequest(envelope,true).body,body);
+  assert.equal(commandRequest(envelope,true).path,`/commands/${kind}/replay`);
+ }
+ assert.throws(()=>freezeEnvelope({kind:'admin-release',body:{commandId:command.body.commandId,instanceId:'1',taskId:'2',reason:' '},expectedToken:'0'}));
+});

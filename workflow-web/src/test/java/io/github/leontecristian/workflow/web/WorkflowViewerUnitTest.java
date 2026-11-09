@@ -130,6 +130,28 @@ class WorkflowViewerUnitTest {
             mvc.perform(get("/custom/read/tasks/1")).andExpect(status().isNotFound());
         }
     }
+    @Test void ownershipHistoryUsesExactTaskGrantEvenWhenHostDetailHookAllowsRead() throws Exception {
+        try (var context = context(Host.class, Enabled.class)) {
+            var mvc = MockMvcBuilders.webAppContextSetup(context).build();
+            var access = context.getBean(WorkflowViewerAccess.class);
+            var reads = context.getBean(WorkflowRuntimeQueryService.class);
+            var release = new WorkflowHistorySummary(1, 2, "TASK_RELEASED", UUID.randomUUID(), null,
+                    ActorKind.USER, "admin", Instant.EPOCH, 3L, 4L, null, null, null, (short) 1);
+            when(reads.findHistoryEvent(1, 2)).thenReturn(Optional.of(new WorkflowHistoryEvent(release, "{\"reason\":\"private\"}")));
+            when(reads.listHistory(1, 1, 1)).thenReturn(new WorkflowHistoryPage(List.of(release), 2L));
+            // The host detail hook accepts the event, while its exact-task policy denies it.
+            mvc.perform(get("/custom/read/instances/1/history/2"))
+                    .andExpect(status().isNotFound()).andExpect(jsonPath("$.detailsJson").doesNotExist());
+            mvc.perform(get("/custom/read/instances/1/history").param("afterSequence", "1").param("limit", "1"))
+                    .andExpect(status().isOk()).andExpect(content().json("{\"items\":[],\"nextAfterSequence\":\"2\"}"));
+            when(access.canReadHistorySummary(release)).thenReturn(true);
+            mvc.perform(get("/custom/read/instances/1/history/2"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.detailsJson").value("{\"reason\":\"private\"}"));
+            doThrow(WorkflowViewerException.missing()).when(access).requireHistoryEventRead(release);
+            mvc.perform(get("/custom/read/instances/1/history/2")).andExpect(status().isNotFound());
+        }
+    }
+
     @Test void queryValidationAndScopedSafeErrors() throws Exception {
         try (var context = context(Host.class, Enabled.class)) {
             var mvc = MockMvcBuilders.webAppContextSetup(context).build();

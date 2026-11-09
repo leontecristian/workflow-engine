@@ -52,11 +52,11 @@ class SharedAssignmentUnitTest {
     private WorkflowTaskEligibilityService eligibility(WorkflowSharedAssignmentProvider... providers) {
         ObjectProvider<WorkflowSharedAssignmentProvider> source=mock(ObjectProvider.class);
         when(source.stream()).thenAnswer(i->Stream.of(providers));
-        return new WorkflowTaskEligibilityService(source);
+        return new WorkflowTaskEligibilityService(source, source(List.of()));
     }
     private WorkflowTaskView view(AssignmentTargetKind kind,String ref) {
         return new WorkflowTaskView(1,2,3,4,"review",new TaskAssignmentTarget(kind,ref),TaskStatus.OPEN,null,
-                Instant.parse("2026-01-01T00:00:00Z"),null,null,null,null);
+                Instant.parse("2026-01-01T00:00:00Z"),null,null,null,null,kind == AssignmentTargetKind.USER ? ref : null);
     }
     @Test void userNeedsNoProviderAndUsesExactIdentity() {
         var service=eligibility();

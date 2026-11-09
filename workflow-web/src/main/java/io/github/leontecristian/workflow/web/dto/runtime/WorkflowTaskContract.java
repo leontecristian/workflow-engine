@@ -1,9 +1,11 @@
 package io.github.leontecristian.workflow.web.dto.runtime;
 
+import io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy;
 import java.util.List;
 /** Contract from the pinned definition and exact historical activity. */
 public record WorkflowTaskContract(long taskId, long instanceId, long instanceLockVersion,
-        String taskType, List<Outcome> outcomes, boolean canComplete, String assignmentLabel) {
+        String taskType, List<Outcome> outcomes, boolean canComplete, String assignmentLabel,
+        TaskClaimPolicy claimPolicy, boolean canClaim, boolean canRelease, boolean canAdminRelease) {
     public WorkflowTaskContract { outcomes = List.copyOf(outcomes); }
     public record Outcome(String key, String label, boolean requiresComment) {}
 }

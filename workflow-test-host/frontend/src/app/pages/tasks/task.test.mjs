@@ -177,3 +177,32 @@ test('uncertain completion retains its frozen command and blocks replacement', a
  page.id='3';page.detail.set({instanceId:'1',status:'OPEN'});page.contract.set({instanceLockVersion:'2',canComplete:true,outcomes:[{key:'OK',label:'OK',requiresComment:false}]});
  await page.complete('OK');const original=buffer.command;await page.complete('OK');assert.equal(calls,1);assert.equal(buffer.command,original);assert.match(page.error(),/outcome is uncertain/i);
 });
+
+test('ownership honors action flags, refreshes after success and preserves uncertain command', async t=>{
+ const {WORKFLOW_RUNTIME_COMMANDS}=await import('@workflow-engine/ui');
+ const buffer=new CommandBuffer(),observations=new Map();let calls=0,reads=0,fail=false;
+ const commands={buffer,observations,async execute(){calls++;if(fail){observations.set(buffer.command.body.commandId,{outcome:'UNKNOWN_OUTCOME'});throw new Error('network');}}};
+ const api={async task(){reads++;return {instanceId:'1',status:'OPEN',assignment:{kind:'GROUP',ref:'team'},assigneeRef:null};},async taskContract(){return {instanceLockVersion:'2',canClaim:true,canRelease:false,canAdminRelease:true,outcomes:[]};},async taskSubmission(){throw Object.assign(new Error('denied'),{httpStatus:403});}};
+ const {page}=component(t,TaskPage,api,routeAt(),undefined,[{provide:WORKFLOW_RUNTIME_COMMANDS,useValue:{ownership(){}}},{provide:CommandRecovery,useValue:commands}]);
+ page.id='3';await page.load();await page.ownership('release');assert.equal(calls,0);
+ await page.ownership('claim');assert.equal(calls,1);assert.equal(reads,2);assert.equal(page.notice(),'Task ownership updated.');
+ fail=true;page.reason='  review  ';await page.ownership('admin-release');assert.equal(buffer.command.body.reason,'  review  ');await page.ownership('claim');assert.equal(calls,2);
+});
+
+test('loads the command token before the displayed ownership snapshot', async t => {
+  let finishContract;
+  let taskReads = 0;
+  const contract = new Promise(resolve => { finishContract = resolve; });
+  const { page } = component(t, TaskPage, {
+    taskContract: () => contract,
+    async task() { taskReads++; return { assigneeRef: 'owner' }; },
+    async taskSubmission() { return null; },
+  }, routeAt(), undefined, [{ provide: CommandRecovery, useValue: {} }]);
+  page.id = '3';
+  const pending = page.load();
+  assert.equal(taskReads, 0);
+  finishContract({ instanceLockVersion: '2' });
+  await pending;
+  assert.equal(taskReads, 1);
+  assert.equal(page.detail().assigneeRef, 'owner');
+});

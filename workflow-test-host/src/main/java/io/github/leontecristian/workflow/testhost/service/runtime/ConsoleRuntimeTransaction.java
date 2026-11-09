@@ -1,5 +1,8 @@
 package io.github.leontecristian.workflow.testhost.service.runtime;
 
+import io.github.leontecristian.workflow.core.dto.runtime.AdministrativelyReleaseWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.ClaimWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
@@ -72,6 +75,38 @@ public class ConsoleRuntimeTransaction {
                 throw new IllegalStateException("Submission command mismatch");
         }
         return after(result);
+    }
+
+    @Transactional
+    public WorkflowCommandResult claim(ClaimWorkflowTask command, WorkflowCommandContext context) {
+        return after(execution.claimTask(command, context));
+    }
+
+    @Transactional
+    public WorkflowCommandResult release(ReleaseWorkflowTask command, WorkflowCommandContext context) {
+        return after(execution.releaseTask(command, context));
+    }
+
+    @Transactional
+    public WorkflowCommandResult administrativelyRelease(
+            AdministrativelyReleaseWorkflowTask command, WorkflowCommandContext context) {
+        return after(execution.administrativelyReleaseTask(command, context));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<WorkflowCommandResult> replayClaim(ClaimWorkflowTask command, WorkflowCommandContext context) {
+        return execution.findReplay(command, context).map(result -> new WorkflowCommandResult(true, result));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<WorkflowCommandResult> replayRelease(ReleaseWorkflowTask command, WorkflowCommandContext context) {
+        return execution.findReplay(command, context).map(result -> new WorkflowCommandResult(true, result));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<WorkflowCommandResult> replayAdministrativeRelease(
+            AdministrativelyReleaseWorkflowTask command, WorkflowCommandContext context) {
+        return execution.findReplay(command, context).map(result -> new WorkflowCommandResult(true, result));
     }
 
     private WorkflowCommandResult after(WorkflowCommandResult result) {

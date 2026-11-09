@@ -13,6 +13,15 @@ public interface WorkflowViewerAccess {
     default void requireHistoryEventRead(WorkflowHistorySummary event) {
         requireHistoryRead(event.instanceId());
     }
+
+    /** Ownership summaries and details require an exact task grant. */
+    default boolean canReadHistorySummary(WorkflowHistorySummary event) {
+        if (!"TASK_CLAIMED".equals(event.eventType()) && !"TASK_RELEASED".equals(event.eventType()))
+            return true;
+        if (event.activityId() == null || event.taskId() == null) return false;
+        var task = new ViewerLinkReference(event.activityId(), event.taskId());
+        return readableLinks(event.instanceId(), Set.of(task)).contains(task);
+    }
     /** Return only candidate activity/exact-task grants; never infer one from the other. */
     Set<ViewerLinkReference> readableLinks(long instanceId, Set<ViewerLinkReference> candidates);
 }

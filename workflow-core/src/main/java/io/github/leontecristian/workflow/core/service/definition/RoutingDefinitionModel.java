@@ -12,6 +12,7 @@ import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWor
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Service;
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Transition;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy;
 import io.github.leontecristian.workflow.core.exception.expression.ExpressionException;
 import io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService;
 import java.util.ArrayDeque;
@@ -58,7 +59,9 @@ final class RoutingDefinitionModel {
                     String resolver = n.path("assignment").path("resolver").textValue();
                     if (!DefinitionInputs.text(resolver, 100, 400, true))
                         d.error("INVALID_STRUCTURE", DiagnosticStage.CONTRACT, "Resolver must be a bounded logical identifier.", "/nodes/" + nodeIndex + "/assignment/resolver");
-                    humans.put(key,new Human(key,n.path("taskType").textValue(),new Assignment(resolver),outcomes));
+                    String claimPolicy = n.path("claimPolicy").asText("OPTIONAL");
+                    humans.put(key,new Human(key,n.path("taskType").textValue(),new Assignment(resolver),outcomes,
+                            TaskClaimPolicy.valueOf(claimPolicy)));
                     humanIndices.put(key,nodeIndex);
                 }
                 case "END" -> ends.put(key,new Node(key,"END",n.path("name").textValue(),n.path("result").textValue()));

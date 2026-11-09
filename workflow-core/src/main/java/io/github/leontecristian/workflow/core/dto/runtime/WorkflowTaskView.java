@@ -14,5 +14,5 @@ public record WorkflowTaskView(
         java.time.Instant dueAt,
         java.time.Instant closedAt,
         String closedBy,
-        TaskClosureReason closureReason) {
+        TaskClosureReason closureReason, String assigneeRef) {
 }

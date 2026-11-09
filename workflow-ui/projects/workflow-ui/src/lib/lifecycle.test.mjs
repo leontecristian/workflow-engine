@@ -38,6 +38,28 @@ test('history owns only summary requests, preserves exact exclusive cursors and 
   assert.equal(calls[1][0],id);assert.equal(calls[1][1],sequence);assert.equal(calls[1][2],50);
   assert.equal(page.rows().length,0);assert.equal(page.next(),null);
 });
+test('history can advance past hidden events without accepting backward or stalled cursors',async t=>{
+  const calls=[];
+  const sourceNext='9007199254740996', emptyNext='9007199254740997';
+  const responses=[
+    {items:[summary],nextAfterSequence:sourceNext},
+    {items:[],nextAfterSequence:emptyNext},
+    {items:[{...summary,historySequence:'9007199254740998'}],nextAfterSequence:null},
+    {items:[],nextAfterSequence:emptyNext},
+    {items:[{...summary,historySequence:'9007199254740998'}],nextAfterSequence:emptyNext},
+  ];
+  const {page}=component(t,History,{history:async(_,after)=>{calls.push(after);return responses.shift();}});
+  await page.load();
+  assert.equal(page.rows().length,1);assert.equal(page.next(),sourceNext);
+  await page.load(page.next());
+  assert.equal(page.rows().length,0);assert.equal(page.next(),emptyNext);assert.equal(page.error(),null);
+  await page.load(page.next());
+  assert.deepEqual(calls,['0',sourceNext,emptyNext]);assert.equal(page.rows().length,1);assert.equal(page.next(),null);
+  await page.load(emptyNext);
+  assert.equal(page.error().category,'FAILED');
+  await page.load(sourceNext);
+  assert.equal(page.error().category,'FAILED');
+});
 test('exact event retains input IDs, unknown event types and raw downloadable number spelling',async t=>{
   const calls=[];const {page}=component(t,Event,{historyEvent:async(...args)=>{calls.push(args);return {summary,detailsJson:exact};}});
   page.sequence=sequence;await page.load();assert.equal(calls[0][0],id);assert.equal(calls[0][1],sequence);

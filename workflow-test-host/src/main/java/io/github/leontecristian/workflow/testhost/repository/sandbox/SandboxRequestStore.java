@@ -76,6 +76,14 @@ public class SandboxRequestStore {
                         != 1) throw new SandboxRequestConflict();
     }
 
+    public boolean linkedToInstance(long instanceId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT CAST(CASE WHEN EXISTS (SELECT 1 FROM wf_test.sandbox_request WHERE instance_id=?)"
+                        + " THEN 1 ELSE 0 END AS bit)",
+                Boolean.class,
+                instanceId));
+    }
+
     public boolean linked(long id, long instanceId) {
         return jdbc.queryForObject(
                         "SELECT COUNT(*) FROM wf_test.sandbox_request WHERE id=? AND instance_id=?",

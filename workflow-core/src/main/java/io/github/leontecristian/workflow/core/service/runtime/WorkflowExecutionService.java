@@ -4,6 +4,12 @@ import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionContext;
 import io.github.leontecristian.workflow.core.dto.runtime.StartInputs;
 
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
+import io.github.leontecristian.workflow.core.dto.runtime.AdministrativelyReleaseWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
+import io.github.leontecristian.workflow.core.dto.runtime.ClaimWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskEligibilityContext;
 import io.github.leontecristian.workflow.core.dto.runtime.ActivityStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.CompletionPolicy;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
@@ -175,7 +181,7 @@ public class WorkflowExecutionService {
                     .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
             RuntimeInputs.require("TASK_CREATED".equals(created.getEventType()) && task.getId().equals(created.getTaskId())
                     && activity.getId().equals(created.getActivityId()), Category.HOST_CONFIGURATION);
-            RuntimeInputs.require(created.getDetailsSchemaVersion() == 2 || created.getDetailsSchemaVersion() == 3, Category.UNSUPPORTED_VERSION);
+            RuntimeInputs.require(created.getDetailsSchemaVersion() >= 2 && created.getDetailsSchemaVersion() <= 4, Category.UNSUPPORTED_VERSION);
             RuntimeInputs.require(RuntimeTaskCreationEvidence.matches(created, task, json), Category.HOST_CONFIGURATION);
             var entered = history.findById(new WorkflowHistoryId(instance.getId(), activity.getActivationSequence()))
                     .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
@@ -189,6 +195,12 @@ public class WorkflowExecutionService {
             var time = RuntimeInputs.context(context);
             RuntimeInputs.require(!time.isBefore(instance.getStartedAt()) && !time.isBefore(activity.getEnteredAt()) && !time.isBefore(task.getCreatedAt()), Category.INVALID_INPUT);
             RuntimeInputs.require(eligibility.isEligible(RuntimeViews.task(task, activity), context.actorRef()), Category.NOT_ASSIGNED);
+            if (task.getAssigneeRef() != null) {
+                RuntimeInputs.require(task.getAssigneeRef().equals(context.actorRef()), Category.TASK_ASSIGNED_TO_OTHER);
+            } else {
+                RuntimeInputs.require(task.getAssignmentKind() != AssignmentTargetKind.USER, Category.HOST_CONFIGURATION);
+                RuntimeInputs.require(human.claimPolicy() != TaskClaimPolicy.REQUIRED, Category.CLAIM_REQUIRED);
+            }
             task.complete(command.outcomeKey(), time, context.actorRef()); activity.complete(command.outcomeKey(), time, context.actorRef());
             RuntimeHistoryBatch batch = new RuntimeHistoryBatch(entityManager, json, instance.getId(), definition.versionId(), command.commandId(), context);
             var submitted = json.object(); submitted.put("outcomeKey", command.outcomeKey()); submitted.put("comment", command.comment()); submitted.putObject("inputs");
@@ -228,6 +240,160 @@ public class WorkflowExecutionService {
                 .map(result -> new WorkflowCommandResult(true, result)));
     }
 
+    @Transactional(propagation = Propagation.MANDATORY)
+    public WorkflowCommandResult claimTask(ClaimWorkflowTask command, WorkflowCommandContext context) {
+        return changeOwnership(ownershipRequest(command), context);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public WorkflowCommandResult releaseTask(ReleaseWorkflowTask command, WorkflowCommandContext context) {
+        return changeOwnership(ownershipRequest(command), context);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public WorkflowCommandResult administrativelyReleaseTask(AdministrativelyReleaseWorkflowTask command,
+            WorkflowCommandContext context) {
+        return changeOwnership(ownershipRequest(command), context);
+    }
+
+    public Optional<WorkflowExecutionResult> findReplay(ClaimWorkflowTask command, WorkflowCommandContext context) {
+        return findOwnershipReplay(ownershipRequest(command), context);
+    }
+
+    public Optional<WorkflowExecutionResult> findReplay(ReleaseWorkflowTask command, WorkflowCommandContext context) {
+        return findOwnershipReplay(ownershipRequest(command), context);
+    }
+
+    public Optional<WorkflowExecutionResult> findReplay(AdministrativelyReleaseWorkflowTask command, WorkflowCommandContext context) {
+        return findOwnershipReplay(ownershipRequest(command), context);
+    }
+
+    private record OwnershipRequest(UUID commandId, WorkflowOperation operation, long instanceId, long taskId,
+                                    long expectedLockVersion, String reason) {
+        void validate(WorkflowCommandContext context) {
+            RuntimeInputs.context(context);
+            RuntimeInputs.require(commandId != null && instanceId > 0 && taskId > 0 && expectedLockVersion >= 0
+                    && (!administrative() || RuntimeInputs.text(reason, 1000, 1000, true)), Category.INVALID_INPUT);
+            RuntimeInputs.require(context.actorKind() == ActorKind.USER, Category.NOT_ASSIGNED);
+        }
+
+        boolean administrative() { return operation == WorkflowOperation.ADMIN_RELEASE_TASK; }
+    }
+
+    private static OwnershipRequest ownershipRequest(ClaimWorkflowTask command) {
+        RuntimeInputs.require(command != null, Category.INVALID_INPUT);
+        return new OwnershipRequest(command.commandId(), WorkflowOperation.CLAIM_TASK, command.instanceId(),
+                command.taskId(), command.expectedLockVersion(), null);
+    }
+
+    private static OwnershipRequest ownershipRequest(ReleaseWorkflowTask command) {
+        RuntimeInputs.require(command != null, Category.INVALID_INPUT);
+        return new OwnershipRequest(command.commandId(), WorkflowOperation.RELEASE_TASK, command.instanceId(),
+                command.taskId(), command.expectedLockVersion(), null);
+    }
+
+    private static OwnershipRequest ownershipRequest(AdministrativelyReleaseWorkflowTask command) {
+        RuntimeInputs.require(command != null, Category.INVALID_INPUT);
+        return new OwnershipRequest(command.commandId(), WorkflowOperation.ADMIN_RELEASE_TASK, command.instanceId(),
+                command.taskId(), command.expectedLockVersion(), command.reason());
+    }
+
+    private EnteredStage authorizedTask(OwnershipRequest request, WorkflowCommandContext context) {
+        var task = tasks.findById(request.taskId()).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
+        var activity = activities.findById(task.getActivityId()).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
+        RuntimeInputs.require(activity.getInstanceId().equals(request.instanceId()), Category.NOT_FOUND);
+        eligibility.requireOwnershipAccess(new TaskEligibilityContext(RuntimeViews.task(task, activity), context.actorRef()));
+        return new EnteredStage(activity, task);
+    }
+
+    private Optional<WorkflowExecutionResult> findOwnershipReplay(OwnershipRequest request, WorkflowCommandContext context) {
+        request.validate(context);
+        return RuntimePersistenceErrors.call(() -> {
+            authorizedTask(request, context);
+            return ownershipReplay(request, context, ownershipFingerprint(request, context));
+        });
+    }
+
+    private byte[] ownershipFingerprint(OwnershipRequest request, WorkflowCommandContext context) {
+        return json.ownershipFingerprint(request.operation(), context, request.instanceId(), request.taskId(),
+                request.expectedLockVersion(), request.reason());
+    }
+
+    private Optional<WorkflowExecutionResult> ownershipReplay(OwnershipRequest request, WorkflowCommandContext context,
+            byte[] fingerprint) {
+        return replay(request.commandId(), request.operation(), context, fingerprint).map(result -> {
+            RuntimeInputs.require(result.instance().id() == request.instanceId() && result.task().id() == request.taskId()
+                    && result.instance().lockVersion() > request.expectedLockVersion(), Category.HOST_CONFIGURATION);
+            return result;
+        });
+    }
+
+    private WorkflowCommandResult changeOwnership(OwnershipRequest request, WorkflowCommandContext context) {
+        return guarded(() -> {
+            request.validate(context);
+            var stage = authorizedTask(request, context);
+            byte[] fingerprint = ownershipFingerprint(request, context);
+            var replay = ownershipReplay(request, context, fingerprint);
+            if (replay.isPresent()) return new WorkflowCommandResult(true, replay.get());
+
+            var instance = instances.findById(request.instanceId())
+                    .orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
+            var activity = stage.activity();
+            var task = stage.task();
+            entityManager.refresh(instance);
+            RuntimeInputs.require(instance.getLockVersion() == request.expectedLockVersion(), Category.STALE_VERSION);
+            RuntimeInputs.require(instance.getStatus() == InstanceStatus.ACTIVE && instance.getLastHistorySequence() >= 4,
+                    Category.INVALID_STATE);
+            RuntimeProgression.advance(instance.getLastHistorySequence(), 1);
+            long sequence = instance.reserveHistorySequence();
+            entityManager.flush(); // Serialize against all existing-instance writes before mutating a task.
+            entityManager.refresh(activity);
+            entityManager.refresh(task);
+            RuntimeInputs.require(activity.getStatus() == ActivityStatus.ACTIVE && task.getStatus() == TaskStatus.OPEN
+                    && instance.getCurrentNodeKey().equals(activity.getNodeKey()), Category.INVALID_STATE);
+            RuntimeInputs.require(task.getAssignmentKind() != AssignmentTargetKind.USER, Category.TASK_NOT_CLAIMABLE);
+            var time = RuntimeInputs.context(context);
+            RuntimeInputs.require(!time.isBefore(task.getCreatedAt()), Category.INVALID_INPUT);
+            var definition = pins.load(instance);
+            RuntimeHistoryBatch batch = new RuntimeHistoryBatch(entityManager, json, instance.getId(), definition.versionId(),
+                    request.commandId(), context);
+            batch.beginAt(sequence - 1);
+            recordOwnershipChange(request, context.actorRef(), activity, task, batch);
+            return finish(request.commandId(), request.operation(), context, fingerprint, definition, instance, activity, task,
+                    sequence, batch, host.recorder(), RuntimeJson.FINGERPRINT_VERSION);
+        });
+    }
+
+    private void recordOwnershipChange(OwnershipRequest request, String actorRef, WorkflowActivityEntity activity,
+            WorkflowTaskEntity task, RuntimeHistoryBatch batch) {
+        var details = json.object();
+        String previous = task.getAssigneeRef();
+        details.put("previousAssigneeRef", previous);
+        var view = RuntimeViews.task(task, activity);
+        if (request.operation() == WorkflowOperation.CLAIM_TASK) {
+            RuntimeInputs.require(eligibility.isEligible(view, actorRef), Category.NOT_ASSIGNED);
+            RuntimeInputs.require(previous == null, Category.TASK_ALREADY_ASSIGNED);
+            task.claim(actorRef);
+            details.put("assigneeRef", actorRef);
+            batch.next("TASK_CLAIMED", activity.getId(), task.getId(), null, details, Map.of("assigneeRef", actorRef));
+            return;
+        }
+        if (request.administrative()) {
+            RuntimeInputs.require(eligibility.canAdministrativelyRelease(new TaskEligibilityContext(view, actorRef)),
+                    Category.ADMIN_RELEASE_FORBIDDEN);
+        }
+        RuntimeInputs.require(previous != null, Category.TASK_NOT_ASSIGNED);
+        if (!request.administrative()) {
+            RuntimeInputs.require(previous.equals(actorRef), Category.TASK_ASSIGNED_TO_OTHER);
+        }
+        task.release();
+        details.putNull("assigneeRef");
+        details.put("administrative", request.administrative());
+        details.put("reason", request.reason());
+        batch.next("TASK_RELEASED", activity.getId(), task.getId(), null, details,
+                Map.of("previousAssigneeRef", previous, "administrative", Boolean.toString(request.administrative())));
+    }
+
     private record EnteredStage(WorkflowActivityEntity activity, WorkflowTaskEntity task) { }
 
     private EnteredStage enterStage(ExecutableDefinition definition, WorkflowInstanceEntity instance, String nodeKey,
@@ -250,8 +416,11 @@ public class WorkflowExecutionService {
         entered.put("completionPolicy","SINGLE"); entered.put("requiredTaskCount",1); entered.put("reviewRevisionRef",assignment.reviewRevisionRef());
         batch.next("ACTIVITY_ENTERED",activity.getId(),null,null,entered,Map.of());
         var created = json.object(); created.put("taskKey", resolved.taskKey()); created.set("assignment", json.tree(json.encode(resolved.assignment())));
-        batch.next("TASK_CREATED",activity.getId(),task.getId(),null,created,
-                Map.of("taskKey",resolved.taskKey(),"assignmentKind",resolved.assignment().kind().name(),"assignmentRef",resolved.assignment().ref()));
+        created.put("assigneeRef", task.getAssigneeRef());
+        var payload = new java.util.HashMap<>(Map.of("taskKey", resolved.taskKey(),
+                "assignmentKind", resolved.assignment().kind().name(), "assignmentRef", resolved.assignment().ref()));
+        if (task.getAssigneeRef() != null) payload.put("assigneeRef", task.getAssigneeRef());
+        batch.next("TASK_CREATED", activity.getId(), task.getId(), null, created, payload);
         return new EnteredStage(activity,task);
     }
 
@@ -283,7 +452,7 @@ public class WorkflowExecutionService {
         entityManager.flush(); // Capture actual final managed token after every instance update, not a predicted increment.
         WorkflowExecutionResult result = snapshot(commandId, operation, definition, instance, activity, task, first);
         entityManager.persist(new WorkflowCommandReceiptEntity(commandId, instance.getId(), operation.name(), context.actorKind(), context.actorRef(),
-                fingerprint, fingerprintVersion, RuntimeInputs.context(context), json.evidence(result), (short)4));
+                fingerprint, fingerprintVersion, RuntimeInputs.context(context), json.evidence(result), (short)5));
         entityManager.flush(); // Detect a receipt-PK loser before invoking the durable recorder; never recover in this transaction.
         host.record(recorder, batch.events());
         entityManager.flush();

@@ -137,6 +137,16 @@ public class RuntimeJson {
         request.put("outcomeKey", command.outcomeKey()); request.put("comment", command.comment());
         return fingerprint(WorkflowOperation.COMPLETE_TASK, context, request);
     }
+    byte[] ownershipFingerprint(WorkflowOperation operation, WorkflowCommandContext context, long instanceId,
+            long taskId, long expectedLockVersion, String reason) {
+        ObjectNode request = object();
+        request.put("instanceId", Long.toString(instanceId));
+        request.put("taskId", Long.toString(taskId));
+        request.put("expectedLockVersion", Long.toString(expectedLockVersion));
+        if (operation == WorkflowOperation.ADMIN_RELEASE_TASK) request.put("reason", reason);
+        return fingerprint(operation, context, request);
+    }
+
     private byte[] fingerprint(WorkflowOperation operation, WorkflowCommandContext context, ObjectNode request) {
         return fingerprint(operation,context,request,FINGERPRINT_VERSION);
     }
@@ -150,28 +160,36 @@ public class RuntimeJson {
         if (receipt == null) return Optional.empty();
         RuntimeInputs.require(receipt.getActorKind() == context.actorKind() && java.util.Objects.equals(receipt.getActorRef(), context.actorRef())
                 && operation.name().equals(receipt.getOperationType()), Category.COMMAND_ID_CONFLICT);
+        Short version = receipt.getResultSchemaVersion();
+        boolean historical = Short.valueOf((short) 3).equals(version) || Short.valueOf((short) 4).equals(version);
         RuntimeInputs.require(FINGERPRINT_VERSION.equals(receipt.getFingerprintVersion())
-                && (Short.valueOf((short)3).equals(receipt.getResultSchemaVersion())
-                    || Short.valueOf((short)4).equals(receipt.getResultSchemaVersion())),
+                && (Short.valueOf((short) 5).equals(version) || historical && !ownershipOperation(operation)),
                 Category.UNSUPPORTED_VERSION);
         RuntimeInputs.require(Arrays.equals(receipt.getRequestFingerprint(), fingerprint), Category.COMMAND_ID_CONFLICT);
         JsonNode stored = tree(receipt.getResultJson());
         requireTimeStrings(stored);
         try {
-            if (receipt.getResultSchemaVersion() == 3) {
-                RuntimeInputs.require(stored.path("task").isObject(), Category.HOST_CONFIGURATION);
-                ObjectNode task = (ObjectNode) stored.path("task");
+            RuntimeInputs.require(stored.path("task").isObject(), Category.HOST_CONFIGURATION);
+            ObjectNode task = (ObjectNode) stored.path("task");
+            if (historical) {
+                RuntimeInputs.require(!task.has("assigneeRef"), Category.HOST_CONFIGURATION);
+                task.putNull("assigneeRef");
+            } else {
+                JsonNode assignee = task.path("assigneeRef");
+                RuntimeInputs.require(assignee.isNull() || assignee.isTextual(), Category.HOST_CONFIGURATION);
+            }
+            if (version == 3) {
                 RuntimeInputs.require(!task.has("assignment") && task.path("assignedUserRef").isTextual(), Category.HOST_CONFIGURATION);
                 String ref = task.remove("assignedUserRef").textValue();
                 ObjectNode assignment = object(); assignment.put("kind", "USER"); assignment.put("ref", ref);
                 task.set("assignment", assignment);
             }
             WorkflowExecutionResult result = mapper.treeToValue(stored, WorkflowExecutionResult.class);
-            verifyResult(result, commandId, operation, receipt);
+            verifyResult(result, commandId, operation, receipt, historical);
             return Optional.of(result);
         } catch (IOException | IllegalArgumentException failure) { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION); }
     }
-    private void verifyResult(WorkflowExecutionResult result, UUID commandId, WorkflowOperation operation, WorkflowCommandReceiptEntity receipt) {
+    private void verifyResult(WorkflowExecutionResult result, UUID commandId, WorkflowOperation operation, WorkflowCommandReceiptEntity receipt, boolean historical) {
         RuntimeInputs.require(result != null && commandId.equals(result.commandId()) && result.operation() == operation
                 && result.instance() != null && result.activity() != null && result.task() != null, Category.HOST_CONFIGURATION);
         var instance = result.instance(); var activity = result.activity(); var task = result.task();
@@ -196,10 +214,28 @@ public class RuntimeJson {
                 && RuntimeInputs.key(task.taskKey()) && task.assignment() != null && task.assignment().kind() != null
                 && RuntimeInputs.text(task.assignment().ref(), 200, 200, true) && task.dueAt() == null,
                 Category.HOST_CONFIGURATION);
-        if (operation == WorkflowOperation.START_WORKFLOW) {
+        boolean userTarget = task.assignment().kind() == io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER;
+        if (!historical) {
+            RuntimeInputs.require((task.assigneeRef() == null || RuntimeInputs.text(task.assigneeRef(), 200, 200, true))
+                    && (!userTarget || task.assigneeRef() == null || task.assignment().ref().equals(task.assigneeRef()))
+                    && (!userTarget || task.status() != TaskStatus.OPEN || task.assignment().ref().equals(task.assigneeRef())),
+                    Category.HOST_CONFIGURATION);
+        }
+        if (ownershipOperation(operation)) {
+            RuntimeInputs.require(!userTarget && receipt.getActorKind() == ActorKind.USER
+                    && result.firstHistorySequence() == result.lastHistorySequence()
+                    && instance.status() == InstanceStatus.ACTIVE && activity.status() == ActivityStatus.ACTIVE
+                    && task.status() == TaskStatus.OPEN && instance.currentNodeKey().equals(activity.nodeKey())
+                    && instance.resultKey() == null && instance.endedAt() == null && instance.endedBy() == null
+                    && activity.outcomeKey() == null && activity.closedAt() == null && activity.closedBy() == null && activity.closureReason() == null
+                    && task.outcomeKey() == null && task.closedAt() == null && task.closedBy() == null && task.closureReason() == null
+                    && (operation == WorkflowOperation.CLAIM_TASK ? receipt.getActorRef().equals(task.assigneeRef()) : task.assigneeRef() == null)
+                    && !RuntimeViews.instant(receipt.getRecordedAt()).isBefore(task.createdAt()), Category.HOST_CONFIGURATION);
+        } else if (operation == WorkflowOperation.START_WORKFLOW) {
             RuntimeInputs.require(instance.status() == InstanceStatus.ACTIVE
                     && activity.status() == ActivityStatus.ACTIVE
                     && task.status() == TaskStatus.OPEN
+                    && (userTarget || task.assigneeRef() == null)
                     && instance.startedAt().equals(activity.enteredAt())
                     && instance.currentNodeKey().equals(activity.nodeKey()) && instance.resultKey() == null
                     && instance.endedAt() == null && instance.endedBy() == null && activity.outcomeKey() == null
@@ -220,6 +256,7 @@ public class RuntimeJson {
                     && activity.closedAt().equals(task.closedAt())
                     && receipt.getActorKind() == ActorKind.USER
                     && receipt.getActorRef().equals(activity.closedBy())
+                    && (task.assigneeRef() == null || task.assigneeRef().equals(task.closedBy()))
                     && receipt.getActorRef().equals(task.closedBy()) && (task.assignment().kind() != io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER
                         || receipt.getActorRef().equals(task.assignment().ref()))
                     && "TASK_OUTCOME".equals(activity.closureReason())
@@ -228,6 +265,11 @@ public class RuntimeJson {
                     && activity.closedAt().equals(RuntimeViews.instant(receipt.getRecordedAt())), Category.HOST_CONFIGURATION);
         }
     }
+    private static boolean ownershipOperation(WorkflowOperation operation) {
+        return operation == WorkflowOperation.CLAIM_TASK || operation == WorkflowOperation.RELEASE_TASK
+                || operation == WorkflowOperation.ADMIN_RELEASE_TASK;
+    }
+
     private boolean validTime(java.time.Instant time) {
         if (time == null || time.getNano() % 100 != 0) return false;
         try { int year = java.time.LocalDateTime.ofInstant(time, java.time.ZoneOffset.UTC).getYear(); return year >= 1 && year <= 9999; }

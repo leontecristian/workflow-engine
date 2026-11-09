@@ -108,6 +108,21 @@ public class WorkflowRuntimeQueryService {
         RuntimeInputs.id(id);
         return RuntimePersistenceErrors.call(() -> tasks.findById(id).map(entity -> RuntimeViews.task(entity, owner(entity))));
     }
+    /** Pinned policy for an exact task already authorized by the host. */
+    public io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy taskClaimPolicy(long instanceId, long taskId) {
+        RuntimeInputs.id(instanceId);
+        RuntimeInputs.id(taskId);
+        return RuntimePersistenceErrors.call(() -> {
+            var task = tasks.findById(taskId).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
+            var activity = owner(task);
+            RuntimeInputs.require(activity.getInstanceId().equals(instanceId), Category.NOT_FOUND);
+            var instance = instances.findById(instanceId).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
+            var human = pins.load(instance).model().humans().get(activity.getNodeKey());
+            RuntimeInputs.require(human != null, Category.HOST_CONFIGURATION);
+            return human.claimPolicy();
+        });
+    }
+
     public WorkflowTaskPage listTasks(long instanceId) { return listTasks(instanceId, 0, 50); }
     public WorkflowTaskPage listTasks(long instanceId, long afterId, int limit) {
         RuntimeInputs.id(instanceId); RuntimeInputs.page(afterId, limit);
@@ -135,7 +150,7 @@ public class WorkflowRuntimeQueryService {
                 int count = Math.min(chunk,rows.size());
                 for (int i=0;i<count;i++) {
                     var task = RuntimeViews.task(rows.get(i));
-                    if (hostAccess.test(task) && eligibility.isEligible(task,actorRef)) {
+                    if (hostAccess.test(task) && (actorRef.equals(task.assigneeRef()) || eligibility.isEligible(task, actorRef))) {
                         items.add(task);
                         if (!RuntimeJson.utf8Fits(json.encode(new WorkflowTaskPage(items,task.id())),1024*1024)) {
                             items.remove(items.size()-1);

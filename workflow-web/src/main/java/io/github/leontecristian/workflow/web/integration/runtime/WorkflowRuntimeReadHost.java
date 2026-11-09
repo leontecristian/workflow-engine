@@ -17,6 +17,9 @@ public interface WorkflowRuntimeReadHost {
     WorkflowActivityView activity(long id);
     /** Presentation hints only; command authorization is always checked again. */
     default boolean canCompleteTask(WorkflowTaskView task) { return false; }
+    default boolean canClaimTask(WorkflowTaskView task) { return false; }
+    default boolean canReleaseTask(WorkflowTaskView task) { return false; }
+    default boolean canAdministrativelyReleaseTask(WorkflowTaskView task) { return false; }
     default String assignmentLabel(WorkflowTaskView task) { return task.assignment().ref(); }
     /** Exact-task filtering is required even when the containing activity is readable. */
     default boolean canReadTask(WorkflowTaskView task) {

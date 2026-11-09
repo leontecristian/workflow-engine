@@ -1,10 +1,10 @@
 # Plan — F017
 
-**Revision:** 3 — 2026-11-09. Applies to [specification revision 3](spec.md), READY. Planning only.
+**Revision:** 3 — 2026-11-09. Applies to [specification revision 3](spec.md), Approved revision 3 contract. The [implementation record](implementation.md) records executed checks and open gates.
 
 ## P01 — Apply closed contracts
 
-O01–O06 are closed in specification revision 3. Follow the exact definition policy, operation/authorization, inbox/access, history/event and migration/receipt contracts. READY is planning completion; implementation still requires a subsequent owner request. Recheck relevant source changes since baseline 981c175 before implementation. Ordinary implementation choices remain within these contracts.
+O01–O06 are closed in specification revision 3. Follow the exact definition policy, operation/authorization, inbox/access, history/event and migration/receipt contracts. The owner authorized implementation through verification and handover after READY. Recheck relevant source changes since baseline 981c175 before implementation. Ordinary implementation choices remain within these contracts.
 
 ## P02 — Definition and preserving persistence evolution
 
@@ -48,7 +48,7 @@ Use one focused browser observation with prepared fixtures for changed Claim/Rel
 
 Candidate REUSED evidence, subject to final change review, is F016 revision 2 handover for unchanged target identity, membership-provider behavior and legacy creation evidence; F015 revision 2 for unchanged recovery-page internals and independent read-only activation; F011 revision 1 for unchanged stage routing. Claim enforcement, initial USER ownership, new operations and changed evidence formats need fresh evidence. Historical owning-feature gaps remain with those features.
 
-Completion requires closed contracts, implemented R01–R07, relevant AC01–AC08 checks with actual results, reviewed diff and updated handover. A required blocked check stays explicit. This documentation phase checks content, local links and whitespace only.
+Completion requires closed contracts, implemented R01–R07, relevant AC01–AC08 checks with actual results, reviewed diff and updated handover. A required blocked check stays explicit. An API fixture can isolate browser interactions if the guarded sandbox is unavailable. The live sandbox and SQL checks then remain open.
 
 ## Closed-contract implementation details
 

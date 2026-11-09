@@ -57,6 +57,7 @@ public class WorkflowInstanceViewerController {
                 case INVALID_INPUT -> { status = 400; code = "INVALID_INPUT"; }
                 case NOT_FOUND -> { status = 404; code = "NOT_FOUND"; }
                 case ASSIGNMENT_LOOKUP_FAILED -> { status = 503; code = "ASSIGNMENT_LOOKUP_FAILED"; }
+                case AUTHORIZATION_LOOKUP_FAILED -> { status = 503; code = "AUTHORIZATION_LOOKUP_FAILED"; }
                 case LIMIT_EXCEEDED -> { status = 422; code = "LIMIT_EXCEEDED"; }
                 default -> { status = 500; code = "HOST_CONFIGURATION"; }
             }

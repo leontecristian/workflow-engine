@@ -26,7 +26,7 @@ export function parseScalarInputs(text:string):ScalarInputs{return freezeInputs(
 export function commandRequest(envelope:Envelope,replay:boolean):{path:string;body:Readonly<Record<string,unknown>>|string;token:string|null} {
  if(envelope.kind==='start')return {path:replay?'/commands/start/replay':'/instances/start',body:startRequest(envelope.body),token:null};
  const {instanceId,taskId,...body}=envelope.body;
- return {path:replay?'/commands/complete/replay':`/instances/${instanceId}/tasks/${taskId}/complete`,body:replay?envelope.body:body,token:envelope.expectedToken};
+ return {path:replay?`/commands/${envelope.kind}/replay`:`/instances/${instanceId}/tasks/${taskId}/${envelope.kind}`,body:replay?envelope.body:body,token:envelope.expectedToken};
 }
 function startRequest(body:CommandBody):string {
  const {inputs,...fields}=body;

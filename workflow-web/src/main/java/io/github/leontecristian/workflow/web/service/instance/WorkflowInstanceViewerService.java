@@ -22,12 +22,22 @@ public class WorkflowInstanceViewerService {
     public Object history(long id, long after, int limit) {
         access.requireInstanceRead(id); access.requireHistoryRead(id);
         var page = reads.listHistory(id, after, limit);
-        return wire.page(page.items(), page.nextAfterSequence(), "nextAfterSequence", WorkflowHistorySummary::historySequence);
+        var visible = page.items().stream()
+                .filter(event -> !isOwnershipEvent(event)
+                        || access.canReadHistorySummary(event))
+                .toList();
+        return wire.page(visible, page.nextAfterSequence(), "nextAfterSequence", WorkflowHistorySummary::historySequence);
     }
+    private static boolean isOwnershipEvent(WorkflowHistorySummary event) {
+        return "TASK_CLAIMED".equals(event.eventType()) || "TASK_RELEASED".equals(event.eventType());
+    }
+
     /** Bound the final escaped envelope, independently of ordinary summary pages. */
     public String event(long id, long sequence) {
         access.requireInstanceRead(id); access.requireHistoryRead(id);
         var event = reads.findHistoryEvent(id, sequence).orElseThrow(WorkflowViewerException::missing);
+        if (isOwnershipEvent(event.summary()) && !access.canReadHistorySummary(event.summary()))
+            throw WorkflowViewerException.missing();
         access.requireHistoryEventRead(event.summary());
         if (!wire.fits(event.detailsJson(), 4 * 1024 * 1024)) throw new WorkflowViewerException(422, "LIMIT_EXCEEDED");
         var json = wire.json(event);

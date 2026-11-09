@@ -1,6 +1,6 @@
 # Workflow web adapter
 
-Ordinary Java 17 library JAR; built with JDK 21. It depends on core's public contracts and supplies independently enabled viewer, administration, runtime-read and optional completion-command groups. It installs no Boot auto-configuration, security, datasource, migration runner, transaction manager, global codec or advice.
+Ordinary Java 17 library JAR; built with JDK 21. It depends on core's public contracts and supplies independently enabled viewer, administration, runtime-read and optional runtime-command groups. It installs no Boot auto-configuration, security, datasource, migration runner, transaction manager, global codec or advice.
 
 Explicitly `@Import(WorkflowViewerConfiguration.class)` in the host and supply:
 
@@ -26,12 +26,16 @@ Reads use core's `WorkflowDefinitionService` and `TaskTypeCatalogService`. Typed
 
 Routes are the existing `/task-types`, `/definitions` and `/versions` operations listed in [F014](../docs/features/F014-definition-catalog-administration/spec.md). IDs/tokens remain decimal strings; raw document import/replacement retains its 4 MiB UTF-8 limit, ordinary bodies 16 KiB, and exports return stored text. Local handlers retain management error categories and diagnostics, including 403 rather than viewer concealment. No task-type deletion, new authoring semantics or automatic write retries are supplied.
 
-## Runtime reads and optional completion mapping
+## Runtime reads and optional command mapping
 
 F015 adds two independent explicit imports: `WorkflowRuntimeReadConfiguration` and `WorkflowRuntimeCommandConfiguration`. Supply `WorkflowRuntimeOptions(basePath, correlationAttribute)` and the corresponding required `WorkflowRuntimeReadHost` / `WorkflowRuntimeCommandHost`. Neither import activates the other; broad package scanning remains inert. The read group additionally uses core query/definition services. The host owns authentication, CSRF, access policy and transaction infrastructure.
 
 Read routes cover monitor, variables, assigned/instance tasks, exact task/contract/submission and activity/submissions, as inventoried in [F015](../docs/features/F015-runtime-task-instance-extraction/spec.md). The host supplies authorized pages and exact-resource access. `requireMonitorAccess()` runs before monitor query parsing. A filtered page may be empty with continuation; consumers must retain it. IDs/tokens remain decimal strings and pinned contracts retain existing fields.
 
-The optional command group maps only completion and completion replay. `complete(CompleteWorkflowTask, correlation)` delegates without a preliminary exact-read check; hosts must preserve receipt-before-current-state validation. `replayComplete` returns an optional original result and must never execute on absence. The host creates trusted context and owns business validation, assignment, transaction, audit, durable handoff and post-rollback receipt lookup. Sandbox start/replay routes and request linking remain host-owned. See the sandbox runtime adapters for the existing coordinator/transaction proxy delegation.
+F017 adds separate original assignment and current assignee fields, plus pinned claim policy and server-derived ownership actions on the exact task contract. The read group can run by itself. History summaries and details for ownership events require the host's exact-task grant in addition to general history access.
+
+The optional command group maps completion, claim, owner release and administrative release under `/instances/{instanceId}/tasks/{taskId}/{operation}`. Each operation has a matching lookup-only `/commands/{operation}/replay` route. Supply `X-Expected-Lock-Version` on both. Claim and release mutation bodies contain `commandId`, and `admin-release` also requires an exact reason. Replay bodies include the instance and task IDs. See [F017](../docs/features/F017-task-claim-release/spec.md) for the full request and result contracts.
+
+The host creates trusted context and owns business authorization, transactions, durable handoff and post-rollback lookup. Preserve receipt-before-current-state validation. Ownership operations require the core ownership authorization adapter for exact-task business access and explicit administrative release permission. Replay uses current business access and the original receipt actor, independently of current membership or administrative permission. Sandbox start/replay routes and request linking remain host-owned.
 
 Definition-family lists additionally accept `order=ASC|DESC` (default ASC). DESC starts at omitted/zero afterId and continues with IDs strictly below nextAfterId; keep the same order while paging. The sandbox Definitions page requests DESC so newly created families appear first. Existing consumers that omit order keep ascending paging; the separate start chooser is unchanged.

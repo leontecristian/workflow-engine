@@ -14,6 +14,8 @@ import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowSharedAssignmentProvider;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskOwnershipAuthorization;
+import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskOwnershipAuthorization;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeAccess;
@@ -33,20 +35,23 @@ class ConsoleSharedAssignmentUnitTest {
     private WorkflowTaskEligibilityService eligibility(WorkflowSharedAssignmentProvider provider) {
         var beans = new DefaultListableBeanFactory();
         beans.registerSingleton("membership", provider);
-        return new WorkflowTaskEligibilityService(beans.getBeanProvider(WorkflowSharedAssignmentProvider.class));
+        return new WorkflowTaskEligibilityService(beans.getBeanProvider(WorkflowSharedAssignmentProvider.class),
+                beans.getBeanProvider(WorkflowTaskOwnershipAuthorization.class));
     }
     private WorkflowTaskView task(TaskStatus status, String closedBy) {
         return new WorkflowTaskView(5, 2, 1, 3, "REVIEW", SandboxSharedAssignmentProvider.FINANCE,
                 status, status == TaskStatus.COMPLETED ? "APPROVE" : null, Instant.EPOCH, null,
                 status == TaskStatus.COMPLETED ? Instant.EPOCH : null, closedBy,
-                status == TaskStatus.COMPLETED ? TaskClosureReason.TASK_OUTCOME : null);
+                status == TaskStatus.COMPLETED ? TaskClosureReason.TASK_OUTCOME : null, null);
     }
     @Test void currentMembershipChangesVisibilityButOnlyActualCompleterRetainsHistoricalAccess() {
         var provider = new SandboxSharedAssignmentProvider(Set.of("first", "second"));
         var reads = mock(WorkflowRuntimeQueryService.class);
         var context = mock(ConsoleContext.class);
         when(context.actor()).thenReturn("first");
-        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider));
+        var ownership = mock(ConsoleTaskOwnershipAuthorization.class);
+        when(ownership.canAccess(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), ownership);
         var open = task(TaskStatus.OPEN, null);
         assertThat(access.canReadTask(open)).isTrue();
         assertThat(access.canCompleteTask(open)).isTrue();
@@ -63,6 +68,34 @@ class ConsoleSharedAssignmentUnitTest {
         when(context.admin()).thenReturn(true);
         assertThat(access.canReadTask(open)).isTrue();
         assertThat(access.canCompleteTask(open)).isFalse();
+    }
+    @Test void formerMemberRetainsExactTaskAccessWithoutAHistoryOrCompletionGrant() {
+        var provider = new SandboxSharedAssignmentProvider(Set.of("second"));
+        var reads = mock(WorkflowRuntimeQueryService.class);
+        var context = mock(ConsoleContext.class);
+        when(context.actor()).thenReturn("first");
+        var ownership = mock(ConsoleTaskOwnershipAuthorization.class);
+        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), ownership);
+        var task = new WorkflowTaskView(5, 2, 1, 3, "REVIEW", SandboxSharedAssignmentProvider.FINANCE,
+                TaskStatus.OPEN, null, Instant.EPOCH, null, null, null, null, "first");
+        when(ownership.canAccess(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        when(reads.findTask(5)).thenReturn(Optional.of(task));
+        when(reads.findInstance(1)).thenReturn(Optional.of(mock(
+                io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView.class)));
+        when(reads.listTasks(1, 0, 100)).thenReturn(
+                new io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage(java.util.List.of(task), null));
+
+        assertThat(access.task(5)).isSameAs(task);
+        assertThat(access.canCompleteTask(task)).isFalse();
+        assertThatThrownBy(() -> access.instance(1))
+                .isInstanceOf(io.github.leontecristian.workflow.testhost.exception.console.ConsoleException.class);
+        when(context.actor()).thenReturn("second");
+        assertThat(access.task(5)).isSameAs(task);
+        assertThat(access.canCompleteTask(task)).isFalse();
+        when(context.actor()).thenReturn("first");
+        when(ownership.canAccess(org.mockito.ArgumentMatchers.any())).thenReturn(false);
+        assertThatThrownBy(() -> access.task(5))
+                .isInstanceOf(io.github.leontecristian.workflow.testhost.exception.console.ConsoleException.class);
     }
     @Test void siblingCompletionDetailsRequireExactTaskAccessEvenWithInstanceHistoryAccess() {
         var reads=mock(WorkflowRuntimeQueryService.class);
@@ -103,7 +136,9 @@ class ConsoleSharedAssignmentUnitTest {
         var reads = mock(WorkflowRuntimeQueryService.class);
         var context = mock(ConsoleContext.class);
         when(context.actor()).thenReturn("first");
-        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider));
+        var ownership = mock(ConsoleTaskOwnershipAuthorization.class);
+        when(ownership.canAccess(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), ownership);
         assertThatThrownBy(() -> access.canReadTask(task(TaskStatus.OPEN, null)))
                 .isInstanceOfSatisfying(WorkflowExecutionException.class,
                         failure -> assertThat(failure.category()).isEqualTo(WorkflowExecutionException.Category.ASSIGNMENT_LOOKUP_FAILED));

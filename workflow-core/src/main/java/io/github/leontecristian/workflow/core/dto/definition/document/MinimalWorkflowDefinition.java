@@ -3,6 +3,7 @@ import java.util.List;
 import java.util.Map;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowLiteral;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy;
 /** Internal validated subset; canonical source is retained separately, including all designer values. */
 public record MinimalWorkflowDefinition(Node start, Map<String,Human> humans, Node end, List<Transition> transitions,
         Map<String,Input> inputs, Map<String,ActionField> variables, Map<String,Binding> initialize,
@@ -28,7 +29,11 @@ public record MinimalWorkflowDefinition(Node start, Map<String,Human> humans, No
     public record Node(String key, String type, String name, String result) {}
     public record Assignment(String resolver) {}
     public record Outcome(String key, String label, boolean requiresComment) {}
-    public record Human(String key, String taskType, Assignment assignment, List<Outcome> outcomes) {
+    public record Human(String key, String taskType, Assignment assignment, List<Outcome> outcomes,
+            TaskClaimPolicy claimPolicy) {
+        public Human(String key, String taskType, Assignment assignment, List<Outcome> outcomes) {
+            this(key, taskType, assignment, outcomes, TaskClaimPolicy.OPTIONAL);
+        }
         public Human { outcomes = List.copyOf(outcomes); }
         public java.util.Optional<Outcome> outcome(String key) {
             return outcomes.stream().filter(outcome -> outcome.key().equals(key)).findFirst();

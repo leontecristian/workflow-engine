@@ -1,5 +1,8 @@
 package io.github.leontecristian.workflow.testhost.service.runtime;
 
+import io.github.leontecristian.workflow.core.dto.runtime.AdministrativelyReleaseWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.ClaimWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
 import io.github.leontecristian.workflow.testhost.exception.console.ConsoleException;
@@ -31,6 +34,38 @@ public class ConsoleRuntimeCommandHost implements WorkflowRuntimeCommandHost {
             return transactions.replayComplete(command, context.runtime(correlation));
         });
     }
+    @Override
+    public WorkflowCommandResult claim(ClaimWorkflowTask command, String correlation) {
+        return policy(() -> commands.claim(command, context.runtime(correlation)));
+    }
+
+    @Override
+    public WorkflowCommandResult release(ReleaseWorkflowTask command, String correlation) {
+        return policy(() -> commands.release(command, context.runtime(correlation)));
+    }
+
+    @Override
+    public WorkflowCommandResult administrativelyRelease(
+            AdministrativelyReleaseWorkflowTask command, String correlation) {
+        return policy(() -> commands.administrativelyRelease(command, context.runtime(correlation)));
+    }
+
+    @Override
+    public Optional<WorkflowCommandResult> replayClaim(ClaimWorkflowTask command, String correlation) {
+        return policy(() -> transactions.replayClaim(command, context.runtime(correlation)));
+    }
+
+    @Override
+    public Optional<WorkflowCommandResult> replayRelease(ReleaseWorkflowTask command, String correlation) {
+        return policy(() -> transactions.replayRelease(command, context.runtime(correlation)));
+    }
+
+    @Override
+    public Optional<WorkflowCommandResult> replayAdministrativeRelease(
+            AdministrativelyReleaseWorkflowTask command, String correlation) {
+        return policy(() -> transactions.replayAdministrativeRelease(command, context.runtime(correlation)));
+    }
+
     private <T> T policy(Supplier<T> operation) {
         try { return operation.get(); }
         catch (RuntimeException failure) {

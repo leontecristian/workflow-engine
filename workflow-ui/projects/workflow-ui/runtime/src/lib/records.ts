@@ -30,7 +30,8 @@ const COLUMNS: Record<string, RecordColumn[]> = {
   tasks: [
     { key: "taskKey", label: "Task" },
     { key: "instanceId", label: "Instance" },
-    { key: "assignment", label: "Assigned to" },
+    { key: "assignment", label: "Assignment" },
+    { key: "assigneeRef", label: "Assignee" },
     { key: "status", label: "Status" },
   ],
 };

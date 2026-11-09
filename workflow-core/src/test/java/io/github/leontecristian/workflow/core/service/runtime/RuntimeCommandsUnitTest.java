@@ -19,6 +19,11 @@ import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWor
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Binding;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
+import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
+import io.github.leontecristian.workflow.core.dto.runtime.ClaimWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.ResolvedTask;
@@ -57,12 +62,15 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.UUID;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /** In-memory repository/EntityManager doubles. Does not establish SQL or proxy transaction behavior. */
 class RuntimeCommandsUnitTest {
-    @Test void completeG04SequenceAndReplayKeepExactValuesAndOriginalSnapshots() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void completionKeepsExactValuesAndOriginalSnapshotsForUserAndClaimedSharedTask(boolean shared) {
         var em=mock(EntityManager.class); var instances=mock(WorkflowInstanceRepository.class);
         var activities=mock(WorkflowActivityRepository.class); var tasks=mock(WorkflowTaskRepository.class);
         var history=mock(WorkflowHistoryRepository.class); var receipts=mock(WorkflowCommandReceiptRepository.class);
@@ -76,7 +84,7 @@ class RuntimeCommandsUnitTest {
                 new RuntimeDefinitionPins(definitions,history,json),variables,new RuntimeServiceProgression(registry,variables,json),eligibility);
         var fields=Map.of("quantity",new ActionField("quantity",VariableValueType.LONG,false,false),"recordedQuantity",new ActionField("recordedQuantity",VariableValueType.LONG,false,false));
         var model=new MinimalWorkflowDefinition(new MinimalWorkflowDefinition.Node("BEGIN","START","Start",null),
-                new MinimalWorkflowDefinition.Human("REVIEW","SANDBOX_REVIEW",new MinimalWorkflowDefinition.Assignment("sandbox.singleReviewer"),List.of(new MinimalWorkflowDefinition.Outcome("COMPLETE","Complete",false))),
+                new MinimalWorkflowDefinition.Human("REVIEW","SANDBOX_REVIEW",new MinimalWorkflowDefinition.Assignment("sandbox.singleReviewer"),List.of(new MinimalWorkflowDefinition.Outcome("COMPLETE","Complete",false)), TaskClaimPolicy.REQUIRED),
                 new MinimalWorkflowDefinition.Node("DONE","END","Done","COMPLETED"),List.of(
                     new MinimalWorkflowDefinition.Transition("beginService","BEGIN","BEFORE",null),new MinimalWorkflowDefinition.Transition("beginReview","BEFORE","REVIEW",null),
                     new MinimalWorkflowDefinition.Transition("finishReview","REVIEW","AFTER","COMPLETE"),new MinimalWorkflowDefinition.Transition("finishService","AFTER","DONE",null)),
@@ -88,7 +96,7 @@ class RuntimeCommandsUnitTest {
         when(definitions.loadForStart(42)).thenReturn(definition); when(definitions.loadPinned(42)).thenReturn(definition);
         when(catalog.findByCode("SANDBOX_REVIEW")).thenReturn(Optional.of(new TaskTypeView(5,"SANDBOX_REVIEW","Review",null,false,0)));
         var resolver=mock(SingleTaskAssignmentResolver.class); when(host.resolver(anyString())).thenReturn(resolver);
-        when(host.resolve(eq(resolver),any())).thenReturn(new SingleAssignmentResult(List.of(new ResolvedTask("review",new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER,"reviewer"))),null));
+        when(host.resolve(eq(resolver),any())).thenReturn(new SingleAssignmentResult(List.of(new ResolvedTask("review",new TaskAssignmentTarget(shared ? AssignmentTargetKind.GROUP : AssignmentTargetKind.USER, shared ? "finance" : "reviewer"))),null));
         var recorder=mock(WorkflowEventRecorder.class); when(host.recorder()).thenReturn(recorder);
         when(registry.descriptor("sandbox.recordQuantity")).thenReturn(new ServiceActionDescriptor("sandbox.recordQuantity",List.of(new ActionField("quantity",VariableValueType.LONG,true,false)),List.of(new ActionField("recordedQuantity",VariableValueType.LONG,true,false))));
         when(registry.action(anyString())).thenReturn(action);
@@ -132,12 +140,38 @@ class RuntimeCommandsUnitTest {
         var task=persisted.stream().filter(WorkflowTaskEntity.class::isInstance).map(WorkflowTaskEntity.class::cast).findFirst().orElseThrow();
         when(instances.findById(1L)).thenReturn(Optional.of(instance)); when(activities.findActiveByInstanceId(1L)).thenReturn(Optional.of(activity)); when(tasks.findById(3L)).thenReturn(Optional.of(task));
         when(tasks.findPageByActivityId(eq(2L),eq(0L),any())).thenReturn(List.of(task));
-        var complete=new CompleteWorkflowTask(UUID.randomUUID(),1,3,opened.execution().instance().lockVersion(),"COMPLETE",null);
         var reviewer=new WorkflowCommandContext(ActorKind.USER,"reviewer",Instant.parse("2026-01-02T00:00:00Z"),"test");
+        long completionToken = opened.execution().instance().lockVersion();
+        long addedFacts = 0;
+        if (shared) {
+            assertEquals(null, opened.execution().task().assigneeRef());
+            when(activities.findById(2L)).thenReturn(Optional.of(activity));
+            var claim = new ClaimWorkflowTask(UUID.randomUUID(), 1, 3, completionToken);
+            var claimed = service.claimTask(claim, reviewer).execution();
+            assertEquals("reviewer", claimed.task().assigneeRef());
+            assertEquals(claimed.firstHistorySequence(), claimed.lastHistorySequence());
+            var release = new ReleaseWorkflowTask(UUID.randomUUID(), 1, 3, claimed.instance().lockVersion());
+            when(eligibility.isEligible(any(), anyString())).thenReturn(false);
+            var released = service.releaseTask(release, reviewer).execution();
+            assertEquals(null, released.task().assigneeRef());
+            assertEquals(claimed, service.findReplay(claim, reviewer).orElseThrow());
+            assertEquals(released, service.releaseTask(release, reviewer).execution());
+            assertEquals(List.of("TASK_CLAIMED", "TASK_RELEASED"), facts.tailMap(10L).values().stream()
+                    .map(WorkflowHistoryEntity::getEventType).toList());
+            when(eligibility.isEligible(any(), anyString())).thenReturn(true);
+            var reclaimed = service.claimTask(new ClaimWorkflowTask(UUID.randomUUID(), 1, 3,
+                    released.instance().lockVersion()), reviewer).execution();
+            completionToken = reclaimed.instance().lockVersion();
+            addedFacts = 3;
+        } else {
+            assertEquals("reviewer", opened.execution().task().assigneeRef());
+        }
+        var complete = new CompleteWorkflowTask(UUID.randomUUID(), 1, 3, completionToken, "COMPLETE", null);
         clearInvocations(em,action); var closed=service.completeTask(complete,reviewer);
-        assertEquals(16,closed.execution().lastHistorySequence()); assertEquals(InstanceStatus.COMPLETED,closed.execution().instance().status());
-        assertEquals(2,closed.execution().instance().lockVersion());
-        assertEquals(List.of("TASK_COMPLETED","ACTIVITY_COMPLETED","TRANSITION_TAKEN","SERVICE_TASK_COMPLETED","VARIABLES_WRITTEN","TRANSITION_TAKEN","INSTANCE_COMPLETED"),facts.tailMap(10L).values().stream().map(WorkflowHistoryEntity::getEventType).toList());
+        assertEquals(16 + addedFacts,closed.execution().lastHistorySequence()); assertEquals(InstanceStatus.COMPLETED,closed.execution().instance().status());
+        assertEquals(2 + addedFacts,closed.execution().instance().lockVersion());
+        assertEquals("reviewer", closed.execution().task().assigneeRef());
+        assertEquals(List.of("TASK_COMPLETED","ACTIVITY_COMPLETED","TRANSITION_TAKEN","SERVICE_TASK_COMPLETED","VARIABLES_WRITTEN","TRANSITION_TAKEN","INSTANCE_COMPLETED"),facts.tailMap(10L + addedFacts).values().stream().map(WorkflowHistoryEntity::getEventType).toList());
         var order=inOrder(em,action); order.verify(em).refresh(instance); order.verify(em).flush(); order.verify(action).execute(any(),any());
         for(var row:variableRows.values()) assertEquals("9007199254740993",((TextLiteral)row.executionValue().value()).value());
         clearInvocations(action,definitions,em,host);
@@ -145,6 +179,6 @@ class RuntimeCommandsUnitTest {
         assertTrue(service.completeTask(complete,reviewer).replayed());
         assertThrows(RuntimeException.class,() -> service.start(start,new StartInputs(Map.of("quantity",new TextLiteral("1"))),context,null));
         verifyNoInteractions(action,definitions,em,host);
-        assertEquals(2,storedReceipts.size()); assertTrue(storedReceipts.values().stream().allMatch(r -> r.getResultSchemaVersion()==4));
+        assertEquals(2 + addedFacts,storedReceipts.size()); assertTrue(storedReceipts.values().stream().allMatch(r -> r.getResultSchemaVersion()==5));
     }
 }

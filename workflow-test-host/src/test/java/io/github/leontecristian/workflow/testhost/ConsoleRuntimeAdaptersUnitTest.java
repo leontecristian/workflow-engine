@@ -46,6 +46,28 @@ class ConsoleRuntimeAdaptersUnitTest {
         assertThatThrownBy(()->host.replayComplete(command,"trusted")).isInstanceOfSatisfying(WorkflowRuntimeException.class,e->assertThat(e.status()).isEqualTo(404));
         verifyNoMoreInteractions(tx);
     }
+    @Test void ownershipRecoveryUsesOnlyTheNewTransactionReplayAndNeverTheMembershipGate() {
+        var tx = mock(ConsoleRuntimeTransaction.class);
+        var access = mock(ConsoleRuntimeAccess.class);
+        var context = mock(ConsoleContext.class);
+        var actor = mock(WorkflowCommandContext.class);
+        when(context.runtime("trusted")).thenReturn(actor);
+        var host = new ConsoleRuntimeCommandHost(new ConsoleRuntimeCoordinator(tx, access), tx, access, context);
+        var command = new io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask(
+                UUID.randomUUID(), 1, 5, 9);
+        var result = new WorkflowCommandResult(true, null);
+        when(tx.release(command, actor)).thenThrow(
+                new io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException(
+                        io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.CONCURRENT_COMMAND));
+        when(tx.replayRelease(command, actor)).thenReturn(Optional.of(result));
+
+        assertThat(host.release(command, "trusted")).isSameAs(result);
+        var order = inOrder(tx);
+        order.verify(tx).release(command, actor);
+        order.verify(tx).replayRelease(command, actor);
+        verifyNoMoreInteractions(tx);
+        verifyNoInteractions(access);
+    }
     @Test void hostFailuresKeepExistingConsoleStatusAndWrappedBusinessConflictMapping() {
         var commands=mock(ConsoleRuntimeCoordinator.class); var tx=mock(ConsoleRuntimeTransaction.class);
         var access=mock(ConsoleRuntimeAccess.class); var context=mock(ConsoleContext.class);

@@ -104,7 +104,7 @@ class WorkflowRuntimeWebUnitTest {
             var task=new io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView(5,2,1,3,"REVIEW",
                     new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(
                             io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.GROUP,"finance"),
-                    io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.OPEN,null,java.time.Instant.EPOCH,null,null,null,null);
+                    io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.OPEN,null,java.time.Instant.EPOCH,null,null,null,null,null);
             when(host.task(5)).thenReturn(task);
             mvc.perform(get("/custom/tasks/5")).andExpect(status().isOk())
                     .andExpect(jsonPath("$.assignment.kind").value("GROUP"))
@@ -118,6 +118,45 @@ class WorkflowRuntimeWebUnitTest {
             when(host.canReadTask(task)).thenReturn(false);
             mvc.perform(get("/custom/activities/2/submissions")).andExpect(status().isOk())
                     .andExpect(content().json("{\"items\":[],\"nextAfterTaskId\":null}"));
+        }
+    }
+    @Test void readOnlyContractIncludesPinnedPolicyWithoutOwnershipActions() throws Exception {
+        try (var c = context(Host.class, Reads.class, WorkflowRuntimeReadConfiguration.class)) {
+            var host = c.getBean(WorkflowRuntimeReadHost.class);
+            var reads = c.getBean(WorkflowRuntimeQueryService.class);
+            var definitions = c.getBean(WorkflowDefinitionService.class);
+            var task = new io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView(5, 2, 1, 3, "REVIEW",
+                    new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(
+                            io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.GROUP, "finance"),
+                    io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.OPEN,
+                    null, java.time.Instant.EPOCH, null, null, null, null, "reviewer");
+            var instance = mock(io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView.class);
+            var activity = mock(io.github.leontecristian.workflow.core.dto.runtime.WorkflowActivityView.class);
+            var version = mock(io.github.leontecristian.workflow.core.dto.definition.DefinitionVersionView.class);
+            when(host.task(5)).thenReturn(task);
+            when(host.canCompleteTask(task)).thenReturn(true);
+            when(host.canReleaseTask(task)).thenReturn(true);
+            when(host.canAdministrativelyReleaseTask(task)).thenReturn(true);
+            when(reads.findInstance(1)).thenReturn(Optional.of(instance));
+            when(instance.definitionVersionId()).thenReturn(4L);
+            when(instance.lockVersion()).thenReturn(9L);
+            when(reads.findActivity(2)).thenReturn(Optional.of(activity));
+            when(activity.nodeKey()).thenReturn("REVIEW");
+            when(reads.taskClaimPolicy(1, 5))
+                    .thenReturn(io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy.REQUIRED);
+            when(definitions.findVersion(4)).thenReturn(Optional.of(version));
+            when(version.documentJson()).thenReturn("""
+                    {"nodes":[{"key":"REVIEW","taskType":"REVIEW","outcomes":[]}]}
+                    """);
+
+            mvc(c).perform(get("/custom/tasks/5/contract")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.claimPolicy").value("REQUIRED"))
+                    .andExpect(jsonPath("$.canComplete").value(true))
+                    .andExpect(jsonPath("$.canClaim").value(false))
+                    .andExpect(jsonPath("$.canRelease").value(false))
+                    .andExpect(jsonPath("$.canAdminRelease").value(false));
+            verify(host, org.mockito.Mockito.never()).instance(1);
+            verify(host, org.mockito.Mockito.never()).activity(2);
         }
     }
     @Test void variableSnapshotAndExactValuesSurviveAndStalePagesFail() throws Exception {
@@ -156,6 +195,40 @@ class WorkflowRuntimeWebUnitTest {
                 .andExpect(status().isOk()).andExpect(content().json("{\"found\":false,\"result\":null}"));
             verify(host,times(1)).complete(any(),any());
             verifyNoInteractions(c.getBean(WorkflowRuntimeReadHost.class));
+        }
+    }
+    @Test void ownershipRoutesPreserveExactInputAndReplayNeverMutates() throws Exception {
+        try (var c = context(Host.class, Commands.class, WorkflowRuntimeCommandConfiguration.class)) {
+            var host = c.getBean(WorkflowRuntimeCommandHost.class);
+            var mvc = mvc(c);
+            String uuid = "12345678-1234-1234-1234-123456789abc";
+            String body = "{\"commandId\":\"" + uuid + "\",\"reason\":\" exact \"}";
+            String token = "9007199254740994";
+            String instance = "9007199254740993";
+            String release = "/custom/instances/" + instance + "/tasks/5/admin-release";
+            when(host.administrativelyRelease(any(), eq("corr")))
+                    .thenReturn(new WorkflowCommandResult(false, null));
+            mvc.perform(post(release).contentType("application/json")
+                    .header("X-Expected-Lock-Version", token).requestAttr("trusted", "corr").content(body))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.replayed").value(false));
+            var command = new io.github.leontecristian.workflow.core.dto.runtime.AdministrativelyReleaseWorkflowTask(
+                    java.util.UUID.fromString(uuid), Long.parseLong(instance), 5, Long.parseLong(token), " exact ");
+            verify(host).administrativelyRelease(command, "corr");
+            when(host.replayAdministrativeRelease(command, "corr")).thenReturn(Optional.empty());
+            mvc.perform(post("/custom/commands/admin-release/replay").contentType("application/json")
+                    .header("X-Expected-Lock-Version", token).requestAttr("trusted", "corr")
+                    .content(body.substring(0, body.length() - 1) + ",\"instanceId\":\"" + instance + "\",\"taskId\":\"5\"}"))
+                    .andExpect(status().isOk()).andExpect(content().json("{\"found\":false,\"result\":null}"));
+            verify(host).replayAdministrativeRelease(command, "corr");
+
+            for (String bad : List.of(body.replace(" exact ", " "), body.replace(" exact ", "x".repeat(1001)),
+                    body.replace(" exact ", "x\",\"reason\":\"y"),
+                    body.replace(" exact ", "x\",\"assignee\":\"fake"))) {
+                mvc.perform(post(release).contentType("application/json")
+                        .header("X-Expected-Lock-Version", token).content(bad))
+                        .andExpect(status().isBadRequest());
+            }
+            org.mockito.Mockito.verifyNoMoreInteractions(host);
         }
     }
     @Test void commandParsingAndSafeErrorCategoriesArePreserved() throws Exception {

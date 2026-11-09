@@ -1,5 +1,8 @@
 package io.github.leontecristian.workflow.testhost.service.runtime;
 
+import io.github.leontecristian.workflow.core.dto.runtime.AdministrativelyReleaseWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.ClaimWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
@@ -11,7 +14,9 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 import java.util.IdentityHashMap;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /** Intentionally nontransactional. The transactional proxy has rolled back before recovery runs. */
 @Service
@@ -61,6 +66,33 @@ public class ConsoleRuntimeCoordinator {
             throw original;
         } finally {
             LOG.info("Console complete end command={}", command.commandId());
+        }
+    }
+
+    public WorkflowCommandResult claim(ClaimWorkflowTask command, WorkflowCommandContext context) {
+        return executeOwnership(() -> transactions.claim(command, context),
+                () -> transactions.replayClaim(command, context));
+    }
+
+    public WorkflowCommandResult release(ReleaseWorkflowTask command, WorkflowCommandContext context) {
+        return executeOwnership(() -> transactions.release(command, context),
+                () -> transactions.replayRelease(command, context));
+    }
+
+    public WorkflowCommandResult administrativelyRelease(
+            AdministrativelyReleaseWorkflowTask command, WorkflowCommandContext context) {
+        return executeOwnership(() -> transactions.administrativelyRelease(command, context),
+                () -> transactions.replayAdministrativeRelease(command, context));
+    }
+
+    private WorkflowCommandResult executeOwnership(Supplier<WorkflowCommandResult> execute,
+            Supplier<Optional<WorkflowCommandResult>> replay) {
+        try {
+            return execute.get();
+        } catch (RuntimeException original) {
+            // Core checks business access again in the fresh replay transaction.
+            if (eligible(original)) return replay.get().orElseThrow(() -> original);
+            throw original;
         }
     }
 

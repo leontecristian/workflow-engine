@@ -26,11 +26,16 @@ function summary(value: unknown, id: string): value is HistorySummary {
 }
 export function validateHistory(value: unknown, id: string, after: string): asserts value is HistoryPage {
   requireValid(object(value) && Array.isArray(value['items']) && value['items'].length <= 100 && nullableId(value['nextAfterSequence']));
-  let cursor = BigInt(after);
+  const requested = BigInt(after);
+  let cursor = requested;
   for (const item of value['items'] as unknown[]) {
     requireValid(summary(item, id) && BigInt(item.historySequence) > cursor); cursor = BigInt(item.historySequence);
   }
-  requireValid(value['nextAfterSequence'] === null || (value['items'] as unknown[]).length > 0 && BigInt(value['nextAfterSequence'] as string) === cursor);
+  const next = value['nextAfterSequence'];
+  if (next !== null) {
+    const sourceCursor = BigInt(next as string);
+    requireValid(sourceCursor > requested && sourceCursor >= cursor);
+  }
 }
 export function validateEvent(value: unknown, id: string, sequence: string): asserts value is HistoryEvent {
   requireValid(object(value) && summary(value['summary'], id) && value['summary'].historySequence === sequence && text(value['detailsJson']));

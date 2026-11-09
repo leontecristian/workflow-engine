@@ -25,7 +25,9 @@ export class CommandRecovery {
   try {
    const result=envelope.kind==='start'
     ? await (replay?this.transport.start!.replay(envelope,signal):this.transport.start!.execute(envelope,signal))
-    : await (replay?this.transport.replayComplete(envelope,signal):this.transport.complete(envelope,signal));
+    : envelope.kind==='complete'
+     ? await (replay?this.transport.replayComplete(envelope,signal):this.transport.complete(envelope,signal))
+     : await (this.transport.ownership?.(envelope,replay,signal) ?? Promise.reject(new Error('Host ownership transport is required')));
    this.record(generation,id,{outcome:replay?'REPLAY_ONLY_LOOKUP':'replayed' in result&&result.replayed?'REPLAYED_ORIGINAL_RESULT':'NEW_COMMITTED_RESULT',result});return result;
   } catch(error) {
    const status=(error as {httpStatus?:number})?.httpStatus;

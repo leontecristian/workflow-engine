@@ -20,7 +20,7 @@ public interface WorkflowTaskRepository extends Repository<WorkflowTaskEntity, L
 
     String TASK_PAGE_SELECT = """
             select t.id as id, t.activityId as activityId, a.instanceId as instanceId,
-                a.taskTypeId as taskTypeId, t.taskKey as taskKey, t.assignmentKind as assignmentKind, t.assignmentRef as assignmentRef,
+                a.taskTypeId as taskTypeId, t.taskKey as taskKey, t.assignmentKind as assignmentKind, t.assignmentRef as assignmentRef, t.assigneeRef as assigneeRef,
                 t.status as status, t.outcomeKey as outcomeKey, t.createdAt as createdAt,
                 t.dueAt as dueAt, t.closedAt as closedAt, t.closedBy as closedBy,
                 t.closureReason as closureReason

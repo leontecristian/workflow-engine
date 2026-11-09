@@ -42,6 +42,10 @@ public class WorkflowTaskEntity {
     @Column(name = "assignment_ref", nullable = false, length = 200)
     private String assignmentRef;
 
+    @Nationalized
+    @Column(name = "assignee_ref", length = 200)
+    private String assigneeRef;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 12)
     private TaskStatus status;
@@ -80,6 +84,7 @@ public class WorkflowTaskEntity {
         this.activityId = activityId; this.taskKey = java.util.Objects.requireNonNull(taskKey);
         this.assignmentKind = java.util.Objects.requireNonNull(assignment.kind());
         this.assignmentRef = java.util.Objects.requireNonNull(assignment.ref());
+        this.assigneeRef = assignmentKind == AssignmentTargetKind.USER ? assignmentRef : null;
         this.createdAt = java.util.Objects.requireNonNull(time); this.status = TaskStatus.OPEN;
     }
 
@@ -87,8 +92,20 @@ public class WorkflowTaskEntity {
         return new TaskAssignmentTarget(assignmentKind, assignmentRef);
     }
 
+    public void claim(String actor) {
+        if (status != TaskStatus.OPEN || assignmentKind == AssignmentTargetKind.USER || assigneeRef != null)
+            throw new IllegalStateException("Unassigned OPEN shared task required");
+        assigneeRef = java.util.Objects.requireNonNull(actor);
+    }
+
+    public void release() {
+        if (status != TaskStatus.OPEN || assignmentKind == AssignmentTargetKind.USER || assigneeRef == null)
+            throw new IllegalStateException("Assigned OPEN shared task required");
+        assigneeRef = null;
+    }
+
     public void complete(String outcome, LocalDateTime time, String actor) {
-        if (status != TaskStatus.OPEN || time.isBefore(createdAt) || (assignmentKind == AssignmentTargetKind.USER && !assignmentRef.equals(actor)))
+        if (status != TaskStatus.OPEN || time.isBefore(createdAt) || (assigneeRef != null && !assigneeRef.equals(actor)))
             throw new IllegalStateException("Assigned OPEN task required");
         status = TaskStatus.COMPLETED; outcomeKey = java.util.Objects.requireNonNull(outcome);
         closedAt = time; closedBy = java.util.Objects.requireNonNull(actor); closureReason = TaskClosureReason.TASK_OUTCOME;

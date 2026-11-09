@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 /** Internal publication-subset checker. No represented host function is ever executed. */
 @Component
 public class DefinitionValidationService {
-    static final String IDENTIFIER = "wf-shared-assignment-validator-v1";
+    static final String IDENTIFIER = "wf-task-claim-validator-v1";
     private final TaskTypeCatalogService catalog;
     private final DefinitionCapabilityProvider provider;
     private final io.github.leontecristian.workflow.core.service.runtime.RuntimeHostSupport runtimeHost;

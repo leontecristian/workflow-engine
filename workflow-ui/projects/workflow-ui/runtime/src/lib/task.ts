@@ -7,9 +7,9 @@ import { PAGE_IMPORTS } from './page-imports';
 export class WorkflowTaskComponent extends RuntimeState {
   @Input() diagnosticsEnabled = false;
   get uncertain(): boolean {
-    return this.commands.buffer.entries.some(e => e.kind === "complete" && e.body["taskId"] === this.id && this.commands.observations.get(e.body["commandId"]!)?.outcome === "UNKNOWN_OUTCOME");
+    return this.commands.buffer.entries.some(e => e.kind !== "start" && e.body["taskId"] === this.id && this.commands.observations.get(e.body["commandId"]!)?.outcome === "UNKNOWN_OUTCOME");
   }
- protected clearContent(){this.detail.set(null);this.contract.set(null);this.submission.set(null);this.comment="";this.outcome="";}
+ protected clearContent(){this.detail.set(null);this.contract.set(null);this.submission.set(null);this.comment="";this.outcome="";this.reason="";}
   get meta() {return {
     title: this.messages.taskTitle,
     eyebrow: "ASSIGNED WORK",
@@ -22,6 +22,7 @@ export class WorkflowTaskComponent extends RuntimeState {
   submission = signal<TaskSubmission | null>(null);
   outcome = "";
   comment = "";
+  reason = "";
   commands = inject(CommandRecovery);
   readonly commandProvider=inject(WORKFLOW_RUNTIME_COMMANDS,{optional:true});
   protected onScope(){this.commands.setScope(this.sessionScope);}
@@ -31,20 +32,52 @@ export class WorkflowTaskComponent extends RuntimeState {
     this.clearContent();
     const id = this.id;
     await this.run(async (signal,current) => {
-      const [d, c, s] = await Promise.all([
-        this.api.task(id,signal),
-        this.api.taskContract(id,signal),
-        this.api.taskSubmission(id,signal),
+      // An older contract token must never authorize actions against a newer, unseen assignee.
+      const snapshot = async () => {
+        const contract = await this.api.taskContract(id, signal);
+        if (!current()) return null;
+        return { contract, detail: await this.api.task(id, signal) };
+      };
+      const [task, s] = await Promise.all([
+        snapshot(),
+        this.api.taskSubmission(id,signal).catch(error => {
+          const status=(error as {httpStatus?:number})?.httpStatus;
+          if(status===403 || status===404)return null;
+          throw error;
+        }),
       ]);
-      if (!current()) return;
-      this.detail.set(d);
-      this.contract.set(c);
+      if (!current() || !task) return;
+      this.detail.set(task.detail);
+      this.contract.set(task.contract);
       this.submission.set(s);
     });
   }
+  reasonBlank(): boolean { return /^[\u0009-\u000d\u001c-\u0020\u1680\u2000-\u2006\u2008-\u200a\u2028\u2029\u205f\u3000]*$/u.test(this.reason); }
   commentBlank(): boolean {
     // Java String.isBlank whitespace; preserve the submitted text exactly.
     return /^[\u0009-\u000d\u001c-\u0020\u1680\u2000-\u2006\u2008-\u200a\u2028\u2029\u205f\u3000]*$/u.test(this.comment);
+  }
+  async ownership(kind: 'claim'|'release'|'admin-release'): Promise<void> {
+    const contract=this.contract(), detail=this.detail();
+    const allowed=kind==='claim'?contract?.canClaim:kind==='release'?contract?.canRelease:contract?.canAdminRelease;
+    if(this.busy() || !this.commandProvider?.ownership || !detail || detail.status!=='OPEN' || detail.assignment.kind==='USER' || !allowed || this.uncertain)return;
+    this.completing=true;
+    let conflict=false;
+    const succeeded=await this.run(async(signal) => {
+      const body: Record<string,string>={commandId:crypto.randomUUID(),instanceId:detail.instanceId,taskId:this.id};
+      if(kind==='admin-release')body['reason']=this.reason;
+      this.commands.buffer.remember({kind,body,expectedToken:contract!.instanceLockVersion});
+      try { await this.commands.execute(false,signal); }
+      catch(error) {
+        const status=(error as {httpStatus?:number})?.httpStatus;
+        conflict=status===409;
+        if((!status || status>=500) && !this.diagnosticsEnabled)throw new Error('The outcome is uncertain. Contact your administrator before trying again.');
+        throw error;
+      }
+    });
+    this.completing=false;
+    if(succeeded){await this.load();this.notice.set('Task ownership updated.');}
+    else if(conflict){await this.load();this.error.set('The task changed. Current details have been refreshed.');}
   }
   async complete(outcomeKey: string): Promise<void> {
     if (this.busy() || !this.commandProvider || !this.detail() || !this.contract()?.canComplete || this.uncertain) return;

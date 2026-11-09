@@ -4,6 +4,7 @@ import io.github.leontecristian.workflow.core.dto.definition.DefinitionManagemen
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +20,17 @@ public class ConsoleContext {
 
     public String actor() {
         return SecurityContextHolder.getContext().getAuthentication().getName();
+    }
+
+    public boolean isConsoleActor(String actorRef) {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null
+                && authentication.isAuthenticated()
+                && !(authentication instanceof AnonymousAuthenticationToken)
+                && authentication.getName().equals(actorRef)
+                && authentication.getAuthorities().stream().anyMatch(authority ->
+                        "ROLE_CONSOLE_ADMIN".equals(authority.getAuthority())
+                                || "ROLE_CONSOLE_REVIEWER".equals(authority.getAuthority()));
     }
 
     public boolean admin() {

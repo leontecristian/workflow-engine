@@ -28,7 +28,7 @@ public class ConsoleRuntimeReadHost implements WorkflowRuntimeReadHost {
         return reads.listInstances(query);
     }
     @Override public WorkflowTaskPage listAssignedTasks(long afterId, int limit) {
-        return reads.listEligibleTasks(context.actor(), afterId, limit, access::canReadTask);
+        return reads.listEligibleTasks(context.actor(), afterId, limit, access::canAccessBusiness);
     }
     @Override public WorkflowTaskPage listTasks(long id, long afterId, int limit) {
         instance(id);
@@ -53,6 +53,11 @@ public class ConsoleRuntimeReadHost implements WorkflowRuntimeReadHost {
     }
     @Override public boolean canCompleteTask(WorkflowTaskView task) { return access.canCompleteTask(task); }
     @Override public boolean canReadTask(WorkflowTaskView task) { return access.canReadTask(task); }
+    @Override public boolean canClaimTask(WorkflowTaskView task) { return access.canClaimTask(task); }
+    @Override public boolean canReleaseTask(WorkflowTaskView task) { return access.canReleaseTask(task); }
+    @Override public boolean canAdministrativelyReleaseTask(WorkflowTaskView task) {
+        return access.canAdministrativelyReleaseTask(task);
+    }
     @Override public WorkflowInstanceView instance(long id) { return policy(() -> access.instance(id)); }
     @Override public WorkflowTaskView task(long id) { return policy(() -> access.task(id)); }
     @Override public WorkflowActivityView activity(long id) { return policy(() -> access.activity(id)); }

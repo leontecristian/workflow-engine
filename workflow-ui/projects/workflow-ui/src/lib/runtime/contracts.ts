@@ -19,6 +19,7 @@ export const WORKFLOW_RUNTIME_READS = new InjectionToken<WorkflowRuntimeReads>('
 export interface WorkflowRuntimeCommands {
  complete(envelope:Envelope,signal:AbortSignal):Promise<CommandResult>;
  replayComplete(envelope:Envelope,signal:AbortSignal):Promise<ReplayResult>;
+ ownership?(envelope:Envelope,replay:boolean,signal:AbortSignal):Promise<CommandResult | ReplayResult>;
  start?: StartEnvelopeAdapter;
 }
 export const WORKFLOW_RUNTIME_COMMANDS = new InjectionToken<WorkflowRuntimeCommands>('Workflow runtime commands');

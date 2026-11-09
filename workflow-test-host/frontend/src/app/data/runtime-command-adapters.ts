@@ -12,6 +12,7 @@ export class ConsoleRuntimeCommands implements WorkflowRuntimeCommands {
   replay:(envelope,signal)=>this.dispatch<ReplayResult>(envelope,true,signal)};
  complete(envelope:Envelope,signal:AbortSignal){return this.dispatch<CommandResult>(envelope,false,signal);}
  replayComplete(envelope:Envelope,signal:AbortSignal){return this.dispatch<ReplayResult>(envelope,true,signal);}
+ ownership(envelope:Envelope,replay:boolean,signal:AbortSignal){return this.dispatch<CommandResult | ReplayResult>(envelope,replay,signal);}
  private dispatch<T>(envelope:Envelope,replay:boolean,signal:AbortSignal):Promise<T>{
   const request=commandRequest(envelope,replay);
   return this.session.runtimeCommand<T>(request.path,request.body,request.token,envelope.kind==='start',signal);

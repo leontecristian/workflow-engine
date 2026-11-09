@@ -13,6 +13,7 @@ public interface RuntimeTaskRow {
     String getTaskKey();
     io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind getAssignmentKind();
     String getAssignmentRef();
+    String getAssigneeRef();
     TaskStatus getStatus();
     String getOutcomeKey();
     LocalDateTime getCreatedAt();

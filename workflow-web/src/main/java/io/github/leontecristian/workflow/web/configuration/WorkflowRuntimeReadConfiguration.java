@@ -2,19 +2,23 @@ package io.github.leontecristian.workflow.web.configuration;
 
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
+import io.github.leontecristian.workflow.web.controller.runtime.WorkflowRuntimeCommandController;
 import io.github.leontecristian.workflow.web.controller.runtime.WorkflowRuntimeReadController;
 import io.github.leontecristian.workflow.web.integration.runtime.WorkflowRuntimeReadHost;
 import io.github.leontecristian.workflow.web.service.runtime.RuntimeErrors;
 import io.github.leontecristian.workflow.web.service.runtime.RuntimeWire;
 import java.util.Map;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 /** Plain explicit import: dependency/scanning alone activates no routes. */
 public class WorkflowRuntimeReadConfiguration {
     @Bean public WorkflowRuntimeReadController workflowRuntimeReadController(WorkflowRuntimeReadHost host,
-            WorkflowRuntimeOptions options, WorkflowRuntimeQueryService reads, WorkflowDefinitionService definitions) {
+            WorkflowRuntimeOptions options, WorkflowRuntimeQueryService reads, WorkflowDefinitionService definitions,
+            ObjectProvider<WorkflowRuntimeCommandController> commands) {
         var wire = new RuntimeWire();
-        return new WorkflowRuntimeReadController(reads, definitions, host, wire, new RuntimeErrors(wire, options));
+        return new WorkflowRuntimeReadController(reads, definitions, host, wire, new RuntimeErrors(wire, options),
+                commands.getIfAvailable() != null);
     }
     @Bean public RequestMappingHandlerMapping workflowRuntimeReadHandlerMapping(WorkflowRuntimeOptions options) {
         var mapping = new RequestMappingHandlerMapping() {

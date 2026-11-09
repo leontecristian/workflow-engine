@@ -25,11 +25,24 @@ public class ConsoleViewerAccess implements WorkflowViewerAccess {
     }
     @Override public void requireHistoryRead(long id) { requireInstanceRead(id); }
     @Override public void requireHistoryEventRead(WorkflowHistorySummary event) {
-        requireHistoryRead(event.instanceId());
+        WorkflowViewerAccess.super.requireHistoryEventRead(event);
         if ("TASK_COMPLETED".equals(event.eventType())) {
             if (event.taskId() == null) throw new WorkflowViewerException(500, "HOST_CONFIGURATION");
             try { access.task(event.taskId()); }
             catch (ConsoleException denied) { throw new WorkflowViewerException(denied.status(), denied.code()); }
+        }
+    }
+    @Override public boolean canReadHistorySummary(WorkflowHistorySummary event) {
+        if (!"TASK_CLAIMED".equals(event.eventType()) && !"TASK_RELEASED".equals(event.eventType()))
+            return true;
+        if (event.taskId() == null || event.activityId() == null)
+            throw new WorkflowViewerException(500, "HOST_CONFIGURATION");
+        try {
+            var task = access.task(event.taskId());
+            return task.instanceId() == event.instanceId() && task.activityId() == event.activityId();
+        } catch (ConsoleException denied) {
+            if (denied.status() == 404) return false;
+            throw new WorkflowViewerException(denied.status(), denied.code());
         }
     }
     @Override public Set<ViewerLinkReference> readableLinks(long id, Set<ViewerLinkReference> candidates) {

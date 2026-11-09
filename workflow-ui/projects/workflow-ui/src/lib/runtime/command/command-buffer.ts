@@ -1,6 +1,6 @@
 import type { CommandResult, ReplayResult } from '../models';
 export type CommandBody = Readonly<Record<string,string|null>>;
-export type Envelope = Readonly<{kind:'start'|'complete';body:CommandBody;expectedToken:string|null}>;
+export type Envelope = Readonly<{kind:'start'|'complete'|'claim'|'release'|'admin-release';body:CommandBody;expectedToken:string|null}>;
 /** The only host-specific envelope: start fields and dispatch remain host-owned. */
 export interface StartEnvelopeAdapter {
  freezeBody(value:unknown):CommandBody;
@@ -14,7 +14,7 @@ export function exactDecimal(value:string,zero=false):string {
 export function freezeEnvelope(input:unknown,start?:StartEnvelopeAdapter):Envelope {
  if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('Invalid command envelope');
  const obj=input as Record<string,unknown>;
- if(Object.keys(obj).sort().join()!=='body,expectedToken,kind'||(obj['kind']!=='start'&&obj['kind']!=='complete'))throw new Error('Invalid command envelope');
+ if(Object.keys(obj).sort().join()!=='body,expectedToken,kind'||!['start','complete','claim','release','admin-release'].includes(obj['kind'] as string))throw new Error('Invalid command envelope');
  if(!obj['body']||typeof obj['body']!=='object'||Array.isArray(obj['body']))throw new Error('Invalid body');
  const source=obj['body'] as Record<string,unknown>;
  if(typeof source['commandId']!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(source['commandId']))throw new Error('Invalid command UUID');
@@ -25,13 +25,15 @@ export function freezeEnvelope(input:unknown,start?:StartEnvelopeAdapter):Envelo
   body=start.freezeBody(source);
   if(body['commandId']!==source['commandId'])throw new Error('Start adapter changed command UUID');
  } else {
-  if(Object.keys(source).sort().join()!=='commandId,comment,instanceId,outcomeKey,taskId')throw new Error('Invalid command fields');
+  const fields=obj['kind']==='complete'?'commandId,comment,instanceId,outcomeKey,taskId':obj['kind']==='admin-release'?'commandId,instanceId,reason,taskId':'commandId,instanceId,taskId';
+  if(Object.keys(source).sort().join()!==fields)throw new Error('Invalid command fields');
   for(const [key,value] of Object.entries(source))if(typeof value!=='string'&&!(key==='comment'&&value===null))throw new Error('Invalid command value');
+  if(obj['kind']==='admin-release' && (typeof source['reason']!=='string' || source['reason'].length>1000 || /^[\u0009-\u000d\u001c-\u0020\u1680\u2000-\u2006\u2008-\u200a\u2028\u2029\u205f\u3000]*$/u.test(source['reason']) || /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(source['reason'])))throw new Error('Invalid administrative reason');
   exactDecimal(source['instanceId'] as string);exactDecimal(source['taskId'] as string);
   exactDecimal(obj['expectedToken'] as string,true);
   body={...source} as CommandBody;
  }
- return Object.freeze({kind:obj['kind'],body:Object.freeze({...body}),expectedToken:obj['expectedToken'] as string|null});
+ return Object.freeze({kind:obj['kind'] as Envelope['kind'],body:Object.freeze({...body}),expectedToken:obj['expectedToken'] as string|null});
 }
 export class CommandBuffer {
  actor:string|null=null;

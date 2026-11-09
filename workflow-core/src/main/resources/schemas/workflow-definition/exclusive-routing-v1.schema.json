@@ -307,6 +307,10 @@
           "type": "string",
           "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
         },
+        "claimPolicy": {
+          "type": "string",
+          "enum": ["OPTIONAL", "REQUIRED"]
+        },
         "assignment": {
           "type": "object",
           "properties": {

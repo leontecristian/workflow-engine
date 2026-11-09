@@ -1,6 +1,6 @@
 # F017 — Task claiming and release
 
-**Status:** READY, revision 3 — 2026-11-09. **Owner:** Workflow project owner. **Constitution:** 6.2.0. Authorization covers specification and planning. O01–O06 are closed; implementation requires a subsequent request.
+**Status:** IMPLEMENTED, revision 3 — 2026-11-09. **Owner:** Workflow project owner. **Constitution:** 6.2.0. O01–O06 are closed. Guarded SQL Server and live sandbox acceptance passed. See the [implementation record](implementation.md).
 
 ## Purpose and authority
 

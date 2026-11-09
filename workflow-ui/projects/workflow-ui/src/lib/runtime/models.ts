@@ -15,6 +15,7 @@ export interface TaskView {
   taskTypeId: Decimal;
   taskKey: string;
   assignment: TaskAssignment;
+  assigneeRef: string | null;
   status: string;
   outcomeKey: string | null;
   createdAt: string;
@@ -28,6 +29,10 @@ export interface TaskContract {
   instanceId: Decimal;
   instanceLockVersion: Decimal;
   taskType: string;
+  claimPolicy: "OPTIONAL" | "REQUIRED";
+  canClaim: boolean;
+  canRelease: boolean;
+  canAdminRelease: boolean;
   canComplete: boolean;
   assignmentLabel: string;
   outcomes: {

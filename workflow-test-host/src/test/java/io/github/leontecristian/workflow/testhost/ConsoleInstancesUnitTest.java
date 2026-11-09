@@ -33,7 +33,7 @@ class ConsoleInstancesUnitTest {
     private final WorkflowRuntimeQueryService reads = mock(WorkflowRuntimeQueryService.class);
     private final ConsoleContext context = new ConsoleContext(java.time.Clock.systemUTC());
     private final WorkflowRuntimeReadController controller = new WorkflowRuntimeReadController(
-            reads, null, new ConsoleRuntimeReadHost(reads, null, context), new RuntimeWire(), null);
+            reads, null, new ConsoleRuntimeReadHost(reads, null, context), new RuntimeWire(), null, false);
 
     @BeforeEach
     void administrator() {

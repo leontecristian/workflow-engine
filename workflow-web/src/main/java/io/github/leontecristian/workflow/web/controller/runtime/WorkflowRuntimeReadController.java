@@ -5,7 +5,10 @@ import static io.github.leontecristian.workflow.web.service.runtime.RuntimeWire.
 import static io.github.leontecristian.workflow.web.service.runtime.RuntimeWire.limit;
 import static io.github.leontecristian.workflow.web.service.runtime.RuntimeWire.query;
 
+import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
 import io.github.leontecristian.workflow.core.dto.runtime.BooleanLiteral;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmission;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmissionPage;
@@ -37,9 +40,11 @@ public class WorkflowRuntimeReadController {
     private final WorkflowRuntimeReadHost access;
     private final RuntimeWire wire;
     private final RuntimeErrors errors;
+    private final boolean commandsAvailable;
     public WorkflowRuntimeReadController(WorkflowRuntimeQueryService reads, WorkflowDefinitionService definitions,
-            WorkflowRuntimeReadHost access, RuntimeWire wire, RuntimeErrors errors) {
+            WorkflowRuntimeReadHost access, RuntimeWire wire, RuntimeErrors errors, boolean commandsAvailable) {
         this.reads = reads; this.definitions = definitions; this.access = access; this.wire = wire; this.errors = errors;
+        this.commandsAvailable = commandsAvailable;
     }
     @GetMapping("/instances/{id}/variables")
     public ResponseEntity<String> variables(@PathVariable String id,HttpServletRequest r) {
@@ -121,9 +126,14 @@ public class WorkflowRuntimeReadController {
     }
     @GetMapping("/tasks/{id}/contract")
     public ResponseEntity<String> contract(@PathVariable String id) {
-        var task = access.task(decimal(id, false));
-        var instance = access.instance(task.instanceId());
-        var activity = access.activity(task.activityId());
+        long taskId = decimal(id, false);
+        var authorized = access.task(taskId);
+        // The exact-task grant permits its own pinned contract without general instance access.
+        // Read the version before the task snapshot so a stale view cannot carry a newer token.
+        var instance = reads.findInstance(authorized.instanceId()).orElseThrow();
+        var task = access.task(taskId);
+        var activity = reads.findActivity(task.activityId()).orElseThrow();
+        var claimPolicy = reads.taskClaimPolicy(task.instanceId(), task.id());
         var version =
                 definitions
                         .findVersion(instance.definitionVersionId())
@@ -137,9 +147,17 @@ public class WorkflowRuntimeReadController {
                             new WorkflowTaskContract.Outcome(
                                     outcome.get("key").textValue(), outcome.get("label").textValue(), outcome.get("requiresComment").booleanValue()));
                 }
-                return wire.response(
-                        new WorkflowTaskContract(
-                                task.id(), task.instanceId(), instance.lockVersion(), node.get("taskType").textValue(), outcomes, access.canCompleteTask(task), assignmentLabel(task)));
+                boolean open = task.status() == TaskStatus.OPEN;
+                boolean shared = task.assignment().kind() != AssignmentTargetKind.USER;
+                boolean assigned = task.assigneeRef() != null;
+                boolean canComplete = open && (!shared || assigned || claimPolicy == TaskClaimPolicy.OPTIONAL)
+                        && access.canCompleteTask(task);
+                return wire.response(new WorkflowTaskContract(
+                        task.id(), task.instanceId(), instance.lockVersion(), node.get("taskType").textValue(),
+                        outcomes, canComplete, assignmentLabel(task), claimPolicy,
+                        commandsAvailable && open && shared && !assigned && access.canClaimTask(task),
+                        commandsAvailable && open && shared && assigned && access.canReleaseTask(task),
+                        commandsAvailable && open && shared && assigned && access.canAdministrativelyReleaseTask(task)));
             }
         throw new IllegalStateException("Pinned human contract missing");
     }
