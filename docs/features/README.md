@@ -1,5 +1,7 @@
 # Feature specifications
 
+[F017 — Task claiming and release](F017-task-claim-release/spec.md) is **READY revision 3**. Agreed policy, ownership, visibility and release/recovery decisions and O01–O06 engineering contracts are closed. Implementation awaits a separate request. See the [plan](F017-task-claim-release/plan.md), [tasks](F017-task-claim-release/tasks.md) and [planning handover](F017-task-claim-release/implementation.md).
+
 [F016 — Shared group/role task assignment with current membership](F016-shared-group-role-task-assignment/spec.md) is **IMPLEMENTED revision 2**. Typed assignment, current membership, authorized discovery, preserving migration and diagnostic opt-in UI are delivered; see its [handover](F016-shared-group-role-task-assignment/implementation.md). Claiming/releasing follows as the next separate feature.
 
 [F015 — Runtime task, command and recovery extraction](F015-runtime-task-instance-extraction/spec.md) is **IMPLEMENTED revision 2**. Runtime reads, complete task UI, immutable buffering and recovery are shared; independently activated completion mapping delegates to required host adapters. Read-only consumption needs no command provider. Business starts and transactional orchestration remain host-owned; see the [handover](F015-runtime-task-instance-extraction/implementation.md).
