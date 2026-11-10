@@ -2,7 +2,10 @@ package io.github.leontecristian.workflow.core.service.runtime;
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition;
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Binding;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
+import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
 import io.github.leontecristian.workflow.core.entity.runtime.WorkflowVariableEntity;
+import io.github.leontecristian.workflow.core.entity.runtime.WorkflowVariableId;
 import io.github.leontecristian.workflow.core.repository.runtime.WorkflowVariableRepository;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category;
 import jakarta.persistence.EntityManager;
@@ -34,6 +37,23 @@ public class RuntimeVariables {
     }
     void apply(long instanceId,String nodeKey,Map<String,Binding> bindings,Map<String,WorkflowValue> before,
             Map<String,WorkflowValue> writes,RuntimeHistoryBatch batch) {
+        apply(instanceId,nodeKey,bindings,before,writes,batch,null,null);
+    }
+    Map<String,WorkflowValue> afterTaskCompletion(long instanceId, MinimalWorkflowDefinition model,
+            MinimalWorkflowDefinition.Human human, WorkflowJsonValue result, long activityId, long taskId,
+            RuntimeHistoryBatch batch) {
+        String key = human.outputVariable();
+        if (key == null || result == null) return read(instanceId, model);
+        RuntimeInputs.require(repository.findById(new WorkflowVariableId(instanceId,key)).isEmpty(),Category.CONFLICT);
+        var state = read(instanceId, model);
+        RuntimeInputs.require(!state.containsKey(key),Category.CONFLICT);
+        var writes = Map.of(key,new WorkflowValue(VariableValueType.JSON,result));
+        apply(instanceId,human.key(),Map.of(key,new Binding("taskResult",human.key(),null)),
+                state,writes,batch,activityId,taskId);
+        return state;
+    }
+    private void apply(long instanceId,String nodeKey,Map<String,Binding> bindings,Map<String,WorkflowValue> before,
+            Map<String,WorkflowValue> writes,RuntimeHistoryBatch batch,Long activityId,Long taskId) {
         Map<String,WorkflowValue> after=new TreeMap<>(before); after.putAll(writes);
         RuntimeInputs.require(json.encode(RuntimeValueBindings.tokens(after,json)).length()*2L<=1024*1024,Category.LIMIT_EXCEEDED);
         if (writes.isEmpty()) return;
@@ -49,12 +69,12 @@ public class RuntimeVariables {
         }
         // Check complete per-record/cumulative evidence before changing any variable. The history
         // append and subsequent writes participate in the same host transaction and roll back together.
-        batch.next("VARIABLES_WRITTEN",null,null,null,details,
+        batch.next("VARIABLES_WRITTEN",activityId,taskId,null,details,
                 Map.of("nodeKey",nodeKey,"writeCount",Integer.toString(orderedWrites.size())));
         for (var e:orderedWrites.entrySet()) {
-            var id=new io.github.leontecristian.workflow.core.entity.runtime.WorkflowVariableId(instanceId,e.getKey());
-            var row=repository.findById(id).orElse(null);
-            if(row==null) entityManager.persist(new WorkflowVariableEntity(instanceId,e.getKey(),e.getValue())); else row.replace(e.getValue());
+            var row=taskId==null ? repository.findById(new WorkflowVariableId(instanceId,e.getKey())).orElse(null) : null;
+            if(row==null) entityManager.persist(new WorkflowVariableEntity(instanceId,e.getKey(),e.getValue()));
+            else row.replace(e.getValue());
         }
         before.clear(); before.putAll(after);
     }

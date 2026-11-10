@@ -279,6 +279,15 @@ class WorkflowRuntimeWebUnitTest {
             mvc.perform(request).andExpect(status().is(422)).andExpect(jsonPath("$.code").value("LIMIT_EXCEEDED"))
                     .andExpect(jsonPath("$.message").value("The result exceeds the validation work limit."));
 
+            doThrow(new WorkflowExecutionException(WorkflowExecutionException.Category.SUBMISSION_UNAVAILABLE))
+                    .when(host).complete(any(), any());
+            mvc.perform(request).andExpect(status().is(422))
+                    .andExpect(jsonPath("$.code").value("SUBMISSION_UNAVAILABLE"));
+
+            doThrow(new WorkflowExecutionException(WorkflowExecutionException.Category.CONFLICT))
+                    .when(host).complete(any(), any());
+            mvc.perform(request).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONFLICT"));
+
             doThrow(new WorkflowExecutionException(WorkflowExecutionException.Category.RESULT_VALIDATION_FAILED,
                     new IllegalStateException("private provider error"))).when(host).complete(any(), any());
             mvc.perform(request).andExpect(status().isServiceUnavailable())
@@ -325,21 +334,27 @@ class WorkflowRuntimeWebUnitTest {
         return new TaskSubmission(id, 2, 1, id + 10, new UUID(0, id), ActorKind.USER,
                 "reviewer", Instant.EPOCH, "APPROVE", null, Map.of(), result);
     }
-    @Test void variableSnapshotAndExactValuesSurviveAndStalePagesFail() throws Exception {
+    @Test void namedOutputUsesInstanceAccessWhileTheSubmissionRequiresExactTaskAccess() throws Exception {
         try(var c=context(Host.class,Reads.class,WorkflowRuntimeReadConfiguration.class)) {
             var reads=c.getBean(WorkflowRuntimeQueryService.class);var host=c.getBean(WorkflowRuntimeReadHost.class);var mvc=mvc(c);
             var value=new io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue(
                 io.github.leontecristian.workflow.core.dto.runtime.VariableValueType.JSON,
                 io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue.parse("{\"amount\":9007199254740993.00}"));
             when(reads.listVariables(1,null,50,null)).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.WorkflowVariablePage(1,7,
-                List.of(new io.github.leontecristian.workflow.core.dto.runtime.WorkflowVariableView("data",value.type(),true,value)),"data"));
+                List.of(new io.github.leontecristian.workflow.core.dto.runtime.WorkflowVariableView("reviewResult",value.type(),true,value)),"reviewResult"));
             mvc.perform(get("/custom/instances/1/variables")).andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("9007199254740993.00")))
-                .andExpect(jsonPath("$.lockVersion").value("7")).andExpect(jsonPath("$.nextAfterKey").value("data"));
+                .andExpect(jsonPath("$.items[0].key").value("reviewResult"))
+                .andExpect(jsonPath("$.items[0].initialized").value(true))
+                .andExpect(jsonPath("$.lockVersion").value("7")).andExpect(jsonPath("$.nextAfterKey").value("reviewResult"));
             verify(host).instance(1);
-            when(reads.listVariables(1,"data",50,7L)).thenThrow(new WorkflowExecutionException(WorkflowExecutionException.Category.STALE_VERSION));
-            mvc.perform(get("/custom/instances/1/variables?afterKey=data&expectedLockVersion=7"))
+            when(reads.listVariables(1,"reviewResult",50,7L)).thenThrow(new WorkflowExecutionException(WorkflowExecutionException.Category.STALE_VERSION));
+            mvc.perform(get("/custom/instances/1/variables?afterKey=reviewResult&expectedLockVersion=7"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("STALE_VERSION"));
+
+            when(host.task(5)).thenThrow(new WorkflowRuntimeException(404, "NOT_FOUND"));
+            mvc.perform(get("/custom/tasks/5/submission")).andExpect(status().isNotFound());
+            verify(reads, times(0)).findTaskSubmission(5);
         }
     }
     @Test void allGroupsCoexistAndCompletionPreservesExactFrozenInputAndLookupOnlyMiss() throws Exception {

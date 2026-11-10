@@ -6,16 +6,20 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionContext;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmission;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmissionPage;
+import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxServiceEffectStore;
 import io.github.leontecristian.workflow.testhost.service.sandbox.SandboxRecordApprovedAmountAction;
+import io.github.leontecristian.workflow.testhost.service.sandbox.SandboxRecordReviewAmountAction;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +29,21 @@ import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.mock.env.MockEnvironment;
 
 class SandboxStructuredSubmissionUnitTest {
+    @Test
+    void recordsCentsFromTheBoundJsonInputWithoutACompletedActivity() {
+        var effects = mock(SandboxServiceEffectStore.class);
+        var action = new SandboxRecordReviewAmountAction(effects, new ConsoleSettings(new MockEnvironment()));
+        var actor = new WorkflowCommandContext(ActorKind.USER, "reviewer", Instant.EPOCH, "sample");
+        var context = new ServiceActionContext(UUID.randomUUID(), 2, 1, "recordAmount",
+                "SANDBOX_REQUEST", "5", actor, null);
+        var result = CompleteWorkflowTask.parseResult("{\"approvedAmount\":1250.00,\"note\":\"Approved\"}");
+
+        assertThat(action.descriptor().inputs()).containsExactly(new ActionField("reviewResult", VariableValueType.JSON, true, false));
+        assertThat(action.execute(context, Map.of("reviewResult", new WorkflowValue(VariableValueType.JSON, result)))
+                .outputs()).isEmpty();
+        verify(effects).insert(context, 125000);
+    }
+
     @Test
     void readsTheExactCompletedActivityAndRecordsCentsBeforeTheConfiguredFailure() {
         var beans = new DefaultListableBeanFactory();

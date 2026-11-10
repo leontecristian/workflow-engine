@@ -1,6 +1,8 @@
 package io.github.leontecristian.workflow.core.service.runtime;
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
+import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
+import io.github.leontecristian.workflow.core.dto.definition.document.TaskResultContract.Mode;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionContext;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionResult;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
@@ -13,14 +15,16 @@ public class RuntimeServiceProgression {
     private final ServiceActionRegistry actions;
     private final RuntimeVariables variables;
     private final RuntimeJson json;
+    private final WorkflowRuntimeQueryService queries;
     private final io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService expressions;
     public RuntimeServiceProgression(ServiceActionRegistry actions,RuntimeVariables variables,RuntimeJson json) {
-        this(actions,variables,json,new io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService());
+        this(actions,variables,json,new io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService(), null);
     }
     @org.springframework.beans.factory.annotation.Autowired
     public RuntimeServiceProgression(ServiceActionRegistry actions,RuntimeVariables variables,RuntimeJson json,
-            io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService expressions) {
+            io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService expressions, WorkflowRuntimeQueryService queries) {
         this.expressions=expressions;
+        this.queries=queries;
         this.actions=actions; this.variables=variables; this.json=json;
     }
     MinimalWorkflowDefinition.Node traverse(MinimalWorkflowDefinition model,String from,String stop,ServiceActionContext context,
@@ -54,7 +58,7 @@ public class RuntimeServiceProgression {
                 var b=node.inputs().get(f.key());
                 RuntimeInputs.require(b!=null || !f.required(),Category.HOST_CONFIGURATION);
                 if (b!=null) {
-                    var value=state.get(b.key()); RuntimeInputs.require(value!=null,Category.UNINITIALIZED_VARIABLE);
+                    var value=resolveInput(model,b,context.instanceId(),state);
                     RuntimeValueBindings.validate(f,value,Category.HOST_CONFIGURATION); args.put(f.key(),value);
                 }
             }
@@ -67,11 +71,29 @@ public class RuntimeServiceProgression {
             RuntimeInputs.require(returned!=null,Category.INVALID_ACTION_OUTPUT);
             RuntimeValueBindings.output(descriptor.outputs(),returned.outputs(),json);
             var writes=RuntimeValueBindings.prepare(node.outputs(),model.variables(),state,returned.outputs(),Category.INVALID_ACTION_OUTPUT);
+            for (String key : writes.keySet()) {
+                if (model.namedOutputs().containsKey(key)) {
+                    RuntimeInputs.require(state.containsKey(key),Category.UNINITIALIZED_VARIABLE);
+                }
+            }
             var success=json.object(); success.put("nodeKey",cursor); success.put("action",node.action());
             success.set("inputs",RuntimeValueBindings.tokens(args,json)); success.set("outputs",RuntimeValueBindings.tokens(returned.outputs(),json));
             batch.next("SERVICE_TASK_COMPLETED",null,null,null,success,Map.of("nodeKey",cursor,"action",node.action()));
             variables.apply(context.instanceId(),cursor,node.outputs(),state,writes,batch);
         }
+    }
+    private WorkflowValue resolveInput(MinimalWorkflowDefinition model, MinimalWorkflowDefinition.Binding binding,
+            long instanceId, Map<String,WorkflowValue> state) {
+        if ("submission".equals(binding.source())) {
+            var human = model.humans().get(binding.nodeKey());
+            RuntimeInputs.require(human != null && human.resultContract().mode() != Mode.FORBIDDEN, Category.HOST_CONFIGURATION);
+            return new WorkflowValue(VariableValueType.JSON,
+                    queries.resolveSubmission(instanceId, binding.nodeKey(), human.resultContract().mode()));
+        }
+        RuntimeInputs.require("variable".equals(binding.source()), Category.HOST_CONFIGURATION);
+        var value = state.get(binding.key());
+        RuntimeInputs.require(value != null, Category.UNINITIALIZED_VARIABLE);
+        return value;
     }
     private MinimalWorkflowDefinition.Transition explicitRoute(MinimalWorkflowDefinition model, String node, String selectedOutcome) {
         boolean human = model.humans().containsKey(node);

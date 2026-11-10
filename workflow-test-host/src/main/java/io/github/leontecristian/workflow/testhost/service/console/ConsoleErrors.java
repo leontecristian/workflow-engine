@@ -58,12 +58,12 @@ public class ConsoleErrors {
                         case NOT_FOUND -> 404;
                         case NOT_ASSIGNED -> 403;
                 case ASSIGNMENT_LOOKUP_FAILED -> 503;
-                        case STALE_VERSION,
+                        case CONFLICT, STALE_VERSION,
                                         CONCURRENT_COMMAND,
                                         COMMAND_ID_CONFLICT,
                                         INVALID_STATE ->
                                 409;
-                        case LIMIT_EXCEEDED, UNINITIALIZED_VARIABLE, ROUTE_NOT_FOUND,
+                        case LIMIT_EXCEEDED, UNINITIALIZED_VARIABLE, SUBMISSION_UNAVAILABLE, ROUTE_NOT_FOUND,
                                 EXPRESSION_EVALUATION_FAILED, EXPRESSION_LIMIT_EXCEEDED -> 422;
                         default -> 500;
                     };

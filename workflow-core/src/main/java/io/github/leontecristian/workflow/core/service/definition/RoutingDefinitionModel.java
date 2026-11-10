@@ -11,8 +11,10 @@ import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWor
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Outcome;
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Service;
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Transition;
+import io.github.leontecristian.workflow.core.dto.definition.document.TaskResultContract;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy;
+import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
 import io.github.leontecristian.workflow.core.exception.expression.ExpressionException;
 import io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService;
 import java.util.ArrayDeque;
@@ -38,6 +40,7 @@ final class RoutingDefinitionModel {
         Map<String,JsonNode> nodes = new LinkedHashMap<>();
         Map<String,Node> ends = new LinkedHashMap<>(); Set<String> gateways = new HashSet<>();
         Map<String,Human> humans = new LinkedHashMap<>();
+        Map<String,String> namedOutputs = new HashMap<>();
         var schemaBudget = new TaskResultSchema.DefinitionBudget();
         Map<String,Integer> humanIndices = new HashMap<>();
         JsonNode start = null; int starts = 0, nodeIndex = 0;
@@ -63,8 +66,13 @@ final class RoutingDefinitionModel {
                     String claimPolicy = n.path("claimPolicy").asText("OPTIONAL");
                     var resultContract = TaskResultSchema.readContract(n.path("resultContract"),
                             "/nodes/" + nodeIndex + "/resultContract", d, schemaBudget, authoring);
+                    String outputVariable = n.path("outputVariable").textValue();
+                    if (outputVariable != null) {
+                        addNamedOutput(outputVariable, key, resultContract, "/nodes/" + nodeIndex + "/outputVariable",
+                                variables, namedOutputs, d);
+                    }
                     humans.put(key,new Human(key,n.path("taskType").textValue(),new Assignment(resolver),outcomes,
-                            TaskClaimPolicy.valueOf(claimPolicy), resultContract));
+                            TaskClaimPolicy.valueOf(claimPolicy), resultContract, outputVariable));
                     humanIndices.put(key,nodeIndex);
                 }
                 case "END" -> ends.put(key,new Node(key,"END",n.path("name").textValue(),n.path("result").textValue()));
@@ -73,6 +81,9 @@ final class RoutingDefinitionModel {
                 default -> graph(d,"/nodes");
             }
             nodeIndex++;
+        }
+        if (variables.size() > 100) {
+            d.error("LIMIT_EXCEEDED", DiagnosticStage.CONTRACT, "Too many declared variables and named outputs.", "/variables");
         }
         if (starts!=1 || humans.isEmpty() || ends.isEmpty()) graph(d,"/nodes");
         if (d.failed()) return null;
@@ -129,8 +140,31 @@ final class RoutingDefinitionModel {
         if(d.failed()) return null;
         return new MinimalWorkflowDefinition(new Node(startKey,"START",start.path("name").textValue(),null),
                 humans,
-                ends.values().iterator().next(),transitions,inputs,variables,initialize,services,ends,gateways);
+                ends.values().iterator().next(),transitions,inputs,variables,initialize,services,ends,gateways,namedOutputs);
     }
+
+    private static void addNamedOutput(String name, String nodeKey, TaskResultContract contract, String pointer,
+            Map<String,ActionField> variables, Map<String,String> namedOutputs, DefinitionDiagnostics diagnostics) {
+        if (contract.mode() == TaskResultContract.Mode.FORBIDDEN) {
+            diagnostics.error("INVALID_VARIABLE", DiagnosticStage.CONTRACT,
+                    "A named output requires an optional or required task result.", pointer);
+            return;
+        }
+        ActionField descriptor;
+        try {
+            descriptor = new ActionField(name, VariableValueType.JSON, false, false);
+        } catch (IllegalArgumentException invalidName) {
+            diagnostics.error("INVALID_VARIABLE", DiagnosticStage.CONTRACT, "Invalid variable name.", pointer);
+            return;
+        }
+        if (variables.putIfAbsent(name, descriptor) != null) {
+            diagnostics.error("INVALID_VARIABLE", DiagnosticStage.CONTRACT,
+                    "Variable names must have distinct producers.", pointer);
+            return;
+        }
+        namedOutputs.put(name, nodeKey);
+    }
+
     private static Set<String> reach(String start,Map<String,List<Transition>> outgoing,Set<String> stop) {
         var found=new HashSet<String>(); var pending=new ArrayDeque<String>(); pending.add(start);
         while(!pending.isEmpty()) {

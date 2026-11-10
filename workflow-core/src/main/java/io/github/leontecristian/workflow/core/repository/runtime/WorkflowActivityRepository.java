@@ -3,7 +3,9 @@ package io.github.leontecristian.workflow.core.repository.runtime;
 import io.github.leontecristian.workflow.core.entity.runtime.WorkflowActivityEntity;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.Repository;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 public interface WorkflowActivityRepository extends Repository<WorkflowActivityEntity, Long> {
 
     Optional<WorkflowActivityEntity> findById(Long id);
+
+    List<WorkflowActivityEntity> findByInstanceIdAndNodeKey(Long instanceId, String nodeKey, Pageable page);
 
     @Query("""
             select activity from WorkflowActivityEntity activity

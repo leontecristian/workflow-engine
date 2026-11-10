@@ -1,5 +1,7 @@
 # Feature specifications
 
+[F019 — Named task output variables](F019-named-task-output-variables/spec.md) is **IMPLEMENTED revision 2**. Per-node output names create variables only at accepted completion, with no separate declaration, rejected collisions and explicit absence. The owner selected mutable copies and existing variable visibility. See the [plan](F019-named-task-output-variables/plan.md), [tasks](F019-named-task-output-variables/tasks.md) and [implementation handover](F019-named-task-output-variables/implementation.md) for verification. F019 also supports explicit service input bindings to the original submission by human node key, independent of the current variable value or triggering completion.
+
 [F018 — Structured task submissions](F018-structured-task-submissions/spec.md) is **IMPLEMENTED revision 3**. It adds pinned JSON result validation, exact replay, authorized submission views and the approvedAmount/note sandbox example. The [implementation handover](F018-structured-task-submissions/implementation.md) records the isolated, guarded SQL Server and live sandbox browser checks.
 
 [F017 — Task claiming and release](F017-task-claim-release/spec.md) is **IMPLEMENTED revision 3**. Pinned claim policy, task ownership, release/recovery and shared web/UI support are in place. Guarded SQL Server and live sandbox acceptance passed. See the [plan](F017-task-claim-release/plan.md), [tasks](F017-task-claim-release/tasks.md) and [handover](F017-task-claim-release/implementation.md).

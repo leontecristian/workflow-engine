@@ -15,7 +15,18 @@ import type { WorkflowAdministrationApi, AdministrationPage, DefinitionView } fr
 const id='9007199254740993';
 const instance:InstanceView={id,definitionVersionId:'7',definitionKey:'alternate-consumer',definitionVersion:1,definitionHash:'hash',status:'ACTIVE',currentNodeKey:'REVIEW',resultKey:null,businessType:null,businessId:null,startedAt:'2026-11-07T00:00:00Z',startedBy:'fixture',endedAt:null,endedBy:null,terminationReason:null,lastHistorySequence:'4',lockVersion:'9007199254740993'};
 const graph={instance,nodes:[{key:'BEGIN',name:'Start',type:'START',state:'COMPLETED',activityId:null,taskId:null},{key:'REVIEW',name:'Review <script>as text</script>',type:'HUMAN_TASK',state:'ACTIVE',activityId:'20',taskId:'30'},{key:'DONE',name:'End',type:'END',state:'PENDING',activityId:null,taskId:null}],edges:[{key:'enter',from:'BEGIN',to:'REVIEW',outcome:null,traversed:true},{key:'end',from:'REVIEW',to:'DONE',outcome:'APPROVE',traversed:false}]};
-const summary={instanceId:id,historySequence:'4',eventType:'UNKNOWN_FUTURE',commandId:'00000000-0000-0000-0000-000000000001',correlationId:null,actorKind:'USER',actorRef:'fixture',occurredAt:instance.startedAt,activityId:null,taskId:null,sourceNodeKey:null,targetNodeKey:null,transitionKey:null,detailsSchemaVersion:1};
+const summary={instanceId:id,historySequence:'4',eventType:'UNKNOWN_FUTURE',commandId:'00000000-0000-0000-0000-000000000001',correlationId:'fixture',actorKind:'USER',actorRef:'fixture',occurredAt:instance.startedAt,activityId:null,taskId:null,sourceNodeKey:null,targetNodeKey:null,transitionKey:null,detailsSchemaVersion:1};
+const namedOutputEvidence = new URLSearchParams(location.search).has('namedOutputEvidence');
+const evidenceEvents: HistoryEvent[] = [
+  {
+    summary: {...summary, historySequence:'3', eventType:'VARIABLES_WRITTEN', activityId:'20', taskId:'30'},
+    detailsJson:'{"nodeKey":"reviewAmount","writes":[{"variableKey":"reviewResult","type":"JSON","source":{"source":"taskResult","key":"reviewAmount"},"previousInitialized":false,"previousValue":null,"value":{"approvedAmount":12.00}}]}',
+  },
+  {
+    summary: {...summary, eventType:'GATEWAY_ROUTED'},
+    detailsJson:'{"nodeKey":"route","selectedTransitionKey":"default","usedDefault":true,"evaluations":[{"transitionKey":"useReview","result":false,"reads":[{"variableKey":"reviewResult","type":"JSON","path":[],"state":"EXISTS","value":false}]}]}',
+  },
+];
 @Injectable() class FixtureState { mode='success'; intercepted=0;commands=0; }
 @Injectable() class FixtureBackend implements HttpBackend {
   private state=inject(FixtureState);
@@ -35,8 +46,10 @@ const summary={instanceId:id,historySequence:'4',eventType:'UNKNOWN_FUTURE',comm
         else if(request.url==='/host-task/instance-tasks')body={items:[fixtureTask],nextAfterId:null};
         else if(request.url.startsWith('/host-command/'))body=request.url.endsWith('/replay')?{found:false,result:null}:fixtureResult(request.body as Envelope);
         else if(request.url.endsWith('/graph'))body=graph;
-        else if(request.url.includes('/history/'))body={summary,detailsJson:'{"n":9007199254740993,"d":12500.00,"nil":null}'};
-        else if(request.url.endsWith('/history'))body={items:[summary],nextAfterSequence:null};
+        else if(request.url.includes('/history/'))body=namedOutputEvidence
+          ? evidenceEvents.find(event=>request.url.endsWith('/'+event.summary.historySequence))
+          : {summary,detailsJson:'{"n":9007199254740993,"d":12500.00,"nil":null}'};
+        else if(request.url.endsWith('/history'))body={items:namedOutputEvidence ? evidenceEvents.map(event=>event.summary) : [summary],nextAfterSequence:null};
         observer.next(new HttpResponse({status:200,body}));observer.complete();
       },mode==='delayed'?1500:50);
       return ()=>clearTimeout(timer);
@@ -71,8 +84,8 @@ function administrationFixture(): WorkflowAdministrationApi {
   };
 }
 
-const fixtureTask:TaskView={id:'30',instanceId:id,activityId:'20',taskTypeId:'1',taskKey:'REVIEW',assignment:{kind:'USER',ref:'fixture'},status:'OPEN',outcomeKey:null,createdAt:instance.startedAt,dueAt:null,closedAt:null,closedBy:null,closureReason:null};
-const fixtureContract:TaskContract={taskId:'30',instanceId:id,instanceLockVersion:instance.lockVersion,taskType:'REVIEW',canComplete:true,assignmentLabel:'Fixture reviewer',outcomes:[{key:'APPROVE',label:'Host approve',requiresComment:true}]};
+const fixtureTask:TaskView={id:'30',instanceId:id,activityId:'20',taskTypeId:'1',taskKey:'REVIEW',assignment:{kind:'USER',ref:'fixture'},assigneeRef:'fixture',status:'OPEN',outcomeKey:null,createdAt:instance.startedAt,dueAt:null,closedAt:null,closedBy:null,closureReason:null};
+const fixtureContract:TaskContract={taskId:'30',instanceId:id,instanceLockVersion:instance.lockVersion,taskType:'REVIEW',claimPolicy:'OPTIONAL',canClaim:false,canRelease:false,canAdminRelease:false,canComplete:true,assignmentLabel:'Fixture reviewer',outcomes:[{key:'APPROVE',label:'Host approve',requiresComment:true}]};
 function fixtureResult(envelope:Envelope):CommandResult{return {replayed:false,execution:{commandId:envelope.body['commandId']!,operation:'COMPLETE',instance,activity:{id:'20',instanceId:id,nodeKey:'REVIEW',activationSequence:'1',taskTypeId:'1',completionPolicy:'SINGLE',contributionOutcomeKey:null,requiredTaskCount:1,reviewRevisionRef:null,status:'COMPLETED',outcomeKey:'APPROVE',enteredAt:instance.startedAt,closedAt:instance.startedAt,closedBy:'fixture',closureReason:null},task:{...fixtureTask,status:'COMPLETED'},firstHistorySequence:'5',lastHistorySequence:'6'}};}
 @Injectable() class RuntimeReads implements WorkflowRuntimeReads {
  private http=inject(HttpClient);
@@ -97,10 +110,12 @@ class ReadOnlyTask {scope={};}
   <button (click)="mode('success')">Successful reads</button><button (click)="mode('delayed')">Delayed reads</button><button (click)="mode('denied')">Denied reads</button><button (click)="mode('failed')">Failed reads</button>
   <div class="viewers"><workflow-instance-viewer [instanceId]="id" [sessionScope]="scope" [messages]="messages"/><workflow-instance-viewer [instanceId]="id" [sessionScope]="scope" [messages]="messages"/></div>
   <workflow-history [instanceId]="id" [sessionScope]="scope" [messages]="messages"/><workflow-history-event [instanceId]="id" sequence="4" [sessionScope]="scope" [messages]="messages"/>
+  @if(namedOutputEvidence){<workflow-history-event [instanceId]="id" sequence="3" [sessionScope]="scope" [messages]="messages"/>}
   <workflow-definitions [sessionScope]="scope" [messages]="administrationMessages"/>
   <p>Custom host command calls: {{state.commands}}</p><workflow-task id="30" [sessionScope]="scope" [messages]="runtimeMessages"/><workflow-commands [sessionScope]="scope" [messages]="runtimeMessages"/><fixture-read-only-task/><router-outlet/>
 `}) class App {
   state=inject(FixtureState); id=id; scope:object|null={};messages=DEFAULT_VIEWER_MESSAGES;
+  namedOutputEvidence=namedOutputEvidence;
   administrationMessages={definitionsTitle:'Host workflow library'};runtimeMessages={taskTitle:'Host assigned review',commandsTitle:'Host command evidence'};
   locale(){this.messages={...DEFAULT_VIEWER_MESSAGES,refresh:'Actualiser',current:'Étape actuelle',graph:'Graphe du workflow'};}
   mode(value:string){this.state.mode=value;this.scope={};}

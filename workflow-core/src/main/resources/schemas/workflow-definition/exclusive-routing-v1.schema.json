@@ -348,6 +348,10 @@
           "type": "array",
           "maxItems": 0
         },
+        "outputVariable": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+        },
         "resultContract": {
           "type": "object",
           "properties": {
@@ -492,6 +496,23 @@
                 "required": [
                   "source",
                   "key"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "const": "submission"
+                  },
+                  "nodeKey": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+                  }
+                },
+                "required": [
+                  "source",
+                  "nodeKey"
                 ],
                 "additionalProperties": false
               }

@@ -11,7 +11,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition;
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Binding;
+import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
 import io.github.leontecristian.workflow.core.dto.runtime.NullLiteral;
@@ -87,6 +91,80 @@ class VariableBatchUnitTest {
         assertEquals("actionOutput", entries.get(1).path("source").path("source").asText());
         assertEquals("unchanged", entries.get(2).path("previousValue").asText());
         assertEquals(writes, previous);
+    }
+
+    @Test void omittedOutputDoesNotCreateRowAndAcceptedEmptyObjectDoes() {
+        var human = namedProducer();
+        var model = namedModel(human, Map.of());
+        assertTrue(variables.afterTaskCompletion(1,model,human,null,3,4,batch).isEmpty());
+        assertTrue(batch.events().isEmpty());
+        verifyNoInteractions(em);
+
+        var accepted = CompleteWorkflowTask.parseResult("{}");
+        var state = variables.afterTaskCompletion(1,model,human,accepted,3,4,batch);
+        assertEquals(accepted,state.get("copy").value());
+        var persisted = org.mockito.ArgumentCaptor.forClass(Object.class);
+        org.mockito.Mockito.verify(em,org.mockito.Mockito.times(2)).persist(persisted.capture());
+        var fact = (WorkflowHistoryEntity) persisted.getAllValues().get(0);
+        assertEquals(3L,fact.getActivityId());
+        assertEquals(4L,fact.getTaskId());
+        var details = json.tree(fact.getDetailsJson());
+        assertEquals("review",details.path("nodeKey").asText());
+        var write = details.path("writes").get(0);
+        assertFalse(write.path("previousInitialized").asBoolean());
+        assertEquals("taskResult",write.path("source").path("source").asText());
+        assertEquals("review",write.path("source").path("key").asText());
+        assertEquals("{}",write.path("value").toString());
+        assertEquals(accepted,((WorkflowVariableEntity) persisted.getAllValues().get(1)).executionValue().value());
+    }
+
+    @Test void completionCopyNeverOverwritesAnExistingRow() {
+        var human = namedProducer();
+        var existing = new WorkflowVariableEntity(1,"copy",new WorkflowValue(VariableValueType.JSON,
+                CompleteWorkflowTask.parseResult("{\"amount\":1.200}")));
+        when(repository.findById(existing.getId())).thenReturn(Optional.of(existing));
+        assertEquals(Category.CONFLICT, assertThrows(WorkflowExecutionException.class,
+                () -> variables.afterTaskCompletion(1,namedModel(human, Map.of()),human,
+                        CompleteWorkflowTask.parseResult("{}"),3,4,batch)).category());
+        assertEquals("{\"amount\":1.200}",((WorkflowJsonValue) existing.executionValue().value()).toJson());
+        assertTrue(batch.events().isEmpty());
+        verifyNoInteractions(em);
+    }
+
+    @Test void completionCopyConsumesExistingStateBudget() {
+        var human = namedProducer();
+        var declarations = new TreeMap<String,ActionField>();
+        var existing = new ArrayList<WorkflowVariableEntity>();
+        String large = "{\"text\":\"" + "x".repeat(3900) + "\"}";
+        for (int i = 0; i < 66; i++) {
+            String key = "value" + i;
+            declarations.put(key,new ActionField(key,VariableValueType.JSON,false,false));
+            var value = WorkflowJsonValue.parse("[" + String.join(",",java.util.Collections.nCopies(2,large)) + "]");
+            existing.add(new WorkflowVariableEntity(1,key,new WorkflowValue(VariableValueType.JSON,value)));
+        }
+        when(repository.findByInstanceId(1,org.springframework.data.domain.PageRequest.of(0,101))).thenReturn(existing);
+        var model = namedModel(human,declarations);
+        RuntimeValueBindings.tokens(variables.read(1,model),json); // Existing state fits before the copy.
+        var accepted = CompleteWorkflowTask.parseResult("{\"items\":[" +
+                String.join(",",java.util.Collections.nCopies(3,large)) + "]}");
+        assertEquals(Category.LIMIT_EXCEEDED, assertThrows(WorkflowExecutionException.class,
+                () -> variables.afterTaskCompletion(1,model,human,accepted,3,4,batch)).category());
+        assertTrue(batch.events().isEmpty());
+        org.mockito.Mockito.verify(em,org.mockito.Mockito.never()).persist(any());
+    }
+
+    private MinimalWorkflowDefinition.Human namedProducer() {
+        return new MinimalWorkflowDefinition.Human("review","REVIEW",new MinimalWorkflowDefinition.Assignment("resolver"),
+                List.of(),TaskClaimPolicy.OPTIONAL,
+                new io.github.leontecristian.workflow.core.dto.definition.document.TaskResultContract(
+                        io.github.leontecristian.workflow.core.dto.definition.document.TaskResultContract.Mode.OPTIONAL,"{\"type\":\"object\"}"),"copy");
+    }
+
+    private MinimalWorkflowDefinition namedModel(MinimalWorkflowDefinition.Human human, Map<String,ActionField> ordinary) {
+        var fields = new TreeMap<>(ordinary);
+        fields.put("copy",new ActionField("copy",VariableValueType.JSON,false,false));
+        return new MinimalWorkflowDefinition(null,Map.of(human.key(),human),null,List.of(),Map.of(),fields,
+                Map.of(),Map.of(),Map.of(),java.util.Set.of(),Map.of("copy",human.key()));
     }
 
     @Test void preparedSwapUsesOneBeforeSnapshotAndUpdatesExistingRows() {

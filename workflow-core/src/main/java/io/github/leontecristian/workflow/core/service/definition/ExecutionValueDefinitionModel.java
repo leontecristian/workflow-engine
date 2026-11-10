@@ -31,7 +31,8 @@ final class ExecutionValueDefinitionModel {
     private static Map<String,Binding> bindings(JsonNode n) {
         Map<String,Binding> result = new HashMap<>();
         n.fields().forEachRemaining(e -> result.put(e.getKey(), new Binding(e.getValue().path("source").textValue(),
-                e.getValue().path("key").textValue(), e.getValue().has("value") ? literal(e.getValue().get("value")) : null)));
+                e.getValue().path("key").textValue(), e.getValue().has("value") ? literal(e.getValue().get("value")) : null,
+                e.getValue().path("nodeKey").textValue())));
         return result;
     }
     static MinimalWorkflowDefinition load(JsonNode root, DefinitionDiagnostics d) {
@@ -80,6 +81,7 @@ final class ExecutionValueDefinitionModel {
                 services.put(key,new MinimalWorkflowDefinition.Service(key,n.path("action").textValue(),bindings(n.path("inputs")),bindings(n.path("outputs")),nodeIndex));
             nodeIndex++;
         }
+        // Add human output descriptors only after checking initialization against authored declarations.
         return RoutingDefinitionModel.load(root,d,inputs,variables,initialize,services,expressions,authoring);
     }
     static void validate(ActionField field, WorkflowValue value) {

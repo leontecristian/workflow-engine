@@ -1,8 +1,10 @@
 package io.github.leontecristian.workflow.core.service.expression;
 
+import io.github.leontecristian.workflow.core.dto.expression.ExpressionRead;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
 import io.github.leontecristian.workflow.core.dto.runtime.NullLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
 import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
 import io.github.leontecristian.workflow.core.exception.expression.ExpressionException;
@@ -26,6 +28,7 @@ class RestrictedExpressionUnitTest {
             "d", new ActionField("d", VariableValueType.DECIMAL, false, true),
             "s", new ActionField("s", VariableValueType.STRING, false, true),
             "b", new ActionField("b", VariableValueType.BOOLEAN, false, true),
+            "reviewResult", new ActionField("reviewResult", VariableValueType.JSON, false, false),
             "a.b", new ActionField("a.b", VariableValueType.STRING, false, false),
             "class", new ActionField("class", VariableValueType.STRING, false, false));
     private boolean eval(String source, Map<String, WorkflowValue> state) {
@@ -70,6 +73,34 @@ class RestrictedExpressionUnitTest {
         assertThat(eval("#vars.d / #vars.n == 0", state)).isTrue();
         assertThat(eval("#vars.d / #vars.n == #vars.d - 1.0", Map.of("d", value(VariableValueType.DECIMAL, "2"), "n", value(VariableValueType.LONG, "2")))).isTrue();
     }
+    @Test void existenceGuardsAbsentJsonAndRecordsOnlyEvaluatedChecks() {
+        String source = "#hasVariable('reviewResult') && #vars.reviewResult.approvedAmount > 0";
+        var absent = evaluator.evaluate("hash", "r", source, fields, Map.of(), new ExpressionAllowance());
+        assertThat(absent.result()).isFalse();
+        assertThat(absent.reads()).containsExactly(
+                new ExpressionRead("reviewResult", VariableValueType.JSON, List.of(), "EXISTS", "false"));
+        fails("#vars?.reviewResult == null", Map.of(), UNINITIALIZED);
+
+        var initialized = Map.of("reviewResult",
+                new WorkflowValue(VariableValueType.JSON, WorkflowJsonValue.parse("{\"approvedAmount\":12.00}")));
+        var present = evaluator.evaluate("hash", "r", source, fields, initialized, new ExpressionAllowance());
+        assertThat(present.result()).isTrue();
+        assertThat(present.reads()).hasSize(2);
+        assertThat(present.reads().get(0)).isEqualTo(
+                new ExpressionRead("reviewResult", VariableValueType.JSON, List.of(), "EXISTS", "true"));
+
+        var skipped = evaluator.evaluate("hash", "r", "true || #hasVariable('reviewResult')", fields,
+                Map.of(), new ExpressionAllowance());
+        assertThat(skipped.result()).isTrue();
+        assertThat(skipped.reads()).isEmpty();
+    }
+    @Test void explicitlyNullVariableExistsWithoutReadingTheValue() {
+        var initialized = Map.of("n", new WorkflowValue(VariableValueType.LONG, NullLiteral.INSTANCE));
+        var evaluation = evaluator.evaluate("hash", "r", "#hasVariable('n')", fields, initialized, new ExpressionAllowance());
+        assertThat(evaluation.result()).isTrue();
+        assertThat(evaluation.reads()).containsExactly(
+                new ExpressionRead("n", VariableValueType.LONG, List.of(), "EXISTS", "true"));
+    }
     @Test void decimalVariablesUseBigDecimal() {
         var state = Map.of("d", value(VariableValueType.DECIMAL, "0.1"));
         assertThat(eval("#vars.d + #vars.d + #vars.d == 0.3", state)).isTrue();
@@ -80,7 +111,10 @@ class RestrictedExpressionUnitTest {
             "@environment == null", "T(java.lang.System).currentTimeMillis() > 0", "new java.lang.String('x') == 'x'",
             "#vars.n = 1", "#vars.n++ > 0", "#f()", "'a' matches '.*'", "{true}[0]", "#vars.missing == 1",
             "false and T(java.lang.Runtime).getRuntime() != null", "#vars.s > #vars.n", "'true' and true", "1", "null",
-            "#vars.s.?[true] == null", "#vars.n instanceof T(java.lang.Long)"})
+            "#vars.s.?[true] == null", "#vars.n instanceof T(java.lang.Long)",
+            "#hasVariable()", "#hasVariable('n','d')", "#hasVariable(null)", "#hasVariable(#vars.s)",
+            "#hasVariable('review' + 'Result')", "#hasVariable('missing')", "#HasVariable('n')",
+            "#hasVariable('n').toString() == 'true'"})
     void unsafeOrStaticallyInvalidSourceCannotPublish(String source) {
         assertThatThrownBy(() -> evaluator.validate(source, fields)).isInstanceOfSatisfying(ExpressionException.class, e -> assertThat(e.kind()).isEqualTo(INVALID));
     }

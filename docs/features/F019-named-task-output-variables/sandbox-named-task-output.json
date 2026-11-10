@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "key": "sandbox-named-task-output",
+  "version": 1,
+  "name": "Sandbox named task output",
+  "startPolicy": {
+    "inputContract": [],
+    "initialize": {}
+  },
+  "variables": [],
+  "nodes": [
+    {
+      "key": "BEGIN",
+      "type": "START",
+      "name": "Start"
+    },
+    {
+      "key": "reviewAmount",
+      "type": "HUMAN_TASK",
+      "name": "Review approved amount",
+      "taskType": "SANDBOX_REVIEW",
+      "assignment": {
+        "resolver": "sandbox.singleReviewer",
+        "inputs": {}
+      },
+      "completion": {
+        "policy": "SINGLE"
+      },
+      "inputContract": [],
+      "outputVariable": "reviewResult",
+      "resultContract": {
+        "mode": "REQUIRED",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "approvedAmount": {
+              "type": "number",
+              "minimum": 0
+            },
+            "note": {
+              "type": "string",
+              "maxLength": 500
+            }
+          },
+          "required": [
+            "approvedAmount",
+            "note"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "outcomes": [
+        {
+          "key": "COMPLETE",
+          "label": "Complete",
+          "requiresComment": false
+        }
+      ]
+    },
+    {
+      "key": "recordAmount",
+      "type": "SERVICE_TASK",
+      "name": "Record approved cents",
+      "action": "sandbox.recordReviewAmount",
+      "inputs": {
+        "reviewResult": {"source": "variable", "key": "reviewResult"}
+      },
+      "outputs": {}
+    },
+    {
+      "key": "DONE",
+      "type": "END",
+      "name": "Done",
+      "result": "COMPLETED"
+    }
+  ],
+  "transitions": [
+    {
+      "key": "begin",
+      "from": "BEGIN",
+      "to": "reviewAmount"
+    },
+    {
+      "key": "record",
+      "from": "reviewAmount",
+      "to": "recordAmount",
+      "outcome": "COMPLETE"
+    },
+    {
+      "key": "done",
+      "from": "recordAmount",
+      "to": "DONE"
+    }
+  ]
+}

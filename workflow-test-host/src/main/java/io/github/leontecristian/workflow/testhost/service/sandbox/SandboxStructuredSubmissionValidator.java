@@ -27,9 +27,9 @@ public class SandboxStructuredSubmissionValidator implements WorkflowTaskSubmiss
 
     @Override
     public void validate(TaskSubmissionValidationContext context, WorkflowJsonValue result) {
-        if (!"reviewAmount".equals(context.nodeKey())
-                || !"sandbox-structured-review".equals(definitions.findVersion(context.definitionVersionId())
-                        .orElseThrow().summary().key())) return;
+        if (!"reviewAmount".equals(context.nodeKey())) return;
+        String workflowKey = definitions.findVersion(context.definitionVersionId()).orElseThrow().summary().key();
+        if (!"sandbox-structured-review".equals(workflowKey) && !"sandbox-named-task-output".equals(workflowKey)) return;
         var instance = reads.findInstance(context.instanceId()).orElseThrow();
         if (!"SANDBOX_REQUEST".equals(instance.businessType())) throw WorkflowExecutionException.rejectResult("");
         try {

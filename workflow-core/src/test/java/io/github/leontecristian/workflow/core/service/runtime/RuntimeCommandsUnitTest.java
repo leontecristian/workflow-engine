@@ -69,6 +69,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
@@ -231,12 +232,39 @@ class RuntimeCommandsUnitTest {
                 new RuntimeDefinitionPins(definitions, history, json), json, variables, eligibility);
         assertEquals(result, reads.findTaskSubmission(3L).orElseThrow().result());
         assertEquals(result, reads.listActivitySubmissions(2L).items().get(0).result());
+        var lookupPage = PageRequest.of(0, 2);
+        assertEquals(Category.SUBMISSION_UNAVAILABLE, assertThrows(WorkflowExecutionException.class,
+                () -> reads.resolveSubmission(1L, "MISSING", mode)).category());
+        var incomplete = new WorkflowActivityEntity(1L, "PENDING", 1L, 5L, null, activity.getEnteredAt());
+        when(activities.findByInstanceIdAndNodeKey(1L, "PENDING", lookupPage)).thenReturn(List.of(incomplete));
+        assertEquals(Category.SUBMISSION_UNAVAILABLE, assertThrows(WorkflowExecutionException.class,
+                () -> reads.resolveSubmission(1L, "PENDING", mode)).category());
+        when(activities.findByInstanceIdAndNodeKey(1L, activity.getNodeKey(), lookupPage)).thenReturn(List.of(activity, activity));
+        assertEquals(Category.HOST_CONFIGURATION, assertThrows(WorkflowExecutionException.class,
+                () -> reads.resolveSubmission(1L, activity.getNodeKey(), mode)).category());
+        when(activities.findByInstanceIdAndNodeKey(1L, activity.getNodeKey(), lookupPage)).thenReturn(List.of(activity));
+        if (present) {
+            assertEquals(result, reads.resolveSubmission(1L, activity.getNodeKey(), mode));
+            ReflectionTestUtils.setField(activity, "outcomeKey", "INCONSISTENT");
+            assertEquals(Category.HOST_CONFIGURATION, assertThrows(WorkflowExecutionException.class,
+                    () -> reads.resolveSubmission(1L, activity.getNodeKey(), mode)).category());
+            ReflectionTestUtils.setField(activity, "outcomeKey", task.getOutcomeKey());
+        } else if (mode == Mode.OPTIONAL) {
+            assertEquals(Category.SUBMISSION_UNAVAILABLE, assertThrows(WorkflowExecutionException.class,
+                    () -> reads.resolveSubmission(1L, activity.getNodeKey(), mode)).category());
+        }
+        when(tasks.findPageByActivityId(2L, 0L, lookupPage)).thenReturn(List.of(task, task));
+        assertEquals(Category.HOST_CONFIGURATION, assertThrows(WorkflowExecutionException.class,
+                () -> reads.resolveSubmission(1L, activity.getNodeKey(), mode)).category());
+        when(tasks.findPageByActivityId(2L, 0L, lookupPage)).thenReturn(List.of(task));
         if (present) {
             ReflectionTestUtils.setField(completionFact, "detailsSchemaVersion", (short) 2);
             ReflectionTestUtils.setField(completionFact, "detailsJson",
                     "{\"comment\":null,\"inputs\":{},\"outcomeKey\":\"COMPLETE\"}");
             assertThrows(WorkflowExecutionException.class,
                     () -> reads.findTaskSubmission(3L));
+            assertEquals(Category.HOST_CONFIGURATION, assertThrows(WorkflowExecutionException.class,
+                    () -> reads.resolveSubmission(1L, activity.getNodeKey(), Mode.REQUIRED)).category());
         }
         assertEquals(2 + addedFacts,storedReceipts.size()); assertTrue(storedReceipts.values().stream().allMatch(r -> r.getResultSchemaVersion()==5));
     }

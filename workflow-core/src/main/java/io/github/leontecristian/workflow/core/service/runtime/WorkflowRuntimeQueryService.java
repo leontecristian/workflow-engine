@@ -19,6 +19,8 @@ import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
 import io.github.leontecristian.workflow.core.dto.definition.document.TaskResultContract.Mode;
 import io.github.leontecristian.workflow.core.service.definition.DefinitionContentCanonicalizer;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
+import io.github.leontecristian.workflow.core.dto.runtime.ActivityStatus;
+import io.github.leontecristian.workflow.core.dto.runtime.CompletionPolicy;
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskClosureReason;
 import io.github.leontecristian.workflow.core.entity.runtime.WorkflowHistoryId;
@@ -72,9 +74,11 @@ public class WorkflowRuntimeQueryService {
         RuntimeInputs.require(expectedLockVersion==null || expectedLockVersion==before,Category.STALE_VERSION);
         var instance=instances.findById(instanceId).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
         var model=pins.load(instance).model();
-        RuntimeInputs.require(afterKey==null || model.variables().containsKey(afterKey),Category.INVALID_INPUT);
         var values=variables.read(instanceId,model);
-        var keys=model.variables().keySet().stream().sorted().filter(k -> afterKey==null || k.compareTo(afterKey)>0).toList();
+        var visibleKeys=model.variables().keySet().stream()
+                .filter(key -> !model.namedOutputs().containsKey(key) || values.containsKey(key)).sorted().toList();
+        RuntimeInputs.require(afterKey==null || visibleKeys.contains(afterKey),Category.INVALID_INPUT);
+        var keys=visibleKeys.stream().filter(key -> afterKey==null || key.compareTo(afterKey)>0).toList();
         var items=new ArrayList<WorkflowVariableView>();
         String next=null;
         for(int i=0;i<Math.min(keys.size(),limit);i++) {
@@ -206,6 +210,28 @@ public class WorkflowRuntimeQueryService {
             return page(rows, limit, task -> submission(task, activity, mode), TaskSubmission::taskId,
                     TaskSubmissionPage::new, json::submissionPageFits);
         });
+    }
+    /** Internal service input resolution under the already authorized command and its pinned model. */
+    WorkflowJsonValue resolveSubmission(long instanceId, String nodeKey, Mode mode) {
+        var matches = activities.findByInstanceIdAndNodeKey(instanceId, nodeKey, PageRequest.of(0, 2));
+        RuntimeInputs.require(matches.size() <= 1, Category.HOST_CONFIGURATION);
+        RuntimeInputs.require(!matches.isEmpty(), Category.SUBMISSION_UNAVAILABLE);
+        var activity = matches.get(0);
+        RuntimeInputs.require(activity.getInstanceId().equals(instanceId) && activity.getNodeKey().equals(nodeKey),
+                Category.HOST_CONFIGURATION);
+        RuntimeInputs.require(activity.getStatus() == ActivityStatus.COMPLETED, Category.SUBMISSION_UNAVAILABLE);
+        RuntimeInputs.require(activity.getCompletionPolicy() == CompletionPolicy.SINGLE && activity.getRequiredTaskCount() == 1,
+                Category.HOST_CONFIGURATION);
+        var roster = tasks.findPageByActivityId(activity.getId(), 0, PageRequest.of(0, 2));
+        RuntimeInputs.require(roster.size() == 1, Category.HOST_CONFIGURATION);
+        var task = roster.get(0);
+        var result = submission(task, activity, mode).result();
+        RuntimeInputs.require(TaskClosureReason.TASK_OUTCOME.name().equals(activity.getClosureReason())
+                && Objects.equals(task.getOutcomeKey(), activity.getOutcomeKey())
+                && Objects.equals(task.getClosedBy(), activity.getClosedBy())
+                && Objects.equals(task.getClosedAt(), activity.getClosedAt()), Category.HOST_CONFIGURATION);
+        RuntimeInputs.require(result != null, Category.SUBMISSION_UNAVAILABLE);
+        return result;
     }
     private WorkflowActivityEntity owner(WorkflowTaskEntity task) {
         return activities.findById(task.getActivityId()).orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));

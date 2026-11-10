@@ -220,13 +220,15 @@ public class WorkflowExecutionService {
                     Map.of("outcomeKey", command.outcomeKey()), (short) (command.result() == null ? 2 : 3));
             batch.append(RuntimeProgression.advance(first, 1), "ACTIVITY_COMPLETED", activity.getId(), null, null,
                     Map.of("outcomeKey", command.outcomeKey(), "closureReason", "TASK_OUTCOME"), Map.of("outcomeKey", command.outcomeKey()));
+            var state = variables.afterTaskCompletion(instance.getId(), model, human, command.result(),
+                    activity.getId(), task.getId(), batch);
             if (human.resultContract().mode() != TaskResultContract.Mode.FORBIDDEN) {
-                entityManager.flush(); // A downstream action can read the accepted submission in this transaction.
+                entityManager.flush(); // Publish completion evidence and the named copy to same-transaction reads.
             }
             var budget=new RuntimeProgression();
             var end=services.traverse(model,human.key(),null,new ServiceActionContext(
                     command.commandId(),instance.getId(),definition.versionId(),human.key(),instance.getBusinessType(),instance.getBusinessId(),context,activity.getId()),
-                    variables.read(instance.getId(),model),budget,batch,definition.contentHash(),selectedOutcome.key());
+                    state,budget,batch,definition.contentHash(),selectedOutcome.key());
             if ("HUMAN_TASK".equals(end.type())) {
                 entityManager.flush(); // Close the previous active row before inserting its successor.
                 enterStage(definition,instance,end.key(),command.commandId(),context,batch);

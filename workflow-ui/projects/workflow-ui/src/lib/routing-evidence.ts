@@ -15,6 +15,10 @@ export function routingEvidence(eventType: string | undefined, details: string |
       if (!key(evaluation?.transitionKey) || typeof evaluation.result !== "boolean" || !Array.isArray(evaluation.reads)) return null;
       for (const read of evaluation.reads) {
         if (!key(read?.variableKey) || !["STRING", "LONG", "DECIMAL", "BOOLEAN", "DATE", "DATETIME", "JSON"].includes(read.type)) return null;
+        if (read.state === "EXISTS") {
+          if (typeof read.value !== "boolean" || !Array.isArray(read.path) || read.path.length !== 0) return null;
+          continue;
+        }
         if (read.type !== "JSON" && read.value !== null && (read.type === "BOOLEAN" ? typeof read.value !== "boolean" : typeof read.value !== "string")) return null;
       }
     }

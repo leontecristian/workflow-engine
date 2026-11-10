@@ -11,6 +11,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionContext;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionDescriptor;
@@ -64,6 +66,33 @@ class ServiceProgressionUnitTest {
             assertTrue(batch.events().stream().allMatch(e -> e.payload().keySet().stream().noneMatch(k -> k.equals("inputs") || k.equals("outputs"))));
         }
     }
+    @Test void optionalServiceOutputCannotCreateANamedCopy() {
+        var base = model(1);
+        var source = new MinimalWorkflowDefinition.Binding("actionOutput","output",null);
+        var step = new MinimalWorkflowDefinition.Service("S0","host.action",Map.of(),Map.of("copy",source),1);
+        var field = new ActionField("copy",VariableValueType.JSON,false,false);
+        var model = new MinimalWorkflowDefinition(base.start(),base.humans(),base.end(),base.transitions(),
+                Map.of(),Map.of("copy",field),Map.of(),Map.of("S0",step),base.ends(),base.gateways(),Map.of("copy","HUMAN"));
+        when(registry.descriptor("host.action")).thenReturn(new ServiceActionDescriptor("host.action",List.of(),
+                List.of(new ActionField("output",VariableValueType.JSON,false,false))));
+        when(registry.action("host.action")).thenReturn(action);
+        var progression = new RuntimeServiceProgression(registry,variables,json);
+        var trigger = new ServiceActionContext(UUID.randomUUID(),1,42,"START",null,null,context);
+        var state = new TreeMap<String,WorkflowValue>();
+        var value = new WorkflowValue(VariableValueType.JSON,WorkflowJsonValue.parse("[]"));
+        when(action.execute(any(),any())).thenReturn(new ServiceActionResult(Map.of("output",value)));
+        var batch = new RuntimeHistoryBatch(em,json,1,42,UUID.randomUUID(),context);
+        assertEquals(Category.UNINITIALIZED_VARIABLE,assertThrows(WorkflowExecutionException.class,
+                () -> progression.traverse(model,"START","HUMAN",trigger,state,new RuntimeProgression(),batch)).category());
+        assertEquals(List.of("TRANSITION_TAKEN"),batch.events().stream().map(WorkflowEvent::eventType).toList());
+        verifyNoInteractions(variables);
+
+        when(action.execute(any(),any())).thenReturn(new ServiceActionResult(Map.of()));
+        var nextBatch = new RuntimeHistoryBatch(em,json,1,42,UUID.randomUUID(),context);
+        assertEquals("HUMAN",progression.traverse(model,"START","HUMAN",trigger,state,new RuntimeProgression(),nextBatch).key());
+        verify(variables).apply(1,"S0",Map.of("copy",source),state,Map.of(),nextBatch);
+    }
+
     @Test void invalidOutputsAndActionThrowablesProduceNoSuccessOrVariableWrites() {
         when(registry.descriptor("host.action")).thenReturn(new ServiceActionDescriptor("host.action",List.of(),List.of(new ActionField("required",VariableValueType.LONG,true,false))));
         when(registry.action("host.action")).thenReturn(action);

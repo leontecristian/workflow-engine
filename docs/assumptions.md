@@ -152,6 +152,8 @@ The plan expects APOLO's root build and release process to accommodate core as a
 
 ## ASM-10 — Completion history can support operational result retrieval
 
+**F019 revision 2 verification — 2026-11-10:** explicit service submission inputs resolve a unique completed activity by current instance and pinned node key. Verify earlier-node lookup independent of the command trigger, exact immutable result binding, missing/ambiguous evidence failure and same-transaction visibility. Existing F018 reads are the decoding foundation, not executed evidence for this new resolver.
+
 **Status:** storage direction SELECTED; contract and integration PENDING VERIFICATION — introduced in database design v1.3 and retained in v1.4, sections 11.1, 13.1, 16 and 19.
 
 **Owner:** workflow persistence/contract maintainer with APOLO integration and retention owners.
@@ -165,6 +167,8 @@ The selected storage is the existing TASK_COMPLETED.details_json record, with ex
 **If false:** revise the storage/access or retention mechanism explicitly while preserving immutable submissions, transaction guarantees and host ownership; do not silently drop evidence, create independently editable copies or expose arbitrary history as the API.
 
 ## ASM-11 — JSON variables preserve persistence and expression guarantees
+
+**F019 verification scope — 2026-11-10:** [named outputs](features/F019-named-task-output-variables/spec.md) select an additional pinned producer with no pre-completion row. Existing JSON storage is expected to support create-only insertion and later replacement. Fresh checks must establish same-transaction visibility, absence/listing, collision rejection, rollback/replay and bounded existence evidence. Existing F009/F018 evidence does not establish these new paths. No new table or migration is presumed.
 
 **Status:** F009 contracts and implementation selected; local automated checks recorded in its [handover](features/F009-json-execution-variables/implementation.md). Interactive browser and APOLO integration remain PENDING VERIFICATION — database design v1.4, section 12.
 

@@ -42,6 +42,7 @@ export const DEFAULT_VIEWER_MESSAGES = {
   recordedThrough: 'Recorded through history sequence', refreshHint: 'Refresh to read the latest state.',
   sequence: 'Sequence', type: 'Event type', actor: 'Actor', occurred: 'Occurred at', open: 'Open',
   routing: 'Exclusive route', selected: 'Selected', defaultRoute: 'Default', noReads: 'No variables read.',
+  existence: 'Exists',
   routingHint: 'Only evaluated conditions and actual reads are recorded.', shortCircuit: 'Evaluation stopped at the first true condition.',
   defaultHint: 'Default selected after the conditions; no condition returned true.'
 };
@@ -53,6 +54,7 @@ export const DEFAULT_VIEWER_PRESENTATION = {
     ? code[0] + code.slice(1).toLowerCase().replaceAll('_', ' ')
     : code,
 };
-export type WorkflowViewerMessages = typeof DEFAULT_VIEWER_MESSAGES & {
+export type WorkflowViewerMessages = Omit<typeof DEFAULT_VIEWER_MESSAGES, 'existence'> & {
+  existence?: string;
   presentation?: Partial<typeof DEFAULT_VIEWER_PRESENTATION>;
 };

@@ -17,3 +17,15 @@ test("malformed or lossy routing display falls back to raw history", () => {
     {transitionKey:"t",result:true,reads:[{variableKey:"n",type:"LONG",value:9007199254740992}]},
   ]})),null);
 });
+
+test("existence evidence keeps a Boolean result independently of the root type", () => {
+  const value = {nodeKey:"ROUTE", selectedTransitionKey:"next", usedDefault:false, evaluations:[
+    {transitionKey:"next", result:true, reads:[
+      {variableKey:"reviewResult", type:"JSON", state:"EXISTS", path:[], value:false},
+      {variableKey:"quantity", type:"LONG", state:"EXISTS", path:[], value:true},
+    ]},
+  ]};
+  assert.deepEqual(routingEvidence("GATEWAY_ROUTED", JSON.stringify(value)), value);
+  value.evaluations[0].reads[0].value = null;
+  assert.equal(routingEvidence("GATEWAY_ROUTED", JSON.stringify(value)), null);
+});

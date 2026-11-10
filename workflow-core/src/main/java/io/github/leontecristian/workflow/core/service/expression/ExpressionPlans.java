@@ -11,6 +11,7 @@ import org.springframework.expression.spel.SpelParserConfiguration;
 import org.springframework.expression.spel.ast.BooleanLiteral;
 import org.springframework.expression.spel.ast.CompoundExpression;
 import org.springframework.expression.spel.ast.Elvis;
+import org.springframework.expression.spel.ast.FunctionReference;
 import org.springframework.expression.spel.ast.Indexer;
 import org.springframework.expression.spel.ast.InlineList;
 import org.springframework.expression.spel.ast.IntLiteral;
@@ -100,6 +101,15 @@ final class ExpressionPlans {
         for (int i = 0; i < n.getChildCount(); i++) size(n.getChild(i), depth + 1, count);
     }
     private static Plan describe(SpelNode n, String source, Map<String, ActionField> declarations, boolean listAllowed) {
+        if (n.getClass() == FunctionReference.class) {
+            if (n.getChildCount() != 1 || !(n.getChild(0) instanceof StringLiteral argument)
+                    || !n.toStringAST().startsWith("#hasVariable(")) throw new ExpressionException(INVALID);
+            String key = (String) argument.getLiteralValue().getValue();
+            ActionField field = declarations.get(key);
+            if (field == null) throw new ExpressionException(INVALID);
+            // Compile only the membership operation. The Spring function is never evaluated or registered.
+            return new Plan("Exists", field, key, List.of(), Type.BOOLEAN, 2);
+        }
         if (n.getClass() == CompoundExpression.class) {
             if (n.getChildCount() < 2 || n.getChild(0).getClass() != VariableReference.class
                     || !n.getChild(0).toStringAST().equals("#vars")) throw new ExpressionException(INVALID);

@@ -168,6 +168,12 @@ public class RestrictedExpressionService {
             Evaluation state = (Evaluation)expressionState; state.work(plan.cost());
             String kind = plan.kind();
             if (kind.equals("Read")) return new TypedValue(read(state));
+            if (kind.equals("Exists")) {
+                boolean exists = state.initialized.containsKey(plan.text());
+                ActionField field = (ActionField) plan.literal();
+                state.record(new ExpressionRead(plan.text(), field.type(), List.of(), "EXISTS", Boolean.toString(exists)));
+                return new TypedValue(exists);
+            }
             if (kind.equals("Literal")) {
                 return new TypedValue(plan.literal());
             }
