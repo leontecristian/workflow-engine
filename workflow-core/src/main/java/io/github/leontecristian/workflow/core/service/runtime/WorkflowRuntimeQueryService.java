@@ -16,6 +16,8 @@ import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmissionPage;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmission;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
+import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Human;
 import io.github.leontecristian.workflow.core.dto.definition.document.TaskResultContract.Mode;
 import io.github.leontecristian.workflow.core.service.definition.DefinitionContentCanonicalizer;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
@@ -39,6 +41,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.ToLongFunction;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -116,6 +119,20 @@ public class WorkflowRuntimeQueryService {
         RuntimeInputs.id(id);
         return RuntimePersistenceErrors.call(() -> tasks.findById(id).map(entity -> RuntimeViews.task(entity, owner(entity))));
     }
+    /** Creation-time values for an exact task already authorized by the host. */
+    public Map<String, WorkflowValue> taskInputs(long instanceId, long taskId) {
+        RuntimeInputs.id(instanceId); RuntimeInputs.id(taskId);
+        return RuntimePersistenceErrors.call(() -> {
+            var task = tasks.findById(taskId).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
+            var activity = owner(task);
+            RuntimeInputs.require(activity.getInstanceId().equals(instanceId), Category.NOT_FOUND);
+            var inputs = pinnedHuman(activity).inputs();
+            if (inputs.isEmpty()) return Map.of();
+            var fact = history.findById(new WorkflowHistoryId(instanceId, RuntimeProgression.advance(activity.getActivationSequence(), 1)))
+                    .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
+            return RuntimeTaskCreationEvidence.read(fact, task, activity, inputs, json);
+        });
+    }
     /** Pinned policy for an exact task already authorized by the host. */
     public io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy taskClaimPolicy(long instanceId, long taskId) {
         RuntimeInputs.id(instanceId);
@@ -184,13 +201,38 @@ public class WorkflowRuntimeQueryService {
                 limit, RuntimeViews::history, WorkflowHistorySummary::historySequence, WorkflowHistoryPage::new));
     }
     public Optional<WorkflowHistoryEvent> findHistoryEvent(long instanceId, long sequence) {
+        return findHistoryEvent(instanceId, sequence, summary -> false);
+    }
+    /**
+     * Host-authorized instance history. Creation snapshots additionally require the host's
+     * current exact-task read grant, based on the receiving task and activity in the summary.
+     */
+    public Optional<WorkflowHistoryEvent> findHistoryEvent(long instanceId, long sequence,
+            Predicate<WorkflowHistorySummary> canReadTaskInputs) {
         RuntimeInputs.id(instanceId); RuntimeInputs.id(sequence);
-        return RuntimePersistenceErrors.call(() -> history.findById(new WorkflowHistoryId(instanceId, sequence)).map(entity -> {
+        Objects.requireNonNull(canReadTaskInputs);
+        var fact = RuntimePersistenceErrors.call(() -> history.findById(new WorkflowHistoryId(instanceId, sequence)));
+        if (fact.isEmpty()) return Optional.empty();
+        var entity = fact.get();
+        var summary = RuntimePersistenceErrors.call(() -> RuntimeViews.history(entity));
+        boolean creation = "TASK_CREATED".equals(summary.eventType());
+        boolean protectedInputs = creation && summary.detailsSchemaVersion() >= RuntimeTaskCreationEvidence.INPUTS_VERSION;
+        if (protectedInputs && (summary.taskId() == null || summary.activityId() == null || !canReadTaskInputs.test(summary)))
+            return Optional.empty();
+        return RuntimePersistenceErrors.call(() -> {
+            if (protectedInputs) {
+                var task = tasks.findById(summary.taskId())
+                        .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
+                var activity = owner(task);
+                RuntimeTaskCreationEvidence.read(entity, task, activity, pinnedHuman(activity).inputs(), json);
+            } else if (creation) {
+                RuntimeInputs.require(!json.tree(entity.getDetailsJson()).has("inputs"), Category.HOST_CONFIGURATION);
+            }
             RuntimeInputs.require(RuntimeJson.fits(entity.getDetailsJson(), 4 * 1024 * 1024), Category.LIMIT_EXCEEDED);
-            var result=new WorkflowHistoryEvent(RuntimeViews.history(entity), entity.getDetailsJson());
+            var result=new WorkflowHistoryEvent(summary, entity.getDetailsJson());
             RuntimeInputs.require(RuntimeJson.utf8Fits(json.encode(result),8*1024*1024),Category.LIMIT_EXCEEDED);
-            return result;
-        }));
+            return Optional.of(result);
+        });
     }
     public Optional<TaskSubmission> findTaskSubmission(long taskId) {
         RuntimeInputs.id(taskId);
@@ -237,11 +279,14 @@ public class WorkflowRuntimeQueryService {
         return activities.findById(task.getActivityId()).orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
     }
     private Mode submissionMode(WorkflowActivityEntity activity) {
+        return pinnedHuman(activity).resultContract().mode();
+    }
+    private Human pinnedHuman(WorkflowActivityEntity activity) {
         var instance = instances.findById(activity.getInstanceId())
                 .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
         var human = pins.load(instance).model().humans().get(activity.getNodeKey());
         RuntimeInputs.require(human != null, Category.HOST_CONFIGURATION);
-        return human.resultContract().mode();
+        return human;
     }
     private TaskSubmission submission(WorkflowTaskEntity task, WorkflowActivityEntity activity, Mode mode) {
         RuntimeInputs.require(activity.getId().equals(task.getActivityId()), Category.HOST_CONFIGURATION);

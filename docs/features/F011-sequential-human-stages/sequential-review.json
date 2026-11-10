@@ -25,7 +25,6 @@
       "completion": {
         "policy": "SINGLE"
       },
-      "inputContract": [],
       "resultContract": {
         "mode": "FORBIDDEN"
       },
@@ -54,7 +53,6 @@
       "completion": {
         "policy": "SINGLE"
       },
-      "inputContract": [],
       "resultContract": {
         "mode": "FORBIDDEN"
       },

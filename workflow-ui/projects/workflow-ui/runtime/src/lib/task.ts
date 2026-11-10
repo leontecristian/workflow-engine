@@ -1,4 +1,4 @@
-import { Component, Input, inject, signal } from '@angular/core';
+import { Component, Input, computed, inject, signal } from '@angular/core';
 import { CommandRecovery, WORKFLOW_RUNTIME_COMMANDS } from '@workflow-engine/ui';
 import type { TaskView, TaskContract, TaskSubmission } from '@workflow-engine/ui';
 import { RuntimeState } from './runtime-state';
@@ -20,6 +20,7 @@ export class WorkflowTaskComponent extends RuntimeState {
   };}
   detail = signal<TaskView | null>(null);
   contract = signal<TaskContract | null>(null);
+  readonly inputs = computed(() => Object.entries(this.contract()?.inputs ?? {}));
   submission = signal<TaskSubmission | null>(null);
   outcome = "";
   comment = "";

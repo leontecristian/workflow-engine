@@ -75,9 +75,11 @@ public class MinimalDefinitionLoader {
     MinimalWorkflowDefinition model(DefinitionDocumentCodec.Document document, DefinitionDiagnostics diagnostics,
             boolean authoring) {
         boolean extended = extended(document.tree());
-        unsupported(document.tree(), "", diagnostics, extended,routing(document.tree()));
         // Designer data is opaque. Avoid asking the structural validator to interpret arbitrary numeric values.
         ObjectNode validationTree = document.tree().deepCopy();
+        handleLegacyHumanInputContracts(validationTree.path("nodes"), diagnostics, authoring);
+        if (diagnostics.failed()) return null;
+        unsupported(validationTree, "", diagnostics, extended,routing(document.tree()));
         if (validationTree.has("designer") && validationTree.get("designer").isObject()) validationTree.set("designer", json.createObjectNode());
         // These two fields were ingested as exact positive integral values; provide conventional integer nodes to the provider.
         validationTree.put("schemaVersion", 1); validationTree.put("version", document.version());
@@ -98,10 +100,27 @@ public class MinimalDefinitionLoader {
                 else if(pointer.startsWith("/startPolicy/initialize") || pointer.contains("/inputs") || pointer.contains("/outputs")) code="INVALID_BINDING";
                 else if(pointer.endsWith("/action")) code="ACTION_CONTRACT";
             }
+            if (pointer.matches("/nodes/[0-9]+/inputs(?:/.*)?")) code="INVALID_BINDING";
             diagnostics.error(code,DiagnosticStage.STRUCTURE,"Document does not match the supported structure.",pointer);
         }
         return errors.isEmpty() ? ExecutionValueDefinitionModel.load(document.tree(), diagnostics, expressions, authoring) : null;
 
+    }
+
+    private void handleLegacyHumanInputContracts(JsonNode nodes, DefinitionDiagnostics diagnostics, boolean authoring) {
+        if (!nodes.isArray()) return;
+        for (int index = 0; index < nodes.size(); index++) {
+            if (!(nodes.get(index) instanceof ObjectNode human) || !"HUMAN_TASK".equals(human.path("type").textValue())
+                    || !human.has("inputContract")) continue;
+            if (authoring) {
+                diagnostics.error("INVALID_INPUT_CONTRACT", DiagnosticStage.STRUCTURE,
+                        "Remove the obsolete human-node inputContract field. Use inputs for incoming bindings.",
+                        "/nodes/" + index + "/inputContract");
+            } else if (human.get("inputContract").isArray() && human.get("inputContract").isEmpty()) {
+                // The stored definition and its hash remain untouched.
+                human.remove("inputContract");
+            }
+        }
     }
 
     private void unsupported(JsonNode node, String pointer, DefinitionDiagnostics diagnostics, boolean extended,boolean routing) {
@@ -111,6 +130,9 @@ public class MinimalDefinitionLoader {
                 String field = entry.getKey(); JsonNode value = entry.getValue();
                 if (field.equals("designer") || field.equals("default") || field.equals("value")
                         || field.equals("resultContract")) return;
+                // Binding names are user-defined ActionField keys, not definition vocabulary.
+                if (field.equals("inputs") && pointer.matches("/nodes/[0-9]+")
+                        && "HUMAN_TASK".equals(node.path("type").textValue())) return;
                 boolean unsupported = ((field.equals("guards") || (!extended && Set.of("variables", "inputContract").contains(field))) && value.isArray() && !value.isEmpty())
                         || (!extended && Set.of("inputs", "initialize").contains(field) && value.isObject() && !value.isEmpty())
                         || (field.equals("policy") && value.isTextual() && !value.textValue().equals("SINGLE"))

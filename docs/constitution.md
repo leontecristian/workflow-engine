@@ -1,5 +1,7 @@
 # Workflow project constitution
 
+**Human-task input bindings — owner decision, 2026-11-10 (constitution 6.4.0).** [F020](features/F020-human-task-input-bindings/spec.md) is implemented at revision 3. Explicit variable or original-submission bindings supply immutable review inputs captured when a SINGLE human task is created. Current receiving-task read authorization governs the copy, including eligible shared peers; source-task access is not granted. Opening, claiming and later variable changes do not refresh the snapshot. The inputs map supplies incoming data; resultContract describes the reviewer answer. Human inputContract is removed from new authoring; published legacy empty-field loading and startPolicy.inputContract are preserved. No separate reviewInputContract is added.
+
 **Named task outputs — owner decision, 2026-11-10 (constitution 6.3.0).** [F019](features/F019-named-task-output-variables/spec.md) selects an additive C08 extension: an optional pinned human-node output name creates a JSON variable only on accepted SINGLE completion, without a separate top-level declaration. Reject name collisions; preserve explicit absence and bounded existence checks. The owner selected later whole-value replacement and existing instance-variable visibility for the copy; the original submission stays immutable. This supersedes blanket declaration-only/no-result-copy wording only for explicitly configured outputs. No implicit merge, arbitrary runtime names or ALL aggregation is selected. F019 revision 2 is implemented. See the [verification record](features/F019-named-task-output-variables/implementation.md).
 
 **Claim/release decisions — 2026-11-09.** [F017](features/F017-task-claim-release/spec.md) is IMPLEMENTED revision 3 with guarded SQL Server and live sandbox acceptance complete. The owner selected per-human-node OPTIONAL (default) or REQUIRED claiming for shared tasks, exclusive claimant completion subject to current eligibility/business access, owner release and host-authorized administrator release, and a separate nullable assignee_ref column preserving the original assignment. Direct USER tasks initialize assignee_ref from assignment_ref and complete without a claim action under either policy. Claim/release actions apply only to GROUP/ROLE tasks. Eligible peers retain claimed-task visibility; current assignees retain discovery/release after membership loss under business access. Own receipt recovery survives membership/admin-privilege loss under business access. Administrative release requires a recorded reason. Constitution 6.2.0 records this additive scope. O01–O06 are closed. Earlier no-claim wording describes the F016 baseline.
@@ -20,11 +22,11 @@
 
 **Owner correction — 2026-11-05:** expression arithmetic follows native SpEL numeric behavior, including floating-point approximation, promotion, rounding and integral overflow. Do not reject a result solely for precision loss or compare it with an exact reference calculation. Declared DECIMAL variables enter evaluation as BigDecimal; decimal literals retain native SpEL types. Native evaluation errors and resource limits still fail the command. Exact decoding, transport, persistence and accepted-submission rules remain unchanged. This supersedes earlier expression-arithmetic exactness wording and the misinterpreted numeric owner decision.
 
-**Version:** 6.3.0
+**Version:** 6.4.0
 
 **Established:** 2026-10-24
 
-**Last amended:** 2026-11-09 (policy-controlled task claiming and release; specification only)
+**Last amended:** 2026-11-10 (human-task input snapshots and receiving-task visibility; specification only)
 
 **Basis:** consolidated design v0.9, database design v1.4 and subsequent owner decisions; see [design sources](design-sources.md) for precedence and proposal status
 
@@ -138,6 +140,8 @@ Initialize or replace complete JSON values only through declared start/service b
 
 ## C09 — Host policy and trusted identity govern business actions
 
+Explicit human-node input bindings MUST capture immutable, bounded review data at task creation in the entering command's transaction. The copy MUST follow the receiving task's current read authorization, including through history details, without granting source-task access. It MUST remain separate from reviewer submissions and MUST NOT refresh implicitly. [F020](features/F020-human-task-input-bindings/spec.md) specifies this additive SINGLE slice; host business invalidation policy remains independent.
+
 APOLO owns booking data, forms, validation, assignment sources, permissions, materiality rules and domain orchestration. Core MUST NOT encode overbooking calculations, country routing or alternative-resource policy.
 
 APOLO owns booking-to-workflow associations by storing the engine-issued instance ID in host data and using the engine API to retrieve instance state, tasks and history. Several bookings may share an instance ID. A booking column or host association table may represent the links according to cardinality and history needs; this constitution does not mandate a host table. APOLO resolves and authorizes related bookings when composing task details or applying business effects. Prior execution links and reviewed membership must remain available when current associations change. A JSON variable may hold a booking selection as execution context; it does not replace host associations or establish membership/authorization. Partial ALL contributions must not alter shared review material, including JSON variables.
@@ -177,6 +181,8 @@ Use semantic versioning for this document: major for incompatible principle/scop
 The consolidated design and database design remain the detailed architectural sources, with scoped precedence recorded in [design sources](design-sources.md). This constitution codifies their confirmed principles and the owner's later decisions. Database design v1.4 retains earlier selected changes and extends the scalar-only execution-variable model with JSON. Structured submissions remain distinct from mutable variables. Other proposed details remain proposals. Where a conflict lacks a superseding decision, record it and resolve it before implementing affected behavior. Historical archives and illustrative contracts cannot override current decisions.
 
 ## Amendment history
+
+- **6.4.0 — 2026-11-10:** owner approved human-task inputs from variables or original task results, captured at task creation and visible under receiving-task authorization. F020 revision 3 uses inputs bindings with source-derived types and resultContract for the answer, removing human inputContract from new authoring while preserving published legacy empty-field loading, start input contracts and host policy. Planning only; no runtime implementation or migration.
 
 - **6.3.0 scope clarification — 2026-11-10:** the owner included explicit submission-by-node-key service input bindings in F019 revision 2, alongside current variable values. This uses immutable evidence through pinned bindings, independent of command-trigger context; no general expression/history lookup or repeated-activity selection is added. Existing transaction, host policy and bounded-input guarantees apply. Specification only.
 

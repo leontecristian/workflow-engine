@@ -10,6 +10,11 @@ export interface TaskAssignment { kind: "USER" | "GROUP" | "ROLE"; ref: string; 
 export type TaskResultContract =
   | { mode: "FORBIDDEN" }
   | { mode: "OPTIONAL" | "REQUIRED"; schema: object; schemaJson?: string };
+export interface TaskInput {
+  readonly type: "STRING" | "LONG" | "DECIMAL" | "BOOLEAN" | "DATE" | "DATETIME" | "JSON";
+  /** Exact JSON token text. Extract from the response before reserializing any parsed values. */
+  readonly valueJson: string;
+}
 
 export interface TaskView {
   id: Decimal;
@@ -39,6 +44,7 @@ export interface TaskContract {
   canComplete: boolean;
   assignmentLabel: string;
   resultContract?: TaskResultContract;
+  inputs?: Readonly<Record<string, TaskInput>>;
   outcomes: {
     key: string;
     label: string;

@@ -12,7 +12,7 @@
     {"key":"BEGIN","type":"START","name":"Start"},
     {"key":"REVIEW","type":"HUMAN_TASK","name":"Review booking","taskType":"SANDBOX_REVIEW",
       "assignment":{"resolver":"sandbox.singleReviewer","inputs":{}},
-      "completion":{"policy":"SINGLE"},"inputContract":[],"resultContract":{"mode":"FORBIDDEN"},
+      "completion":{"policy":"SINGLE"},"resultContract":{"mode":"FORBIDDEN"},
       "outcomes":[{"key":"COMPLETE","label":"Complete","requiresComment":false}]},
     {"key":"RECORD","type":"SERVICE_TASK","name":"Refresh booking","action":"sandbox.refreshBooking",
       "inputs":{"booking":{"source":"variable","key":"booking"}},

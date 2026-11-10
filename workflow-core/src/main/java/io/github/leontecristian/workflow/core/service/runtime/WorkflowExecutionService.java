@@ -143,7 +143,7 @@ public class WorkflowExecutionService {
             var paused=services.traverse(model,model.start().key(),null,new ServiceActionContext(
                     command.commandId(),instance.getId(),definition.versionId(),model.start().key(),command.businessType(),command.businessId(),context),state,progression,batch,definition.contentHash(),null);
             RuntimeInputs.require("HUMAN_TASK".equals(paused.type()),Category.HOST_CONFIGURATION);
-            var stage = enterStage(definition,instance,paused.key(),command.commandId(),context,batch);
+            var stage = enterStage(definition,instance,paused.key(),command.commandId(),context,batch,state);
             instance.waitAt(paused.key(),batch.last());
             return finish(command.commandId(), WorkflowOperation.START_WORKFLOW, context, fingerprint, definition, instance, stage.activity(), stage.task(), 1, batch, recorder, json.fingerprintVersion(inputs));
         });
@@ -186,10 +186,7 @@ public class WorkflowExecutionService {
             RuntimeInputs.require(history.findCompletionByTaskId(task.getId()).isEmpty(), Category.HOST_CONFIGURATION);
             var created = history.findById(new WorkflowHistoryId(instance.getId(), RuntimeProgression.advance(activity.getActivationSequence(),1)))
                     .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
-            RuntimeInputs.require("TASK_CREATED".equals(created.getEventType()) && task.getId().equals(created.getTaskId())
-                    && activity.getId().equals(created.getActivityId()), Category.HOST_CONFIGURATION);
-            RuntimeInputs.require(created.getDetailsSchemaVersion() >= 2 && created.getDetailsSchemaVersion() <= 4, Category.UNSUPPORTED_VERSION);
-            RuntimeInputs.require(RuntimeTaskCreationEvidence.matches(created, task, json), Category.HOST_CONFIGURATION);
+            RuntimeTaskCreationEvidence.read(created, task, activity, human.inputs(), json);
             var entered = history.findById(new WorkflowHistoryId(instance.getId(), activity.getActivationSequence()))
                     .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
             RuntimeInputs.require("ACTIVITY_ENTERED".equals(entered.getEventType()) && activity.getId().equals(entered.getActivityId())
@@ -231,7 +228,7 @@ public class WorkflowExecutionService {
                     state,budget,batch,definition.contentHash(),selectedOutcome.key());
             if ("HUMAN_TASK".equals(end.type())) {
                 entityManager.flush(); // Close the previous active row before inserting its successor.
-                enterStage(definition,instance,end.key(),command.commandId(),context,batch);
+                enterStage(definition,instance,end.key(),command.commandId(),context,batch,state);
                 instance.advanceToHuman(end.key(),batch.last());
             } else {
                 budget.visit(end,"END");
@@ -403,6 +400,14 @@ public class WorkflowExecutionService {
             var time = RuntimeInputs.context(context);
             RuntimeInputs.require(!time.isBefore(task.getCreatedAt()), Category.INVALID_INPUT);
             var definition = pins.load(instance);
+            var human = definition.model().humans().get(activity.getNodeKey());
+            RuntimeInputs.require(human != null, Category.HOST_CONFIGURATION);
+            if (!human.inputs().isEmpty()) {
+                var created = history.findById(new WorkflowHistoryId(instance.getId(),
+                        RuntimeProgression.advance(activity.getActivationSequence(), 1)))
+                        .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
+                RuntimeTaskCreationEvidence.read(created, task, activity, human.inputs(), json);
+            }
             RuntimeHistoryBatch batch = new RuntimeHistoryBatch(entityManager, json, instance.getId(), definition.versionId(),
                     request.commandId(), context);
             batch.beginAt(sequence - 1);
@@ -445,9 +450,11 @@ public class WorkflowExecutionService {
     private record EnteredStage(WorkflowActivityEntity activity, WorkflowTaskEntity task) { }
 
     private EnteredStage enterStage(ExecutableDefinition definition, WorkflowInstanceEntity instance, String nodeKey,
-            UUID commandId, WorkflowCommandContext context, RuntimeHistoryBatch batch) {
+            UUID commandId, WorkflowCommandContext context, RuntimeHistoryBatch batch, Map<String, WorkflowValue> state) {
         var human = definition.model().humans().get(nodeKey);
         RuntimeInputs.require(human != null, Category.HOST_CONFIGURATION);
+        var inputs = human.inputs().isEmpty() ? null : RuntimeTaskCreationEvidence.capture(human.inputs(),
+                input -> services.resolveInput(definition.model(), input.binding(), instance.getId(), state), json);
         var resolver = host.resolver(human.assignment().resolver());
         var taskType = catalog.findByCode(human.taskType())
                 .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
@@ -468,7 +475,12 @@ public class WorkflowExecutionService {
         var payload = new java.util.HashMap<>(Map.of("taskKey", resolved.taskKey(),
                 "assignmentKind", resolved.assignment().kind().name(), "assignmentRef", resolved.assignment().ref()));
         if (task.getAssigneeRef() != null) payload.put("assigneeRef", task.getAssigneeRef());
-        batch.next("TASK_CREATED", activity.getId(), task.getId(), null, created, payload);
+        if (inputs == null) {
+            batch.next("TASK_CREATED", activity.getId(), task.getId(), null, created, payload);
+        } else {
+            created.set("inputs", inputs);
+            batch.next("TASK_CREATED", activity.getId(), task.getId(), created, payload, RuntimeTaskCreationEvidence.INPUTS_VERSION);
+        }
         return new EnteredStage(activity,task);
     }
 

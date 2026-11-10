@@ -26,7 +26,6 @@
       "completion": {
         "policy": "SINGLE"
       },
-      "inputContract": [],
       "outputVariable": "reviewResult",
       "resultContract": {
         "mode": "REQUIRED",

@@ -222,6 +222,44 @@
   ],
   "additionalProperties": false,
   "$defs": {
+    "inputBinding": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "const": "variable"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+            }
+          },
+          "required": [
+            "source",
+            "key"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "const": "submission"
+            },
+            "nodeKey": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+            }
+          },
+          "required": [
+            "source",
+            "nodeKey"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
     "start": {
       "type": "object",
       "properties": {
@@ -341,9 +379,16 @@
           ],
           "additionalProperties": false
         },
-        "inputContract": {
-          "type": "array",
-          "maxItems": 0
+        "inputs": {
+          "type": "object",
+          "maxProperties": 50,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/inputBinding"
+          }
         },
         "outputVariable": {
           "type": "string",
@@ -407,7 +452,6 @@
         "taskType",
         "assignment",
         "completion",
-        "inputContract",
         "resultContract",
         "outcomes"
       ],
@@ -478,42 +522,7 @@
             "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
           },
           "additionalProperties": {
-            "oneOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "source": {
-                    "const": "variable"
-                  },
-                  "key": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
-                  }
-                },
-                "required": [
-                  "source",
-                  "key"
-                ],
-                "additionalProperties": false
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "source": {
-                    "const": "submission"
-                  },
-                  "nodeKey": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"
-                  }
-                },
-                "required": [
-                  "source",
-                  "nodeKey"
-                ],
-                "additionalProperties": false
-              }
-            ]
+            "$ref": "#/$defs/inputBinding"
           }
         },
         "outputs": {

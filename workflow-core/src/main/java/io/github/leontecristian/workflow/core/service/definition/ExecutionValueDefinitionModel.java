@@ -28,7 +28,7 @@ final class ExecutionValueDefinitionModel {
         return new ActionField(n.path("key").textValue(), VariableValueType.valueOf(n.path("type").textValue()),
                 input && n.path("required").booleanValue(), n.path("nullable").booleanValue());
     }
-    private static Map<String,Binding> bindings(JsonNode n) {
+    static Map<String,Binding> bindings(JsonNode n) {
         Map<String,Binding> result = new HashMap<>();
         n.fields().forEachRemaining(e -> result.put(e.getKey(), new Binding(e.getValue().path("source").textValue(),
                 e.getValue().path("key").textValue(), e.getValue().has("value") ? literal(e.getValue().get("value")) : null,

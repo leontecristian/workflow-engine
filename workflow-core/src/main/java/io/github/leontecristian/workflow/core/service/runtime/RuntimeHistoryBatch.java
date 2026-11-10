@@ -32,6 +32,9 @@ final class RuntimeHistoryBatch {
     long next(String type, Long activityId, Long taskId, MinimalWorkflowDefinition.Transition transition, Object details, Map<String,String> payload) {
         long next=RuntimeProgression.advance(sequence,1); append(next,type,activityId,taskId,transition,details,payload); return next;
     }
+    void next(String type, Long activityId, Long taskId, Object details, Map<String,String> payload, short detailsVersion) {
+        append(RuntimeProgression.advance(sequence,1),type,activityId,taskId,null,details,payload,detailsVersion);
+    }
     void append(long sequence, String type, Long activityId, Long taskId,
                 MinimalWorkflowDefinition.Transition transition, Object details, Map<String,String> payload) {
         short detailsVersion = switch (type) {

@@ -37,20 +37,24 @@ public class WorkflowInstanceViewerService {
     /** Bound the final escaped envelope, independently of ordinary summary pages. */
     public String event(long id, long sequence) {
         access.requireInstanceRead(id); access.requireHistoryRead(id);
-        var event = reads.findHistoryEvent(id, sequence).orElseThrow(WorkflowViewerException::missing);
+        var event = reads.findHistoryEvent(id, sequence, this::canReadExactTask)
+                .orElseThrow(WorkflowViewerException::missing);
         if (isOwnershipEvent(event.summary()) && !access.canReadHistorySummary(event.summary()))
             throw WorkflowViewerException.missing();
         var summary = event.summary();
-        if ("TASK_COMPLETED".equals(summary.eventType()) && summary.detailsSchemaVersion() >= 3) {
-            if (summary.activityId() == null || summary.taskId() == null) throw WorkflowViewerException.missing();
-            var exactTask = new ViewerLinkReference(summary.activityId(), summary.taskId());
-            if (!access.readableLinks(id, Set.of(exactTask)).contains(exactTask)) throw WorkflowViewerException.missing();
-        }
+        if ("TASK_COMPLETED".equals(summary.eventType()) && summary.detailsSchemaVersion() >= 3
+                && !canReadExactTask(summary)) throw WorkflowViewerException.missing();
         access.requireHistoryEventRead(event.summary());
         if (!wire.fits(event.detailsJson(), 4 * 1024 * 1024)) throw new WorkflowViewerException(422, "LIMIT_EXCEEDED");
         var json = wire.json(event);
         if (json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 8 * 1024 * 1024)
             throw new WorkflowViewerException(422, "LIMIT_EXCEEDED");
         return json;
+    }
+
+    private boolean canReadExactTask(WorkflowHistorySummary summary) {
+        if (summary.activityId() == null || summary.taskId() == null) return false;
+        var exactTask = new ViewerLinkReference(summary.activityId(), summary.taskId());
+        return access.readableLinks(summary.instanceId(), Set.of(exactTask)).contains(exactTask);
     }
 }

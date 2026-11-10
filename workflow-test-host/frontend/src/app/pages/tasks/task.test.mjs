@@ -188,7 +188,7 @@ test('structured task completion handles required input, local JSON errors and o
  const {page}=component(t,TaskPage,{},routeAt(),undefined,[{provide:CommandRecovery,useValue:commands}]);
  page.id='3';page.detail.set({instanceId:'1',status:'OPEN'});
  const contract={instanceLockVersion:'2',canComplete:true,outcomes:[{key:'OK',label:'OK',requiresComment:false}]};
- page.contract.set({...contract,resultContract:{mode:'REQUIRED',schema:{type:'object'}}});
+ page.contract.set({...contract,inputs:{booking:{type:'JSON',valueJson:'{"amount":9007199254740993.00}'}},resultContract:{mode:'REQUIRED',schema:{type:'object'}}});
  await page.complete('OK');
  assert.match(page.error(),/result is required/);
  page.resultDraft='null';
@@ -200,6 +200,8 @@ test('structured task completion handles required input, local JSON errors and o
  await page.complete('OK');
  assert.equal(calls,1);
  assert.equal(buffer.command.body.resultJson,draft);
+ assert.ok(!Object.hasOwn(buffer.command.body,'inputs'));
+ assert.equal(page.inputs()[0][1].valueJson,'{"amount":9007199254740993.00}');
  assert.equal(page.resultDraft,draft);
  assert.match(page.error(),/approvedAmount.*Amount rejected/);
  page.contract.set({...contract,resultContract:{mode:'OPTIONAL',schema:{type:'object'}}});

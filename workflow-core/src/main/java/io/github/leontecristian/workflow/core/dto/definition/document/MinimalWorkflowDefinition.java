@@ -4,6 +4,7 @@ import java.util.Map;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy;
+import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
 /** Internal validated subset; canonical source is retained separately, including all designer values. */
 public record MinimalWorkflowDefinition(Node start, Map<String,Human> humans, Node end, List<Transition> transitions,
         Map<String,Input> inputs, Map<String,ActionField> variables, Map<String,Binding> initialize,
@@ -40,8 +41,14 @@ public record MinimalWorkflowDefinition(Node start, Map<String,Human> humans, No
     public record Node(String key, String type, String name, String result) {}
     public record Assignment(String resolver) {}
     public record Outcome(String key, String label, boolean requiresComment) {}
+    public record HumanInput(Binding binding, VariableValueType type, boolean nullable) {}
     public record Human(String key, String taskType, Assignment assignment, List<Outcome> outcomes,
-            TaskClaimPolicy claimPolicy, TaskResultContract resultContract, String outputVariable) {
+            TaskClaimPolicy claimPolicy, TaskResultContract resultContract, String outputVariable,
+            Map<String,HumanInput> inputs) {
+        public Human(String key, String taskType, Assignment assignment, List<Outcome> outcomes,
+                TaskClaimPolicy claimPolicy, TaskResultContract resultContract, String outputVariable) {
+            this(key, taskType, assignment, outcomes, claimPolicy, resultContract, outputVariable, Map.of());
+        }
         public Human(String key, String taskType, Assignment assignment, List<Outcome> outcomes,
                 TaskClaimPolicy claimPolicy, TaskResultContract resultContract) {
             this(key, taskType, assignment, outcomes, claimPolicy, resultContract, null);
@@ -53,7 +60,10 @@ public record MinimalWorkflowDefinition(Node start, Map<String,Human> humans, No
         public Human(String key, String taskType, Assignment assignment, List<Outcome> outcomes) {
             this(key, taskType, assignment, outcomes, TaskClaimPolicy.OPTIONAL);
         }
-        public Human { outcomes = List.copyOf(outcomes); }
+        public Human {
+            outcomes = List.copyOf(outcomes);
+            inputs = Map.copyOf(inputs);
+        }
         public java.util.Optional<Outcome> outcome(String key) {
             return outcomes.stream().filter(outcome -> outcome.key().equals(key)).findFirst();
         }

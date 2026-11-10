@@ -2,6 +2,8 @@ package io.github.leontecristian.workflow.testhost;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -103,7 +105,7 @@ class ConsoleSharedAssignmentUnitTest {
         var host=new io.github.leontecristian.workflow.testhost.service.runtime.ConsoleViewerAccess(access,reads);
         var summary=mock(io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistorySummary.class);
         when(summary.instanceId()).thenReturn(1L);when(summary.eventType()).thenReturn("TASK_COMPLETED");when(summary.taskId()).thenReturn(5L);
-        when(reads.findHistoryEvent(1,9)).thenReturn(Optional.of(new io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistoryEvent(summary,"{}")));
+        when(reads.findHistoryEvent(eq(1L),eq(9L),any())).thenReturn(Optional.of(new io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistoryEvent(summary,"{}")));
         when(access.task(5)).thenThrow(io.github.leontecristian.workflow.testhost.exception.console.ConsoleException.missing());
         var viewer=new io.github.leontecristian.workflow.web.service.instance.WorkflowInstanceViewerService(reads,host,
                 new io.github.leontecristian.workflow.web.service.instance.ViewerWire());

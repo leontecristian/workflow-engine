@@ -132,7 +132,7 @@ class RestrictedRoutingIT extends DatabaseIntegrationTest {
                {"key":"missing","type":"LONG","nullable":true},{"key":"decimal","type":"DECIMAL","nullable":false}],
              "nodes":[{"key":"BEGIN","type":"START","name":"Start"},
                {"key":"REVIEW","type":"HUMAN_TASK","name":"Review","taskType":"%s","assignment":{"resolver":"f008.reviewer","inputs":{}},
-                "completion":{"policy":"SINGLE"},"inputContract":[],"resultContract":{"mode":"FORBIDDEN"},
+                "completion":{"policy":"SINGLE"},"resultContract":{"mode":"FORBIDDEN"},
                 "outcomes":[{"key":"COMPLETE","label":"Complete","requiresComment":false}]},
                {"key":"RECORD","type":"SERVICE_TASK","name":"Participating host effect","action":"f008.record",
                 "inputs":{"quantity":{"source":"variable","key":"quantity"}},"outputs":{"recordedQuantity":{"source":"actionOutput","key":"recordedQuantity"}}},

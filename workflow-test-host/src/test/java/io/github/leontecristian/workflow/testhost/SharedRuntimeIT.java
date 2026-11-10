@@ -13,9 +13,12 @@ import io.github.leontecristian.workflow.core.dto.definition.DefinitionManagemen
 import io.github.leontecristian.workflow.core.dto.definition.ImportWorkflowDraft;
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.NullLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionContext;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionDescriptor;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionResult;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
+import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
@@ -47,6 +50,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -113,7 +118,7 @@ class SharedRuntimeIT extends DatabaseIntegrationTest {
                 @Override public ServiceActionResult execute(ServiceActionContext context, Map<String, WorkflowValue> inputs) {
                     // The source resolves the current completion, and a query in the same transaction sees its copy.
                     var page = reads.getObject().listVariables(context.instanceId(), null, 50, null);
-                    assertThat(page.items()).singleElement()
+                    assertThat(page.items()).filteredOn(variable -> variable.key().equals("reviewResult")).singleElement()
                             .satisfies(variable -> assertThat(variable.value()).isEqualTo(inputs.get("reviewResult")));
                     return new ServiceActionResult(Map.of("reviewResult", new WorkflowValue(VariableValueType.JSON,
                             WorkflowJsonValue.parse("{\"approvedAmount\":900.0}"))));
@@ -386,6 +391,180 @@ class SharedRuntimeIT extends DatabaseIntegrationTest {
                 assertThat(variable.value().value()).isEqualTo(WorkflowJsonValue.parse("{\"approvedAmount\":900.0}")));
     }
 
+    private enum EntryFailure { MISSING_RESULT, UNINITIALIZED, LIMIT }
+
+    @Test
+    void humanTaskInputsPersistExactValuesAcrossReplayClaimAndCompletion() throws Exception {
+        var entered = enterHumanTaskWithInputs();
+        long instanceId = entered.started().instance().id();
+        long sourceTaskId = entered.started().task().id();
+        long taskId = entered.taskId();
+        var inputs = reads.taskInputs(instanceId, taskId);
+        assertThat(reads.taskInputs(instanceId, sourceTaskId)).isEmpty();
+        assertThat(inputs).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "original", new WorkflowValue(VariableValueType.JSON, entered.command().result()),
+                "current", new WorkflowValue(VariableValueType.JSON, WorkflowJsonValue.parse("{\"approvedAmount\":900.0}")),
+                "reviewDate", new WorkflowValue(VariableValueType.DATE, new TextLiteral("2026-11-10")),
+                "optionalNote", new WorkflowValue(VariableValueType.STRING, NullLiteral.INSTANCE)));
+
+        var creation = reads.listHistory(instanceId).items().stream()
+                .filter(item -> "TASK_CREATED".equals(item.eventType()) && Long.valueOf(taskId).equals(item.taskId()))
+                .findFirst().orElseThrow();
+        assertThat(creation.detailsSchemaVersion()).isEqualTo((short) 5);
+        assertThat(reads.findHistoryEvent(instanceId, creation.historySequence())).isEmpty();
+        assertThat(jdbc.queryForObject("""
+                SELECT event_json FROM wf_test.workflow_event_outbox WHERE instance_id=? AND history_sequence=?
+                """, String.class, instanceId, creation.historySequence())).doesNotContain("approvedAmount", "optionalNote");
+
+        // The sandbox has no replacement endpoint. Change only this test-owned source row
+        // to check that reloads read the snapshot independently of the variable store.
+        assertThat(jdbc.update("""
+                UPDATE wf.workflow_variable SET json_value=? WHERE instance_id=? AND variable_key='reviewResult'
+                """, "{\"approvedAmount\":12.3}", instanceId)).isEqualTo(1);
+        var replay = runtime.complete(entered.command(), reviewerContext("f015-reviewer"));
+        assertThat(replay.replayed()).isTrue();
+        assertThat(replay.execution()).isEqualTo(entered.progressed());
+        assertThat(reads.listHistory(instanceId).items()).filteredOn(item ->
+                "TASK_CREATED".equals(item.eventType()) && item.detailsSchemaVersion() == 5).containsExactly(creation);
+        assertThat(reads.taskInputs(instanceId, taskId)).isEqualTo(inputs);
+
+        var mvc = MockMvcBuilders.webAppContextSetup(web).addFilters(web.getBean(FilterChainProxy.class)).build();
+        var originalReviewer = session("f015-reviewer", "ROLE_CONSOLE_REVIEWER");
+        var peer = session("f015-reviewer2", "ROLE_CONSOLE_REVIEWER");
+        String taskContract = "/console/api/tasks/" + taskId + "/contract";
+        String instance = "/console/api/instances/" + instanceId;
+        String event = instance + "/history/" + creation.historySequence();
+        var csrf = json.readTree(mvc.perform(get("/console/api/session").session(peer))
+                .andReturn().getResponse().getContentAsString());
+        var claimed = mvc.perform(post(instance + "/tasks/" + taskId + "/claim").session(peer)
+                .contentType("application/json")
+                .header(csrf.path("csrfHeaderName").asText(), csrf.path("csrfToken").asText())
+                .header("X-Expected-Lock-Version", entered.progressed().instance().lockVersion())
+                .content(json.createObjectNode().put("commandId", UUID.randomUUID().toString()).toString()))
+                .andReturn().getResponse();
+        assertThat(claimed.getStatus()).withFailMessage(claimed.getContentAsString()).isEqualTo(200);
+        assertThat(reads.findTask(taskId).orElseThrow().assigneeRef()).isEqualTo("f015-reviewer2");
+        assertThat(reads.taskInputs(instanceId, taskId)).isEqualTo(inputs);
+        assertThat(mvc.perform(get("/console/api/tasks/" + sourceTaskId + "/submission").session(peer))
+                .andReturn().getResponse().getStatus()).isEqualTo(404);
+        var open = mvc.perform(get(taskContract).session(originalReviewer)).andReturn().getResponse();
+        assertThat(open.getStatus()).isEqualTo(200);
+        assertThat(open.getContentAsString()).contains("9007199254740993.00", "2026-11-10");
+        var historyResponse = mvc.perform(get(event).session(peer)).andReturn().getResponse();
+        assertThat(historyResponse.getStatus()).isEqualTo(200);
+        assertThat(json.readTree(historyResponse.getContentAsString()).path("detailsJson").asText())
+                .contains("9007199254740993.00");
+
+        var answer = CompleteWorkflowTask.parseResult("{\"approvedAmount\":1250.00,\"note\":\"Receiver answer\"}");
+        var complete = new CompleteWorkflowTask(UUID.randomUUID(), instanceId, taskId, reads.findInstance(instanceId).orElseThrow().lockVersion(),
+                "COMPLETE", null, answer);
+        runtime.complete(complete, reviewerContext("f015-reviewer2"));
+        assertThat(reads.findTaskSubmission(taskId).orElseThrow().result()).isEqualTo(answer);
+        assertThat(reads.taskInputs(instanceId, taskId)).isEqualTo(inputs);
+        var completed = mvc.perform(get(taskContract).session(peer)).andReturn().getResponse();
+        assertThat(completed.getStatus()).isEqualTo(200);
+        assertThat(completed.getContentAsString()).contains("9007199254740993.00");
+        assertThat(mvc.perform(get(instance).session(originalReviewer)).andReturn().getResponse().getStatus()).isEqualTo(200);
+        var denied = mvc.perform(get(event).session(originalReviewer)).andReturn().getResponse();
+        assertThat(denied.getStatus()).isEqualTo(404);
+        assertThat(denied.getContentAsString()).doesNotContain("approvedAmount");
+        assertThat(mvc.perform(get(taskContract).session(originalReviewer)).andReturn().getResponse().getStatus()).isEqualTo(404);
+    }
+
+    @ParameterizedTest
+    @EnumSource(EntryFailure.class)
+    void humanTaskInputsRollBackEnteringCompletion(EntryFailure failure) throws Exception {
+        publishStructuredDefinition(humanTaskInputsDocument(failure));
+        var started = startStructured();
+        long instanceId = started.instance().id();
+        var reviewer = reviewerContext("f015-reviewer");
+        var result = failure == EntryFailure.MISSING_RESULT ? null : inputSourceResult();
+        var command = new CompleteWorkflowTask(UUID.randomUUID(), instanceId, started.task().id(),
+                started.instance().lockVersion(), "COMPLETE", null, result);
+        var expected = switch (failure) {
+            case MISSING_RESULT -> Category.SUBMISSION_UNAVAILABLE;
+            case UNINITIALIZED -> Category.UNINITIALIZED_VARIABLE;
+            case LIMIT -> Category.LIMIT_EXCEEDED;
+        };
+        assertThatThrownBy(() -> runtime.complete(command, reviewer)).isInstanceOfSatisfying(
+                WorkflowExecutionException.class, error -> assertThat(error.category()).isEqualTo(expected));
+        assertThat(reads.findInstance(instanceId).orElseThrow()).isEqualTo(started.instance());
+        assertThat(reads.listTasks(instanceId).items()).containsExactly(started.task());
+        assertThat(reads.findTaskSubmission(command.taskId())).isEmpty();
+        assertThat(runtime.replayComplete(command, reviewer)).isEmpty();
+        assertThat(reads.listVariables(instanceId, null, 50, null).items()).noneMatch(item -> item.key().equals("reviewResult"));
+        assertThat(reads.listHistory(instanceId).items()).noneMatch(item -> item.commandId().equals(command.commandId()));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf_test.workflow_event_outbox WHERE instance_id=?",
+                Long.class, instanceId)).isEqualTo(started.lastHistorySequence());
+    }
+
+    private record EnteredInputTask(WorkflowExecutionResult started, CompleteWorkflowTask command,
+            WorkflowExecutionResult progressed, long taskId) { }
+
+    private EnteredInputTask enterHumanTaskWithInputs() throws Exception {
+        publishStructuredDefinition(humanTaskInputsDocument(null));
+        var started = startStructured();
+        long instanceId = started.instance().id();
+        var command = new CompleteWorkflowTask(UUID.randomUUID(), instanceId, started.task().id(),
+                started.instance().lockVersion(), "COMPLETE", null, inputSourceResult());
+        var progressed = runtime.complete(command, reviewerContext("f015-reviewer")).execution();
+        long taskId = reads.listTasks(instanceId).items().stream().filter(task -> task.status() == TaskStatus.OPEN)
+                .findFirst().orElseThrow().id();
+        return new EnteredInputTask(started, command, progressed, taskId);
+    }
+
+    private WorkflowCommandContext reviewerContext(String actor) {
+        return new WorkflowCommandContext(ActorKind.USER, actor, Instant.now(), marker);
+    }
+
+    private WorkflowJsonValue inputSourceResult() {
+        return CompleteWorkflowTask.parseResult("{\"approvedAmount\":9007199254740993.00,\"note\":\"Original answer\"}");
+    }
+
+    private ObjectNode humanTaskInputsDocument(EntryFailure failure) throws Exception {
+        var document = namedOutputDocument().put("key", marker);
+        var nodes = document.withArray("nodes");
+        var source = (ObjectNode) nodes.get(1);
+        var receiving = source.deepCopy().put("key", "receivingReview").put("name", "Review saved inputs");
+        receiving.remove("outputVariable");
+        receiving.put("claimPolicy", "REQUIRED");
+        ((ObjectNode) receiving.get("assignment")).put("resolver", "sandbox.sharedGroupReviewer");
+        var inputs = receiving.putObject("inputs");
+        inputs.putObject("original").put("source", "submission").put("nodeKey", "reviewAmount");
+        inputs.putObject("current").put("source", "variable").put("key", "reviewResult");
+        inputs.putObject("reviewDate").put("source", "variable").put("key", "reviewDate");
+        inputs.putObject("optionalNote").put("source", "variable").put("key", "optionalNote");
+        nodes.add(receiving);
+
+        var variables = document.withArray("variables");
+        var initialize = (ObjectNode) document.path("startPolicy").path("initialize");
+        variables.addObject().put("key", "reviewDate").put("type", "DATE").put("nullable", false);
+        initialize.putObject("reviewDate").put("source", "literal").put("value", "2026-11-10");
+        variables.addObject().put("key", "optionalNote").put("type", "STRING").put("nullable", true);
+        if (failure != EntryFailure.UNINITIALIZED) initialize.putObject("optionalNote").put("source", "literal").putNull("value");
+        if (failure == EntryFailure.LIMIT) {
+            variables.addObject().put("key", "largeText").put("type", "STRING").put("nullable", false);
+            initialize.putObject("largeText").put("source", "literal").put("value", "x".repeat(4000));
+            for (int i = 0; i < 20; i++) inputs.putObject("copy" + i).put("source", "variable").put("key", "largeText");
+        }
+
+        var edges = document.withArray("transitions");
+        edges.addObject().put("key", "answer").put("from", "receivingReview").put("to", "DONE").put("outcome", "COMPLETE");
+        if (failure == EntryFailure.MISSING_RESULT) {
+            ((ObjectNode) source.get("resultContract")).put("mode", "OPTIONAL");
+            source.remove("outputVariable");
+            inputs.remove("current");
+            nodes.remove(2);
+            ((ObjectNode) edges.get(1)).put("to", "receivingReview");
+            edges.remove(2);
+        } else {
+            var replace = ((ObjectNode) nodes.get(2)).put("action", "test.replaceReviewAmount");
+            ((ObjectNode) replace.get("outputs")).putObject("reviewResult").put("source", "actionOutput").put("key", "reviewResult");
+            ((ObjectNode) edges.get(2)).put("to", "receivingReview");
+        }
+        return document;
+    }
+
     private ObjectNode namedOutputDocument() throws Exception {
         return (ObjectNode) json.readTree(Files.readString(repository().resolve(
                 "docs/features/F019-named-task-output-variables/sandbox-named-task-output.json")));
@@ -531,4 +710,5 @@ class SharedRuntimeIT extends DatabaseIntegrationTest {
             if(ownedTaskType!=null)jdbc.update("DELETE FROM wf.workflow_task_type WHERE id=? AND code='SANDBOX_REVIEW'",ownedTaskType);
         });
     }
+
 }

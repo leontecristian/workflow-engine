@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { findNodeAtLocation, parseTree, visit, type JSONPath } from 'jsonc-parser';
 import { ConsoleSession } from './console-session';
-import type { WorkflowRuntimeReads, InstanceSummary, Page, VariablePage, TaskView, TaskContract, TaskSubmission, ActivityView, SubmissionPage } from '@workflow-engine/ui';
+import type { WorkflowRuntimeReads, InstanceSummary, Page, VariablePage, TaskView, TaskContract, TaskInput, TaskSubmission, ActivityView, SubmissionPage } from '@workflow-engine/ui';
 @Injectable({providedIn:'root'})
 export class ConsoleRuntimeReads implements WorkflowRuntimeReads {
  private readonly session=inject(ConsoleSession);
@@ -22,12 +22,13 @@ export class ConsoleRuntimeReads implements WorkflowRuntimeReads {
   const exit=()=>{depth--;};
   visit(text,{onObjectBegin:enter,onArrayBegin:enter,onObjectEnd:exit,onArrayEnd:exit});
   const tree=parseTree(text);
-  return {value,objectAt(location:JSONPath){
+  function tokenAt(location:JSONPath, objectOnly = false) {
    const node=tree&&findNodeAtLocation(tree,location);
    if(!node)return undefined;
-   if(node.type!=='object')throw new Error('Invalid read response.');
+   if(objectOnly&&node.type!=='object')throw new Error('Invalid read response.');
    return text.slice(node.offset,node.offset+node.length);
-  }};
+  }
+  return {value, tokenAt, objectAt:(location:JSONPath)=>tokenAt(location,true)};
  }
  private query(values:Record<string,string|undefined>){return '?'+new URLSearchParams(Object.entries(values).filter((p):p is [string,string]=>p[1]!==undefined));}
  listInstances(status:string,cursor:string|undefined,limit:number,signal:AbortSignal){return this.read<Page<InstanceSummary>>('/instances'+this.query({status,afterId:cursor,limit:String(limit)}),signal);}
@@ -36,10 +37,15 @@ export class ConsoleRuntimeReads implements WorkflowRuntimeReads {
  instanceTasks(id:string,cursor:string|undefined,limit:number,signal:AbortSignal){return this.read<Page<TaskView>>('/instances/'+encodeURIComponent(id)+'/tasks'+this.query({afterId:cursor,limit:String(limit)}),signal);}
  task(id:string,signal:AbortSignal){return this.read<TaskView>('/tasks/'+encodeURIComponent(id),signal);}
  async taskContract(id:string,signal:AbortSignal){
-  const {value,objectAt}=await this.readExact<TaskContract>('/tasks/'+encodeURIComponent(id)+'/contract',signal);
-  const contract=value.resultContract;
+  const {value:{inputs,...task},objectAt,tokenAt}=await this.readExact<WireTaskContract>('/tasks/'+encodeURIComponent(id)+'/contract',signal);
+  const contract=task.resultContract;
   if(contract&&contract.mode!=='FORBIDDEN')contract.schemaJson=objectAt(['resultContract','schema']);
-  return value;
+  if(inputs===undefined)return task;
+  return {...task,inputs:Object.fromEntries(Object.entries(inputs).map(([key,input])=>{
+   const valueJson=tokenAt(['inputs',key,'value']);
+   if(valueJson===undefined)throw new Error('Invalid read response.');
+   return [key,{type:input.type,valueJson}];
+  }))};
  }
  async taskSubmission(id:string,signal:AbortSignal){
   const {value,objectAt}=await this.readExact<WireSubmission|null>('/tasks/'+encodeURIComponent(id)+'/submission',signal);
@@ -54,6 +60,7 @@ export class ConsoleRuntimeReads implements WorkflowRuntimeReads {
 }
 
 type WireSubmission=TaskSubmission&{result?:object};
+type WireTaskContract=Omit<TaskContract,'inputs'>&{inputs?:Record<string,{type:TaskInput['type'];value:unknown}>};
 function exactSubmission(row:WireSubmission,resultJson:string|undefined):TaskSubmission {
  delete row.result;
  if(resultJson!==undefined)row.resultJson=resultJson;

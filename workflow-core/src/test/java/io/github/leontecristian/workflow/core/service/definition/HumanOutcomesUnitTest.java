@@ -24,7 +24,7 @@ class HumanOutcomesUnitTest {
                  "nodes":[{"key":"START","type":"START","name":"Start"},
                  {"key":"REVIEW","type":"HUMAN_TASK","name":"Review","taskType":"REVIEW",
                   "assignment":{"resolver":"reviewer","inputs":{}},"completion":{"policy":"SINGLE"},
-                  "inputContract":[],"resultContract":{"mode":"FORBIDDEN"},"outcomes":[]},
+                  "resultContract":{"mode":"FORBIDDEN"},"outcomes":[]},
                  {"key":"END","type":"END","name":"End","result":"DONE"}],
                  "transitions":[{"key":"begin","from":"START","to":"REVIEW"}]}
                 """);

@@ -85,7 +85,6 @@
       "completion": {
         "policy": "SINGLE"
       },
-      "inputContract": [],
       "resultContract": {
         "mode": "FORBIDDEN"
       },

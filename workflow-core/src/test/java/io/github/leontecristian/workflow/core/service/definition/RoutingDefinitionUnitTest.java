@@ -289,7 +289,7 @@ class RoutingDefinitionUnitTest {
                    {"key":"BEGIN","type":"START","name":"Start"},
                    {"key":"REVIEW","type":"HUMAN_TASK","name":"Review","taskType":"REVIEW",
                     "assignment":{"resolver":"reviewer","inputs":{}},"completion":{"policy":"SINGLE"},
-                    "inputContract":[],"resultContract":{"mode":"FORBIDDEN"},
+                    "resultContract":{"mode":"FORBIDDEN"},
                     "outcomes":[{"key":"COMPLETE","label":"Complete","requiresComment":false}]},
                    {"key":"DONE","type":"END","name":"Done","result":"COMPLETED"}],
                  "transitions":[{"key":"start","from":"BEGIN","to":"REVIEW"},

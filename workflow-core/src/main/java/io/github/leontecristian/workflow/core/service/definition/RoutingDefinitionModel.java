@@ -6,6 +6,7 @@ import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWor
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Assignment;
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Binding;
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Human;
+import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.HumanInput;
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Input;
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Node;
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Outcome;
@@ -138,9 +139,46 @@ final class RoutingDefinitionModel {
         var reachesEnd=new HashSet<String>(); for(String end:ends.keySet()) reachesEnd.addAll(reach(end,reverse,Set.of()));
         if(reachesEnd.size()!=nodes.size()) graph(d,"/transitions");
         if(d.failed()) return null;
+        // All source contracts and named-output descriptors are known, regardless of document node order.
+        for (var human : List.copyOf(humans.values())) {
+            var bindings = ExecutionValueDefinitionModel.bindings(nodes.get(human.key()).path("inputs"));
+            if (bindings.isEmpty()) continue;
+            var humanInputs = humanInputs(bindings, variables, humans, d,
+                    "/nodes/" + humanIndices.get(human.key()) + "/inputs/");
+            humans.put(human.key(), new Human(human.key(), human.taskType(), human.assignment(), human.outcomes(),
+                    human.claimPolicy(), human.resultContract(), human.outputVariable(), humanInputs));
+        }
+        if(d.failed()) return null;
         return new MinimalWorkflowDefinition(new Node(startKey,"START",start.path("name").textValue(),null),
                 humans,
                 ends.values().iterator().next(),transitions,inputs,variables,initialize,services,ends,gateways,namedOutputs);
+    }
+
+    private static Map<String,HumanInput> humanInputs(Map<String,Binding> bindings, Map<String,ActionField> variables,
+            Map<String,Human> humans, DefinitionDiagnostics diagnostics, String pointer) {
+        Map<String,HumanInput> inputs = new HashMap<>();
+        for (var entry : bindings.entrySet()) {
+            var binding = entry.getValue();
+            if ("variable".equals(binding.source())) {
+                var variable = variables.get(binding.key());
+                if (variable == null) {
+                    diagnostics.error("INVALID_BINDING", DiagnosticStage.CONTRACT,
+                            "Human input must reference a declared variable or named output.", pointer + entry.getKey());
+                } else {
+                    inputs.put(entry.getKey(), new HumanInput(binding, variable.type(), variable.nullable()));
+                }
+            } else {
+                var source = humans.get(binding.nodeKey());
+                if (source == null || source.resultContract().mode() == TaskResultContract.Mode.FORBIDDEN) {
+                    diagnostics.error("INVALID_BINDING", DiagnosticStage.CONTRACT,
+                            "Submission source must be a human node with an optional or required result.",
+                            pointer + entry.getKey());
+                } else {
+                    inputs.put(entry.getKey(), new HumanInput(binding, VariableValueType.JSON, false));
+                }
+            }
+        }
+        return inputs;
     }
 
     private static void addNamedOutput(String name, String nodeKey, TaskResultContract contract, String pointer,

@@ -17,6 +17,7 @@ const instance:InstanceView={id,definitionVersionId:'7',definitionKey:'alternate
 const graph={instance,nodes:[{key:'BEGIN',name:'Start',type:'START',state:'COMPLETED',activityId:null,taskId:null},{key:'REVIEW',name:'Review <script>as text</script>',type:'HUMAN_TASK',state:'ACTIVE',activityId:'20',taskId:'30'},{key:'DONE',name:'End',type:'END',state:'PENDING',activityId:null,taskId:null}],edges:[{key:'enter',from:'BEGIN',to:'REVIEW',outcome:null,traversed:true},{key:'end',from:'REVIEW',to:'DONE',outcome:'APPROVE',traversed:false}]};
 const summary={instanceId:id,historySequence:'4',eventType:'UNKNOWN_FUTURE',commandId:'00000000-0000-0000-0000-000000000001',correlationId:'fixture',actorKind:'USER',actorRef:'fixture',occurredAt:instance.startedAt,activityId:null,taskId:null,sourceNodeKey:null,targetNodeKey:null,transitionKey:null,detailsSchemaVersion:1};
 const namedOutputEvidence = new URLSearchParams(location.search).has('namedOutputEvidence');
+const taskInputEvidence = new URLSearchParams(location.search).get('taskInputEvidence');
 const evidenceEvents: HistoryEvent[] = [
   {
     summary: {...summary, historySequence:'3', eventType:'VARIABLES_WRITTEN', activityId:'20', taskId:'30'},
@@ -84,8 +85,19 @@ function administrationFixture(): WorkflowAdministrationApi {
   };
 }
 
-const fixtureTask:TaskView={id:'30',instanceId:id,activityId:'20',taskTypeId:'1',taskKey:'REVIEW',assignment:{kind:'USER',ref:'fixture'},assigneeRef:'fixture',status:'OPEN',outcomeKey:null,createdAt:instance.startedAt,dueAt:null,closedAt:null,closedBy:null,closureReason:null};
-const fixtureContract:TaskContract={taskId:'30',instanceId:id,instanceLockVersion:instance.lockVersion,taskType:'REVIEW',claimPolicy:'OPTIONAL',canClaim:false,canRelease:false,canAdminRelease:false,canComplete:true,assignmentLabel:'Fixture reviewer',outcomes:[{key:'APPROVE',label:'Host approve',requiresComment:true}]};
+const completedInputFixture = taskInputEvidence === 'completed';
+const fixtureTask:TaskView={id:'30',instanceId:id,activityId:'20',taskTypeId:'1',taskKey:'REVIEW',assignment:{kind:'USER',ref:'fixture'},assigneeRef:'fixture',status:completedInputFixture?'COMPLETED':'OPEN',outcomeKey:completedInputFixture?'APPROVE':null,createdAt:instance.startedAt,dueAt:null,closedAt:completedInputFixture?instance.startedAt:null,closedBy:completedInputFixture?'fixture':null,closureReason:null};
+const fixtureContract:TaskContract={taskId:'30',instanceId:id,instanceLockVersion:instance.lockVersion,taskType:'REVIEW',claimPolicy:'OPTIONAL',canClaim:false,canRelease:false,canAdminRelease:false,canComplete:!completedInputFixture,assignmentLabel:'Fixture reviewer',outcomes:[{key:'APPROVE',label:'Host approve',requiresComment:true}],
+  ...(taskInputEvidence && {
+    inputs:{
+      booking:{type:'JSON',valueJson:'{"amount":9007199254740993.00}'},
+      financeReview:{type:'JSON',valueJson:'{"approved":true}'},
+      dueOn:{type:'DATE',valueJson:'"2026-11-10"'},
+      note:{type:'STRING',valueJson:'null'},
+    },
+    resultContract:{mode:'REQUIRED',schema:{type:'object'}},
+  }),
+};
 function fixtureResult(envelope:Envelope):CommandResult{return {replayed:false,execution:{commandId:envelope.body['commandId']!,operation:'COMPLETE',instance,activity:{id:'20',instanceId:id,nodeKey:'REVIEW',activationSequence:'1',taskTypeId:'1',completionPolicy:'SINGLE',contributionOutcomeKey:null,requiredTaskCount:1,reviewRevisionRef:null,status:'COMPLETED',outcomeKey:'APPROVE',enteredAt:instance.startedAt,closedAt:instance.startedAt,closedBy:'fixture',closureReason:null},task:{...fixtureTask,status:'COMPLETED'},firstHistorySequence:'5',lastHistorySequence:'6'}};}
 @Injectable() class RuntimeReads implements WorkflowRuntimeReads {
  private http=inject(HttpClient);

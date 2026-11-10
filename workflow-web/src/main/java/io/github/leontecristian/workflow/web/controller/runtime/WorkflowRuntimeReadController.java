@@ -16,7 +16,9 @@ import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmissionPage;
 import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceQuery;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceSummary;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.web.dto.runtime.WorkflowTaskContract;
@@ -55,16 +57,17 @@ public class WorkflowRuntimeReadController {
         var items=new java.util.ArrayList<Map<String,Object>>();
         for(var v:page.items()) {
             Map<String,Object> item=new LinkedHashMap<>(); item.put("key",v.key()); item.put("type",v.type()); item.put("initialized",v.initialized());
-            Object value=null;
-            if(v.value()!=null) {
-                if(v.value().value() instanceof TextLiteral t) value=t.value();
-                else if(v.value().value() instanceof BooleanLiteral t) value=t.value();
-                else if(v.value().value() instanceof io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue t) value=t;
-            }
-            item.put("value",value); items.add(item);
+            item.put("value", v.value() == null ? null : wireValue(v.value())); items.add(item);
         }
         Map<String,Object> result=new LinkedHashMap<>(); result.put("instanceId",page.instanceId()); result.put("lockVersion",page.lockVersion());
         result.put("items",items); result.put("nextAfterKey",page.nextAfterKey()); return wire.response(result);
+    }
+
+    private static Object wireValue(WorkflowValue value) {
+        if (value.value() instanceof TextLiteral text) return text.value();
+        if (value.value() instanceof BooleanLiteral bool) return bool.value();
+        if (value.value() instanceof WorkflowJsonValue json) return json;
+        return null;
     }
     @GetMapping("/instances")
     public ResponseEntity<String> instances(HttpServletRequest r) {
@@ -162,13 +165,16 @@ public class WorkflowRuntimeReadController {
                         && access.canCompleteTask(task);
                 var resultContract = node.get("resultContract");
                 if (resultContract == null) resultContract = JsonNodeFactory.instance.objectNode().put("mode", "FORBIDDEN");
+                var inputs = new LinkedHashMap<String, WorkflowTaskContract.Input>();
+                reads.taskInputs(task.instanceId(), task.id()).forEach((key, value) ->
+                        inputs.put(key, new WorkflowTaskContract.Input(value.type(), wireValue(value))));
                 return wire.response(new WorkflowTaskContract(
                         task.id(), task.instanceId(), instance.lockVersion(), node.get("taskType").textValue(),
                         outcomes, canComplete, assignmentLabel(task), claimPolicy,
                         commandsAvailable && open && shared && !assigned && access.canClaimTask(task),
                         commandsAvailable && open && shared && assigned && access.canReleaseTask(task),
                         commandsAvailable && open && shared && assigned && access.canAdministrativelyReleaseTask(task),
-                        resultContract));
+                        resultContract, inputs));
             }
         throw new IllegalStateException("Pinned human contract missing");
     }

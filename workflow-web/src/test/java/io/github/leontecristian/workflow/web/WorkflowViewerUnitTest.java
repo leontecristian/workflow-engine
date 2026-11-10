@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -33,7 +34,9 @@ import org.springframework.web.context.support.AnnotationConfigWebApplicationCon
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -124,7 +127,7 @@ class WorkflowViewerUnitTest {
             mvc.perform(get("/custom/read/instances/1/history").param("afterSequence", "50"))
                     .andExpect(status().isNotFound()).andExpect(jsonPath("$.diagnostics").isEmpty());
             mvc.perform(get("/custom/read/instances/1/history/1")).andExpect(status().isNotFound());
-            verify(reads, never()).findHistoryEvent(anyLong(), anyLong());
+            verify(reads, never()).findHistoryEvent(anyLong(), anyLong(), any());
             doThrow(new WorkflowViewerException(401, "UNAUTHENTICATED")).when(access).requireInstanceRead(1);
             for (String suffix : List.of("", "/history", "/history/1", "/graph"))
                 mvc.perform(get("/custom/read/instances/1" + suffix)).andExpect(status().isUnauthorized());
@@ -139,7 +142,7 @@ class WorkflowViewerUnitTest {
             var reads = context.getBean(WorkflowRuntimeQueryService.class);
             var release = new WorkflowHistorySummary(1, 2, "TASK_RELEASED", UUID.randomUUID(), null,
                     ActorKind.USER, "admin", Instant.EPOCH, 3L, 4L, null, null, null, (short) 1);
-            when(reads.findHistoryEvent(1, 2)).thenReturn(Optional.of(new WorkflowHistoryEvent(release, "{\"reason\":\"private\"}")));
+            when(reads.findHistoryEvent(eq(1L), eq(2L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(release, "{\"reason\":\"private\"}")));
             when(reads.listHistory(1, 1, 1)).thenReturn(new WorkflowHistoryPage(List.of(release), 2L));
             // The host detail hook accepts the event, while its exact-task policy denies it.
             mvc.perform(get("/custom/read/instances/1/history/2"))
@@ -175,12 +178,34 @@ class WorkflowViewerUnitTest {
             var event = new WorkflowHistorySummary(1, 3, "TASK_COMPLETED", UUID.randomUUID(), null,
                     ActorKind.USER, "reviewer", Instant.EPOCH, 3L, 4L, null, null, null, (short) 3);
             String details = "{\"outcomeKey\":\"APPROVE\",\"comment\":null,\"inputs\":{},\"result\":{\"amount\":123.00}}";
-            when(reads.findHistoryEvent(1, 3)).thenReturn(Optional.of(new WorkflowHistoryEvent(event, details)));
+            when(reads.findHistoryEvent(eq(1L), eq(3L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(event, details)));
             var exactTask = new ViewerLinkReference(3, 4L);
             when(access.readableLinks(1, Set.of(exactTask))).thenReturn(Set.of(new ViewerLinkReference(3, null)));
             mvc.perform(get("/custom/read/instances/1/history/3"))
                     .andExpect(status().isNotFound()).andExpect(jsonPath("$.detailsJson").doesNotExist());
             when(access.readableLinks(1, Set.of(exactTask))).thenReturn(Set.of(exactTask));
+            mvc.perform(get("/custom/read/instances/1/history/3"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.detailsJson").value(details));
+            verify(access).requireHistoryEventRead(event);
+        }
+    }
+    @Test void taskInputDetailsRequireReceivingTaskAccess() throws Exception {
+        try (var context = context(Host.class, Enabled.class)) {
+            var mvc = MockMvcBuilders.webAppContextSetup(context).build();
+            var access = context.getBean(WorkflowViewerAccess.class);
+            var reads = context.getBean(WorkflowRuntimeQueryService.class);
+            var event = new WorkflowHistorySummary(1, 3, "TASK_CREATED", UUID.randomUUID(), null,
+                    ActorKind.USER, "reviewer", Instant.EPOCH, 3L, 4L, null, null, null, (short) 5);
+            String details = "{\"taskKey\":\"REVIEW\",\"inputs\":{\"booking\":{\"type\":\"JSON\",\"value\":{\"amount\":123.00}}}}";
+            when(reads.findHistoryEvent(eq(1L), eq(3L), any())).thenAnswer(call -> {
+                Predicate<WorkflowHistorySummary> authorized = call.getArgument(2);
+                return authorized.test(event) ? Optional.of(new WorkflowHistoryEvent(event, details)) : Optional.empty();
+            });
+            var receivingTask = new ViewerLinkReference(3, 4L);
+            when(access.readableLinks(1, Set.of(receivingTask))).thenReturn(Set.of(new ViewerLinkReference(3, null)));
+            mvc.perform(get("/custom/read/instances/1/history/3"))
+                    .andExpect(status().isNotFound()).andExpect(jsonPath("$.detailsJson").doesNotExist());
+            when(access.readableLinks(1, Set.of(receivingTask))).thenReturn(Set.of(receivingTask));
             mvc.perform(get("/custom/read/instances/1/history/3"))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.detailsJson").value(details));
             verify(access).requireHistoryEventRead(event);
@@ -231,9 +256,9 @@ class WorkflowViewerUnitTest {
         var viewer = new WorkflowInstanceViewerService(reads, mock(WorkflowViewerAccess.class), new ViewerWire());
         String unicode = "{\"v\":\"" + "漢".repeat(1398098) + "\"}";
         assertThat(unicode.getBytes(java.nio.charset.StandardCharsets.UTF_8).length).isLessThanOrEqualTo(4 * 1024 * 1024);
-        when(reads.findHistoryEvent(1, 1)).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), unicode)));
+        when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), unicode)));
         assertThat(viewer.event(1, 1)).contains("漢");
-        when(reads.findHistoryEvent(1, 1)).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), unicode + "漢")));
+        when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), unicode + "漢")));
         assertThatThrownBy(() -> viewer.event(1, 1)).isInstanceOf(WorkflowViewerException.class);
     }
     private WorkflowHistorySummary summary(long sequence, String actor) {
@@ -244,23 +269,23 @@ class WorkflowViewerUnitTest {
         var reads = mock(WorkflowRuntimeQueryService.class); var access = mock(WorkflowViewerAccess.class);
         var wire = new ViewerWire(); var viewer = new WorkflowInstanceViewerService(reads, access, wire);
         String exact = "{\"long\":9007199254740993,\"decimal\":12500.00,\"nil\":null}";
-        when(reads.findHistoryEvent(1, 1)).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), exact)));
+        when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), exact)));
         var json = viewer.event(1, 1);
         assertThat(wire.tree(json).path("detailsJson").textValue()).isEqualTo(exact);
         assertThat(json).contains("\"instanceId\":\"9007199254740993\"", "FUTURE_EVENT");
         // Exactly 4 MiB UTF-16 details, well above the ordinary summary cap.
         String maximum = "{\"v\":\"" + "a".repeat(2 * 1024 * 1024 - 8) + "\"}";
         assertThat(maximum.length()).isEqualTo(2 * 1024 * 1024);
-        when(reads.findHistoryEvent(1, 1)).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), maximum)));
+        when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), maximum)));
         assertThat(viewer.event(1, 1)).contains(maximum.substring(10, 100));
         // Valid stored JSON whose backslashes expand in the final detailsJson envelope.
         String escaping = "{\"v\":\"" + "\\u0001".repeat(349524) + "\"}";
-        when(reads.findHistoryEvent(1, 1)).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), escaping)));
+        when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), escaping)));
         assertThat(viewer.event(1, 1).getBytes(java.nio.charset.StandardCharsets.UTF_8).length).isLessThan(8 * 1024 * 1024);
         // Oversized final envelope fails, never returning a partial event.
-        when(reads.findHistoryEvent(1, 1)).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "\u0001".repeat(1400000)), exact)));
+        when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "\u0001".repeat(1400000)), exact)));
         assertThatThrownBy(() -> viewer.event(1, 1)).isInstanceOfSatisfying(WorkflowViewerException.class, e -> assertThat(e.code()).isEqualTo("LIMIT_EXCEEDED"));
-        when(reads.findHistoryEvent(1, 1)).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), maximum + " ")));
+        when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), maximum + " ")));
         assertThatThrownBy(() -> viewer.event(1, 1)).isInstanceOf(WorkflowViewerException.class);
     }
     @Test void bytePagingIncludesWholeRowsAndLastReturnedContinuation() {

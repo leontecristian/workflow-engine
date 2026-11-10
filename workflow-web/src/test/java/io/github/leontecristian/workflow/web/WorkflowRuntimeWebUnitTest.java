@@ -19,15 +19,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
 import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
+import io.github.leontecristian.workflow.core.dto.runtime.BooleanLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.NullLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmission;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmissionPage;
+import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
+import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
@@ -118,7 +123,9 @@ class WorkflowRuntimeWebUnitTest {
                 mvc.perform(get("/custom/instances/1/tasks?"+q)).andExpect(status().isBadRequest());
             when(host.task(5)).thenThrow(new WorkflowRuntimeException(404,"NOT_FOUND"));
             mvc.perform(get("/custom/tasks/5?unchanged=1")).andExpect(status().isNotFound());
-            verify(host).task(5);
+            mvc.perform(get("/custom/tasks/5/contract")).andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.inputs").doesNotExist());
+            verify(host, times(2)).task(5);
             verifyNoInteractions(c.getBean(WorkflowRuntimeQueryService.class));
         }
     }
@@ -175,6 +182,7 @@ class WorkflowRuntimeWebUnitTest {
 
             mvc(c).perform(get("/custom/tasks/5/contract")).andExpect(status().isOk())
                     .andExpect(jsonPath("$.claimPolicy").value("REQUIRED"))
+                    .andExpect(jsonPath("$.inputs").isEmpty())
                     .andExpect(jsonPath("$.resultContract.mode").value("FORBIDDEN"))
                     .andExpect(jsonPath("$.canComplete").value(true))
                     .andExpect(jsonPath("$.canClaim").value(false))
@@ -184,8 +192,19 @@ class WorkflowRuntimeWebUnitTest {
                     {"nodes":[{"key":"REVIEW","taskType":"REVIEW","outcomes":[],"resultContract":
                       {"mode":"REQUIRED","schema":{"type":"object","properties":{"amount":{"minimum":9007199254740993.00}}}}}]}
                     """);
+            when(reads.taskInputs(1, 5)).thenReturn(Map.of(
+                    "booking", new WorkflowValue(VariableValueType.JSON, WorkflowJsonValue.parse("{\"amount\":9007199254740995.00}")),
+                    "date", new WorkflowValue(VariableValueType.DATE, new TextLiteral("2026-11-10")),
+                    "eligible", new WorkflowValue(VariableValueType.BOOLEAN, new BooleanLiteral(false)),
+                    "missing", new WorkflowValue(VariableValueType.LONG, NullLiteral.INSTANCE)));
             mvc(c).perform(get("/custom/tasks/5/contract")).andExpect(status().isOk())
                     .andExpect(jsonPath("$.resultContract.mode").value("REQUIRED"))
+                    .andExpect(jsonPath("$.inputs.booking.type").value("JSON"))
+                    .andExpect(jsonPath("$.inputs.date.value").value("2026-11-10"))
+                    .andExpect(jsonPath("$.inputs.eligible.value").value(false))
+                    .andExpect(jsonPath("$.inputs.missing.value").hasJsonPath())
+                    .andExpect(jsonPath("$.inputs.missing.value").value(org.hamcrest.Matchers.nullValue()))
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("\"amount\":9007199254740995.00")))
                     .andExpect(content().string(org.hamcrest.Matchers.containsString("9007199254740993.00")));
             verify(host, org.mockito.Mockito.never()).instance(1);
             verify(host, org.mockito.Mockito.never()).activity(2);

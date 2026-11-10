@@ -18,7 +18,7 @@
      "outputs":{"recordedQuantity":{"source":"actionOutput","key":"recordedQuantity"}}},
     {"key":"REVIEW","type":"HUMAN_TASK","name":"Review","taskType":"SANDBOX_REVIEW",
      "assignment":{"resolver":"sandbox.singleReviewer","inputs":{}},"completion":{"policy":"SINGLE"},
-     "inputContract":[],"resultContract":{"mode":"FORBIDDEN"},
+     "resultContract":{"mode":"FORBIDDEN"},
      "outcomes":[{"key":"COMPLETE","label":"Complete","requiresComment":false}]},
     {"key":"AFTER","type":"SERVICE_TASK","name":"Record accepted quantity","action":"sandbox.recordQuantity",
      "inputs":{"quantity":{"source":"variable","key":"recordedQuantity"}},

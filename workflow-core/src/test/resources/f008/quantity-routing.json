@@ -15,7 +15,7 @@
      "outputs":{"recordedQuantity":{"source":"actionOutput","key":"recordedQuantity"}}},
     {"key":"REVIEW","type":"HUMAN_TASK","name":"Review","taskType":"SANDBOX_REVIEW",
      "assignment":{"resolver":"sandbox.singleReviewer","inputs":{}},"completion":{"policy":"SINGLE"},
-     "inputContract":[],"resultContract":{"mode":"FORBIDDEN"},
+     "resultContract":{"mode":"FORBIDDEN"},
      "outcomes":[{"key":"COMPLETE","label":"Complete","requiresComment":false}]},
     {"key":"ROUTE","type":"EXCLUSIVE_GATEWAY","name":"Choose result"},
     {"key":"HIGH","type":"END","name":"High quantity","result":"HIGH"},

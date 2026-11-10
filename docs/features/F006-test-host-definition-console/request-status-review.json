@@ -31,7 +31,7 @@
       "taskType": "SANDBOX_REVIEW",
       "assignment": { "resolver": "sandbox.singleReviewer", "inputs": {} },
       "completion": { "policy": "SINGLE" },
-      "inputContract": [], "resultContract": { "mode": "FORBIDDEN" },
+      "resultContract": { "mode": "FORBIDDEN" },
       "outcomes": [
         { "key": "APPROVE", "label": "Approve", "requiresComment": false },
         { "key": "REJECT", "label": "Reject", "requiresComment": true }

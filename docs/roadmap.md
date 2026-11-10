@@ -1,5 +1,7 @@
 # Workflow engine roadmap
 
+**Human-task inputs — 2026-11-10:** [F020 — Human-task input bindings](features/F020-human-task-input-bindings/spec.md) is implemented. It adds variable/original-submission bindings, immutable creation-time snapshots and task-authorized read-only display. See the [handover](features/F020-human-task-input-bindings/implementation.md) for verification.
+
 **Named task outputs — 2026-11-10:** [F019 — Named task output variables](features/F019-named-task-output-variables/spec.md) is IMPLEMENTED revision 2. An optional human-node output name creates a JSON variable at accepted completion without a separate declaration or service node. Collision rejection, explicit absence, ordinary replacement and variable visibility are settled. See the [handover](features/F019-named-task-output-variables/implementation.md) for verification. F019 also supports explicit service input bindings to the original submission by human node key, independent of the current variable value or triggering completion.
 
 **Implemented slice — 2026-11-10.** [F018 — Structured task submissions](features/F018-structured-task-submissions/spec.md) adds pinned JSON validation, exact replay and authorized result reads. See the [handover](features/F018-structured-task-submissions/implementation.md) for guarded SQL Server and live sandbox acceptance. ALL review, operational commands and APOLO integration remain separate.

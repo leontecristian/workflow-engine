@@ -82,7 +82,7 @@ public class RuntimeServiceProgression {
             variables.apply(context.instanceId(),cursor,node.outputs(),state,writes,batch);
         }
     }
-    private WorkflowValue resolveInput(MinimalWorkflowDefinition model, MinimalWorkflowDefinition.Binding binding,
+    WorkflowValue resolveInput(MinimalWorkflowDefinition model, MinimalWorkflowDefinition.Binding binding,
             long instanceId, Map<String,WorkflowValue> state) {
         if ("submission".equals(binding.source())) {
             var human = model.humans().get(binding.nodeKey());

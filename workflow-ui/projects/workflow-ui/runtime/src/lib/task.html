@@ -28,6 +28,19 @@
     @if(diagnosticsEnabled && commands.buffer.command){<a mat-button [routerLink]="link({kind:'commands'})">Command recovery</a>}</mat-card-content
 ></mat-card>
 @if(!commandProvider && diagnosticsEnabled){<mat-card appearance="outlined"><mat-card-header><h2>Pinned contract</h2></mat-card-header><mat-card-content><console-details [value]="contract()" /></mat-card-content></mat-card>}
+@if(inputs().length) {
+  <mat-card appearance="outlined">
+    <mat-card-header><h2>Inputs</h2></mat-card-header>
+    <mat-card-content>
+      <dl>
+        @for (entry of inputs(); track entry[0]) {
+          <dt><strong>{{entry[0]}}</strong> ({{entry[1].type}})</dt>
+          <dd><pre>{{entry[1].valueJson}}</pre></dd>
+        }
+      </dl>
+    </mat-card-content>
+  </mat-card>
+}
 @if(commandProvider?.ownership && detail()?.assignment?.kind !== 'USER' && detail()?.status === 'OPEN') {
 <mat-card appearance="outlined"><mat-card-header><h2>Task ownership</h2></mat-card-header><mat-card-content>
   <div class="actions">
