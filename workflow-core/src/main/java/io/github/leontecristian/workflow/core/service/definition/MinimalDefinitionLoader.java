@@ -3,16 +3,14 @@ package io.github.leontecristian.workflow.core.service.definition;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.networknt.schema.JsonSchema;
-import com.networknt.schema.JsonSchemaFactory;
-import com.networknt.schema.PathType;
-import com.networknt.schema.SchemaValidatorsConfig;
-import com.networknt.schema.SpecVersion;
+import com.networknt.schema.Error;
+import com.networknt.schema.Schema;
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition;
 import io.github.leontecristian.workflow.core.dto.definition.DiagnosticStage;
 import io.github.leontecristian.workflow.core.exception.definition.WorkflowDefinitionException;
 import java.io.InputStream;
 import java.io.IOException;
+import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Component;
 
@@ -20,11 +18,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class MinimalDefinitionLoader {
     private final ObjectMapper json = new ObjectMapper();
-    private final JsonSchema schema;
+    private final Schema schema;
     private final String schemaDigest;
-    private final JsonSchema extendedSchema;
+    private final Schema extendedSchema;
     private final String extendedDigest;
-    private final JsonSchema routingSchema;
+    private final Schema routingSchema;
     private final String routingDigest;
     private final io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService expressions;
 
@@ -38,27 +36,21 @@ public class MinimalDefinitionLoader {
             if (input == null) throw new IllegalStateException("Missing bundled definition schema");
             byte[] bytes = input.readAllBytes();
             this.schemaDigest = DefinitionContentCanonicalizer.hex(DefinitionContentCanonicalizer.hash(new String(bytes, java.nio.charset.StandardCharsets.UTF_8)));
-            // Only the bundled schema and local fragment references are used. All external loads fail closed.
-            JsonSchemaFactory factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012,
-                    builder -> builder.schemaLoaders(loaders -> loaders.add(iri -> {
-                        throw new IllegalStateException("External schema resolution is disabled");
-                    })));
-            this.schema = factory.getSchema(json.readTree(bytes), SchemaValidatorsConfig.builder()
-                    .failFast(true).pathType(PathType.JSON_POINTER).typeLoose(false).build());
+            var registry = DefinitionSchemas.offlineRegistry(false);
+            this.schema = registry.getSchema(json.readTree(bytes));
             schema.initializeValidators();
             try (InputStream extended = getClass().getResourceAsStream("/schemas/workflow-definition/scalar-service-v1.schema.json")) {
                 if (extended == null) throw new IllegalStateException("Missing extended schema");
                 byte[] content = extended.readAllBytes();
                 extendedDigest = DefinitionContentCanonicalizer.hex(DefinitionContentCanonicalizer.hash(new String(content, java.nio.charset.StandardCharsets.UTF_8)));
-                extendedSchema = factory.getSchema(json.readTree(content), SchemaValidatorsConfig.builder().failFast(true)
-                        .pathType(PathType.JSON_POINTER).typeLoose(false).build());
+                extendedSchema = registry.getSchema(json.readTree(content));
                 extendedSchema.initializeValidators();
             }
             try (InputStream routing = getClass().getResourceAsStream("/schemas/workflow-definition/exclusive-routing-v1.schema.json")) {
                 if(routing==null) throw new IllegalStateException("Missing routing schema");
                 byte[] content=routing.readAllBytes();
                 routingDigest=DefinitionContentCanonicalizer.hex(DefinitionContentCanonicalizer.hash(new String(content,java.nio.charset.StandardCharsets.UTF_8)));
-                routingSchema=factory.getSchema(json.readTree(content),SchemaValidatorsConfig.builder().failFast(true).pathType(PathType.JSON_POINTER).typeLoose(false).build());
+                routingSchema = registry.getSchema(json.readTree(content));
                 routingSchema.initializeValidators();
             }
         } catch (IOException failure) { throw new IllegalStateException("Cannot load bundled definition schema", failure); }
@@ -77,6 +69,11 @@ public class MinimalDefinitionLoader {
     }
 
     MinimalWorkflowDefinition model(DefinitionDocumentCodec.Document document, DefinitionDiagnostics diagnostics) {
+        return model(document, diagnostics, true);
+    }
+
+    MinimalWorkflowDefinition model(DefinitionDocumentCodec.Document document, DefinitionDiagnostics diagnostics,
+            boolean authoring) {
         boolean extended = extended(document.tree());
         unsupported(document.tree(), "", diagnostics, extended,routing(document.tree()));
         // Designer data is opaque. Avoid asking the structural validator to interpret arbitrary numeric values.
@@ -84,7 +81,7 @@ public class MinimalDefinitionLoader {
         if (validationTree.has("designer") && validationTree.get("designer").isObject()) validationTree.set("designer", json.createObjectNode());
         // These two fields were ingested as exact positive integral values; provide conventional integer nodes to the provider.
         validationTree.put("schemaVersion", 1); validationTree.put("version", document.version());
-        Set<com.networknt.schema.ValidationMessage> errors;
+        List<Error> errors;
         try {
             errors = (routing(document.tree()) ? routingSchema : extended ? extendedSchema : schema).validate(validationTree);
         } catch (RuntimeException failure) {
@@ -94,7 +91,7 @@ public class MinimalDefinitionLoader {
         }
         for (var error : errors) {
             String pointer=error.getInstanceLocation().toString();
-            String code=error.getType().equals("additionalProperties") ? "UNKNOWN_FIELD" : "INVALID_STRUCTURE";
+            String code=error.getKeyword().equals("additionalProperties") ? "UNKNOWN_FIELD" : "INVALID_STRUCTURE";
             if (extended) {
                 if(pointer.startsWith("/variables")) code="INVALID_VARIABLE";
                 else if(pointer.startsWith("/startPolicy/inputContract")) code="INVALID_INPUT_CONTRACT";
@@ -103,7 +100,7 @@ public class MinimalDefinitionLoader {
             }
             diagnostics.error(code,DiagnosticStage.STRUCTURE,"Document does not match the supported structure.",pointer);
         }
-        return errors.isEmpty() ? ExecutionValueDefinitionModel.load(document.tree(), diagnostics, expressions) : null;
+        return errors.isEmpty() ? ExecutionValueDefinitionModel.load(document.tree(), diagnostics, expressions, authoring) : null;
 
     }
 
@@ -112,11 +109,11 @@ public class MinimalDefinitionLoader {
         if (node.isObject()) {
             node.fields().forEachRemaining(entry -> {
                 String field = entry.getKey(); JsonNode value = entry.getValue();
-                if (field.equals("designer") || field.equals("default") || field.equals("value")) return;
+                if (field.equals("designer") || field.equals("default") || field.equals("value")
+                        || field.equals("resultContract")) return;
                 boolean unsupported = ((field.equals("guards") || (!extended && Set.of("variables", "inputContract").contains(field))) && value.isArray() && !value.isEmpty())
                         || (!extended && Set.of("inputs", "initialize").contains(field) && value.isObject() && !value.isEmpty())
                         || (field.equals("policy") && value.isTextual() && !value.textValue().equals("SINGLE"))
-                        || (field.equals("mode") && value.isTextual() && !value.textValue().equals("FORBIDDEN"))
                         || (field.equals("type") && value.isTextual() && Set.of("DECISION", "PARALLEL_GATEWAY", "INCLUSIVE_GATEWAY").contains(value.textValue()))
                         || (field.equals("expressionPolicy"));
                 String path = pointer + "/" + field.replace("~", "~0").replace("/", "~1");

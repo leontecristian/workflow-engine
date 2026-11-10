@@ -30,8 +30,10 @@ export class CommandRecovery {
      : await (this.transport.ownership?.(envelope,replay,signal) ?? Promise.reject(new Error('Host ownership transport is required')));
    this.record(generation,id,{outcome:replay?'REPLAY_ONLY_LOOKUP':'replayed' in result&&result.replayed?'REPLAYED_ORIGINAL_RESULT':'NEW_COMMITTED_RESULT',result});return result;
   } catch(error) {
-   const status=(error as {httpStatus?:number})?.httpStatus;
-   this.record(generation,id,{outcome:status&&status<500?'REJECTED':'UNKNOWN_OUTCOME',message:String(error)});throw error;
+   const failure=error as {httpStatus?:number;code?:string};
+   const status=failure?.httpStatus;
+   const rejected=status&&status<500||status===503&&failure?.code==='RESULT_VALIDATION_FAILED';
+   this.record(generation,id,{outcome:rejected?'REJECTED':'UNKNOWN_OUTCOME',message:String(error)});throw error;
   }
  }
  private record(generation:number,id:string,observation:Observation){

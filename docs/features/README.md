@@ -1,5 +1,7 @@
 # Feature specifications
 
+[F018 — Structured task submissions](F018-structured-task-submissions/spec.md) is **IMPLEMENTED revision 3**. It adds pinned JSON result validation, exact replay, authorized submission views and the approvedAmount/note sandbox example. The [implementation handover](F018-structured-task-submissions/implementation.md) records the isolated, guarded SQL Server and live sandbox browser checks.
+
 [F017 — Task claiming and release](F017-task-claim-release/spec.md) is **IMPLEMENTED revision 3**. Pinned claim policy, task ownership, release/recovery and shared web/UI support are in place. Guarded SQL Server and live sandbox acceptance passed. See the [plan](F017-task-claim-release/plan.md), [tasks](F017-task-claim-release/tasks.md) and [handover](F017-task-claim-release/implementation.md).
 
 [F016 — Shared group/role task assignment with current membership](F016-shared-group-role-task-assignment/spec.md) is **IMPLEMENTED revision 2**. Typed assignment, current membership, authorized discovery, preserving migration and diagnostic opt-in UI are delivered; see its [handover](F016-shared-group-role-task-assignment/implementation.md). F017 extends this baseline with claiming and release.

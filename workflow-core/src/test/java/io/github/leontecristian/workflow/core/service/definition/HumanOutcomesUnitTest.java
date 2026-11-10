@@ -95,7 +95,7 @@ class HumanOutcomesUnitTest {
         var ready = validation.check(document, false);
         assertThat(ready.report().diagnostics()).isEmpty();
         assertThat(ready.contextHash()).isNotEqualTo(unavailable.contextHash());
-        assertThat(json.readTree(ready.detailsJson()).path("provenance").path("validator").asText()).isEqualTo("wf-shared-assignment-validator-v1");
+        assertThat(json.readTree(ready.detailsJson()).path("provenance").path("validator").asText()).isEqualTo("wf-task-claim-validator-v1");
         assertThat(json.readTree(ready.detailsJson()).path("provenance").path("structuralSchemaHash").asText()).isEqualTo(loader.schemaDigest(document.tree()));
         var model = loader.model(document, new DefinitionDiagnostics());
         var definition = new io.github.leontecristian.workflow.core.dto.definition.document.ExecutableDefinition(1, 1, "review", 1, "hash",

@@ -1,4 +1,4 @@
-import { exactDecimal, parseExactJson } from '@workflow-engine/ui';
+import { exactDecimal, freezeResultJson, parseExactJson } from '@workflow-engine/ui';
 import type { Envelope, CommandBody } from '@workflow-engine/ui';
 export type { Envelope, CommandBody } from '@workflow-engine/ui';
 export { exactDecimal, rawDocument, prettyDocument } from '@workflow-engine/ui';
@@ -26,7 +26,13 @@ export function parseScalarInputs(text:string):ScalarInputs{return freezeInputs(
 export function commandRequest(envelope:Envelope,replay:boolean):{path:string;body:Readonly<Record<string,unknown>>|string;token:string|null} {
  if(envelope.kind==='start')return {path:replay?'/commands/start/replay':'/instances/start',body:startRequest(envelope.body),token:null};
  const {instanceId,taskId,...body}=envelope.body;
- return {path:replay?`/commands/${envelope.kind}/replay`:`/instances/${instanceId}/tasks/${taskId}/${envelope.kind}`,body:replay?envelope.body:body,token:envelope.expectedToken};
+ const path=replay?`/commands/${envelope.kind}/replay`:`/instances/${instanceId}/tasks/${taskId}/${envelope.kind}`;
+ const requestBody=replay?envelope.body:body;
+ if(envelope.kind==='complete'&&Object.hasOwn(requestBody,'resultJson')) {
+  const {resultJson,...fields}=requestBody;
+  return {path,body:JSON.stringify(fields).slice(0,-1)+',"result":'+freezeResultJson(resultJson)+'}',token:envelope.expectedToken};
+ }
+ return {path,body:requestBody,token:envelope.expectedToken};
 }
 function startRequest(body:CommandBody):string {
  const {inputs,...fields}=body;

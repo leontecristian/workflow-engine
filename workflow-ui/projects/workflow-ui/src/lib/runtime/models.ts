@@ -7,6 +7,9 @@ export interface SubmissionPage {
 }
 
 export interface TaskAssignment { kind: "USER" | "GROUP" | "ROLE"; ref: string; }
+export type TaskResultContract =
+  | { mode: "FORBIDDEN" }
+  | { mode: "OPTIONAL" | "REQUIRED"; schema: object; schemaJson?: string };
 
 export interface TaskView {
   id: Decimal;
@@ -35,6 +38,7 @@ export interface TaskContract {
   canAdminRelease: boolean;
   canComplete: boolean;
   assignmentLabel: string;
+  resultContract?: TaskResultContract;
   outcomes: {
     key: string;
     label: string;
@@ -70,6 +74,8 @@ export interface TaskSubmission {
   outcomeKey: string;
   comment: string | null;
   inputs: Record<string, string>;
+  /** Exact result text extracted from the authorized HTTP response. */
+  resultJson?: string;
 }
 export interface Execution {
   commandId: string;

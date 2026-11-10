@@ -24,19 +24,7 @@ public class DefinitionDocumentCodec {
         if (source == null || !DefinitionInputs.unicode(source)) throw DefinitionInputs.error("MALFORMED_JSON", "Invalid JSON text.");
         if (source.length() > 4 * 1024 * 1024 || source.getBytes(StandardCharsets.UTF_8).length > 4 * 1024 * 1024)
             throw DefinitionInputs.error("LIMIT_EXCEEDED", "Document exceeds its input budget.");
-        JsonNode root;
-        try (JsonParser parser = factory.createParser(source)) {
-            if (parser.nextToken() == null) throw DefinitionInputs.error("MALFORMED_JSON", "An object document is required.");
-            root = read(parser);
-            if (parser.nextToken() != null || !root.isObject()) throw DefinitionInputs.error("MALFORMED_JSON", "Exactly one object document is required.");
-        } catch (com.fasterxml.jackson.core.exc.StreamConstraintsException failure) {
-            throw DefinitionInputs.error("LIMIT_EXCEEDED", "JSON parser limit exceeded.");
-        } catch (IOException failure) {
-            throw DefinitionInputs.error("MALFORMED_JSON", "Invalid JSON syntax.");
-        } catch (ArithmeticException | NumberFormatException failure) {
-            throw DefinitionInputs.error("MALFORMED_JSON", "Invalid exact numeric token.");
-        }
-        ObjectNode object = (ObjectNode) root;
+        ObjectNode object = readObject(source);
         String key = string(object, "key"), name = string(object, "name");
         DefinitionInputs.require(DefinitionInputs.key(key));
         JsonNode schemaVersion = object.get("schemaVersion");
@@ -60,6 +48,22 @@ public class DefinitionDocumentCodec {
         String canonical = DefinitionContentCanonicalizer.canonical(object);
         if (canonical.length() * 2L > 2 * 1024 * 1024) throw DefinitionInputs.error("LIMIT_EXCEEDED", "Definition exceeds its storage budget.");
         return new Document(object, canonical, DefinitionContentCanonicalizer.hash(canonical), key, version.intValue(), name, description);
+    }
+
+    ObjectNode readObject(String source) {
+        JsonNode root;
+        try (JsonParser parser = factory.createParser(source)) {
+            if (parser.nextToken() == null) throw DefinitionInputs.error("MALFORMED_JSON", "An object document is required.");
+            root = read(parser);
+            if (parser.nextToken() != null || !root.isObject()) throw DefinitionInputs.error("MALFORMED_JSON", "Exactly one object document is required.");
+        } catch (com.fasterxml.jackson.core.exc.StreamConstraintsException failure) {
+            throw DefinitionInputs.error("LIMIT_EXCEEDED", "JSON parser limit exceeded.");
+        } catch (IOException failure) {
+            throw DefinitionInputs.error("MALFORMED_JSON", "Invalid JSON syntax.");
+        } catch (ArithmeticException | NumberFormatException failure) {
+            throw DefinitionInputs.error("MALFORMED_JSON", "Invalid exact numeric token.");
+        }
+        return (ObjectNode) root;
     }
 
     private JsonNode read(JsonParser parser) throws IOException {
@@ -106,7 +110,8 @@ public class DefinitionDocumentCodec {
                 throw DefinitionInputs.error("INVALID_IDENTITY", "Invalid technical key.", pointer);
         }
         if (node.isObject()) node.fields().forEachRemaining(e -> {
-            if (!e.getKey().equals("default") && !e.getKey().equals("value"))
+            if (!e.getKey().equals("default") && !e.getKey().equals("value")
+                    && !(field.equals("resultContract") && e.getKey().equals("schema")))
                 checkTexts(e.getValue(), e.getKey(), designer || e.getKey().equals("designer"),
                         pointer + "/" + e.getKey().replace("~", "~0").replace("/", "~1"));
         });

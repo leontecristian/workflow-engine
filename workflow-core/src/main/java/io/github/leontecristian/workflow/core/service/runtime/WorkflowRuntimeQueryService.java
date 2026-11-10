@@ -14,6 +14,10 @@ import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistoryPage;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmissionPage;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmission;
+import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
+import io.github.leontecristian.workflow.core.dto.definition.document.TaskResultContract.Mode;
+import io.github.leontecristian.workflow.core.service.definition.DefinitionContentCanonicalizer;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskClosureReason;
@@ -186,23 +190,41 @@ public class WorkflowRuntimeQueryService {
     }
     public Optional<TaskSubmission> findTaskSubmission(long taskId) {
         RuntimeInputs.id(taskId);
-        return RuntimePersistenceErrors.call(() -> tasks.findById(taskId).filter(t -> t.getStatus() == TaskStatus.COMPLETED).map(this::submission));
+        return RuntimePersistenceErrors.call(() -> tasks.findById(taskId).filter(t -> t.getStatus() == TaskStatus.COMPLETED).map(task -> {
+            var activity = owner(task);
+            return submission(task, activity, submissionMode(activity));
+        }));
     }
     public TaskSubmissionPage listActivitySubmissions(long activityId) { return listActivitySubmissions(activityId, 0, 50); }
     public TaskSubmissionPage listActivitySubmissions(long activityId, long afterTaskId, int limit) {
         RuntimeInputs.id(activityId); RuntimeInputs.page(afterTaskId, limit);
-        return RuntimePersistenceErrors.call(() -> page(tasks.findCompletedPage(activityId, afterTaskId, PageRequest.of(0, limit + 1)),
-                limit, this::submission, TaskSubmission::taskId, TaskSubmissionPage::new));
+        return RuntimePersistenceErrors.call(() -> {
+            var rows = tasks.findCompletedPage(activityId, afterTaskId, PageRequest.of(0, limit + 1));
+            if (rows.isEmpty()) return new TaskSubmissionPage(List.of(), null);
+            var activity = owner(rows.get(0));
+            var mode = submissionMode(activity);
+            return page(rows, limit, task -> submission(task, activity, mode), TaskSubmission::taskId,
+                    TaskSubmissionPage::new, json::submissionPageFits);
+        });
     }
     private WorkflowActivityEntity owner(WorkflowTaskEntity task) {
         return activities.findById(task.getActivityId()).orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
     }
-    private TaskSubmission submission(WorkflowTaskEntity task) {
-        var activity = owner(task);
+    private Mode submissionMode(WorkflowActivityEntity activity) {
+        var instance = instances.findById(activity.getInstanceId())
+                .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
+        var human = pins.load(instance).model().humans().get(activity.getNodeKey());
+        RuntimeInputs.require(human != null, Category.HOST_CONFIGURATION);
+        return human.resultContract().mode();
+    }
+    private TaskSubmission submission(WorkflowTaskEntity task, WorkflowActivityEntity activity, Mode mode) {
+        RuntimeInputs.require(activity.getId().equals(task.getActivityId()), Category.HOST_CONFIGURATION);
         var fact = history.findCompletionByTaskId(task.getId()).orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
-        RuntimeInputs.require(fact.getDetailsSchemaVersion() == 2, Category.UNSUPPORTED_VERSION);
+        short version = fact.getDetailsSchemaVersion();
+        RuntimeInputs.require(version == 2 || version == 3, Category.UNSUPPORTED_VERSION);
         var details = json.tree(fact.getDetailsJson());
-        RuntimeInputs.require(details.isObject() && details.size() == 3 && details.has("outcomeKey") && details.has("comment") && details.has("inputs")
+        RuntimeInputs.require(details.isObject() && details.size() == (version == 3 ? 4 : 3)
+                && (version == 2 || details.path("result").isObject()) && details.has("outcomeKey") && details.has("comment") && details.has("inputs")
                 && details.get("outcomeKey").isTextual() && details.get("inputs").isObject() && details.get("inputs").isEmpty()
                 && (details.get("comment").isNull() || (details.get("comment").isTextual()
                     && RuntimeInputs.text(details.get("comment").textValue(), 2000, 2000, false))), Category.HOST_CONFIGURATION);
@@ -214,22 +236,36 @@ public class WorkflowRuntimeQueryService {
                 && task.getId().equals(fact.getTaskId()) && activity.getId().equals(fact.getActivityId())
                 && activity.getInstanceId().equals(fact.getId().getInstanceId()) && "TASK_COMPLETED".equals(fact.getEventType())
                 && RuntimeInputs.key(task.getOutcomeKey()) && Objects.equals(task.getOutcomeKey(), details.get("outcomeKey").textValue()), Category.HOST_CONFIGURATION);
+        RuntimeInputs.require(version == 3 ? mode != Mode.FORBIDDEN : mode != Mode.REQUIRED, Category.HOST_CONFIGURATION);
+        WorkflowJsonValue result = null;
+        if (version == 3) {
+            try {
+                result = CompleteWorkflowTask.parseResult(
+                        DefinitionContentCanonicalizer.canonical(details.get("result")));
+            } catch (WorkflowExecutionException failure) {
+                throw new WorkflowExecutionException(Category.HOST_CONFIGURATION, failure);
+            }
+        }
         return new TaskSubmission(task.getId(), activity.getId(), activity.getInstanceId(), fact.getId().getSequenceNumber(),
                 fact.getCommandId(), fact.getActorKind(), fact.getActorRef(), RuntimeViews.instant(fact.getOccurredAt()), task.getOutcomeKey(),
-                details.get("comment").isNull() ? null : details.get("comment").textValue(), Map.of());
+                details.get("comment").isNull() ? null : details.get("comment").textValue(), Map.of(), result);
     }
 
     /** SQL limits rows first. JSON bytes bound the complete page including continuation; no item is split or skipped. */
     private <R,T,P> P page(List<R> rows, int limit, Function<R,T> map, ToLongFunction<T> cursor, BiFunction<List<T>,Long,P> create) {
+        return page(rows, limit, map, cursor, create, page -> RuntimeJson.utf8Fits(json.encode(page), 1024 * 1024));
+    }
+    private <R,T,P> P page(List<R> rows, int limit, Function<R,T> map, ToLongFunction<T> cursor,
+            BiFunction<List<T>,Long,P> create, java.util.function.Predicate<P> fits) {
         List<T> emitted = new ArrayList<>();
         for (int i = 0; i < Math.min(rows.size(), limit); i++) {
             T item = map.apply(rows.get(i));
             // A single item must fit its own complete page, even if this page is already nearly full.
-            RuntimeInputs.require(RuntimeJson.utf8Fits(json.encode(create.apply(List.of(item), cursor.applyAsLong(item))), 1024 * 1024), Category.LIMIT_EXCEEDED);
+            RuntimeInputs.require(fits.test(create.apply(List.of(item), cursor.applyAsLong(item))), Category.LIMIT_EXCEEDED);
             emitted.add(item);
             Long next = i + 1 < rows.size() ? cursor.applyAsLong(item) : null;
             P candidate = create.apply(emitted, next);
-            if (!RuntimeJson.utf8Fits(json.encode(candidate), 1024 * 1024)) {
+            if (!fits.test(candidate)) {
                 emitted.remove(emitted.size() - 1);
                 RuntimeInputs.require(!emitted.isEmpty(), Category.LIMIT_EXCEEDED);
                 return create.apply(emitted, cursor.applyAsLong(emitted.get(emitted.size() - 1)));

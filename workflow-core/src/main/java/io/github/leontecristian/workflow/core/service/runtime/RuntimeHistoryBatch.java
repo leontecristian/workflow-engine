@@ -34,6 +34,16 @@ final class RuntimeHistoryBatch {
     }
     void append(long sequence, String type, Long activityId, Long taskId,
                 MinimalWorkflowDefinition.Transition transition, Object details, Map<String,String> payload) {
+        short detailsVersion = switch (type) {
+            case "TASK_CREATED" -> 4;
+            case "TASK_CLAIMED", "TASK_RELEASED" -> 1;
+            default -> 2;
+        };
+        append(sequence, type, activityId, taskId, transition, details, payload, detailsVersion);
+    }
+    void append(long sequence, String type, Long activityId, Long taskId,
+                MinimalWorkflowDefinition.Transition transition, Object details, Map<String,String> payload,
+                short detailsVersion) {
         RuntimeInputs.require(sequence==this.sequence+1 && events.size()<6000,io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.LIMIT_EXCEEDED);
         String encoded=json.history(details);
         utf8Bytes+=encoded.getBytes(java.nio.charset.StandardCharsets.UTF_8).length; utf16Bytes+=encoded.length()*2L;
@@ -42,11 +52,7 @@ final class RuntimeHistoryBatch {
         WorkflowHistorySummary fact = new WorkflowHistorySummary(instanceId, sequence, type, commandId, context.correlationId(),
                 context.actorKind(), context.actorRef(), context.occurredAt(), activityId, taskId,
                 transition == null ? null : transition.from(), transition == null ? null : transition.to(),
-                transition == null ? null : transition.key(), switch (type) {
-                    case "TASK_CREATED" -> (short) 4;
-                    case "TASK_CLAIMED", "TASK_RELEASED" -> (short) 1;
-                    default -> (short) 2;
-                });
+                transition == null ? null : transition.key(), detailsVersion);
         RuntimeInputs.require(json.encode(new io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistoryEvent(fact,encoded))
                 .getBytes(java.nio.charset.StandardCharsets.UTF_8).length<=8*1024*1024,
                 io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.LIMIT_EXCEEDED);

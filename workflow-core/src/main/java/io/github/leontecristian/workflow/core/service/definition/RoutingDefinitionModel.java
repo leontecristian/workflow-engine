@@ -29,7 +29,7 @@ final class RoutingDefinitionModel {
     private RoutingDefinitionModel() { }
     static MinimalWorkflowDefinition load(JsonNode root, DefinitionDiagnostics d, Map<String,Input> inputs,
             Map<String,ActionField> variables, Map<String,Binding> initialize, Map<String,Service> services,
-            RestrictedExpressionService expressions) {
+            RestrictedExpressionService expressions, boolean authoring) {
         try { if (MinimalDefinitionLoader.routing(root)) expressions.requireCompatible(); }
         catch(ExpressionException failure) {
             d.error("EXPRESSION_VERSION_UNSUPPORTED",DiagnosticStage.CONTRACT,"Unsupported restricted expression implementation.","/nodes");
@@ -38,6 +38,7 @@ final class RoutingDefinitionModel {
         Map<String,JsonNode> nodes = new LinkedHashMap<>();
         Map<String,Node> ends = new LinkedHashMap<>(); Set<String> gateways = new HashSet<>();
         Map<String,Human> humans = new LinkedHashMap<>();
+        var schemaBudget = new TaskResultSchema.DefinitionBudget();
         Map<String,Integer> humanIndices = new HashMap<>();
         JsonNode start = null; int starts = 0, nodeIndex = 0;
         for (var n : root.path("nodes")) {
@@ -60,8 +61,10 @@ final class RoutingDefinitionModel {
                     if (!DefinitionInputs.text(resolver, 100, 400, true))
                         d.error("INVALID_STRUCTURE", DiagnosticStage.CONTRACT, "Resolver must be a bounded logical identifier.", "/nodes/" + nodeIndex + "/assignment/resolver");
                     String claimPolicy = n.path("claimPolicy").asText("OPTIONAL");
+                    var resultContract = TaskResultSchema.readContract(n.path("resultContract"),
+                            "/nodes/" + nodeIndex + "/resultContract", d, schemaBudget, authoring);
                     humans.put(key,new Human(key,n.path("taskType").textValue(),new Assignment(resolver),outcomes,
-                            TaskClaimPolicy.valueOf(claimPolicy)));
+                            TaskClaimPolicy.valueOf(claimPolicy), resultContract));
                     humanIndices.put(key,nodeIndex);
                 }
                 case "END" -> ends.put(key,new Node(key,"END",n.path("name").textValue(),n.path("result").textValue()));

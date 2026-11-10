@@ -39,6 +39,11 @@ final class ExecutionValueDefinitionModel {
     }
     static MinimalWorkflowDefinition load(JsonNode root, DefinitionDiagnostics d,
             io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService expressions) {
+        return load(root, d, expressions, true);
+    }
+    static MinimalWorkflowDefinition load(JsonNode root, DefinitionDiagnostics d,
+            io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService expressions,
+            boolean authoring) {
         Map<String,MinimalWorkflowDefinition.Input> inputs = new HashMap<>();
         Map<String,ActionField> variables = new HashMap<>();
         int i=0;
@@ -75,7 +80,7 @@ final class ExecutionValueDefinitionModel {
                 services.put(key,new MinimalWorkflowDefinition.Service(key,n.path("action").textValue(),bindings(n.path("inputs")),bindings(n.path("outputs")),nodeIndex));
             nodeIndex++;
         }
-        return RoutingDefinitionModel.load(root,d,inputs,variables,initialize,services,expressions);
+        return RoutingDefinitionModel.load(root,d,inputs,variables,initialize,services,expressions,authoring);
     }
     static void validate(ActionField field, WorkflowValue value) {
         if (value.type()!=field.type() || (!field.nullable() && value.value()==NullLiteral.INSTANCE)) throw new IllegalArgumentException();

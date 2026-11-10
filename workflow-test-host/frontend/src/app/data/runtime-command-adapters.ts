@@ -15,7 +15,7 @@ export class ConsoleRuntimeCommands implements WorkflowRuntimeCommands {
  ownership(envelope:Envelope,replay:boolean,signal:AbortSignal){return this.dispatch<CommandResult | ReplayResult>(envelope,replay,signal);}
  private dispatch<T>(envelope:Envelope,replay:boolean,signal:AbortSignal):Promise<T>{
   const request=commandRequest(envelope,replay);
-  return this.session.runtimeCommand<T>(request.path,request.body,request.token,envelope.kind==='start',signal);
+  return this.session.runtimeCommand<T>(request.path,request.body,request.token,typeof request.body==='string',signal);
  }
 }
 /** Host session bridge: scope identity, rather than actor name, defines private state lifetime. */

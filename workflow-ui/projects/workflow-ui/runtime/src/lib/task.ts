@@ -3,13 +3,14 @@ import { CommandRecovery, WORKFLOW_RUNTIME_COMMANDS } from '@workflow-engine/ui'
 import type { TaskView, TaskContract, TaskSubmission } from '@workflow-engine/ui';
 import { RuntimeState } from './runtime-state';
 import { PAGE_IMPORTS } from './page-imports';
+import { download } from './variables';
 @Component({selector:"workflow-task",standalone:true,imports:[...PAGE_IMPORTS],styleUrl:"./runtime.scss",templateUrl:"./task.html"})
 export class WorkflowTaskComponent extends RuntimeState {
   @Input() diagnosticsEnabled = false;
   get uncertain(): boolean {
     return this.commands.buffer.entries.some(e => e.kind !== "start" && e.body["taskId"] === this.id && this.commands.observations.get(e.body["commandId"]!)?.outcome === "UNKNOWN_OUTCOME");
   }
- protected clearContent(){this.detail.set(null);this.contract.set(null);this.submission.set(null);this.comment="";this.outcome="";this.reason="";}
+ protected clearContent(){this.detail.set(null);this.contract.set(null);this.submission.set(null);this.comment="";this.outcome="";this.reason="";this.resultDraft="";}
   get meta() {return {
     title: this.messages.taskTitle,
     eyebrow: "ASSIGNED WORK",
@@ -23,6 +24,17 @@ export class WorkflowTaskComponent extends RuntimeState {
   outcome = "";
   comment = "";
   reason = "";
+  resultDraft = "";
+  get resultMode() { return this.contract()?.resultContract?.mode ?? "FORBIDDEN"; }
+  get resultSchema(): string | undefined {
+    const contract = this.contract()?.resultContract;
+    return contract && contract.mode !== "FORBIDDEN" ? contract.schemaJson : undefined;
+  }
+  get resultBlank(): boolean { return /^[ \t\r\n]*$/.test(this.resultDraft); }
+  downloadResult() {
+    const text = this.submission()?.resultJson;
+    if (text !== undefined) download(text, 'task-result.json');
+  }
   commands = inject(CommandRecovery);
   readonly commandProvider=inject(WORKFLOW_RUNTIME_COMMANDS,{optional:true});
   protected onScope(){this.commands.setScope(this.sessionScope);}
@@ -89,6 +101,7 @@ export class WorkflowTaskComponent extends RuntimeState {
       if(this.comment.length>2000)throw new Error("Comment exceeds 2000 characters.");
       this.outcome = selected.key;
       if (selected.requiresComment && this.commentBlank()) throw new Error("A comment is required for " + selected.label + ".");
+      if (this.resultMode === "REQUIRED" && this.resultBlank) throw new Error("A JSON result is required.");
       this.commands.buffer.remember({
         kind: "complete",
         body: {
@@ -97,14 +110,17 @@ export class WorkflowTaskComponent extends RuntimeState {
           taskId: this.id,
           outcomeKey: selected.key,
           comment: this.comment || null,
+          ...(this.resultMode !== "FORBIDDEN" && !this.resultBlank ? {resultJson: this.resultDraft} : {}),
         },
         expectedToken: this.contract()!.instanceLockVersion,
       });
       try { await this.commands.execute(false,signal); }
       catch (error) {
-        const status = (error as {httpStatus?:number})?.httpStatus;
+        const failure = error as {httpStatus?:number;code?:string};
+        const status = failure?.httpStatus;
         conflict = status === 409;
-        if ((!status || status >= 500) && !this.diagnosticsEnabled) throw new Error("The outcome is uncertain. Contact your administrator before trying again.");
+        const validationFailed = status === 503 && failure?.code === 'RESULT_VALIDATION_FAILED';
+        if ((!status || status >= 500) && !validationFailed && !this.diagnosticsEnabled) throw new Error("The outcome is uncertain. Contact your administrator before trying again.");
         throw error;
       }
       if(current() && this.diagnosticsEnabled)this.navigate({kind:"commands"});

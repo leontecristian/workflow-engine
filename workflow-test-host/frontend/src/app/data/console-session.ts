@@ -154,8 +154,14 @@ export class ConsoleSession {
     let value:unknown;
     try {value=text?JSON.parse(text):null;}catch {throw new Error('Response unavailable. Command outcome may be unknown; use Find result.');}
     if(!response.ok){
-      const v=value as {code?:string;diagnostics?:unknown[];correlationId?:string}|null;
-      throw Object.assign(new Error(`${response.status} ${v?.code||'REQUEST_FAILED'} ${JSON.stringify(v?.diagnostics||[])} [${v?.correlationId||''}]`),{httpStatus:response.status});
+      const v=value as {code?:string;message?:string;diagnostics?:{path?:string;message?:string}[];correlationId?:string}|null;
+      const diagnostic=v?.diagnostics?.[0];
+      const resultFailure=v?.code?.startsWith('RESULT_');
+      const description=diagnostic?.message||v?.message;
+      const message=resultFailure&&description
+        ? (diagnostic?.path?diagnostic.path+' — ':'')+description
+        : `${response.status} ${v?.code||'REQUEST_FAILED'} ${JSON.stringify(v?.diagnostics||[])} [${v?.correlationId||''}]`;
+      throw Object.assign(new Error(message),{httpStatus:response.status,code:v?.code});
     }
     return value as T;
   }

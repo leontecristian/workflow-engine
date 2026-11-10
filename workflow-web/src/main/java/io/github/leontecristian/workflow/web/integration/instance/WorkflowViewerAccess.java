@@ -9,7 +9,7 @@ public interface WorkflowViewerAccess {
     void requireInstanceRead(long instanceId);
     /** Full retained evidence, including actors, comments and business snapshots. */
     void requireHistoryRead(long instanceId);
-    /** Authorize exact evidence independently of instance-level summary visibility. */
+    /** Additional host authorization for exact evidence. Structured completion details also require an exact-task link grant. */
     default void requireHistoryEventRead(WorkflowHistorySummary event) {
         requireHistoryRead(event.instanceId());
     }

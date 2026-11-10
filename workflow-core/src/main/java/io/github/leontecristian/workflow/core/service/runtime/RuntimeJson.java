@@ -42,10 +42,15 @@ import org.springframework.stereotype.Component;
 @Component
 public class RuntimeJson {
     static final String FINGERPRINT_VERSION = "wf-runtime-request-v3";
+    private static final String RESULT_FINGERPRINT_VERSION = "wf-runtime-request-v4";
     private final ObjectMapper mapper;
     public RuntimeJson() {
-        mapper = new ObjectMapper(JsonFactory.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
-                .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(32).maxStringLength(131072).maxNumberLength(128).build()).build());
+        mapper = com.fasterxml.jackson.databind.json.JsonMapper.builder(JsonFactory.builder()
+                .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+                .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(32)
+                        .maxStringLength(131072).maxNumberLength(128).build()).build())
+                .disable(com.fasterxml.jackson.databind.cfg.JsonNodeFeature.STRIP_TRAILING_BIGDECIMAL_ZEROES)
+                .build();
         SimpleModule numbers = new SimpleModule();
         numbers.addSerializer(io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue.class,
                 new com.fasterxml.jackson.databind.JsonSerializer<>() {
@@ -74,7 +79,6 @@ public class RuntimeJson {
         numbers.addDeserializer(Integer.class, integers); numbers.addDeserializer(Integer.TYPE, integers);
         mapper.registerModule(new JavaTimeModule()).registerModule(numbers);
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        mapper.setNodeFactory(com.fasterxml.jackson.databind.node.JsonNodeFactory.withExactBigDecimals(true));
         mapper.enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS, DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
                 DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES, DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES,
                 DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS, DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS,
@@ -97,6 +101,13 @@ public class RuntimeJson {
         catch (IOException failure) { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION); }
     }
     static boolean utf8Fits(String value,int bytes) { return value.getBytes(StandardCharsets.UTF_8).length<=bytes; }
+    boolean submissionPageFits(io.github.leontecristian.workflow.core.dto.runtime.TaskSubmissionPage page) {
+        try {
+            return utf8Fits(mapper.writeValueAsString(page), 1024 * 1024);
+        } catch (IOException failure) {
+            throw new WorkflowExecutionException(Category.HOST_CONFIGURATION, failure);
+        }
+    }
     String encode(Object value) { return DefinitionContentCanonicalizer.canonical(mapper.valueToTree(value)); }
     static byte[] hash(String value) { return DefinitionContentCanonicalizer.hash(value); }
     static boolean fits(String text, int bytes) {
@@ -131,11 +142,15 @@ public class RuntimeJson {
         }
         return fingerprint(WorkflowOperation.START_WORKFLOW, context, request,fingerprintVersion(inputs));
     }
+    String fingerprintVersion(CompleteWorkflowTask command) {
+        return command.result() == null ? FINGERPRINT_VERSION : RESULT_FINGERPRINT_VERSION;
+    }
     byte[] fingerprint(CompleteWorkflowTask command, WorkflowCommandContext context) {
         ObjectNode request = object(); request.put("instanceId", Long.toString(command.instanceId()));
         request.put("taskId", Long.toString(command.taskId())); request.put("expectedLockVersion", Long.toString(command.expectedLockVersion()));
         request.put("outcomeKey", command.outcomeKey()); request.put("comment", command.comment());
-        return fingerprint(WorkflowOperation.COMPLETE_TASK, context, request);
+        if (command.result() != null) request.set("result", tree(command.result().toJson()));
+        return fingerprint(WorkflowOperation.COMPLETE_TASK, context, request, fingerprintVersion(command));
     }
     byte[] ownershipFingerprint(WorkflowOperation operation, WorkflowCommandContext context, long instanceId,
             long taskId, long expectedLockVersion, String reason) {
@@ -157,13 +172,21 @@ public class RuntimeJson {
     }
     Optional<WorkflowExecutionResult> replay(WorkflowCommandReceiptEntity receipt, UUID commandId,
             WorkflowOperation operation, WorkflowCommandContext context, byte[] fingerprint) {
+        return replay(receipt, commandId, operation, context, fingerprint, FINGERPRINT_VERSION);
+    }
+
+    Optional<WorkflowExecutionResult> replay(WorkflowCommandReceiptEntity receipt, UUID commandId,
+            WorkflowOperation operation, WorkflowCommandContext context, byte[] fingerprint, String fingerprintVersion) {
         if (receipt == null) return Optional.empty();
         RuntimeInputs.require(receipt.getActorKind() == context.actorKind() && java.util.Objects.equals(receipt.getActorRef(), context.actorRef())
                 && operation.name().equals(receipt.getOperationType()), Category.COMMAND_ID_CONFLICT);
         Short version = receipt.getResultSchemaVersion();
         boolean historical = Short.valueOf((short) 3).equals(version) || Short.valueOf((short) 4).equals(version);
-        RuntimeInputs.require(FINGERPRINT_VERSION.equals(receipt.getFingerprintVersion())
-                && (Short.valueOf((short) 5).equals(version) || historical && !ownershipOperation(operation)),
+        String storedFingerprintVersion = receipt.getFingerprintVersion();
+        boolean hasResult = operation == WorkflowOperation.COMPLETE_TASK && RESULT_FINGERPRINT_VERSION.equals(storedFingerprintVersion);
+        RuntimeInputs.require(FINGERPRINT_VERSION.equals(storedFingerprintVersion) || hasResult, Category.UNSUPPORTED_VERSION);
+        RuntimeInputs.require(fingerprintVersion.equals(storedFingerprintVersion), Category.COMMAND_ID_CONFLICT);
+        RuntimeInputs.require(Short.valueOf((short) 5).equals(version) || historical && !hasResult && !ownershipOperation(operation),
                 Category.UNSUPPORTED_VERSION);
         RuntimeInputs.require(Arrays.equals(receipt.getRequestFingerprint(), fingerprint), Category.COMMAND_ID_CONFLICT);
         JsonNode stored = tree(receipt.getResultJson());

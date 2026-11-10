@@ -5,7 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.argThat;
+import static org.mockito.Mockito.calls;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.inOrder;
@@ -15,6 +18,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionStatus;
 import io.github.leontecristian.workflow.core.dto.definition.document.ExecutableDefinition;
+import io.github.leontecristian.workflow.core.dto.definition.document.TaskResultContract;
+import io.github.leontecristian.workflow.core.dto.definition.document.TaskResultContract.Mode;
+import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
+import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category;
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition;
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Binding;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
@@ -63,14 +70,20 @@ import java.util.Optional;
 import java.util.TreeMap;
 import java.util.UUID;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /** In-memory repository/EntityManager doubles. Does not establish SQL or proxy transaction behavior. */
 class RuntimeCommandsUnitTest {
     @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    void completionKeepsExactValuesAndOriginalSnapshotsForUserAndClaimedSharedTask(boolean shared) {
+    @CsvSource({"false,FORBIDDEN,false,", "true,FORBIDDEN,false,",
+            "false,OPTIONAL,false,", "true,REQUIRED,true,", "false,OPTIONAL,false,RESULT_REJECTED",
+            "false,OPTIONAL,false,RESULT_VALIDATION_FAILED", "false,REQUIRED,false,INVALID_INPUT",
+            "false,FORBIDDEN,true,INVALID_INPUT"})
+    void completionKeepsExactValuesAndOriginalSnapshotsForUserAndClaimedSharedTask(boolean shared,
+            Mode mode, boolean present,
+            Category failureCategory) {
         var em=mock(EntityManager.class); var instances=mock(WorkflowInstanceRepository.class);
         var activities=mock(WorkflowActivityRepository.class); var tasks=mock(WorkflowTaskRepository.class);
         var history=mock(WorkflowHistoryRepository.class); var receipts=mock(WorkflowCommandReceiptRepository.class);
@@ -80,11 +93,17 @@ class RuntimeCommandsUnitTest {
         var json=new RuntimeJson(); var variables=new RuntimeVariables(rows,em,json);
         var eligibility=mock(WorkflowTaskEligibilityService.class);
         when(eligibility.isEligible(any(),anyString())).thenReturn(true);
+        var validators = new StaticListableBeanFactory();
+        var validator = mock(WorkflowTaskSubmissionValidator.class);
+        validators.addBean("validator", validator);
         var service=new WorkflowExecutionService(instances,activities,tasks,history,receipts,em,definitions,catalog,json,host,
-                new RuntimeDefinitionPins(definitions,history,json),variables,new RuntimeServiceProgression(registry,variables,json),eligibility);
+                new RuntimeDefinitionPins(definitions,history,json),variables,new RuntimeServiceProgression(registry,variables,json),eligibility,
+                validators.getBeanProvider(WorkflowTaskSubmissionValidator.class));
         var fields=Map.of("quantity",new ActionField("quantity",VariableValueType.LONG,false,false),"recordedQuantity",new ActionField("recordedQuantity",VariableValueType.LONG,false,false));
+        var contract = new TaskResultContract(mode,
+                mode == Mode.FORBIDDEN ? null : "{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}");
         var model=new MinimalWorkflowDefinition(new MinimalWorkflowDefinition.Node("BEGIN","START","Start",null),
-                new MinimalWorkflowDefinition.Human("REVIEW","SANDBOX_REVIEW",new MinimalWorkflowDefinition.Assignment("sandbox.singleReviewer"),List.of(new MinimalWorkflowDefinition.Outcome("COMPLETE","Complete",false)), TaskClaimPolicy.REQUIRED),
+                new MinimalWorkflowDefinition.Human("REVIEW","SANDBOX_REVIEW",new MinimalWorkflowDefinition.Assignment("sandbox.singleReviewer"),List.of(new MinimalWorkflowDefinition.Outcome("COMPLETE","Complete",false)), TaskClaimPolicy.REQUIRED, contract),
                 new MinimalWorkflowDefinition.Node("DONE","END","Done","COMPLETED"),List.of(
                     new MinimalWorkflowDefinition.Transition("beginService","BEGIN","BEFORE",null),new MinimalWorkflowDefinition.Transition("beginReview","BEFORE","REVIEW",null),
                     new MinimalWorkflowDefinition.Transition("finishReview","REVIEW","AFTER","COMPLETE"),new MinimalWorkflowDefinition.Transition("finishService","AFTER","DONE",null)),
@@ -166,19 +185,59 @@ class RuntimeCommandsUnitTest {
         } else {
             assertEquals("reviewer", opened.execution().task().assigneeRef());
         }
-        var complete = new CompleteWorkflowTask(UUID.randomUUID(), 1, 3, completionToken, "COMPLETE", null);
-        clearInvocations(em,action); var closed=service.completeTask(complete,reviewer);
+        var result = present ? CompleteWorkflowTask.parseResult("{}") : null;
+        var complete = new CompleteWorkflowTask(UUID.randomUUID(), 1, 3, completionToken, "COMPLETE", null, result);
+        verify(action).execute(argThat(ctx -> ctx.completedActivityId() == null), any());
+        clearInvocations(em, action);
+        if (failureCategory != null) {
+            if (failureCategory == Category.RESULT_REJECTED || failureCategory == Category.RESULT_VALIDATION_FAILED) {
+                doThrow(failureCategory == Category.RESULT_REJECTED
+                        ? WorkflowExecutionException.rejectResult("")
+                        : new IllegalStateException("Private failure detail")).when(validator).validate(any(), any());
+            }
+            var failure = assertThrows(WorkflowExecutionException.class,
+                    () -> service.completeTask(complete, reviewer));
+            assertEquals(failureCategory, failure.category());
+            assertEquals(9 + addedFacts, facts.lastKey().longValue());
+            assertEquals(1 + addedFacts, storedReceipts.size());
+            verifyNoInteractions(action);
+            if (failureCategory == Category.INVALID_INPUT) verifyNoInteractions(validator);
+            return;
+        }
+        var closed=service.completeTask(complete,reviewer);
         assertEquals(16 + addedFacts,closed.execution().lastHistorySequence()); assertEquals(InstanceStatus.COMPLETED,closed.execution().instance().status());
         assertEquals(2 + addedFacts,closed.execution().instance().lockVersion());
         assertEquals("reviewer", closed.execution().task().assigneeRef());
         assertEquals(List.of("TASK_COMPLETED","ACTIVITY_COMPLETED","TRANSITION_TAKEN","SERVICE_TASK_COMPLETED","VARIABLES_WRITTEN","TRANSITION_TAKEN","INSTANCE_COMPLETED"),facts.tailMap(10L + addedFacts).values().stream().map(WorkflowHistoryEntity::getEventType).toList());
-        var order=inOrder(em,action); order.verify(em).refresh(instance); order.verify(em).flush(); order.verify(action).execute(any(),any());
+        var order=inOrder(em,action); order.verify(em).refresh(instance); order.verify(em, calls(1)).flush(); order.verify(action).execute(argThat(ctx -> Long.valueOf(2).equals(ctx.completedActivityId())),any());
+        assertEquals(present ? 3 : 2, facts.get(10L + addedFacts).getDetailsSchemaVersion().intValue());
+        if (mode == Mode.FORBIDDEN) verifyNoInteractions(validator);
+        else verify(validator).validate(argThat(ctx -> ctx.activityId() == 2 && ctx.taskId() == 3), eq(result));
         for(var row:variableRows.values()) assertEquals("9007199254740993",((TextLiteral)row.executionValue().value()).value());
-        clearInvocations(action,definitions,em,host);
+        clearInvocations(action,definitions,em,host,validator);
         assertEquals(opened.execution(),service.start(start,inputs,context,null).execution());
         assertTrue(service.completeTask(complete,reviewer).replayed());
+        var changedPresence = new CompleteWorkflowTask(complete.commandId(), 1, 3, completionToken, "COMPLETE", null,
+                present ? null : CompleteWorkflowTask.parseResult("{}"));
+        assertEquals(Category.COMMAND_ID_CONFLICT,
+                assertThrows(WorkflowExecutionException.class, () -> service.findReplay(changedPresence, reviewer)).category());
         assertThrows(RuntimeException.class,() -> service.start(start,new StartInputs(Map.of("quantity",new TextLiteral("1"))),context,null));
-        verifyNoInteractions(action,definitions,em,host);
+        verifyNoInteractions(action,definitions,em,host,validator);
+        var completionFact = facts.get(10L + addedFacts);
+        when(history.findCompletionByTaskId(3L)).thenReturn(Optional.of(completionFact));
+        when(activities.findById(2L)).thenReturn(Optional.of(activity));
+        when(tasks.findCompletedPage(eq(2L), eq(0L), any())).thenReturn(List.of(task));
+        var reads = new WorkflowRuntimeQueryService(instances, activities, tasks, history,
+                new RuntimeDefinitionPins(definitions, history, json), json, variables, eligibility);
+        assertEquals(result, reads.findTaskSubmission(3L).orElseThrow().result());
+        assertEquals(result, reads.listActivitySubmissions(2L).items().get(0).result());
+        if (present) {
+            ReflectionTestUtils.setField(completionFact, "detailsSchemaVersion", (short) 2);
+            ReflectionTestUtils.setField(completionFact, "detailsJson",
+                    "{\"comment\":null,\"inputs\":{},\"outcomeKey\":\"COMPLETE\"}");
+            assertThrows(WorkflowExecutionException.class,
+                    () -> reads.findTaskSubmission(3L));
+        }
         assertEquals(2 + addedFacts,storedReceipts.size()); assertTrue(storedReceipts.values().stream().allMatch(r -> r.getResultSchemaVersion()==5));
     }
 }

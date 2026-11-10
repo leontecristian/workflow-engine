@@ -80,7 +80,7 @@ public class WorkflowDefinitionRuntimeReader {
                 || version.getVersion() != document.version() || !version.getDefinitionJson().equals(document.canonical())
                 || !Arrays.equals(version.getContentHash(), document.hash())) throw corrupt();
         DefinitionDiagnostics diagnostics = new DefinitionDiagnostics();
-        var model = loader.model(document, diagnostics);
+        var model = loader.model(document, diagnostics, false);
         if (model == null || diagnostics.failed()) throw corrupt();
         return new ExecutableDefinition(version.getId(), version.getDefinitionId(), document.key(),
                 document.version(), DefinitionContentCanonicalizer.hex(document.hash()), version.getStatus(), model);

@@ -349,13 +349,19 @@
           "type": "object",
           "properties": {
             "mode": {
-              "const": "FORBIDDEN"
+              "enum": ["FORBIDDEN", "OPTIONAL", "REQUIRED"]
+            },
+            "schema": {
+              "type": "object"
             }
           },
-          "required": [
-            "mode"
-          ],
-          "additionalProperties": false
+          "required": ["mode"],
+          "additionalProperties": false,
+          "if": {
+            "properties": { "mode": { "const": "FORBIDDEN" } }
+          },
+          "then": { "not": { "required": ["schema"] } },
+          "else": { "required": ["schema"] }
         },
         "outcomes": {
           "type": "array",

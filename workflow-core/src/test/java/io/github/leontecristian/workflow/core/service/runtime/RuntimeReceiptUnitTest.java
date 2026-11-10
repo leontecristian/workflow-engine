@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
+import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.NullLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.StartInputs;
 import io.github.leontecristian.workflow.core.dto.runtime.StartWorkflow;
@@ -37,6 +38,31 @@ class RuntimeReceiptUnitTest {
             assertFalse(java.util.Arrays.equals(json.fingerprint(command,new StartInputs(Map.of("v",pair.get(0))),context),json.fingerprint(command,new StartInputs(Map.of("v",pair.get(1))),context)));
         assertFalse(java.util.Arrays.equals(json.fingerprint(command,context),json.fingerprint(command,new StartInputs(Map.of("v",NullLiteral.INSTANCE)),context)));
     }
+    @Test void structuredCompletionFingerprintUsesExactFullResult() {
+        assertArrayEquals(completionHash("{\"a\":{\"x\":100e-2,\"y\":null},\"b\":[1,2]}"),
+                completionHash(" {\"b\":[1,2],\"a\":{\"y\":null,\"x\":1.00}} "));
+        for (var pair : java.util.List.of(
+                java.util.List.of("{\"a\":[1,2]}", "{\"a\":[2,1]}"),
+                java.util.List.of("{\"a\":null}", "{}"),
+                java.util.List.of("{\"a\":1}", "{\"a\":1.00}"),
+                java.util.List.of("{\"a\":0E+2147483647}", "{\"a\":0}"))) {
+            assertFalse(java.util.Arrays.equals(completionHash(pair.get(0)), completionHash(pair.get(1))));
+        }
+        for (String malformed : java.util.List.of("null", "[]", "{\"a\":1,\"a\":2}", "{} {}")) {
+            assertEquals(Category.INVALID_INPUT, assertThrows(WorkflowExecutionException.class,
+                    () -> CompleteWorkflowTask.parseResult(malformed)).category());
+        }
+        String oversized = "{\"a\":\"" + "a".repeat(16000) + "\",\"b\":\"" + "b".repeat(16000)
+                + "\",\"c\":\"" + "c".repeat(800) + "\"}";
+        assertEquals(Category.LIMIT_EXCEEDED, assertThrows(WorkflowExecutionException.class,
+                () -> CompleteWorkflowTask.parseResult(oversized)).category());
+    }
+
+    private byte[] completionHash(String result) {
+        var command = new CompleteWorkflowTask(id, 1, 3, 0, "COMPLETE", null, CompleteWorkflowTask.parseResult(result));
+        return json.fingerprint(command, context("reviewer"));
+    }
+
     @Test void newBaselineSnapshotsReplayWithoutCurrentState() throws Exception {
         for (boolean complete:new boolean[]{false,true}) {
             String name="extended"+(complete?"-complete":"-start");

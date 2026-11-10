@@ -1,6 +1,7 @@
 package io.github.leontecristian.workflow.testhost;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
@@ -14,6 +15,8 @@ import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowExecutionResult;
+import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
+import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category;
 import io.github.leontecristian.workflow.core.dto.tasktype.CreateTaskType;
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionService;
@@ -60,6 +63,7 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest(classes=WorkflowTestHostApplication.class,webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties={"workflow.console.enabled=true","workflow.console.capabilities=sample",
         "workflow.console.admin.username=f015-admin","workflow.console.admin.password=f015-local-test-password",
+        "workflow.console.fail-service-node=failRecordAmount",
         "workflow.console.reviewer.username=f015-reviewer","workflow.console.reviewer.password=f015-local-test-password"})
 @Import(SharedRuntimeIT.FailureFixture.class)
 class SharedRuntimeIT extends DatabaseIntegrationTest {
@@ -77,6 +81,7 @@ class SharedRuntimeIT extends DatabaseIntegrationTest {
     private final String marker="f015."+UUID.randomUUID();
     private final List<Long> instances=new ArrayList<>();
     private Long versionId,familyId,ownedTaskType;
+    private String ownedDefinitionKey;
     private TransactionTemplate tx() { return new TransactionTemplate(transactions); }
     private Path repository() { return Files.isDirectory(Path.of("docs"))?Path.of(""):Path.of(".."); }
     private WorkflowCommandContext context() { return new WorkflowCommandContext(ActorKind.USER,"f015-admin",Instant.now(),marker); }
@@ -119,6 +124,7 @@ class SharedRuntimeIT extends DatabaseIntegrationTest {
     }
     @Test void movedReadsCompletionReplayAndRollbackRetainHostSemantics() throws Exception {
         if(catalog.findByCode("SANDBOX_REVIEW").isEmpty()) ownedTaskType=tx().execute(t->catalog.create(new CreateTaskType("SANDBOX_REVIEW",marker,null,true)).after().id());
+        ownedDefinitionKey = marker;
         var document=(ObjectNode)json.readTree(Files.readString(repository().resolve("docs/features/F006-test-host-definition-console/request-status-review.json")));
         document.put("key",marker);
         tx().executeWithoutResult(t->{
@@ -180,10 +186,137 @@ class SharedRuntimeIT extends DatabaseIntegrationTest {
             assertThat(Files.exists(done)).as("Focused browser completion signal").isTrue();Files.deleteIfExists(done);
         }
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void structuredSubmissionAndSandboxEffectShareTheCompletionTransaction(boolean failDownstream) throws Exception {
+        prepareStructuredDefinition(failDownstream);
+        var started = startStructured();
+        long instanceId = started.instance().id();
+        var reviewer = new WorkflowCommandContext(ActorKind.USER, "f015-reviewer", Instant.now(), marker);
+        var accepted = CompleteWorkflowTask.parseResult("{\"approvedAmount\":1250.00,\"note\":\"Approved\"}");
+        var first = new CompleteWorkflowTask(UUID.randomUUID(), instanceId, started.task().id(),
+                started.instance().lockVersion(), "COMPLETE", null, accepted);
+        if (!failDownstream) {
+            for (var invalid : Map.of(
+                    "{\"approvedAmount\":1}", Category.RESULT_SCHEMA_INVALID,
+                    "{\"approvedAmount\":10000.01,\"note\":\"Over limit\"}", Category.RESULT_REJECTED,
+                    "{\"approvedAmount\":1.001,\"note\":\"Fractional cent\"}", Category.RESULT_REJECTED).entrySet()) {
+                var rejected = new CompleteWorkflowTask(UUID.randomUUID(), instanceId, first.taskId(), first.expectedLockVersion(),
+                        "COMPLETE", null, CompleteWorkflowTask.parseResult(invalid.getKey()));
+                assertThatThrownBy(() -> runtime.complete(rejected, reviewer)).isInstanceOfSatisfying(
+                        WorkflowExecutionException.class, e -> assertThat(e.category()).isEqualTo(invalid.getValue()));
+                assertThat(runtime.replayComplete(rejected, reviewer)).isEmpty();
+                assertThat(reads.findTaskSubmission(first.taskId())).isEmpty();
+                assertThat(reads.findInstance(instanceId).orElseThrow().lockVersion()).isEqualTo(first.expectedLockVersion());
+            }
+        }
+        runtime.complete(first, reviewer);
+        assertThat(reads.findTaskSubmission(first.taskId()).orElseThrow().result()).isEqualTo(accepted);
+        assertThat(reads.listActivitySubmissions(started.activity().id()).items()).singleElement()
+                .satisfies(submission -> assertThat(submission.result()).isEqualTo(accepted));
+
+        if (failDownstream) {
+            var current = reads.listTasks(instanceId).items().stream().filter(task -> task.id() != first.taskId()).findFirst().orElseThrow();
+            long token = reads.findInstance(instanceId).orElseThrow().lockVersion();
+            var failing = new CompleteWorkflowTask(UUID.randomUUID(), instanceId, current.id(), token, "COMPLETE", null, accepted);
+            assertThatThrownBy(() -> runtime.complete(failing, reviewer)).isInstanceOfSatisfying(
+                    WorkflowExecutionException.class, e -> {
+                        assertThat(e.category()).isEqualTo(Category.SERVICE_ACTION_FAILED);
+                        assertThat(e).hasRootCauseMessage("Configured service failure");
+                    });
+            assertThat(runtime.replayComplete(failing, reviewer)).isEmpty();
+            assertThat(reads.findTaskSubmission(current.id())).isEmpty();
+            assertThat(reads.findTaskSubmission(first.taskId()).orElseThrow().result()).isEqualTo(accepted);
+            assertThat(reads.findInstance(instanceId).orElseThrow().lockVersion()).isEqualTo(token);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf_test.service_effect WHERE instance_id=?", Integer.class, instanceId))
+                    .isZero();
+        } else {
+            var reordered = new CompleteWorkflowTask(first.commandId(), instanceId, first.taskId(), first.expectedLockVersion(),
+                    "COMPLETE", null, CompleteWorkflowTask.parseResult("{\"note\":\"Approved\",\"approvedAmount\":1250.00}"));
+            assertThat(runtime.replayComplete(reordered, reviewer)).isPresent();
+            var changed = new CompleteWorkflowTask(first.commandId(), instanceId, first.taskId(), first.expectedLockVersion(),
+                    "COMPLETE", null, CompleteWorkflowTask.parseResult("{\"approvedAmount\":1250,\"note\":\"Approved\"}"));
+            assertThatThrownBy(() -> runtime.replayComplete(changed, reviewer)).isInstanceOfSatisfying(
+                    WorkflowExecutionException.class, e -> assertThat(e.category()).isEqualTo(Category.COMMAND_ID_CONFLICT));
+            assertThat(jdbc.queryForList("SELECT quantity FROM wf_test.service_effect WHERE instance_id=?", Long.class, instanceId))
+                    .containsExactly(125000L);
+        }
+    }
+
+    private void prepareStructuredDefinition(boolean failDownstream) throws Exception {
+        if (catalog.findByCode("SANDBOX_REVIEW").isEmpty()) {
+            ownedTaskType = tx().execute(t -> catalog.create(new CreateTaskType("SANDBOX_REVIEW", marker, null, true)).after().id());
+        }
+        var document = (ObjectNode) json.readTree(Files.readString(repository().resolve(
+                "docs/features/F018-structured-task-submissions/sandbox-structured-review.json")));
+        String key = document.path("key").asText();
+        var existing = jdbc.queryForList("SELECT id FROM wf.workflow_definition WHERE workflow_key=?", Long.class, key);
+        if (!existing.isEmpty()) {
+            int version = jdbc.queryForObject("SELECT COALESCE(MAX(version),0) FROM wf.workflow_definition_version WHERE definition_id=?",
+                    Integer.class, existing.get(0));
+            document.put("version", version + 1);
+        } else {
+            ownedDefinitionKey = key;
+        }
+        if (failDownstream) {
+            var nodes = (com.fasterxml.jackson.databind.node.ArrayNode) document.get("nodes");
+            var firstReview = ((ObjectNode) nodes.get(1)).deepCopy().put("key", "priorReview");
+            nodes.add(firstReview);
+            ((ObjectNode) nodes.get(2)).put("key", "failRecordAmount");
+            var edges = (com.fasterxml.jackson.databind.node.ArrayNode) document.get("transitions");
+            ((ObjectNode) edges.get(0)).put("to", "priorReview");
+            ((ObjectNode) edges.get(1)).put("to", "failRecordAmount");
+            ((ObjectNode) edges.get(2)).put("from", "failRecordAmount");
+            edges.addObject().put("key", "reviewAgain").put("from", "priorReview").put("to", "reviewAmount").put("outcome", "COMPLETE");
+        }
+        tx().executeWithoutResult(t -> {
+            var draft = definitions.importDraft(new ImportWorkflowDraft(document.toString()),
+                    new DefinitionManagementContext(marker, Instant.now())).after();
+            versionId = draft.id();
+            if (ownedDefinitionKey != null) familyId = draft.definitionId();
+            var published = definitions.publish(new CheckWorkflowDefinition(versionId, draft.lockVersion()),
+                    new DefinitionManagementContext(marker, Instant.now()));
+            assertThat(published.published()).withFailMessage(() -> published.report().toString()).isTrue();
+        });
+    }
+
+    private WorkflowExecutionResult startStructured() {
+        long request = tx().execute(t -> requests.create(marker, marker, Instant.now()).id());
+        var started = runtime.start(new SandboxStart(UUID.randomUUID(), versionId, request, 0), context()).execution();
+        instances.add(started.instance().id());
+        return started;
+    }
+
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfSystemProperty(named = "f018.browserHold", matches = "true")
+    void liveStructuredSubmissionBrowserFixture() throws Exception {
+        prepareStructuredDefinition(false);
+        var started = startStructured();
+        Path local = repository().resolve(".local");
+        Files.createDirectories(local);
+        Path state = local.resolve("f018-browser-fixture.json");
+        Path done = local.resolve("f018-browser.done");
+        try {
+            Files.writeString(state, json.writeValueAsString(Map.of("port", port, "pid", ProcessHandle.current().pid(),
+                    "instance", started.instance().id(), "task", started.task().id(), "activity", started.activity().id())));
+            long deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(8);
+            while (!Files.exists(done) && System.nanoTime() < deadline) Thread.sleep(250);
+            assertThat(Files.exists(done)).as("Live F018 browser check signal").isTrue();
+            var result = reads.findTaskSubmission(started.task().id()).orElseThrow().result();
+            assertThat(result.toJson()).isEqualTo("{\"approvedAmount\":1250.00,\"note\":\"Live sandbox check\"}");
+            assertThat(jdbc.queryForList("SELECT quantity FROM wf_test.service_effect WHERE instance_id=?", Long.class,
+                    started.instance().id())).containsExactly(125000L);
+        } finally {
+            Files.deleteIfExists(done);
+            Files.deleteIfExists(state);
+        }
+    }
+
     @AfterEach void cleanup() {
         failCompletion.set(false);
         tx().executeWithoutResult(t->{
             for(long id:instances) {
+                jdbc.update("DELETE FROM wf_test.service_effect WHERE instance_id=?",id);
                 jdbc.update("DELETE FROM wf_test.workflow_event_outbox WHERE instance_id=?",id);
                 jdbc.update("DELETE FROM wf.workflow_command_receipt WHERE instance_id=?",id);
                 jdbc.update("DELETE FROM wf.workflow_history WHERE instance_id=?",id);
@@ -194,7 +327,7 @@ class SharedRuntimeIT extends DatabaseIntegrationTest {
             }
             jdbc.update("DELETE FROM wf_test.sandbox_request WHERE name=? AND created_by=?",marker,marker);
             if(versionId!=null)jdbc.update("DELETE FROM wf.workflow_definition_version WHERE id=?",versionId);
-            if(familyId!=null)jdbc.update("DELETE FROM wf.workflow_definition WHERE id=? AND workflow_key=?",familyId,marker);
+            if(familyId!=null)jdbc.update("DELETE FROM wf.workflow_definition WHERE id=? AND workflow_key=?",familyId,ownedDefinitionKey);
             if(ownedTaskType!=null)jdbc.update("DELETE FROM wf.workflow_task_type WHERE id=? AND code='SANDBOX_REVIEW'",ownedTaskType);
         });
     }

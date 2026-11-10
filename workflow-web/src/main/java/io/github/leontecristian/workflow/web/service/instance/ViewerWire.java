@@ -1,15 +1,19 @@
 package io.github.leontecristian.workflow.web.service.instance;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.cfg.JsonNodeFeature;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
+import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmission;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
 import io.github.leontecristian.workflow.web.exception.instance.WorkflowViewerException;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,14 +35,19 @@ import java.util.function.ToLongFunction;
 public class ViewerWire {
     private final ObjectMapper mapper;
 
+    private abstract static class TaskSubmissionMixin {
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        abstract WorkflowJsonValue result();
+    }
+
     public ViewerWire() {
         var longs =
                 new SimpleModule()
                         .addSerializer(Long.class, ToStringSerializer.instance)
                         .addSerializer(Long.TYPE, ToStringSerializer.instance);
-        longs.addSerializer(io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue.class,
+        longs.addSerializer(WorkflowJsonValue.class,
                 new com.fasterxml.jackson.databind.JsonSerializer<>() {
-                    @Override public void serialize(io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue value,
+                    @Override public void serialize(WorkflowJsonValue value,
                             com.fasterxml.jackson.core.JsonGenerator generator, com.fasterxml.jackson.databind.SerializerProvider provider)
                             throws java.io.IOException { generator.writeRawValue(value.toJson()); }
                 });
@@ -52,11 +61,12 @@ public class ViewerWire {
                         .registerModule(longs)
                         .registerModule(new JavaTimeModule())
                         .registerModule(new Jdk8Module())
+                        .addMixIn(TaskSubmission.class, TaskSubmissionMixin.class)
                         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                         .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
         mapper.enable(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS,
                 com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_INTEGER_FOR_INTS);
-        mapper.setNodeFactory(com.fasterxml.jackson.databind.node.JsonNodeFactory.withExactBigDecimals(true));
+        mapper.setConfig(mapper.getDeserializationConfig().without(JsonNodeFeature.STRIP_TRAILING_BIGDECIMAL_ZEROES));
     }
 
     public String json(Object value) {

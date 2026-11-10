@@ -24,5 +24,15 @@
       (sizeChange)="pageSize=$event;load()"
       (reload)="load()"
       (advance)="nextPage()"
-      (inspect)="open($event)" /></mat-card-content
+      (inspect)="open($event)" />
+    @for(row of rows(); track row.taskId){
+      @if(row.resultJson !== undefined){
+        <mat-expansion-panel class="evidence-panel">
+          <mat-expansion-panel-header><mat-panel-title>Task #{{row.taskId}} result</mat-panel-title></mat-expansion-panel-header>
+          <pre>{{row.resultJson}}</pre>
+          <button mat-button (click)="downloadResult(row)">Download result JSON</button>
+        </mat-expansion-panel>
+      }
+    }
+  </mat-card-content
 ></mat-card>

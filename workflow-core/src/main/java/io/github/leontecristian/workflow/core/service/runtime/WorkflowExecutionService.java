@@ -37,7 +37,11 @@ import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogSe
 import io.github.leontecristian.workflow.core.dto.definition.document.ExecutableDefinition;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category;
+import io.github.leontecristian.workflow.core.dto.definition.document.TaskResultContract;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmissionValidationContext;
+import io.github.leontecristian.workflow.core.service.definition.TaskResultSchema;
 import jakarta.persistence.EntityManager;
+import org.springframework.beans.factory.ObjectProvider;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -74,12 +78,15 @@ public class WorkflowExecutionService {
     private final RuntimeDefinitionPins pins;
     private final RuntimeVariables variables;
     private final RuntimeServiceProgression services;
+    private final ObjectProvider<WorkflowTaskSubmissionValidator> submissionValidator;
     private final ThreadLocal<Boolean> executing = new ThreadLocal<>();
 
     public WorkflowExecutionService(WorkflowInstanceRepository instances, WorkflowActivityRepository activities,
             WorkflowTaskRepository tasks, WorkflowHistoryRepository history, WorkflowCommandReceiptRepository receipts,
             EntityManager entityManager, WorkflowDefinitionRuntimeReader definitions, TaskTypeCatalogService catalog,
-            RuntimeJson json, RuntimeHostSupport host, RuntimeDefinitionPins pins, RuntimeVariables variables, RuntimeServiceProgression services, WorkflowTaskEligibilityService eligibility) {
+            RuntimeJson json, RuntimeHostSupport host, RuntimeDefinitionPins pins, RuntimeVariables variables, RuntimeServiceProgression services, WorkflowTaskEligibilityService eligibility,
+            ObjectProvider<WorkflowTaskSubmissionValidator> submissionValidator) {
+        this.submissionValidator = submissionValidator;
         this.eligibility = eligibility;
         this.variables=variables; this.services=services;
         this.instances = instances; this.activities = activities; this.tasks = tasks; this.history = history; this.receipts = receipts;
@@ -201,16 +208,24 @@ public class WorkflowExecutionService {
                 RuntimeInputs.require(task.getAssignmentKind() != AssignmentTargetKind.USER, Category.HOST_CONFIGURATION);
                 RuntimeInputs.require(human.claimPolicy() != TaskClaimPolicy.REQUIRED, Category.CLAIM_REQUIRED);
             }
+            validateSubmission(command, new TaskSubmissionValidationContext(context, instance.getId(), definition.versionId(),
+                    activity.getId(), task.getId(), human.key(), human.taskType(), command.outcomeKey(), command.comment()),
+                    human.resultContract());
             task.complete(command.outcomeKey(), time, context.actorRef()); activity.complete(command.outcomeKey(), time, context.actorRef());
             RuntimeHistoryBatch batch = new RuntimeHistoryBatch(entityManager, json, instance.getId(), definition.versionId(), command.commandId(), context);
             var submitted = json.object(); submitted.put("outcomeKey", command.outcomeKey()); submitted.put("comment", command.comment()); submitted.putObject("inputs");
+            if (command.result() != null) submitted.set("result", json.tree(command.result().toJson()));
             batch.beginAt(first-1);
-            batch.append(first, "TASK_COMPLETED", activity.getId(), task.getId(), null, submitted, Map.of("outcomeKey", command.outcomeKey()));
+            batch.append(first, "TASK_COMPLETED", activity.getId(), task.getId(), null, submitted,
+                    Map.of("outcomeKey", command.outcomeKey()), (short) (command.result() == null ? 2 : 3));
             batch.append(RuntimeProgression.advance(first, 1), "ACTIVITY_COMPLETED", activity.getId(), null, null,
                     Map.of("outcomeKey", command.outcomeKey(), "closureReason", "TASK_OUTCOME"), Map.of("outcomeKey", command.outcomeKey()));
+            if (human.resultContract().mode() != TaskResultContract.Mode.FORBIDDEN) {
+                entityManager.flush(); // A downstream action can read the accepted submission in this transaction.
+            }
             var budget=new RuntimeProgression();
             var end=services.traverse(model,human.key(),null,new ServiceActionContext(
-                    command.commandId(),instance.getId(),definition.versionId(),human.key(),instance.getBusinessType(),instance.getBusinessId(),context),
+                    command.commandId(),instance.getId(),definition.versionId(),human.key(),instance.getBusinessType(),instance.getBusinessId(),context,activity.getId()),
                     variables.read(instance.getId(),model),budget,batch,definition.contentHash(),selectedOutcome.key());
             if ("HUMAN_TASK".equals(end.type())) {
                 entityManager.flush(); // Close the previous active row before inserting its successor.
@@ -221,8 +236,39 @@ public class WorkflowExecutionService {
                 batch.next("INSTANCE_COMPLETED",null,null,null,Map.of("resultKey",end.result()),Map.of("resultKey",end.result()));
                 instance.complete(end.key(),end.result(),batch.last(),time,context.actorRef());
             }
-            return finish(command.commandId(), WorkflowOperation.COMPLETE_TASK, context, fingerprint, definition, instance, activity, task, first, batch, recorder, RuntimeJson.FINGERPRINT_VERSION);
+            return finish(command.commandId(), WorkflowOperation.COMPLETE_TASK, context, fingerprint, definition, instance, activity, task, first, batch, recorder, json.fingerprintVersion(command));
         });
+    }
+
+    private void validateSubmission(CompleteWorkflowTask command, TaskSubmissionValidationContext context,
+            TaskResultContract contract) {
+        var result = command.result();
+        if (contract.mode() == TaskResultContract.Mode.FORBIDDEN) {
+            RuntimeInputs.require(result == null, Category.INVALID_INPUT);
+            return;
+        }
+        RuntimeInputs.require(result != null || contract.mode() == TaskResultContract.Mode.OPTIONAL, Category.INVALID_INPUT);
+        if (result != null) {
+            try {
+                var violation = TaskResultSchema.validate(contract, result);
+                if (violation != null) {
+                    throw WorkflowExecutionException.invalidResultSchema(violation.path(), violation.schemaPath());
+                }
+            } catch (TaskResultSchema.LimitExceeded failure) {
+                throw WorkflowExecutionException.resultLimit(failure.getMessage());
+            }
+        }
+        var validator = submissionValidator.getIfAvailable();
+        if (validator == null) return;
+        try {
+            validator.validate(context, result);
+        } catch (RuntimeException failure) {
+            if (failure instanceof WorkflowExecutionException rejection && rejection.category() == Category.RESULT_REJECTED) {
+                var diagnostic = rejection.diagnostic();
+                throw WorkflowExecutionException.rejectResult(diagnostic == null ? "" : diagnostic.path());
+            }
+            throw new WorkflowExecutionException(Category.RESULT_VALIDATION_FAILED, failure);
+        }
     }
 
     public Optional<WorkflowCommandResult> findReplay(StartWorkflow command, WorkflowCommandContext context) {
@@ -438,7 +484,8 @@ public class WorkflowExecutionService {
     }
 
     private Optional<WorkflowExecutionResult> completionReplay(CompleteWorkflowTask command, WorkflowCommandContext context, byte[] fingerprint) {
-        return replay(command.commandId(), WorkflowOperation.COMPLETE_TASK, context, fingerprint).map(result -> {
+        return json.replay(receipts.findById(command.commandId()).orElse(null), command.commandId(),
+                WorkflowOperation.COMPLETE_TASK, context, fingerprint, json.fingerprintVersion(command)).map(result -> {
             RuntimeInputs.require(result.instance().id() == command.instanceId() && result.task().id() == command.taskId()
                     && command.outcomeKey().equals(result.task().outcomeKey()) && result.instance().lockVersion() > command.expectedLockVersion(),
                     Category.HOST_CONFIGURATION);

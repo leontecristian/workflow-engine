@@ -25,9 +25,13 @@ export function freezeEnvelope(input:unknown,start?:StartEnvelopeAdapter):Envelo
   body=start.freezeBody(source);
   if(body['commandId']!==source['commandId'])throw new Error('Start adapter changed command UUID');
  } else {
-  const fields=obj['kind']==='complete'?'commandId,comment,instanceId,outcomeKey,taskId':obj['kind']==='admin-release'?'commandId,instanceId,reason,taskId':'commandId,instanceId,taskId';
+  const hasResult=obj['kind']==='complete'&&Object.hasOwn(source,'resultJson');
+  const fields=obj['kind']==='complete'
+   ? hasResult?'commandId,comment,instanceId,outcomeKey,resultJson,taskId':'commandId,comment,instanceId,outcomeKey,taskId'
+   : obj['kind']==='admin-release'?'commandId,instanceId,reason,taskId':'commandId,instanceId,taskId';
   if(Object.keys(source).sort().join()!==fields)throw new Error('Invalid command fields');
   for(const [key,value] of Object.entries(source))if(typeof value!=='string'&&!(key==='comment'&&value===null))throw new Error('Invalid command value');
+  if(hasResult)freezeResultJson(source['resultJson']);
   if(obj['kind']==='admin-release' && (typeof source['reason']!=='string' || source['reason'].length>1000 || /^[\u0009-\u000d\u001c-\u0020\u1680\u2000-\u2006\u2008-\u200a\u2028\u2029\u205f\u3000]*$/u.test(source['reason']) || /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(source['reason'])))throw new Error('Invalid administrative reason');
   exactDecimal(source['instanceId'] as string);exactDecimal(source['taskId'] as string);
   exactDecimal(obj['expectedToken'] as string,true);
@@ -63,5 +67,19 @@ export function parseExactJson(text:string):unknown {
   else if(t.startsWith('"')&&tokens[i+1]===':') {const key=JSON.parse(t),current=stack[stack.length-1];if(current?.has(key))throw new Error('Duplicate JSON property');current?.add(key);}
  }
  return JSON.parse(text);
+}
+
+/** Validate the syntax and object shape without changing any source token. */
+export function freezeResultJson(value:unknown):string {
+ if(typeof value!=='string')throw new Error('Result must be JSON object text.');
+ if(value.length>256*1024)throw new Error('Result JSON exceeds the request size limit.');
+ let object:unknown;
+ try {object=parseExactJson(value);}
+ catch(error) {
+  if(error instanceof SyntaxError)throw new Error('Enter valid JSON for the result.');
+  throw error;
+ }
+ if(!object||typeof object!=='object'||Array.isArray(object))throw new Error('Result must be a JSON object.');
+ return value;
 }
 function commandIdentity(body:CommandBody){return JSON.stringify(Object.fromEntries(Object.entries(body).sort(([a],[b])=>a.localeCompare(b))));}

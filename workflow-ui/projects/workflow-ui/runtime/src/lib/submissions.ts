@@ -2,6 +2,7 @@ import { Component, signal } from '@angular/core';
 import type { TaskSubmission } from '@workflow-engine/ui';
 import { RuntimeState } from './runtime-state';
 import { PAGE_IMPORTS } from './page-imports';
+import { download } from './variables';
 @Component({selector:"workflow-submissions",standalone:true,imports:[...PAGE_IMPORTS],styleUrl:"./runtime.scss",templateUrl:"./submissions.html"})
 export class WorkflowSubmissionsComponent extends RuntimeState {
  protected clearContent(){this.rows.set([]);this.next=null;}
@@ -32,5 +33,8 @@ export class WorkflowSubmissionsComponent extends RuntimeState {
   }
   open(row: TaskSubmission) {
     this.navigate({kind:"task",id:row.taskId});
+  }
+  downloadResult(row: TaskSubmission) {
+    if(row.resultJson!==undefined)download(row.resultJson,'task-'+row.taskId+'-result.json');
   }
 }

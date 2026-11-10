@@ -9,6 +9,7 @@ import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQue
 import io.github.leontecristian.workflow.web.configuration.WorkflowViewerConfiguration;
 import io.github.leontecristian.workflow.web.configuration.WorkflowViewerOptions;
 import io.github.leontecristian.workflow.web.controller.instance.WorkflowInstanceViewerController;
+import io.github.leontecristian.workflow.web.dto.instance.ViewerLinkReference;
 import io.github.leontecristian.workflow.web.exception.instance.WorkflowViewerException;
 import io.github.leontecristian.workflow.web.integration.instance.WorkflowViewerAccess;
 import io.github.leontecristian.workflow.web.service.instance.ViewerWire;
@@ -16,6 +17,7 @@ import io.github.leontecristian.workflow.web.service.instance.WorkflowInstanceVi
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -163,6 +165,25 @@ class WorkflowViewerUnitTest {
             mvc.perform(get("/custom/read/instances/1?unchangedDetailQuery=1").requestAttr("trusted.correlation", "safe-id"))
                     .andExpect(status().isInternalServerError()).andExpect(content().json(
                             "{\"code\":\"HOST_FAILURE\",\"message\":\"HOST_FAILURE\",\"diagnostics\":[],\"correlationId\":\"safe-id\"}"));
+        }
+    }
+    @Test void structuredCompletionDetailsRequireAnExactTaskGrantEvenWithPermissiveHistoryAccess() throws Exception {
+        try (var context = context(Host.class, Enabled.class)) {
+            var mvc = MockMvcBuilders.webAppContextSetup(context).build();
+            var access = context.getBean(WorkflowViewerAccess.class);
+            var reads = context.getBean(WorkflowRuntimeQueryService.class);
+            var event = new WorkflowHistorySummary(1, 3, "TASK_COMPLETED", UUID.randomUUID(), null,
+                    ActorKind.USER, "reviewer", Instant.EPOCH, 3L, 4L, null, null, null, (short) 3);
+            String details = "{\"outcomeKey\":\"APPROVE\",\"comment\":null,\"inputs\":{},\"result\":{\"amount\":123.00}}";
+            when(reads.findHistoryEvent(1, 3)).thenReturn(Optional.of(new WorkflowHistoryEvent(event, details)));
+            var exactTask = new ViewerLinkReference(3, 4L);
+            when(access.readableLinks(1, Set.of(exactTask))).thenReturn(Set.of(new ViewerLinkReference(3, null)));
+            mvc.perform(get("/custom/read/instances/1/history/3"))
+                    .andExpect(status().isNotFound()).andExpect(jsonPath("$.detailsJson").doesNotExist());
+            when(access.readableLinks(1, Set.of(exactTask))).thenReturn(Set.of(exactTask));
+            mvc.perform(get("/custom/read/instances/1/history/3"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.detailsJson").value(details));
+            verify(access).requireHistoryEventRead(event);
         }
     }
     @Test void viewerCodecAndErrorsDoNotReplaceHostHandling() throws Exception {

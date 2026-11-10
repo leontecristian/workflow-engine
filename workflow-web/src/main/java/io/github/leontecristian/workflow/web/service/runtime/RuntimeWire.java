@@ -1,11 +1,24 @@
 package io.github.leontecristian.workflow.web.service.runtime;
 
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.core.StreamReadConstraints;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.core.exc.StreamConstraintsException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmission;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmissionPage;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
+import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException;
 import jakarta.servlet.http.HttpServletRequest;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -15,6 +28,11 @@ import org.springframework.http.ResponseEntity;
 
 /** Private HTTP/evidence codec; never replaces the application's or core's ObjectMapper. */
 public class RuntimeWire {
+    private static final int SUBMISSION_PAGE_BYTES = 1024 * 1024;
+    private static final JsonFactory COMPLETION_JSON = JsonFactory.builder()
+            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+            .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(64).maxNumberLength(128).build())
+            .build();
     private final io.github.leontecristian.workflow.web.service.instance.ViewerWire codec =
             new io.github.leontecristian.workflow.web.service.instance.ViewerWire();
     public String json(Object value) { return codec.json(value); }
@@ -26,7 +44,77 @@ public class RuntimeWire {
     }
 
     public ResponseEntity<String> response(Object value) {
-        return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(json(value));
+        return jsonResponse(json(value));
+    }
+
+    private static ResponseEntity<String> jsonResponse(String json) {
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(json);
+    }
+
+    public record CompletionBody(JsonNode fields, WorkflowJsonValue result) {}
+
+    public CompletionBody completionBody(HttpServletRequest request, String... fields) {
+        String source = raw(request, 256 * 1024);
+        Set<String> allowed = Set.of(fields);
+        var metadata = JsonNodeFactory.instance.objectNode();
+        String resultJson = null;
+        // Slice the original object token. A tree would interpret numeric tokens before the exact codec.
+        try (var parser = COMPLETION_JSON.createParser(source)) {
+            if (parser.nextToken() != JsonToken.START_OBJECT) throw WorkflowRuntimeException.invalid();
+            while (parser.nextToken() == JsonToken.FIELD_NAME) {
+                String key = parser.currentName();
+                JsonToken value = parser.nextToken();
+                if ("result".equals(key)) {
+                    if (value != JsonToken.START_OBJECT) throw WorkflowRuntimeException.invalid();
+                    int start = (int) parser.currentTokenLocation().getCharOffset();
+                    parser.skipChildren();
+                    int end = (int) parser.currentLocation().getCharOffset();
+                    resultJson = source.substring(start, end);
+                } else if (allowed.contains(key) && value == JsonToken.VALUE_STRING) {
+                    metadata.put(key, parser.getText());
+                } else if (allowed.contains(key) && value == JsonToken.VALUE_NULL) {
+                    metadata.putNull(key);
+                } else {
+                    throw WorkflowRuntimeException.invalid();
+                }
+            }
+            if (parser.currentToken() != JsonToken.END_OBJECT || parser.nextToken() != null)
+                throw WorkflowRuntimeException.invalid();
+        } catch (StreamConstraintsException limit) {
+            throw WorkflowExecutionException.resultLimit("The completion JSON exceeds the depth or numeric token limit.");
+        } catch (IOException invalid) {
+            throw WorkflowRuntimeException.invalid();
+        }
+        return new CompletionBody(metadata, resultJson == null ? null : CompleteWorkflowTask.parseResult(resultJson));
+    }
+
+    public ResponseEntity<String> submissionPage(TaskSubmissionPage page) {
+        String prefix = "{\"items\":[";
+        int bytes = prefix.length();
+        List<String> rows = new ArrayList<>();
+        Long next = page.nextAfterTaskId();
+        for (int index = 0; index < page.items().size(); index++) {
+            TaskSubmission submission = page.items().get(index);
+            String row = json(submission);
+            int rowBytes = utf8Length(row) + (index == 0 ? 0 : 1);
+            Long candidate = index + 1 == page.items().size() ? page.nextAfterTaskId() : Long.valueOf(submission.taskId());
+            if (bytes + rowBytes + submissionPageEnd(candidate).length() > SUBMISSION_PAGE_BYTES) {
+                if (rows.isEmpty()) throw new WorkflowRuntimeException(422, "LIMIT_EXCEEDED");
+                next = page.items().get(index - 1).taskId();
+                break;
+            }
+            rows.add(row);
+            bytes += rowBytes;
+        }
+        return jsonResponse(prefix + String.join(",", rows) + submissionPageEnd(next));
+    }
+
+    private static String submissionPageEnd(Long next) {
+        return "],\"nextAfterTaskId\":" + (next == null ? "null" : "\"" + next + "\"") + "}";
+    }
+
+    static int utf8Length(String value) {
+        return value.getBytes(StandardCharsets.UTF_8).length;
     }
 
     public String raw(HttpServletRequest request, int limit) {

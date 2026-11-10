@@ -21,6 +21,7 @@
     </modules>
     <properties>
         <java.version>17</java.version>
+        <jackson-bom.version>2.22.3</jackson-bom.version>
         <!-- Enforce Java 17 APIs as well as bytecode when building on a newer JDK. -->
         <maven.compiler.release>${java.version}</maven.compiler.release>
     </properties>

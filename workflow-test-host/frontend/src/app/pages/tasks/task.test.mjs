@@ -178,6 +178,37 @@ test('uncertain completion retains its frozen command and blocks replacement', a
  await page.complete('OK');const original=buffer.command;await page.complete('OK');assert.equal(calls,1);assert.equal(buffer.command,original);assert.match(page.error(),/outcome is uncertain/i);
 });
 
+test('structured task completion handles required input, local JSON errors and optional omission',async t=>{
+ const buffer=new CommandBuffer(),observations=new Map();
+ let calls=0;
+ const commands={buffer,observations,async execute(){
+  calls++;
+  throw Object.assign(new Error('/approvedAmount — Amount rejected.'),{httpStatus:422,code:'RESULT_REJECTED'});
+ }};
+ const {page}=component(t,TaskPage,{},routeAt(),undefined,[{provide:CommandRecovery,useValue:commands}]);
+ page.id='3';page.detail.set({instanceId:'1',status:'OPEN'});
+ const contract={instanceLockVersion:'2',canComplete:true,outcomes:[{key:'OK',label:'OK',requiresComment:false}]};
+ page.contract.set({...contract,resultContract:{mode:'REQUIRED',schema:{type:'object'}}});
+ await page.complete('OK');
+ assert.match(page.error(),/result is required/);
+ page.resultDraft='null';
+ await page.complete('OK');
+ assert.match(page.error(),/must be a JSON object/);
+ assert.equal(calls,0);
+ const draft='{"approvedAmount":9007199254740993.00}';
+ page.resultDraft=draft;
+ await page.complete('OK');
+ assert.equal(calls,1);
+ assert.equal(buffer.command.body.resultJson,draft);
+ assert.equal(page.resultDraft,draft);
+ assert.match(page.error(),/approvedAmount.*Amount rejected/);
+ page.contract.set({...contract,resultContract:{mode:'OPTIONAL',schema:{type:'object'}}});
+ page.resultDraft=' \n ';
+ await page.complete('OK');
+ assert.equal(calls,2);
+ assert.ok(!Object.hasOwn(buffer.command.body,'resultJson'));
+});
+
 test('ownership honors action flags, refreshes after success and preserves uncertain command', async t=>{
  const {WORKFLOW_RUNTIME_COMMANDS}=await import('@workflow-engine/ui');
  const buffer=new CommandBuffer(),observations=new Map();let calls=0,reads=0,fail=false;

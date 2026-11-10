@@ -62,7 +62,7 @@ public class RuntimeServiceProgression {
             ServiceActionResult returned;
             try {
                 returned=actions.action(node.action()).execute(new ServiceActionContext(context.commandId(),context.instanceId(),context.definitionVersionId(),
-                        cursor,context.businessType(),context.businessId(),context.commandContext()),Map.copyOf(args));
+                        cursor,context.businessType(),context.businessId(),context.commandContext(),context.completedActivityId()),Map.copyOf(args));
             } catch (Throwable failure) { throw new WorkflowExecutionException(Category.SERVICE_ACTION_FAILED,failure); }
             RuntimeInputs.require(returned!=null,Category.INVALID_ACTION_OUTPUT);
             RuntimeValueBindings.output(descriptor.outputs(),returned.outputs(),json);

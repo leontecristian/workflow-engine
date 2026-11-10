@@ -30,7 +30,11 @@ public record MinimalWorkflowDefinition(Node start, Map<String,Human> humans, No
     public record Assignment(String resolver) {}
     public record Outcome(String key, String label, boolean requiresComment) {}
     public record Human(String key, String taskType, Assignment assignment, List<Outcome> outcomes,
-            TaskClaimPolicy claimPolicy) {
+            TaskClaimPolicy claimPolicy, TaskResultContract resultContract) {
+        public Human(String key, String taskType, Assignment assignment, List<Outcome> outcomes,
+                TaskClaimPolicy claimPolicy) {
+            this(key, taskType, assignment, outcomes, claimPolicy, TaskResultContract.FORBIDDEN);
+        }
         public Human(String key, String taskType, Assignment assignment, List<Outcome> outcomes) {
             this(key, taskType, assignment, outcomes, TaskClaimPolicy.OPTIONAL);
         }

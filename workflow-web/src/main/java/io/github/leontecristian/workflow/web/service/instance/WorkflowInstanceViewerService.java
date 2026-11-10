@@ -2,8 +2,10 @@ package io.github.leontecristian.workflow.web.service.instance;
 
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistorySummary;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
+import io.github.leontecristian.workflow.web.dto.instance.ViewerLinkReference;
 import io.github.leontecristian.workflow.web.integration.instance.WorkflowViewerAccess;
 import io.github.leontecristian.workflow.web.exception.instance.WorkflowViewerException;
+import java.util.Set;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Read projection only; all authorization is repeated for each request. */
@@ -38,6 +40,12 @@ public class WorkflowInstanceViewerService {
         var event = reads.findHistoryEvent(id, sequence).orElseThrow(WorkflowViewerException::missing);
         if (isOwnershipEvent(event.summary()) && !access.canReadHistorySummary(event.summary()))
             throw WorkflowViewerException.missing();
+        var summary = event.summary();
+        if ("TASK_COMPLETED".equals(summary.eventType()) && summary.detailsSchemaVersion() >= 3) {
+            if (summary.activityId() == null || summary.taskId() == null) throw WorkflowViewerException.missing();
+            var exactTask = new ViewerLinkReference(summary.activityId(), summary.taskId());
+            if (!access.readableLinks(id, Set.of(exactTask)).contains(exactTask)) throw WorkflowViewerException.missing();
+        }
         access.requireHistoryEventRead(event.summary());
         if (!wire.fits(event.detailsJson(), 4 * 1024 * 1024)) throw new WorkflowViewerException(422, "LIMIT_EXCEEDED");
         var json = wire.json(event);

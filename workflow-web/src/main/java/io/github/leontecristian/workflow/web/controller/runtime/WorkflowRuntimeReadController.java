@@ -5,6 +5,7 @@ import static io.github.leontecristian.workflow.web.service.runtime.RuntimeWire.
 import static io.github.leontecristian.workflow.web.service.runtime.RuntimeWire.limit;
 import static io.github.leontecristian.workflow.web.service.runtime.RuntimeWire.query;
 
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
 import io.github.leontecristian.workflow.core.dto.runtime.BooleanLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy;
@@ -121,8 +122,15 @@ public class WorkflowRuntimeReadController {
     @GetMapping("/tasks/{id}/submission")
     public ResponseEntity<String> submission(@PathVariable String id) {
         long key = decimal(id, false);
-        access.task(key);
-        return wire.response(reads.findTaskSubmission(key).orElse(null));
+        var authorized = access.task(key);
+        var submission = reads.findTaskSubmission(key).orElse(null);
+        // Open-task ownership can grant a read before completion. Authorize the final task if
+        // the submission became visible after the initial grant.
+        if (submission != null && authorized.status() != TaskStatus.COMPLETED
+                && access.task(key).status() != TaskStatus.COMPLETED) {
+            throw new WorkflowRuntimeException(404, "NOT_FOUND");
+        }
+        return wire.response(submission);
     }
     @GetMapping("/tasks/{id}/contract")
     public ResponseEntity<String> contract(@PathVariable String id) {
@@ -152,12 +160,15 @@ public class WorkflowRuntimeReadController {
                 boolean assigned = task.assigneeRef() != null;
                 boolean canComplete = open && (!shared || assigned || claimPolicy == TaskClaimPolicy.OPTIONAL)
                         && access.canCompleteTask(task);
+                var resultContract = node.get("resultContract");
+                if (resultContract == null) resultContract = JsonNodeFactory.instance.objectNode().put("mode", "FORBIDDEN");
                 return wire.response(new WorkflowTaskContract(
                         task.id(), task.instanceId(), instance.lockVersion(), node.get("taskType").textValue(),
                         outcomes, canComplete, assignmentLabel(task), claimPolicy,
                         commandsAvailable && open && shared && !assigned && access.canClaimTask(task),
                         commandsAvailable && open && shared && assigned && access.canReleaseTask(task),
-                        commandsAvailable && open && shared && assigned && access.canAdministrativelyReleaseTask(task)));
+                        commandsAvailable && open && shared && assigned && access.canAdministrativelyReleaseTask(task),
+                        resultContract));
             }
         throw new IllegalStateException("Pinned human contract missing");
     }
@@ -171,7 +182,7 @@ public class WorkflowRuntimeReadController {
         long key = decimal(id, false);
         access.activity(key);
         var page = visibleSubmissions(key, after(r.getParameter("afterTaskId")), limit(r.getParameter("limit")));
-        return wire.response(wire.page(page.items(), page.nextAfterTaskId(), "nextAfterTaskId", TaskSubmission::taskId));
+        return wire.submissionPage(page);
     }
     private TaskSubmissionPage visibleSubmissions(long activityId, long after, int limit) {
         var visible = new java.util.ArrayList<TaskSubmission>();

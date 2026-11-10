@@ -32,14 +32,16 @@ public class WorkflowRuntimeCommandController {
         this.commands = commands; this.wire = wire; this.errors = errors;
     }
     private CompleteWorkflowTask completeBody(HttpServletRequest r, long instance, long task) {
-        var b = wire.body(r, "commandId", "outcomeKey", "comment");
+        var body = wire.completionBody(r, "commandId", "outcomeKey", "comment");
+        var b = body.fields();
         return new CompleteWorkflowTask(
                 uuid(b),
                 instance,
                 task,
                 token(r),
                 text(b, "outcomeKey", false),
-                text(b, "comment", true));
+                text(b, "comment", true),
+                body.result());
     }
     @PostMapping("/instances/{instanceId}/tasks/{taskId}/complete")
     public ResponseEntity<String> complete(
@@ -53,7 +55,8 @@ public class WorkflowRuntimeCommandController {
     }
     @PostMapping("/commands/complete/replay")
     public ResponseEntity<String> replayComplete(HttpServletRequest r) {
-        var b = wire.body(r, "commandId", "instanceId", "taskId", "outcomeKey", "comment");
+        var body = wire.completionBody(r, "commandId", "instanceId", "taskId", "outcomeKey", "comment");
+        var b = body.fields();
         var command =
                 new CompleteWorkflowTask(
                         uuid(b),
@@ -61,7 +64,8 @@ public class WorkflowRuntimeCommandController {
                         id(b, "taskId", false),
                         token(r),
                         text(b, "outcomeKey", false),
-                        text(b, "comment", true));
+                        text(b, "comment", true),
+                        body.result());
 
         return wire.response(
                 replay(

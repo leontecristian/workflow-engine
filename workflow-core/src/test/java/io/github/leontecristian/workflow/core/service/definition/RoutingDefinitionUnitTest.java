@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy;
+import io.github.leontecristian.workflow.core.dto.definition.document.TaskResultContract;
 import java.util.List;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
@@ -65,6 +66,35 @@ class RoutingDefinitionUnitTest {
         for(String resource:List.of("minimal-v1.schema.json","scalar-service-v1.schema.json")) {
             String actual=new String(getClass().getResourceAsStream("/schemas/workflow-definition/"+resource).readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
             assertThat(loader.schemaDigest(resource.startsWith("scalar"))).isEqualTo(DefinitionContentCanonicalizer.hex(DefinitionContentCanonicalizer.hash(actual)));
+        }
+    }
+
+    @Test void validatesAndPinsResultContractsAcrossAllThreeDefinitionSchemas() throws Exception {
+        var documents = List.of(minimalFixture(),
+                (ObjectNode) json.readTree(getClass().getResourceAsStream("/f007/service-review.json")), fixture());
+        for (var source : documents) {
+            var human = reviewNode(source);
+            var result = (ObjectNode) human.path("resultContract");
+            var schema = (ObjectNode) json.readTree("""
+                    {"type":"object","properties":{"approvedAmount":{"type":"number","minimum":0},
+                     "note":{"type":"string","maxLength":500}},"required":["approvedAmount","note"],"additionalProperties":false}
+                    """);
+            result.set("schema", schema);
+            assertThat(check(source).failed()).isTrue();
+            result.put("mode", "OPTIONAL");
+            var document = codec.ingest(source.toString());
+            var diagnostics = new DefinitionDiagnostics();
+            var model = loader.model(document, diagnostics);
+            assertThat(diagnostics.report().diagnostics()).isEmpty();
+            assertThat(model.humans().get("REVIEW").resultContract()).isEqualTo(
+                    new TaskResultContract(TaskResultContract.Mode.OPTIONAL, DefinitionContentCanonicalizer.canonical(schema)));
+            assertThat(loader.model(codec.ingest(document.canonical()), new DefinitionDiagnostics(), false))
+                    .isEqualTo(model);
+            result.put("mode", "REQUIRED");
+            result.remove("schema");
+            assertThat(check(source).failed()).isTrue();
+            result.set("schema", schema);
+            assertThat(check(source).failed()).isFalse();
         }
     }
 
