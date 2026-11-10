@@ -54,6 +54,10 @@ Stop when the assigned scope and relevant checks pass. Broaden or repeat verific
 
 ## Review and handover
 
+Start the review agent only after all implementation agents have finished and returned their final handoffs, the lead has integrated their changes and resolved integration issues, and the relevant checks have completed with results inspected and recorded for the integrated state. Confirm agent completion explicitly through agent status and final handoffs. An interim progress message or an agent still running tests does not satisfy this gate. Reuse applicable evidence under the verification rules above.
+
+Keep the reviewed implementation stable while review runs. If further implementation is needed, pause the review, finish and integrate that work, and complete the affected checks before resuming review against the updated diff. Apply the same gate to follow-up review after fixes.
+
 For substantive code changes, obtain one focused independent review when available. Provide the approved requirements, diff, affected contracts and verification evidence; ask for actionable defects and concrete regression risks. Keep the reviewer independent of the implementation rationale where practical. Do not request a broad security or concurrency audit merely because those guarantees exist globally. For small maintenance or documentation changes, a focused self-review can suffice.
 
 Evaluate findings against evidence and the approved scope. Fix relevant defects autonomously and rerun affected checks. Seek follow-up review only for unresolved findings or consequential new changes; do not repeat clean reviews automatically. If independent review is unavailable, disclose the self-review fallback.
