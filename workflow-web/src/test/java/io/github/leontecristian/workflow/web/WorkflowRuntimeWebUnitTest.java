@@ -137,10 +137,44 @@ class WorkflowRuntimeWebUnitTest {
                             io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.GROUP,"finance"),
                     io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.OPEN,null,java.time.Instant.EPOCH,null,null,null,null,null);
             when(host.task(5)).thenReturn(task);
+            var instance = mock(io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView.class);
+            var activity = mock(io.github.leontecristian.workflow.core.dto.runtime.WorkflowActivityView.class);
+            var version = mock(io.github.leontecristian.workflow.core.dto.definition.DefinitionVersionView.class);
+            when(reads.findInstance(1)).thenReturn(Optional.of(instance));
+            when(instance.definitionVersionId()).thenReturn(4L);
+            when(reads.findActivity(2)).thenReturn(Optional.of(activity));
+            when(activity.nodeKey()).thenReturn("COLLECT");
+            var definitions = c.getBean(WorkflowDefinitionService.class);
+            var catalog = c.getBean(TaskTypeCatalogService.class);
+            when(catalog.findById(3)).thenReturn(Optional.of(new io.github.leontecristian.workflow.core.dto.tasktype.TaskTypeView(
+                    3, "SANDBOX_REVIEW", "Sandbox review", null, false, 0)));
+            when(definitions.findVersion(4)).thenReturn(Optional.of(version));
+            when(version.documentJson()).thenReturn("""
+                    {"nodes":[{"key":"COLLECT","name":"Collect reviews","taskType":"SANDBOX_REVIEW"}]}
+                    """);
             mvc.perform(get("/custom/tasks/5")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.nodeName").value("Collect reviews"))
+                    .andExpect(jsonPath("$.taskType").value("SANDBOX_REVIEW"))
+                    .andExpect(jsonPath("$.taskTypeName").value("Sandbox review"))
                     .andExpect(jsonPath("$.assignment.kind").value("GROUP"))
                     .andExpect(jsonPath("$.assignment.ref").value("finance"))
                     .andExpect(jsonPath("$.assignedUserRef").doesNotExist());
+            when(host.listTasks(1, 0, 50)).thenReturn(new WorkflowTaskPage(List.of(task, task), 42L));
+            when(host.listAssignedTasks(0, 50)).thenReturn(new WorkflowTaskPage(List.of(task), null));
+            mvc.perform(get("/custom/instances/1/tasks")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items[1].nodeName").value("Collect reviews"))
+                    .andExpect(jsonPath("$.items[1].taskType").value("SANDBOX_REVIEW"))
+                    .andExpect(jsonPath("$.items[1].taskTypeName").value("Sandbox review"))
+                    .andExpect(jsonPath("$.items[1].taskKey").value("REVIEW"))
+                    .andExpect(jsonPath("$.nextAfterId").value("42"));
+            // One definition lookup for the detail response and one for the entire page.
+            verify(definitions, times(2)).findVersion(4);
+            verify(catalog, times(2)).findById(3);
+            mvc.perform(get("/custom/tasks/mine")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items[0].nodeName").value("Collect reviews"))
+                    .andExpect(jsonPath("$.items[0].taskTypeName").value("Sandbox review"));
+            verify(host, org.mockito.Mockito.never()).instance(1);
+            verify(host, org.mockito.Mockito.never()).activity(2);
             var submission=new io.github.leontecristian.workflow.core.dto.runtime.TaskSubmission(5,2,1,9,
                     java.util.UUID.randomUUID(),io.github.leontecristian.workflow.core.dto.runtime.ActorKind.USER,
                     "other",java.time.Instant.EPOCH,"APPROVE","private",java.util.Map.of());

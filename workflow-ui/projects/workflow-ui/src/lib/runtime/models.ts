@@ -22,6 +22,9 @@ export interface TaskView {
   instanceId: Decimal;
   taskTypeId: Decimal;
   taskKey: string;
+  nodeName?: string;
+  taskType?: string;
+  taskTypeName?: string;
   assignment: TaskAssignment;
   assigneeRef: string | null;
   status: string;

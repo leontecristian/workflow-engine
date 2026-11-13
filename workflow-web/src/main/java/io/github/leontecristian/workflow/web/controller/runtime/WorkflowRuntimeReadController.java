@@ -21,6 +21,7 @@ import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
+import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
 import io.github.leontecristian.workflow.web.dto.runtime.WorkflowTaskContract;
 import io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException;
 import io.github.leontecristian.workflow.web.integration.runtime.WorkflowRuntimeReadHost;
@@ -40,14 +41,16 @@ import org.springframework.web.bind.annotation.ResponseBody;
 public class WorkflowRuntimeReadController {
     private final WorkflowRuntimeQueryService reads;
     private final WorkflowDefinitionService definitions;
+    private final TaskTypeCatalogService catalog;
     private final WorkflowRuntimeReadHost access;
     private final RuntimeWire wire;
     private final RuntimeErrors errors;
     private final boolean commandsAvailable;
-    public WorkflowRuntimeReadController(WorkflowRuntimeQueryService reads, WorkflowDefinitionService definitions,
+    public WorkflowRuntimeReadController(WorkflowRuntimeQueryService reads, WorkflowDefinitionService definitions, TaskTypeCatalogService catalog,
             WorkflowRuntimeReadHost access, RuntimeWire wire, RuntimeErrors errors, boolean commandsAvailable) {
         this.reads = reads; this.definitions = definitions; this.access = access; this.wire = wire; this.errors = errors;
         this.commandsAvailable = commandsAvailable;
+        this.catalog = catalog;
     }
     @GetMapping("/instances/{id}/variables")
     public ResponseEntity<String> variables(@PathVariable String id,HttpServletRequest r) {
@@ -105,7 +108,7 @@ public class WorkflowRuntimeReadController {
                 access.listTasks(
                         key, after(r.getParameter("afterId")), limit(r.getParameter("limit")));
         return wire.response(
-                wire.page(page.items(), page.nextAfterId(), "nextAfterId", WorkflowTaskView::id));
+                taskPage(page));
     }
     @GetMapping("/tasks/mine")
     public ResponseEntity<String> mine(HttpServletRequest r) {
@@ -116,11 +119,48 @@ public class WorkflowRuntimeReadController {
                         after(r.getParameter("afterId")),
                         limit(r.getParameter("limit")));
         return wire.response(
-                wire.page(page.items(), page.nextAfterId(), "nextAfterId", WorkflowTaskView::id));
+                taskPage(page));
     }
     @GetMapping("/tasks/{id}")
     public ResponseEntity<String> task(@PathVariable String id) {
-        return wire.response(access.task(decimal(id, false)));
+        return wire.response(new TaskLabels().project(access.task(decimal(id, false))));
+    }
+
+    private Map<String, Object> taskPage(io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage page) {
+        var labels = new TaskLabels();
+        return wire.page(page.items().stream().map(labels::project).toList(), page.nextAfterId(),
+                "nextAfterId", row -> Long.parseLong(row.path("id").asText()));
+    }
+
+    /** Request-local lookups run only after the host has authorized the returned tasks. */
+    private final class TaskLabels {
+        private final Map<Long, String> activityNodes = new java.util.HashMap<>();
+        private final Map<Long, Long> instanceVersions = new java.util.HashMap<>();
+        private final Map<Long, String> taskTypeNames = new java.util.HashMap<>();
+        private final Map<Long, Map<String, com.fasterxml.jackson.databind.JsonNode>> versionNodes = new java.util.HashMap<>();
+
+        com.fasterxml.jackson.databind.node.ObjectNode project(WorkflowTaskView task) {
+            String nodeKey = activityNodes.computeIfAbsent(task.activityId(), id ->
+                    reads.findActivity(id).orElseThrow().nodeKey());
+            long versionId = instanceVersions.computeIfAbsent(task.instanceId(), id ->
+                    reads.findInstance(id).orElseThrow().definitionVersionId());
+            var nodes = versionNodes.computeIfAbsent(versionId, id -> {
+                var version = definitions.findVersion(id)
+                        .orElseThrow(() -> new IllegalStateException("Pinned definition missing"));
+                Map<String, com.fasterxml.jackson.databind.JsonNode> result = new java.util.HashMap<>();
+                for (var node : wire.tree(version.documentJson()).path("nodes"))
+                    result.put(node.path("key").asText(), node);
+                return result;
+            });
+            var node = nodes.get(nodeKey);
+            if (node == null) throw new IllegalStateException("Pinned human contract missing");
+            var result = (com.fasterxml.jackson.databind.node.ObjectNode) wire.tree(wire.json(task));
+            result.put("nodeName", node.path("name").asText(nodeKey));
+            result.put("taskType", node.path("taskType").asText());
+            result.put("taskTypeName", taskTypeNames.computeIfAbsent(task.taskTypeId(), id ->
+                    catalog.findById(id).orElseThrow(() -> new IllegalStateException("Task type missing")).name()));
+            return result;
+        }
     }
     @GetMapping("/tasks/{id}/submission")
     public ResponseEntity<String> submission(@PathVariable String id) {

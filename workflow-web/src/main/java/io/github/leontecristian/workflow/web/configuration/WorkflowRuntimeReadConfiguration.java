@@ -2,6 +2,7 @@ package io.github.leontecristian.workflow.web.configuration;
 
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
+import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
 import io.github.leontecristian.workflow.web.controller.runtime.WorkflowRuntimeCommandController;
 import io.github.leontecristian.workflow.web.controller.runtime.WorkflowRuntimeReadController;
 import io.github.leontecristian.workflow.web.integration.runtime.WorkflowRuntimeReadHost;
@@ -15,9 +16,10 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 public class WorkflowRuntimeReadConfiguration {
     @Bean public WorkflowRuntimeReadController workflowRuntimeReadController(WorkflowRuntimeReadHost host,
             WorkflowRuntimeOptions options, WorkflowRuntimeQueryService reads, WorkflowDefinitionService definitions,
+            TaskTypeCatalogService catalog,
             ObjectProvider<WorkflowRuntimeCommandController> commands) {
         var wire = new RuntimeWire();
-        return new WorkflowRuntimeReadController(reads, definitions, host, wire, new RuntimeErrors(wire, options),
+        return new WorkflowRuntimeReadController(reads, definitions, catalog, host, wire, new RuntimeErrors(wire, options),
                 commands.getIfAvailable() != null);
     }
     @Bean public RequestMappingHandlerMapping workflowRuntimeReadHandlerMapping(WorkflowRuntimeOptions options) {

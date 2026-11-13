@@ -29,21 +29,29 @@ import org.springframework.mock.web.MockHttpServletRequest;
 class ConsoleSequentialStagesUnitTest {
     @Test void historicalContractAndTaskPagesDoNotFollowCurrentPositionOrExposeOtherAssignments() {
         var reads=mock(WorkflowRuntimeQueryService.class); var definitions=mock(WorkflowDefinitionService.class);
+        var catalog=mock(io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService.class);
+        when(catalog.findById(3)).thenReturn(Optional.of(new io.github.leontecristian.workflow.core.dto.tasktype.TaskTypeView(
+                3,"REVIEW","Review",null,false,0)));
         var context=mock(ConsoleContext.class); when(context.actor()).thenReturn("manager");
         var wire=new ConsoleWire(); var access=new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskOwnershipAuthorization.class));
-        var controller=new WorkflowRuntimeReadController(reads,definitions,new ConsoleRuntimeReadHost(reads,access,context),new RuntimeWire(),null,false);
+        var controller=new WorkflowRuntimeReadController(reads,definitions,catalog,new ConsoleRuntimeReadHost(reads,access,context),new RuntimeWire(),null,false);
         var instance=mock(WorkflowInstanceView.class); when(instance.id()).thenReturn(1L);
         when(instance.definitionVersionId()).thenReturn(2L); when(instance.currentNodeKey()).thenReturn("PARTNER");
         when(reads.findInstance(1)).thenReturn(Optional.of(instance));
+        when(reads.previousDecisionsPolicy(10)).thenReturn(
+                io.github.leontecristian.workflow.core.dto.definition.document.PreviousDecisionsPolicy.NONE);
         var manager=mock(WorkflowTaskView.class); when(manager.id()).thenReturn(10L); when(manager.instanceId()).thenReturn(1L);
         when(manager.activityId()).thenReturn(20L); when(manager.assignment()).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER, "manager"));
         var partner=mock(WorkflowTaskView.class); when(partner.id()).thenReturn(11L); when(partner.instanceId()).thenReturn(1L);
+        when(manager.taskTypeId()).thenReturn(3L); when(partner.taskTypeId()).thenReturn(3L);
         when(partner.activityId()).thenReturn(21L); when(partner.assignment()).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER, "partner"));
         when(reads.findTask(10)).thenReturn(Optional.of(manager)); when(reads.findTask(11)).thenReturn(Optional.of(partner));
         when(reads.listTasks(1,0,100)).thenReturn(new WorkflowTaskPage(List.of(manager,partner),null));
         when(reads.listTasks(1,0,50)).thenReturn(new WorkflowTaskPage(List.of(manager,partner),null));
         var activity=mock(WorkflowActivityView.class); when(activity.instanceId()).thenReturn(1L); when(activity.nodeKey()).thenReturn("MANAGER");
         when(reads.findActivity(20)).thenReturn(Optional.of(activity));
+        var partnerActivity=mock(WorkflowActivityView.class); when(partnerActivity.nodeKey()).thenReturn("PARTNER");
+        when(reads.findActivity(21)).thenReturn(Optional.of(partnerActivity));
         var version=mock(DefinitionVersionView.class);
         when(version.documentJson()).thenReturn("""
             {"nodes":[{"key":"PARTNER","taskType":"REVIEW","outcomes":[{"key":"APPROVE","label":"Partner approval","requiresComment":true}]},

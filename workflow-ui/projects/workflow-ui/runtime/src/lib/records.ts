@@ -28,7 +28,8 @@ const COLUMNS: Record<string, RecordColumn[]> = {
     { key: "occurredAt", label: "Submitted" },
   ],
   tasks: [
-    { key: "taskKey", label: "Task" },
+    { key: "nodeName", label: "Task" },
+    { key: "taskTypeName", label: "Task type" },
     { key: "instanceId", label: "Instance" },
     { key: "assignment", label: "Assignment" },
     { key: "assigneeRef", label: "Assignee" },
@@ -93,7 +94,7 @@ const COLUMNS: Record<string, RecordColumn[]> = {
               >
                 {{ cell(row, column.key) ?? "—" }}</button
               ><small class="record-id"
-                >#{{ row.id || row.taskId || row.historySequence }}</small
+                >@if (column.key === 'nodeName') { {{row.taskKey}} · }#{{ row.id || row.taskId || row.historySequence }}</small
               >
             } @else {
               <span [class.monospace]="isExact(column.key)">{{
@@ -159,6 +160,7 @@ export class ConsoleRecords {
     return [...this.columns().map((column) => column.key), "actions"];
   }
   cell(row: any, key: string): any {
+    if (key === "nodeName") return row.nodeName || row.taskKey;
     return key === "assignment" && row.assignment ? `${row.assignment.kind}: ${row.assignment.ref}` : row[key];
   }
   isStatus(key: string): boolean {

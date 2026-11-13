@@ -9,7 +9,8 @@
     ><div class="card-heading">
       <div>
         <div class="eyebrow">TASK #{{id}}</div>
-        <h2>{{detail()?.taskKey}}</h2>
+        <h2>{{detail()?.nodeName || detail()?.taskKey}}</h2>
+        <p>Task type: <strong>{{detail()?.taskTypeName}}</strong> · Task key: {{detail()?.taskKey}}</p>
         <p>Assignment: <strong>{{detail()?.assignment?.kind}}: {{contract()?.assignmentLabel || detail()?.assignment?.ref}}</strong></p>
         <p>Assignee: <strong>{{detail()?.assigneeRef || "Unassigned"}}</strong> · Claim policy: {{contract()?.claimPolicy}}</p>
       </div>
@@ -32,16 +33,32 @@
 @if(!commandProvider && diagnosticsEnabled){<mat-card appearance="outlined"><mat-card-header><h2>Pinned contract</h2></mat-card-header><mat-card-content><console-details [value]="contract()" /></mat-card-content></mat-card>}
 @if(hasPreviousDecisions) {
   <mat-card appearance="outlined">
-    <mat-card-header><h2>Previous decisions</h2></mat-card-header>
+    <mat-card-header>
+      <div class="card-heading">
+        <h2>Previous decisions</h2>
+        @if(previousDecisions().length){<span class="decision-count">{{previousDecisions().length}} shown</span>}
+      </div>
+    </mat-card-header>
     <mat-card-content>
-      @for(decision of previousDecisions(); track decision.historySequence) {
-        <article class="previous-decision">
-          <h3>{{decision.nodeName}} · {{decision.outcomeLabel}}</h3>
-          <p>{{decision.actorRef}} ({{decision.actorKind}}) · {{decision.occurredAt | date:'medium'}}</p>
-          @if(noPreviousComment(decision.comment)){<p class="muted">No comment provided.</p>}
-          @else{<pre>{{decision.comment}}</pre>}
-        </article>
-      }
+      <ol class="decision-list" aria-label="Previous decisions">
+        @for(decision of previousDecisions(); track decision.historySequence) {
+          <li class="decision-entry">
+            <span class="decision-avatar" aria-hidden="true">{{decision.actorRef.slice(0,1) | uppercase}}</span>
+            <article class="decision-body">
+              <div class="decision-heading">
+                <h3>{{decision.nodeName}}</h3>
+                <span class="decision-outcome">{{decision.outcomeLabel}}</span>
+              </div>
+              <div class="decision-meta">
+                <span class="decision-actor">{{decision.actorRef}} <span class="decision-actor-kind">({{decision.actorKind}})</span></span>
+                <time [attr.datetime]="decision.occurredAt">{{decision.occurredAt | date:'medium'}}</time>
+              </div>
+              @if(noPreviousComment(decision.comment)){<p class="decision-empty">No comment provided.</p>}
+              @else{<p class="decision-comment">{{decision.comment}}</p>}
+            </article>
+          </li>
+        }
+      </ol>
       @if(previousBusy()){<p role="status">Loading previous decisions…</p>}
       @if(previousError()){
         <p role="alert">{{previousError()}}</p>
