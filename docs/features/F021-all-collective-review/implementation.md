@@ -1,5 +1,14 @@
 # Implementation — F021 ALL collective review
 
+## Owner-followed live Chrome walkthrough — 2026-11-13
+
+PASS — tested the owner-started app through visible Chrome at http://127.0.0.1:4200/console/ using the configured local administrator/reviewer accounts. Imported and published a separate definition family f021-live-walkthrough-20261113, version identity 39. No existing workflow/request was changed, no direct SQL was used, and no app process was started or stopped by this walkthrough.
+
+- Request 51 / instance 56 / activity 51 / tasks 51–53: common exact 1250.00 input, separate required result editors, DIRECT contribution leaves the review ACTIVE, FINANCE claim preserves its GROUP target, second contribution still waits, ROLE approval resolves APPROVED. The resolution-only reviewCollection contains the three distinct answers in task-key order, and one recordApproved effect has quantity 3. Retrieving the original DIRECT command through Find result after resolution returned REPLAY_ONLY_LOOKUP with its frozen ACTIVE snapshot while current work showed COMPLETED/APPROVED.
+- Request 52 / instance 57 / activity 52 / tasks 54–56: DIRECT approved; FINANCE supplied its own result and required comment, then rejected. Instance resolved REJECTED; DIRECT and FINANCE remained COMPLETED, ROLE became CANCELLED/ACTIVITY_RESOLVED with no outcome/submission and disabled actions. The output contains exactly the two actual answers. History sequences 11–18 show TASK_COMPLETED, TASK_CANCELLED, ACTIVITY_COMPLETED, VARIABLES_WRITTEN, routing, service completion, routing and instance completion. Exact ACTIVITY_COMPLETED details are only closureReason TASK_OUTCOME and outcomeKey REJECT.
+
+The guided observations used pauses for owner visibility. One click during page settling opened an existing request read-only; navigation returned to the demo form before creation. No feature defect was observed. This is functional UI evidence, not a new rollback/concurrency/load campaign. Demo records are intentionally retained, and the owner-started app and Chrome remain open. No code changes, build, commit or push in this walkthrough.
+
 ## Delivery — revision 2, 2026-11-13
 
 The owner authorized T02–T08 against commit 0b6383f. That supersedes the historical planning-only notes below. Initial worktree was clean. T02–T08 are complete; focused checks and independent review pass. The owner subsequently authorized committing only the intended F021 changes; pushing remains unauthorized.
