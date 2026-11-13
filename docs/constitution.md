@@ -1,5 +1,7 @@
 # Workflow project constitution
 
+**ALL collective review — owner decisions, 2026-11-13 (constitution 6.5.0).** [F021](features/F021-all-collective-review/spec.md) specifies the next selected feature; implementation is not authorized yet. Each fixed-roster task retains USER/GROUP/ROLE assignment and claim behavior; ALL counts tasks, not members. All tasks receive the same immutable node inputs and share one result contract, with independent answers. TASK_COMPLETED remains authoritative for submissions; ACTIVITY_COMPLETED retains only outcome/closure reason. Resolved original collections may feed explicit service/human bindings, and an optional named variable holds a mutable copy created only on resolution. Task results remain 64 KiB; collections allow 8 MiB UTF-16, with coordinated larger value/history/transport bounds and no reservations. F021 governs these scoped extensions to F019/F020; SINGLE behavior and host authorization remain constraints. APOLO integration waits for owner access.
+
 **Human-task input bindings — owner decision, 2026-11-10 (constitution 6.4.0).** [F020](features/F020-human-task-input-bindings/spec.md) is implemented at revision 3. Explicit variable or original-submission bindings supply immutable review inputs captured when a SINGLE human task is created. Current receiving-task read authorization governs the copy, including eligible shared peers; source-task access is not granted. Opening, claiming and later variable changes do not refresh the snapshot. The inputs map supplies incoming data; resultContract describes the reviewer answer. Human inputContract is removed from new authoring; published legacy empty-field loading and startPolicy.inputContract are preserved. No separate reviewInputContract is added.
 
 **Named task outputs — owner decision, 2026-11-10 (constitution 6.3.0).** [F019](features/F019-named-task-output-variables/spec.md) selects an additive C08 extension: an optional pinned human-node output name creates a JSON variable only on accepted SINGLE completion, without a separate top-level declaration. Reject name collisions; preserve explicit absence and bounded existence checks. The owner selected later whole-value replacement and existing instance-variable visibility for the copy; the original submission stays immutable. This supersedes blanket declaration-only/no-result-copy wording only for explicitly configured outputs. No implicit merge, arbitrary runtime names or ALL aggregation is selected. F019 revision 2 is implemented. See the [verification record](features/F019-named-task-output-variables/implementation.md).
@@ -22,11 +24,11 @@
 
 **Owner correction — 2026-11-05:** expression arithmetic follows native SpEL numeric behavior, including floating-point approximation, promotion, rounding and integral overflow. Do not reject a result solely for precision loss or compare it with an exact reference calculation. Declared DECIMAL variables enter evaluation as BigDecimal; decimal literals retain native SpEL types. Native evaluation errors and resource limits still fail the command. Exact decoding, transport, persistence and accepted-submission rules remain unchanged. This supersedes earlier expression-arithmetic exactness wording and the misinterpreted numeric owner decision.
 
-**Version:** 6.4.0
+**Version:** 6.5.0
 
 **Established:** 2026-10-24
 
-**Last amended:** 2026-11-10 (human-task input snapshots and receiving-task visibility; specification only)
+**Last amended:** 2026-11-13 (ALL collection bindings, resolution-only outputs and capacity extension; specification only)
 
 **Basis:** consolidated design v0.9, database design v1.4 and subsequent owner decisions; see [design sources](design-sources.md) for precedence and proposal status
 
@@ -181,6 +183,8 @@ Use semantic versioning for this document: major for incompatible principle/scop
 The consolidated design and database design remain the detailed architectural sources, with scoped precedence recorded in [design sources](design-sources.md). This constitution codifies their confirmed principles and the owner's later decisions. Database design v1.4 retains earlier selected changes and extends the scalar-only execution-variable model with JSON. Structured submissions remain distinct from mutable variables. Other proposed details remain proposals. Where a conflict lacks a superseding decision, record it and resolve it before implementing affected behavior. Historical archives and illustrative contracts cannot override current decisions.
 
 ## Amendment history
+
+- **6.5.0 — 2026-11-13:** owner selected F021 ALL as next, with task-owned assignment, common immutable inputs/result contract, immutable per-task answers, original collection bindings and optional resolution-only output. Consistent larger capacities are specified without reservations. Core ALL direction was already agreed; this amendment extends F019/F020 data contracts. Planning only; no runtime or migration execution.
 
 - **6.4.0 — 2026-11-10:** owner approved human-task inputs from variables or original task results, captured at task creation and visible under receiving-task authorization. F020 revision 3 uses inputs bindings with source-derived types and resultContract for the answer, removing human inputContract from new authoring while preserving published legacy empty-field loading, start input contracts and host policy. Planning only; no runtime implementation or migration.
 
