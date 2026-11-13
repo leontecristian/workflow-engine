@@ -8,7 +8,7 @@ import { WorkflowInstanceViewerComponent, WorkflowHistoryComponent, WorkflowHist
 import type {WorkflowViewerReads, WorkflowViewerNavigation, ViewerDestination, InstanceView, HistoryPage, HistoryEvent, InstanceGraph} from '@workflow-engine/ui';
 import { WORKFLOW_ADMINISTRATION_API } from '@workflow-engine/ui';
 import { WORKFLOW_RUNTIME_READS, WORKFLOW_RUNTIME_COMMANDS, CommandRecovery } from '@workflow-engine/ui';
-import type { WorkflowRuntimeReads, WorkflowRuntimeCommands, TaskView, TaskContract, Envelope, CommandResult, ReplayResult } from '@workflow-engine/ui';
+import type { WorkflowRuntimeReads, WorkflowRuntimeCommands, TaskView, TaskContract, Envelope, CommandResult, ReplayResult, PreviousDecisionPage } from '@workflow-engine/ui';
 import { WorkflowTaskComponent, WorkflowCommandsComponent } from '@workflow-engine/ui/runtime';
 import { WorkflowDefinitionsComponent } from '@workflow-engine/ui/administration';
 import type { WorkflowAdministrationApi, AdministrationPage, DefinitionView } from '@workflow-engine/ui';
@@ -18,6 +18,7 @@ const graph={instance,nodes:[{key:'BEGIN',name:'Start',type:'START',state:'COMPL
 const summary={instanceId:id,historySequence:'4',eventType:'UNKNOWN_FUTURE',commandId:'00000000-0000-0000-0000-000000000001',correlationId:'fixture',actorKind:'USER',actorRef:'fixture',occurredAt:instance.startedAt,activityId:null,taskId:null,sourceNodeKey:null,targetNodeKey:null,transitionKey:null,detailsSchemaVersion:1};
 const namedOutputEvidence = new URLSearchParams(location.search).has('namedOutputEvidence');
 const taskInputEvidence = new URLSearchParams(location.search).get('taskInputEvidence');
+const previousDecisionEvidence = new URLSearchParams(location.search).get('previousDecisionEvidence');
 const evidenceEvents: HistoryEvent[] = [
   {
     summary: {...summary, historySequence:'3', eventType:'VARIABLES_WRITTEN', activityId:'20', taskId:'30'},
@@ -44,6 +45,13 @@ const evidenceEvents: HistoryEvent[] = [
         else if(request.url==='/host-task/30')body=fixtureTask;
         else if(request.url==='/host-task/30/contract')body=fixtureContract;
         else if(request.url==='/host-task/30/submission')body=null;
+        else if(request.url.startsWith('/host-task/30/previous-decisions'))body={
+          items:[{taskId:'9007199254740995',activityId:'10',historySequence:request.url.includes('afterSequence=9')?'12':'9',
+            nodeKey:'MANAGER',nodeName:'Manager <img src=x onerror=alert(1)>',outcomeKey:'APPROVE',outcomeLabel:'Approved',
+            actorKind:'USER',actorRef:'actual-manager',occurredAt:instance.startedAt,
+            comment:request.url.includes('afterSequence=9')?null:'  <script>alert("unsafe")</script>\n  Exact comment whitespace  '}],
+          nextAfterSequence:request.url.includes('afterSequence=9')?null:'9',
+        };
         else if(request.url==='/host-task/instance-tasks')body={items:[fixtureTask],nextAfterId:null};
         else if(request.url.startsWith('/host-command/'))body=request.url.endsWith('/replay')?{found:false,result:null}:fixtureResult(request.body as Envelope);
         else if(request.url.endsWith('/graph'))body=graph;
@@ -85,9 +93,10 @@ function administrationFixture(): WorkflowAdministrationApi {
   };
 }
 
-const completedInputFixture = taskInputEvidence === 'completed';
+const completedInputFixture = taskInputEvidence === 'completed' || previousDecisionEvidence === 'completed';
 const fixtureTask:TaskView={id:'30',instanceId:id,activityId:'20',taskTypeId:'1',taskKey:'REVIEW',assignment:{kind:'USER',ref:'fixture'},assigneeRef:'fixture',status:completedInputFixture?'COMPLETED':'OPEN',outcomeKey:completedInputFixture?'APPROVE':null,createdAt:instance.startedAt,dueAt:null,closedAt:completedInputFixture?instance.startedAt:null,closedBy:completedInputFixture?'fixture':null,closureReason:null};
 const fixtureContract:TaskContract={taskId:'30',instanceId:id,instanceLockVersion:instance.lockVersion,taskType:'REVIEW',claimPolicy:'OPTIONAL',canClaim:false,canRelease:false,canAdminRelease:false,canComplete:!completedInputFixture,assignmentLabel:'Fixture reviewer',outcomes:[{key:'APPROVE',label:'Host approve',requiresComment:true}],
+  previousDecisions:{mode:previousDecisionEvidence==='none' || !previousDecisionEvidence?'NONE':previousDecisionEvidence==='selected'?'SELECTED':'ALL_PREVIOUS'},
   ...(taskInputEvidence && {
     inputs:{
       booking:{type:'JSON',valueJson:'{"amount":9007199254740993.00}'},
@@ -104,6 +113,7 @@ function fixtureResult(envelope:Envelope):CommandResult{return {replayed:false,e
  private read<T>(path:string,signal:AbortSignal){return firstValueFrom(this.http.get<T>(path).pipe(takeUntil(fromEvent(signal,'abort'))));}
  task(_id:string,signal:AbortSignal){return this.read<TaskView>('/host-task/30',signal);}
  taskContract(_id:string,signal:AbortSignal){return this.read<TaskContract>('/host-task/30/contract',signal);}
+ previousDecisions(_id:string,cursor:string|undefined,_limit:number,signal:AbortSignal){return this.read<PreviousDecisionPage>('/host-task/30/previous-decisions'+(cursor?'?afterSequence='+cursor:''),signal);}
  taskSubmission(_id:string,signal:AbortSignal){return this.read<null>('/host-task/30/submission',signal);}
  instanceTasks(_id:string,_cursor:string|undefined,_limit:number,signal:AbortSignal){return this.read<{items:TaskView[];nextAfterId:null}>('/host-task/instance-tasks',signal);}
  listInstances():never{throw new Error('Outside fixture');}variables():never{throw new Error('Outside fixture');}assignedTasks():never{throw new Error('Outside fixture');}activity():never{throw new Error('Outside fixture');}submissions():never{throw new Error('Outside fixture');}

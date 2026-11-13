@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "key": "previousCollectiveDecisions",
+  "version": 1,
+  "name": "Resolved ALL decisions for a later reviewer",
+  "startPolicy": {
+    "inputContract": [
+      {
+        "key": "requestData",
+        "type": "JSON",
+        "required": false,
+        "nullable": false,
+        "default": {}
+      }
+    ],
+    "initialize": {
+      "requestData": {
+        "source": "startInput",
+        "key": "requestData"
+      }
+    }
+  },
+  "variables": [
+    {
+      "key": "requestData",
+      "type": "JSON",
+      "nullable": false
+    }
+  ],
+  "nodes": [
+    {
+      "key": "BEGIN",
+      "type": "START",
+      "name": "Start"
+    },
+    {
+      "key": "review",
+      "type": "HUMAN_TASK",
+      "name": "Collect independent reviews",
+      "taskType": "SANDBOX_REVIEW",
+      "assignment": {
+        "resolver": "sandbox.allReviewers",
+        "inputs": {}
+      },
+      "completion": {
+        "policy": "ALL",
+        "contributionOutcome": "APPROVE"
+      },
+      "resultContract": {
+        "mode": "FORBIDDEN"
+      },
+      "outcomes": [
+        {
+          "key": "APPROVE",
+          "label": "Approve",
+          "requiresComment": false
+        },
+        {
+          "key": "REJECT",
+          "label": "Reject",
+          "requiresComment": true
+        }
+      ]
+    },
+    {
+      "key": "laterReview",
+      "type": "HUMAN_TASK",
+      "name": "Review earlier individual contributions",
+      "taskType": "SANDBOX_REVIEW",
+      "assignment": {
+        "resolver": "sandbox.singleReviewer",
+        "inputs": {}
+      },
+      "completion": {
+        "policy": "SINGLE"
+      },
+      "resultContract": {
+        "mode": "FORBIDDEN"
+      },
+      "outcomes": [
+        {
+          "key": "APPROVE",
+          "label": "Approve",
+          "requiresComment": false
+        },
+        {
+          "key": "REJECT",
+          "label": "Reject",
+          "requiresComment": true
+        }
+      ]
+    },
+    {
+      "key": "APPROVED",
+      "type": "END",
+      "name": "Approved",
+      "result": "APPROVED"
+    },
+    {
+      "key": "REJECTED",
+      "type": "END",
+      "name": "Rejected",
+      "result": "REJECTED"
+    }
+  ],
+  "transitions": [
+    {
+      "key": "begin",
+      "from": "BEGIN",
+      "to": "review"
+    },
+    {
+      "key": "approvedReview",
+      "from": "review",
+      "to": "laterReview",
+      "outcome": "APPROVE"
+    },
+    {
+      "key": "rejectedReview",
+      "from": "review",
+      "to": "laterReview",
+      "outcome": "REJECT"
+    },
+    {
+      "key": "approve",
+      "from": "laterReview",
+      "to": "APPROVED",
+      "outcome": "APPROVE"
+    },
+    {
+      "key": "reject",
+      "from": "laterReview",
+      "to": "REJECTED",
+      "outcome": "REJECT"
+    }
+  ],
+  "previousDecisions": {
+    "mode": "ALL_PREVIOUS"
+  }
+}

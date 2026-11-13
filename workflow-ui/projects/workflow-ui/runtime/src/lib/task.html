@@ -30,6 +30,29 @@
     @if(diagnosticsEnabled && commands.buffer.command){<a mat-button [routerLink]="link({kind:'commands'})">Command recovery</a>}</mat-card-content
 ></mat-card>
 @if(!commandProvider && diagnosticsEnabled){<mat-card appearance="outlined"><mat-card-header><h2>Pinned contract</h2></mat-card-header><mat-card-content><console-details [value]="contract()" /></mat-card-content></mat-card>}
+@if(hasPreviousDecisions) {
+  <mat-card appearance="outlined">
+    <mat-card-header><h2>Previous decisions</h2></mat-card-header>
+    <mat-card-content>
+      @for(decision of previousDecisions(); track decision.historySequence) {
+        <article class="previous-decision">
+          <h3>{{decision.nodeName}} · {{decision.outcomeLabel}}</h3>
+          <p>{{decision.actorRef}} ({{decision.actorKind}}) · {{decision.occurredAt | date:'medium'}}</p>
+          @if(noPreviousComment(decision.comment)){<p class="muted">No comment provided.</p>}
+          @else{<pre>{{decision.comment}}</pre>}
+        </article>
+      }
+      @if(previousBusy()){<p role="status">Loading previous decisions…</p>}
+      @if(previousError()){
+        <p role="alert">{{previousError()}}</p>
+        <button mat-button (click)="loadPreviousDecisions(previousDecisions().length > 0)" [disabled]="previousBusy()">Retry</button>
+      }@else if(!previousBusy() && !previousDecisions().length){<p>No previous decisions.</p>}
+      @if(previousCursor() && !previousError()){
+        <button mat-button (click)="loadPreviousDecisions(true)" [disabled]="previousBusy()">Load more</button>
+      }
+    </mat-card-content>
+  </mat-card>
+}
 @if(inputs().length) {
   <mat-card appearance="outlined">
     <mat-card-header><h2>Inputs</h2></mat-card-header>

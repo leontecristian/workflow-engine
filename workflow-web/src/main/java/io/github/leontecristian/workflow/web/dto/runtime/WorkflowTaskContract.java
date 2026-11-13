@@ -9,11 +9,12 @@ import java.util.Map;
 public record WorkflowTaskContract(long taskId, long instanceId, long instanceLockVersion,
         String taskType, List<Outcome> outcomes, boolean canComplete, String assignmentLabel,
         TaskClaimPolicy claimPolicy, boolean canClaim, boolean canRelease, boolean canAdminRelease,
-        JsonNode resultContract, Map<String, Input> inputs) {
+        JsonNode resultContract, Map<String, Input> inputs, PreviousDecisions previousDecisions) {
     public WorkflowTaskContract {
         outcomes = List.copyOf(outcomes);
         inputs = Map.copyOf(inputs);
     }
+    public record PreviousDecisions(String mode) {}
     public record Outcome(String key, String label, boolean requiresComment) {}
     public record Input(VariableValueType type, Object value) {}
 }

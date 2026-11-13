@@ -175,6 +175,8 @@ class WorkflowRuntimeWebUnitTest {
             when(activity.nodeKey()).thenReturn("REVIEW");
             when(reads.taskClaimPolicy(1, 5))
                     .thenReturn(io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy.REQUIRED);
+            when(reads.previousDecisionsPolicy(5)).thenReturn(
+                    io.github.leontecristian.workflow.core.dto.definition.document.PreviousDecisionsPolicy.ALL_PREVIOUS);
             when(definitions.findVersion(4)).thenReturn(Optional.of(version));
             when(version.documentJson()).thenReturn("""
                     {"nodes":[{"key":"REVIEW","taskType":"REVIEW","outcomes":[]}]}
@@ -182,6 +184,7 @@ class WorkflowRuntimeWebUnitTest {
 
             mvc(c).perform(get("/custom/tasks/5/contract")).andExpect(status().isOk())
                     .andExpect(jsonPath("$.claimPolicy").value("REQUIRED"))
+                    .andExpect(jsonPath("$.previousDecisions.mode").value("ALL_PREVIOUS"))
                     .andExpect(jsonPath("$.inputs").isEmpty())
                     .andExpect(jsonPath("$.resultContract.mode").value("FORBIDDEN"))
                     .andExpect(jsonPath("$.canComplete").value(true))
@@ -209,6 +212,55 @@ class WorkflowRuntimeWebUnitTest {
             verify(host, org.mockito.Mockito.never()).instance(1);
             verify(host, org.mockito.Mockito.never()).activity(2);
         }
+    }
+
+    @Test void previousDecisionsAuthorizeOnlyReceivingTaskAndValidateEveryContinuation() throws Exception {
+        try (var c = context(Host.class, Reads.class, WorkflowRuntimeReadConfiguration.class)) {
+            var host = c.getBean(WorkflowRuntimeReadHost.class);
+            var reads = c.getBean(WorkflowRuntimeQueryService.class);
+            var item = decision(9007199254740993L, 9, " <b>Exact</b>\n ");
+            when(reads.listPreviousDecisions(5, 0, 20)).thenReturn(
+                    new io.github.leontecristian.workflow.core.dto.runtime.PreviousDecisionPage(List.of(item), 9L));
+            mvc(c).perform(get("/custom/tasks/5/previous-decisions")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items[0].taskId").value("9007199254740993"))
+                    .andExpect(jsonPath("$.items[0].comment").value(" <b>Exact</b>\n "))
+                    .andExpect(jsonPath("$.items[0].result").doesNotExist())
+                    .andExpect(jsonPath("$.items[0].inputs").doesNotExist())
+                    .andExpect(jsonPath("$.nextAfterSequence").value("9"));
+            verify(host).task(5);
+            verify(host, org.mockito.Mockito.never()).task(item.taskId());
+            when(host.task(5)).thenThrow(new WorkflowRuntimeException(404, "NOT_FOUND"));
+            mvc(c).perform(get("/custom/tasks/5/previous-decisions?afterSequence=9"))
+                    .andExpect(status().isNotFound());
+            verify(reads, org.mockito.Mockito.never()).listPreviousDecisions(5, 9, 20);
+            for (String invalid : List.of("limit=0", "limit=51", "limit=1.5", "limit=9223372036854775808",
+                    "afterSequence=-1", "afterSequence=01", "afterSequence=1&afterSequence=2", "unknown=1"))
+                mvc(c).perform(get("/custom/tasks/5/previous-decisions?" + invalid)).andExpect(status().isBadRequest());
+        }
+    }
+
+    @Test void previousDecisionWireBoundsEscapedWholeRowsAndRejectsOversizedEntry() {
+        var wire = new io.github.leontecristian.workflow.web.service.runtime.RuntimeWire();
+        var items = new ArrayList<io.github.leontecristian.workflow.core.dto.runtime.PreviousDecision>();
+        for (int i = 1; i <= 50; i++) items.add(decision(i, i, "\u0001".repeat(2000)));
+        String encoded = wire.previousDecisionPage(
+                new io.github.leontecristian.workflow.core.dto.runtime.PreviousDecisionPage(items, null)).getBody();
+        var tree = wire.tree(encoded);
+        assertThat(encoded.getBytes(StandardCharsets.UTF_8).length).isLessThanOrEqualTo(256 * 1024);
+        assertThat(encoded.length() * 2).isLessThanOrEqualTo(256 * 1024);
+        int returned = tree.get("items").size();
+        assertThat(returned).isBetween(1, 49);
+        assertThat(tree.get("nextAfterSequence").textValue()).isEqualTo(String.valueOf(returned));
+        assertThat(tree.get("items").get(returned - 1).get("comment").textValue()).hasSize(2000);
+        assertThatThrownBy(() -> wire.previousDecisionPage(
+                new io.github.leontecristian.workflow.core.dto.runtime.PreviousDecisionPage(
+                        List.of(decision(1, 1, "x".repeat(256 * 1024))), null)))
+                .isInstanceOf(WorkflowRuntimeException.class)
+                .satisfies(failure -> assertThat(((WorkflowRuntimeException) failure).code()).isEqualTo("LIMIT_EXCEEDED"));
+    }
+    private static io.github.leontecristian.workflow.core.dto.runtime.PreviousDecision decision(long id, long sequence, String comment) {
+        return new io.github.leontecristian.workflow.core.dto.runtime.PreviousDecision(id, 2, "MANAGER", "Manager review",
+                "APPROVE", "Approve", ActorKind.USER, "actual-actor", Instant.EPOCH, sequence, comment);
     }
 
     @Test void completionAndReplayPreserveRawResultNumbersAndEnforceActualUtf8Boundary() throws Exception {

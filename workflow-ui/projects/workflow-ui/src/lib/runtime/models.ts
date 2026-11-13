@@ -32,7 +32,14 @@ export interface TaskView {
   closedBy: string | null;
   closureReason: string | null;
 }
+export interface PreviousDecision {
+  taskId: Decimal; activityId: Decimal; historySequence: Decimal;
+  nodeKey: string; nodeName: string; outcomeKey: string; outcomeLabel: string;
+  actorKind: string; actorRef: string; occurredAt: string; comment: string | null;
+}
+export interface PreviousDecisionPage { items: PreviousDecision[]; nextAfterSequence: Decimal | null; }
 export interface TaskContract {
+  previousDecisions?: { mode: "NONE" | "ALL_PREVIOUS" | "SELECTED" };
   taskId: Decimal;
   instanceId: Decimal;
   instanceLockVersion: Decimal;

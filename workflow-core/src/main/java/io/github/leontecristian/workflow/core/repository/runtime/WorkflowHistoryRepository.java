@@ -35,6 +35,17 @@ public interface WorkflowHistoryRepository extends Repository<WorkflowHistoryEnt
     Optional<WorkflowHistoryEntity> findById(WorkflowHistoryId id);
 
     @Query("""
+            select new io.github.leontecristian.workflow.core.repository.runtime.PreviousDecisionRow(t,h)
+            from WorkflowTaskEntity t join WorkflowHistoryEntity h on h.taskId = t.id
+            where t.activityId in :activityIds
+              and t.status = io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.COMPLETED
+              and h.eventType = 'TASK_COMPLETED' and h.id.sequenceNumber > :afterSequence
+            order by h.id.sequenceNumber
+            """)
+    List<PreviousDecisionRow> findPreviousDecisionPage(@Param("activityIds") java.util.Collection<Long> activityIds,
+            @Param("afterSequence") long afterSequence, Pageable page);
+
+    @Query("""
             select history from WorkflowHistoryEntity history
             where history.id.instanceId = :instanceId and history.id.sequenceNumber > :afterSequence
             order by history.id.sequenceNumber asc

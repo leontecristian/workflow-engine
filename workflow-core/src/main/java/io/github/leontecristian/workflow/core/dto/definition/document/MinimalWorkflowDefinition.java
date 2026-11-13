@@ -10,12 +10,18 @@ import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
 public record MinimalWorkflowDefinition(Node start, Map<String,Human> humans, Node end, List<Transition> transitions,
         Map<String,Input> inputs, Map<String,ActionField> variables, Map<String,Binding> initialize,
         Map<String,Service> services, Map<String,Node> ends, java.util.Set<String> gateways,
-        Map<String,String> namedOutputs) {
+        Map<String,String> namedOutputs, PreviousDecisionsPolicy previousDecisions) {
     public MinimalWorkflowDefinition {
         humans = Map.copyOf(humans);
         transitions = List.copyOf(transitions); inputs=Map.copyOf(inputs); variables=Map.copyOf(variables);
         initialize=Map.copyOf(initialize); services=Map.copyOf(services); ends=Map.copyOf(ends); gateways=java.util.Set.copyOf(gateways);
         namedOutputs = Map.copyOf(namedOutputs);
+    }
+    public MinimalWorkflowDefinition(Node start, Map<String,Human> humans, Node end, List<Transition> transitions,
+            Map<String,Input> inputs, Map<String,ActionField> variables, Map<String,Binding> initialize,
+            Map<String,Service> services, Map<String,Node> ends, java.util.Set<String> gateways,
+            Map<String,String> namedOutputs) {
+        this(start,humans,end,transitions,inputs,variables,initialize,services,ends,gateways,namedOutputs,PreviousDecisionsPolicy.NONE);
     }
     public MinimalWorkflowDefinition(Node start, Map<String,Human> humans, Node end, List<Transition> transitions,
             Map<String,Input> inputs, Map<String,ActionField> variables, Map<String,Binding> initialize,
@@ -47,7 +53,14 @@ public record MinimalWorkflowDefinition(Node start, Map<String,Human> humans, No
     }
     public record Human(String key, String taskType, Assignment assignment, List<Outcome> outcomes,
             TaskClaimPolicy claimPolicy, TaskResultContract resultContract, String outputVariable,
-            Map<String,HumanInput> inputs, CompletionPolicy completionPolicy, String contributionOutcome) {
+            Map<String,HumanInput> inputs, CompletionPolicy completionPolicy, String contributionOutcome,
+            PreviousDecisionsPolicy previousDecisions, String name) {
+        public Human(String key, String taskType, Assignment assignment, List<Outcome> outcomes,
+                TaskClaimPolicy claimPolicy, TaskResultContract resultContract, String outputVariable,
+                Map<String,HumanInput> inputs, CompletionPolicy completionPolicy, String contributionOutcome) {
+            this(key, taskType, assignment, outcomes, claimPolicy, resultContract, outputVariable, inputs,
+                    completionPolicy, contributionOutcome, PreviousDecisionsPolicy.NONE, key);
+        }
         public Human(String key, String taskType, Assignment assignment, List<Outcome> outcomes,
                 TaskClaimPolicy claimPolicy, TaskResultContract resultContract, String outputVariable,
                 Map<String,HumanInput> inputs) {

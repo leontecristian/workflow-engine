@@ -48,7 +48,9 @@ class AllDefinitionUnitTest {
         var copied = new io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Human(
                 source.key(), source.taskType(), source.assignment(), source.outcomes(), source.claimPolicy(),
                 source.resultContract(), source.outputVariable(), source.inputs());
-        assertThat(copied).isEqualTo(source);
+        assertThat(copied).usingRecursiveComparison().ignoringFields("name").isEqualTo(source);
+        assertThat(copied.name()).isEqualTo("REVIEW");
+        assertThat(source.name()).isEqualTo("Review");
         assertThat(source.completionPolicy()).isEqualTo(CompletionPolicy.SINGLE);
         assertThat(source.contributionOutcome()).isNull();
     }

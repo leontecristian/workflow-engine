@@ -135,6 +135,16 @@ public class WorkflowRuntimeReadController {
         }
         return wire.response(submission);
     }
+    @GetMapping("/tasks/{id}/previous-decisions")
+    public ResponseEntity<String> previousDecisions(@PathVariable String id, HttpServletRequest r) {
+        query(r, "afterSequence", "limit");
+        long key = decimal(id, false);
+        long cursor = after(r.getParameter("afterSequence"));
+        long count = r.getParameter("limit") == null ? 20 : decimal(r.getParameter("limit"), false);
+        if (count > 50) throw WorkflowRuntimeException.invalid();
+        access.task(key);
+        return wire.previousDecisionPage(reads.listPreviousDecisions(key, cursor, (int) count));
+    }
     @GetMapping("/tasks/{id}/contract")
     public ResponseEntity<String> contract(@PathVariable String id) {
         long taskId = decimal(id, false);
@@ -174,7 +184,8 @@ public class WorkflowRuntimeReadController {
                         commandsAvailable && open && shared && !assigned && access.canClaimTask(task),
                         commandsAvailable && open && shared && assigned && access.canReleaseTask(task),
                         commandsAvailable && open && shared && assigned && access.canAdministrativelyReleaseTask(task),
-                        resultContract, inputs));
+                        resultContract, inputs, new WorkflowTaskContract.PreviousDecisions(
+                                reads.previousDecisionsPolicy(taskId).mode().name())));
             }
         throw new IllegalStateException("Pinned human contract missing");
     }

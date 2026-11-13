@@ -1,8 +1,8 @@
 # Workflow engine roadmap
 
-**Updated:** 2026-11-13 · **Delivery baseline:** F020 · **Next feature:** F021 ALL collective review
+**Updated:** 2026-11-13 · **Delivery baseline:** F022 previous-decision comments, IMPLEMENTED revision 1
 
-The agreed direction is **working sandbox → first APOLO booking integration → graphical designer**, with reliability required before production. The sandbox and reusable libraries are implemented. ALL collective review is the next selected feature; APOLO integration waits until the owner has access to APOLO.
+The agreed direction is **working sandbox → first APOLO booking integration → graphical designer**, with reliability required before production. The sandbox, reusable libraries and ALL collective review are implemented. F022 previous-decision comments is implemented with focused core/shared web/UI and sandbox verification. APOLO integration waits until the owner has access to APOLO.
 
 ## Contents
 
@@ -17,9 +17,9 @@ The agreed direction is **working sandbox → first APOLO booking integration �
 
 ## 1. Current position
 
-**✅ Sandbox + shared libraries → 📍 ALL collective review → ⏸ APOLO integration → ⏳ Graphical designer**
+**✅ Sandbox + shared libraries + ALL review → ✅ Previous-decision comments → ⏸ APOLO integration → ⏳ Graphical designer**
 
-### ✅ Implemented — F001–F020
+### ✅ Implemented — F001–F022
 
 | Features | Capability |
 | --- | --- |
@@ -28,18 +28,19 @@ The agreed direction is **working sandbox → first APOLO booking integration �
 | ✅ F012–F015 | **Shared libraries** — Angular 19, web/UI components, viewer, administration, task UI |
 | ✅ F016–F017 | **Assignment & claiming** — user/group/role tasks, claim, release |
 | ✅ F018–F020 | **Review data** — structured answers, named outputs, frozen task inputs |
+| ✅ F021 | **Collective review** — fixed task roster, contributions/early resolution and original collections |
+| ✅ F022 | **Previous decisions** — pinned visibility, receiving-task context and bounded shared reads |
 
-### 📍 Next — selected
+### ✅ Latest delivery
 
-> **F021 ALL collective review — specification and plan READY; not implemented.**
+> **F022 previous-decision comments — IMPLEMENTED revision 1.**
 >
-> See the [specification](features/F021-all-collective-review/spec.md) and [plan](features/F021-all-collective-review/plan.md). Implementation awaits a separate request; APOLO access is not required for sandbox delivery.
+> See the [specification](features/F022-previous-decision-comments/spec.md) and [plan](features/F022-previous-decision-comments/plan.md). See the [F022 handover](features/F022-previous-decision-comments/implementation.md) for focused verification; APOLO integration remains separate. F021's completed delivery and live walkthrough are recorded in its [handover](features/F021-all-collective-review/implementation.md).
 
 ### ⏳ Still to deliver
 
 | Status | Capability | When |
 | --- | --- | --- |
-| 📍 Next feature | **F021 ALL collective review** | Specification and plan READY; implementation not started. |
 | ⬜ Not implemented | **Cancellation & reassignment** | Prioritize what the selected booking scenario needs. |
 | ⏸ Waiting for access | **APOLO booking integration** | Resume when the owner has access to APOLO. |
 | ⬜ Not implemented | **Graphical designer** | After the first successful APOLO integration. |
@@ -48,12 +49,12 @@ The agreed direction is **working sandbox → first APOLO booking integration �
 
 ## 2. Selected priorities
 
-**Owner decision — 2026-11-13:** ALL collective review is next. The design discussion is complete and [F021](features/F021-all-collective-review/spec.md) records the specification and plan. APOLO integration waits until the owner has access. Feature contracts are specified; implementation is not authorized yet.
+**Owner decisions — 2026-11-13:** F021 was subsequently implemented and verified as recorded in its [handover](features/F021-all-collective-review/implementation.md). The owner requested specification and planning only for [F022](features/F022-previous-decision-comments/spec.md), including workflow default and human-node overrides. The owner subsequently authorized T02–T06, delivered in the F022 handover. APOLO integration still waits for access.
 
 | Order | Work | Completion condition |
 | --- | --- | --- |
-| 1 — planning complete | F021 design, specification and plan | Roster, completion, review data, capacities and host/UI contracts are specified. See the feature records. |
-| 2 — next, awaiting implementation request | Implement F021 in the engine, shared libraries and sandbox | The selected feature passes focused acceptance checks without depending on APOLO access. |
+| 1 — planning complete | F022 design, specification and plan | Visibility inheritance, stable prior-stage selection, receiving-task access and task-context reads are specified. |
+| 2 — delivered | Deliver F022 in the engine, shared libraries and sandbox | The selected feature passes its focused acceptance checks without depending on APOLO access. |
 | 3 — waiting for access | Specify and deliver the first APOLO booking integration | Access is available, the business scenario and host compatibility are established, and the integration exit in section 4 is met. Select additional engine operations only as required. |
 | 4 | Deliver the graphical designer in workflow-ui | The authoring exit in section 5 is met after successful first APOLO integration. |
 
@@ -63,7 +64,6 @@ Production readiness applies before any deployment, regardless of designer timin
 
 | Capability | Scope and dependencies | Exit condition |
 | --- | --- | --- |
-| **[F021 ALL collective review](features/F021-all-collective-review/spec.md)** — next selected feature; READY | Extend SINGLE to a fixed task roster created atomically within one active activity. Specify contribution and early-resolution contracts. F021 extends F018–F020 with resolved task-identified collections and resolution-only named outputs; original answers remain on task completion history. JSON variables are not inherently required. | All required contributions or a permitted early outcome resolve the activity. Early resolution cancels open siblings and preserves earlier submissions. Competing commands yield one committed result; downstream failures roll back the current command. |
 | **Cancellation and audited administrative reassignment** — exact slices open | Specify lifecycle rules, authorization, APIs and evidence. Pull forward operations required by the chosen scenario; do not bundle them automatically with ALL. | Selected operations preserve task identity where required, aggregate concurrency, replay, history and atomicity. |
 | **External variable-update command** — conditional scope | F009 supports start/service replacements, not a standalone external update command. Specify one only when a selected scenario requires it. | Authorized updates follow the agreed whole-value and aggregate concurrency contracts, with focused verification. |
 

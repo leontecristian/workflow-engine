@@ -66,6 +66,15 @@ public interface WorkflowTaskRepository extends Repository<WorkflowTaskEntity, L
     Optional<WorkflowTaskEntity> findById(Long id);
 
     @Query("""
+            select t.id from WorkflowTaskEntity t where t.activityId in :activityIds
+              and t.status = io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.COMPLETED
+              and (select count(h) from WorkflowHistoryEntity h
+                where h.taskId = t.id and h.eventType = 'TASK_COMPLETED') <> 1
+            """)
+    List<Long> findPreviousTasksWithoutUniqueFact(@Param("activityIds") java.util.Collection<Long> activityIds,
+            Pageable page);
+
+    @Query("""
             select task from WorkflowTaskEntity task
             where task.activityId = :activityId and task.id > :afterId
             order by task.id asc

@@ -55,3 +55,13 @@ test('task contract inputs preserve exact tokens and keep null distinct from a m
   Object.entries(tokens).map(([key,[type,valueJson]])=>[key,{type,valueJson}])));
  await assert.rejects(reads.taskContract('1',signal),/Invalid read response/);
 });
+
+test('previous-decision adapter keeps receiving-task IDs and exclusive cursors exact',async t=>{
+ const calls=[];const text='{"items":[{"taskId":"9007199254740993","historySequence":"9007199254740995","comment":" <b>Exact</b> "}],"nextAfterSequence":"9007199254740995"}';
+ const session={async administrationCall(...args){calls.push(args);return text;}};
+ const {page:reads}=component(t,ConsoleRuntimeReads,{},undefined,undefined,[{provide:ConsoleSession,useValue:session}]);
+ const signal=new AbortController().signal;
+ const page=await reads.previousDecisions('9007199254740997','9007199254740991',20,signal);
+ assert.equal(calls.length,1);assert.equal(calls[0][0],'/tasks/9007199254740997/previous-decisions?afterSequence=9007199254740991&limit=20');assert.equal(calls[0][1],signal);
+ assert.equal(page.items[0].taskId,'9007199254740993');assert.equal(page.items[0].comment,' <b>Exact</b> ');assert.equal(page.nextAfterSequence,'9007199254740995');
+});

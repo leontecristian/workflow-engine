@@ -148,6 +148,33 @@ public class WorkflowRuntimeQueryService {
         });
     }
 
+    /** Resolved metadata; the host must authorize the exact receiving task before calling. */
+    public io.github.leontecristian.workflow.core.dto.definition.document.PreviousDecisionsPolicy previousDecisionsPolicy(long taskId) {
+        RuntimeInputs.id(taskId);
+        return RuntimePersistenceErrors.call(() -> {
+            var task = tasks.findById(taskId).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
+            return pinnedHuman(owner(task)).previousDecisions();
+        });
+    }
+
+    /**
+     * Narrow sharing under current receiving-task authorization only. Source IDs grant no other reads.
+     * Uses immutable entry/completion sequences; no writes, claims or command receipts are produced.
+     */
+    public io.github.leontecristian.workflow.core.dto.runtime.PreviousDecisionPage listPreviousDecisions(
+            long taskId, long afterSequence, int limit) {
+        RuntimeInputs.id(taskId);
+        RuntimeInputs.require(afterSequence >= 0 && limit >= 1 && limit <= 50, Category.INVALID_INPUT);
+        return RuntimePersistenceErrors.call(() -> {
+            var task = tasks.findById(taskId).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
+            var activity = owner(task);
+            var instance = instances.findById(activity.getInstanceId())
+                    .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
+            return new RuntimePreviousDecisions(activities, tasks, history, json)
+                    .read(activity, pins.load(instance).model(), afterSequence, limit);
+        });
+    }
+
     public WorkflowTaskPage listTasks(long instanceId) { return listTasks(instanceId, 0, 50); }
     public WorkflowTaskPage listTasks(long instanceId, long afterId, int limit) {
         RuntimeInputs.id(instanceId); RuntimeInputs.page(afterId, limit);

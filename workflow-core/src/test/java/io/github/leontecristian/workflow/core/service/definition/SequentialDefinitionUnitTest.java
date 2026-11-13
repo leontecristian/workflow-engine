@@ -109,6 +109,6 @@ class SequentialDefinitionUnitTest {
         var accepted=validation.check(codec.ingest(root.toString()),false);
         assertThat(accepted.report().diagnostics()).isEmpty();
         assertThat(accepted.contextHash()).isNotEqualTo(missing.contextHash());
-        assertThat(accepted.detailsJson()).contains("wf-all-task-validator-v1","MANAGER","PARTNER");
+        assertThat(accepted.detailsJson()).contains("wf-previous-decisions-validator-v1","MANAGER","PARTNER");
     }
 }

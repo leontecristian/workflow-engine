@@ -116,6 +116,36 @@ public class RuntimeWire {
         return jsonResponse(prefix + String.join(",", rows) + submissionPageEnd(next));
     }
 
+    /** Bound the encoded projection, including JSON escapes, in both wire encodings. */
+    public ResponseEntity<String> previousDecisionPage(
+            io.github.leontecristian.workflow.core.dto.runtime.PreviousDecisionPage page) {
+        String prefix = "{\"items\":[";
+        int bytes = prefix.length();
+        int units = prefix.length();
+        List<String> rows = new ArrayList<>();
+        Long next = page.nextAfterSequence();
+        for (int index = 0; index < page.items().size(); index++) {
+            var item = page.items().get(index);
+            String row = json(item);
+            int separator = rows.isEmpty() ? 0 : 1;
+            Long candidate = index + 1 == page.items().size() ? page.nextAfterSequence() : Long.valueOf(item.historySequence());
+            String suffix = previousDecisionPageEnd(candidate);
+            if (bytes + separator + utf8Length(row) + suffix.length() > 256 * 1024
+                    || 2 * (units + separator + row.length() + suffix.length()) > 256 * 1024) {
+                if (rows.isEmpty()) throw new WorkflowRuntimeException(422, "LIMIT_EXCEEDED");
+                next = page.items().get(index - 1).historySequence();
+                break;
+            }
+            rows.add(row);
+            bytes += separator + utf8Length(row);
+            units += separator + row.length();
+        }
+        return jsonResponse(prefix + String.join(",", rows) + previousDecisionPageEnd(next));
+    }
+    private static String previousDecisionPageEnd(Long next) {
+        return "],\"nextAfterSequence\":" + (next == null ? "null" : "\"" + next + "\"") + "}";
+    }
+
     private static String submissionPageEnd(Long next) {
         return "],\"nextAfterTaskId\":" + (next == null ? "null" : "\"" + next + "\"") + "}";
     }

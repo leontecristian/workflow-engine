@@ -1,5 +1,7 @@
 # Workflow project constitution
 
+**Previous-decision comments — owner decisions, 2026-11-13 (constitution 6.6.0).** [F022](features/F022-previous-decision-comments/spec.md) specifies a pinned workflow visibility default with human-node overrides for earlier decision comments. Configured context is readable under the receiving task's current authorization without source-task access; it grants no access to the source's full submission or history. Original completion evidence stays authoritative and immutable. Omitted settings preserve existing display behavior. The owner subsequently authorized T02–T06; see F022 delivery evidence. Comment submission is unchanged. F021's later delivery record establishes its IMPLEMENTED status; its planning-era note below is historical.
+
 **ALL collective review — owner decisions, 2026-11-13 (constitution 6.5.0).** [F021](features/F021-all-collective-review/spec.md) specifies the next selected feature; implementation is not authorized yet. Each fixed-roster task retains USER/GROUP/ROLE assignment and claim behavior; ALL counts tasks, not members. All tasks receive the same immutable node inputs and share one result contract, with independent answers. TASK_COMPLETED remains authoritative for submissions; ACTIVITY_COMPLETED retains only outcome/closure reason. Resolved original collections may feed explicit service/human bindings, and an optional named variable holds a mutable copy created only on resolution. Task results remain 64 KiB; collections allow 8 MiB UTF-16, with coordinated larger value/history/transport bounds and no reservations. F021 governs these scoped extensions to F019/F020; SINGLE behavior and host authorization remain constraints. APOLO integration waits for owner access.
 
 **Human-task input bindings — owner decision, 2026-11-10 (constitution 6.4.0).** [F020](features/F020-human-task-input-bindings/spec.md) is implemented at revision 3. Explicit variable or original-submission bindings supply immutable review inputs captured when a SINGLE human task is created. Current receiving-task read authorization governs the copy, including eligible shared peers; source-task access is not granted. Opening, claiming and later variable changes do not refresh the snapshot. The inputs map supplies incoming data; resultContract describes the reviewer answer. Human inputContract is removed from new authoring; published legacy empty-field loading and startPolicy.inputContract are preserved. No separate reviewInputContract is added.
@@ -24,7 +26,7 @@
 
 **Owner correction — 2026-11-05:** expression arithmetic follows native SpEL numeric behavior, including floating-point approximation, promotion, rounding and integral overflow. Do not reject a result solely for precision loss or compare it with an exact reference calculation. Declared DECIMAL variables enter evaluation as BigDecimal; decimal literals retain native SpEL types. Native evaluation errors and resource limits still fail the command. Exact decoding, transport, persistence and accepted-submission rules remain unchanged. This supersedes earlier expression-arithmetic exactness wording and the misinterpreted numeric owner decision.
 
-**Version:** 6.5.0
+**Version:** 6.6.0
 
 **Established:** 2026-10-24
 
@@ -183,6 +185,8 @@ Use semantic versioning for this document: major for incompatible principle/scop
 The consolidated design and database design remain the detailed architectural sources, with scoped precedence recorded in [design sources](design-sources.md). This constitution codifies their confirmed principles and the owner's later decisions. Database design v1.4 retains earlier selected changes and extends the scalar-only execution-variable model with JSON. Structured submissions remain distinct from mutable variables. Other proposed details remain proposals. Where a conflict lacks a superseding decision, record it and resolve it before implementing affected behavior. Historical archives and illustrative contracts cannot override current decisions.
 
 ## Amendment history
+
+- **6.6.0 — 2026-11-13:** owner approved workflow default/per-human-node previous-decision visibility and receiving-task authorization. F022 extends C07/C09's pinned context-sharing contracts while retaining original completion evidence and source access boundaries. Existing definitions default to hidden context; no migration is planned. Specification/plan only, no implementation.
 
 - **6.5.0 — 2026-11-13:** owner selected F021 ALL as next, with task-owned assignment, common immutable inputs/result contract, immutable per-task answers, original collection bindings and optional resolution-only output. Consistent larger capacities are specified without reservations. Core ALL direction was already agreed; this amendment extends F019/F020 data contracts. Planning only; no runtime or migration execution.
 

@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { findNodeAtLocation, parseTree, visit, type JSONPath } from 'jsonc-parser';
 import { ConsoleSession } from './console-session';
-import type { WorkflowRuntimeReads, InstanceSummary, Page, VariablePage, TaskView, TaskContract, TaskInput, TaskSubmission, ActivityView, SubmissionPage } from '@workflow-engine/ui';
+import type { WorkflowRuntimeReads, InstanceSummary, Page, VariablePage, TaskView, TaskContract, TaskInput, TaskSubmission, ActivityView, SubmissionPage, PreviousDecisionPage } from '@workflow-engine/ui';
 @Injectable({providedIn:'root'})
 export class ConsoleRuntimeReads implements WorkflowRuntimeReads {
  private readonly session=inject(ConsoleSession);
@@ -46,6 +46,9 @@ export class ConsoleRuntimeReads implements WorkflowRuntimeReads {
    if(valueJson===undefined)throw new Error('Invalid read response.');
    return [key,{type:input.type,valueJson}];
   }))};
+ }
+ previousDecisions(id:string,cursor:string|undefined,limit:number,signal:AbortSignal){
+  return this.read<PreviousDecisionPage>('/tasks/'+encodeURIComponent(id)+'/previous-decisions'+this.query({afterSequence:cursor,limit:String(limit)}),signal);
  }
  async taskSubmission(id:string,signal:AbortSignal){
   const {value,objectAt}=await this.readExact<WireSubmission|null>('/tasks/'+encodeURIComponent(id)+'/submission',signal);

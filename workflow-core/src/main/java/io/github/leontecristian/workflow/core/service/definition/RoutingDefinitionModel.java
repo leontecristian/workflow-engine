@@ -13,6 +13,7 @@ import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWor
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Service;
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Transition;
 import io.github.leontecristian.workflow.core.dto.definition.document.TaskResultContract;
+import io.github.leontecristian.workflow.core.dto.definition.document.PreviousDecisionsPolicy;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
 import io.github.leontecristian.workflow.core.dto.runtime.CompletionPolicy;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy;
@@ -39,6 +40,7 @@ final class RoutingDefinitionModel {
             d.error("EXPRESSION_VERSION_UNSUPPORTED",DiagnosticStage.CONTRACT,"Unsupported restricted expression implementation.","/nodes");
             return null;
         }
+        PreviousDecisionsPolicy previousDecisions = previousDecisions(root.path("previousDecisions"), PreviousDecisionsPolicy.NONE);
         Map<String,JsonNode> nodes = new LinkedHashMap<>();
         Map<String,Node> ends = new LinkedHashMap<>(); Set<String> gateways = new HashSet<>();
         Map<String,Human> humans = new LinkedHashMap<>();
@@ -81,7 +83,8 @@ final class RoutingDefinitionModel {
                                 variables, namedOutputs, d);
                     }
                     humans.put(key,new Human(key,n.path("taskType").textValue(),new Assignment(resolver),outcomes,
-                            TaskClaimPolicy.valueOf(claimPolicy), resultContract, outputVariable, Map.of(), completionPolicy, contributionOutcome));
+                            TaskClaimPolicy.valueOf(claimPolicy), resultContract, outputVariable, Map.of(), completionPolicy, contributionOutcome,
+                            previousDecisions(n.path("previousDecisions"), previousDecisions), n.path("name").textValue()));
                     humanIndices.put(key,nodeIndex);
                 }
                 case "END" -> ends.put(key,new Node(key,"END",n.path("name").textValue(),n.path("result").textValue()));
@@ -147,6 +150,17 @@ final class RoutingDefinitionModel {
         var reachesEnd=new HashSet<String>(); for(String end:ends.keySet()) reachesEnd.addAll(reach(end,reverse,Set.of()));
         if(reachesEnd.size()!=nodes.size()) graph(d,"/transitions");
         if(d.failed()) return null;
+        for (var human : humans.values()) {
+            var selectors = human.previousDecisions().nodeKeys();
+            for (int index = 0; index < selectors.size(); index++) {
+                String source = selectors.get(index);
+                if (source.equals(human.key()) || !humans.containsKey(source)
+                        || !reach(source, outgoing, Set.of()).contains(human.key())) {
+                    graph(d, "/nodes/" + humanIndices.get(human.key()) + "/previousDecisions/nodeKeys/" + index);
+                }
+            }
+        }
+        if (d.failed()) return null;
         // All source contracts and named-output descriptors are known, regardless of document node order.
         for (var human : List.copyOf(humans.values())) {
             var bindings = ExecutionValueDefinitionModel.bindings(nodes.get(human.key()).path("inputs"));
@@ -155,12 +169,20 @@ final class RoutingDefinitionModel {
                     "/nodes/" + humanIndices.get(human.key()) + "/inputs/");
             humans.put(human.key(), new Human(human.key(), human.taskType(), human.assignment(), human.outcomes(),
                     human.claimPolicy(), human.resultContract(), human.outputVariable(), humanInputs,
-                    human.completionPolicy(), human.contributionOutcome()));
+                    human.completionPolicy(), human.contributionOutcome(), human.previousDecisions(), human.name()));
         }
         if(d.failed()) return null;
         return new MinimalWorkflowDefinition(new Node(startKey,"START",start.path("name").textValue(),null),
                 humans,
-                ends.values().iterator().next(),transitions,inputs,variables,initialize,services,ends,gateways,namedOutputs);
+                ends.values().iterator().next(),transitions,inputs,variables,initialize,services,ends,gateways,namedOutputs,previousDecisions);
+    }
+
+    private static PreviousDecisionsPolicy previousDecisions(JsonNode setting, PreviousDecisionsPolicy inherited) {
+        if (setting.isMissingNode() || "INHERIT".equals(setting.path("mode").textValue())) return inherited;
+        var mode = PreviousDecisionsPolicy.Mode.valueOf(setting.path("mode").textValue());
+        var keys = new ArrayList<String>();
+        setting.path("nodeKeys").forEach(key -> keys.add(key.textValue()));
+        return new PreviousDecisionsPolicy(mode, keys);
     }
 
     private static Map<String,HumanInput> humanInputs(Map<String,Binding> bindings, Map<String,ActionField> variables,

@@ -3,6 +3,7 @@
   "$id": "urn:workflow:exclusive-routing-v1",
   "type": "object",
   "properties": {
+    "previousDecisions": {"$ref": "#/$defs/rootPreviousDecisions"},
     "schemaVersion": {
       "const": 1
     },
@@ -225,6 +226,27 @@
   ],
   "additionalProperties": false,
   "$defs": {
+    "rootPreviousDecisions": {
+      "type": "object",
+      "properties": {"mode": {"enum": ["NONE", "ALL_PREVIOUS"]}},
+      "required": ["mode"],
+      "additionalProperties": false
+    },
+    "humanPreviousDecisions": {
+      "type": "object",
+      "properties": {
+        "mode": {"enum": ["INHERIT", "NONE", "ALL_PREVIOUS", "SELECTED"]},
+        "nodeKeys": {
+          "type": "array", "minItems": 1, "maxItems": 200, "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"}
+        }
+      },
+      "required": ["mode"],
+      "additionalProperties": false,
+      "if": {"properties": {"mode": {"const": "SELECTED"}}},
+      "then": {"required": ["nodeKeys"]},
+      "else": {"not": {"required": ["nodeKeys"]}}
+    },
     "inputBinding": {
       "oneOf": [
         {
@@ -325,6 +347,7 @@
     "human": {
       "type": "object",
       "properties": {
+        "previousDecisions": {"$ref": "#/$defs/humanPreviousDecisions"},
         "key": {
           "type": "string",
           "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"

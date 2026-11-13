@@ -1,6 +1,6 @@
 import { Component, Input, computed, inject, signal } from '@angular/core';
 import { CommandRecovery, WORKFLOW_RUNTIME_COMMANDS } from '@workflow-engine/ui';
-import type { TaskView, TaskContract, TaskSubmission } from '@workflow-engine/ui';
+import type { TaskView, TaskContract, TaskSubmission, PreviousDecision } from '@workflow-engine/ui';
 import { RuntimeState } from './runtime-state';
 import { PAGE_IMPORTS } from './page-imports';
 import { download } from './variables';
@@ -11,7 +11,36 @@ export class WorkflowTaskComponent extends RuntimeState {
   get uncertain(): boolean {
     return this.commands.buffer.entries.some(e => e.kind !== "start" && e.body["taskId"] === this.id && this.commands.observations.get(e.body["commandId"]!)?.outcome === "UNKNOWN_OUTCOME");
   }
- protected clearContent(){this.detail.set(null);this.contract.set(null);this.submission.set(null);this.currentTasks.set([]);this.comment="";this.outcome="";this.reason="";this.resultDraft="";}
+ protected clearContent(){this.cancelPreviousRead();this.previousDecisions.set([]);this.previousCursor.set(null);this.previousError.set('');this.detail.set(null);this.contract.set(null);this.submission.set(null);this.currentTasks.set([]);this.comment="";this.outcome="";this.reason="";this.resultDraft="";}
+  previousDecisions = signal<PreviousDecision[]>([]);
+  previousCursor = signal<string | null>(null);
+  previousBusy = signal(false);
+  previousError = signal('');
+  private previousController?: AbortController;
+  private previousSequence = 0;
+  private cancelPreviousRead(){this.previousSequence++;this.previousController?.abort();this.previousBusy.set(false);}
+  get hasPreviousDecisions(){const mode=this.contract()?.previousDecisions?.mode;return !!mode && mode!=='NONE';}
+  noPreviousComment(comment:string|null){return comment===null || /^\s*$/u.test(comment);}
+  async loadPreviousDecisions(more=false):Promise<void>{
+    if(!this.hasPreviousDecisions || this.previousBusy() || !this.sessionScope || (more && !this.previousCursor()))return;
+    this.cancelPreviousRead();
+    const controller=this.previousController=new AbortController();
+    const sequence=this.previousSequence, scope=this.sessionScope, id=this.id;
+    const current=()=>!controller.signal.aborted && scope===this.sessionScope
+      && sequence===this.previousSequence && id===this.id;
+    this.previousBusy.set(true);this.previousError.set('');
+    try{
+      const page=await this.api.previousDecisions(id,more?this.previousCursor()!:undefined,20,controller.signal);
+      if(!current())return;
+      this.previousDecisions.set(more?[...this.previousDecisions(),...page.items]:page.items);
+      this.previousCursor.set(page.nextAfterSequence);
+    }catch(failure){
+      if(!current() || (failure as {name?:string})?.name==='AbortError')return;
+      const status=(failure as {httpStatus?:number})?.httpStatus;
+      if(status===401 || status===403 || status===404){this.clearContent();this.error.set('Resource missing or unavailable.');}
+      else this.previousError.set('Previous decisions could not be loaded. Try again.');
+    }finally{if(current())this.previousBusy.set(false);}
+  }
   get meta() {return {
     title: this.messages.taskTitle,
     eyebrow: "ASSIGNED WORK",
@@ -46,7 +75,7 @@ export class WorkflowTaskComponent extends RuntimeState {
   async load() {
     this.clearContent();
     const id = this.id;
-    await this.run(async (signal,current) => {
+    const loaded = await this.run(async (signal,current) => {
       // An older contract token must never authorize actions against a newer, unseen assignee.
       const snapshot = async () => {
         const contract = await this.api.taskContract(id, signal);
@@ -66,6 +95,8 @@ export class WorkflowTaskComponent extends RuntimeState {
       this.contract.set(task.contract);
       this.submission.set(s);
     });
+    // The read-only context has its own request state and never gates completion.
+    if(loaded)await this.loadPreviousDecisions();
   }
   reasonBlank(): boolean { return /^[\u0009-\u000d\u001c-\u0020\u1680\u2000-\u2006\u2008-\u200a\u2028\u2029\u205f\u3000]*$/u.test(this.reason); }
   commentBlank(): boolean {
