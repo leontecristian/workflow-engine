@@ -1,13 +1,13 @@
 # Workflow engine roadmap
 
-**Updated:** 2026-11-13 · **Delivery baseline:** F020 · **Next milestone:** first APOLO booking integration
+**Updated:** 2026-11-13 · **Delivery baseline:** F020 · **Next feature:** ALL collective review
 
-The agreed direction is **working sandbox → first APOLO booking integration → graphical designer**, with reliability required before production. The sandbox and reusable libraries are implemented; the next milestone still needs a concrete business scenario and verified host compatibility.
+The agreed direction is **working sandbox → first APOLO booking integration → graphical designer**, with reliability required before production. The sandbox and reusable libraries are implemented. ALL collective review is the next selected feature; APOLO integration waits until the owner has access to APOLO.
 
 ## Contents
 
 1. [Current position](#1-current-position)
-2. [Proposed next priorities](#2-proposed-next-priorities)
+2. [Selected priorities](#2-selected-priorities)
 3. [Remaining engine capabilities](#3-remaining-engine-capabilities)
 4. [First APOLO booking integration](#4-first-apolo-booking-integration)
 5. [Graphical designer](#5-graphical-designer)
@@ -17,7 +17,7 @@ The agreed direction is **working sandbox → first APOLO booking integration �
 
 ## 1. Current position
 
-**✅ Sandbox + shared libraries → 📍 APOLO integration → ⏳ Graphical designer**
+**✅ Sandbox + shared libraries → 📍 ALL collective review → ⏸ APOLO integration → ⏳ Graphical designer**
 
 ### ✅ Implemented — F001–F020
 
@@ -29,32 +29,32 @@ The agreed direction is **working sandbox → first APOLO booking integration �
 | ✅ F016–F017 | **Assignment & claiming** — user/group/role tasks, claim, release |
 | ✅ F018–F020 | **Review data** — structured answers, named outputs, frozen task inputs |
 
-### 📍 Next — proposed
+### 📍 Next — selected
 
-> **Define the first APOLO booking scenario and check host compatibility.**
+> **ALL collective review — design discussion, then specification and plan.**
 >
-> Then implement its missing engine capabilities and deliver the integration.
+> Settle the feature contracts together before implementation. APOLO access is not required for sandbox design and delivery.
 
 ### ⏳ Still to deliver
 
 | Status | Capability | When |
 | --- | --- | --- |
-| ⬜ Not implemented | **ALL collective review** | Before integration if every reviewer must contribute; remains agreed V1 scope. |
+| 📍 Next feature | **ALL collective review** | Design discussion now; specification and plan follow. |
 | ⬜ Not implemented | **Cancellation & reassignment** | Prioritize what the selected booking scenario needs. |
-| ⬜ Not implemented | **APOLO booking integration** | After scenario definition and required engine/host work. |
+| ⏸ Waiting for access | **APOLO booking integration** | Resume when the owner has access to APOLO. |
 | ⬜ Not implemented | **Graphical designer** | After the first successful APOLO integration. |
 
 **Verification:** ✅ means implemented, not production-ready. Historical acceptance gaps remain; production checks are required before deployment. See the [feature index](features/README.md) for evidence and section 8 for historical notes. The existing read-only graph is not the designer.
 
-## 2. Proposed next priorities
+## 2. Selected priorities
 
-The following sequencing is **PROPOSED**. The underlying agreed V1 capabilities remain in scope; these entries are not READY specifications or new implementation authorization.
+**Owner decision — 2026-11-13:** ALL collective review is next. Begin with a design discussion, then prepare its specification and plan. APOLO integration waits until the owner has access. This selects the feature and planning work; it does not settle open contracts or authorize implementation yet.
 
 | Order | Work | Completion condition |
 | --- | --- | --- |
-| 1 | Specify one useful APOLO cross-team booking scenario and assess the actual host build, transactions, security and UI integration | Business rules and host boundaries are clear enough to identify the missing engine capabilities and required compatibility work. |
-| 2 | Implement only the missing capabilities required by that scenario | The selected engine slices meet their specifications and focused acceptance checks. ALL comes first if every reviewer must contribute; cancellation/reassignment are selected where needed. |
-| 3 | Deliver the booking scenario through real APOLO interfaces | The integration exit in section 4 is met, with applicable evidence reused and changed host boundaries verified. |
+| 1 — now | Discuss ALL collective review, then write its specification and plan | Agreed behavior is separated from open choices; roster, completion, review data and host/UI contracts are ready for implementation. |
+| 2 | Implement ALL in the engine, shared libraries and sandbox once its contracts are settled and implementation is requested | The selected feature passes focused acceptance checks without depending on APOLO access. |
+| 3 — waiting for access | Specify and deliver the first APOLO booking integration | Access is available, the business scenario and host compatibility are established, and the integration exit in section 4 is met. Select additional engine operations only as required. |
 | 4 | Deliver the graphical designer in workflow-ui | The authoring exit in section 5 is met after successful first APOLO integration. |
 
 Production readiness applies before any deployment, regardless of designer timing. Historical verification debt is reconciled when relevant to a selected dependency or integration/release gate, rather than becoming a blanket prerequisite for new work.
@@ -63,7 +63,7 @@ Production readiness applies before any deployment, regardless of designer timin
 
 | Capability | Scope and dependencies | Exit condition |
 | --- | --- | --- |
-| **ALL collective review** — agreed V1 capability; scheduling proposed | Extend SINGLE to a fixed task roster created atomically within one active activity. Specify contribution and early-resolution contracts. F018–F020 provide SINGLE data contracts, not ALL aggregation or named-output semantics; resolve those as required by the selected slice. JSON variables are not inherently required. | All required contributions or a permitted early outcome resolve the activity. Early resolution cancels open siblings and preserves earlier submissions. Competing commands yield one committed result; downstream failures roll back the current command. |
+| **ALL collective review** — next selected feature; design discussion | Extend SINGLE to a fixed task roster created atomically within one active activity. Specify contribution and early-resolution contracts. F018–F020 provide SINGLE data contracts, not ALL aggregation or named-output semantics; resolve those as required by the selected slice. JSON variables are not inherently required. | All required contributions or a permitted early outcome resolve the activity. Early resolution cancels open siblings and preserves earlier submissions. Competing commands yield one committed result; downstream failures roll back the current command. |
 | **Cancellation and audited administrative reassignment** — exact slices open | Specify lifecycle rules, authorization, APIs and evidence. Pull forward operations required by the chosen scenario; do not bundle them automatically with ALL. | Selected operations preserve task identity where required, aggregate concurrency, replay, history and atomicity. |
 | **External variable-update command** — conditional scope | F009 supports start/service replacements, not a standalone external update command. Specify one only when a selected scenario requires it. | Authorized updates follow the agreed whole-value and aggregate concurrency contracts, with focused verification. |
 
@@ -73,7 +73,7 @@ Assign feature IDs when specifications begin. Follow the [four-document workflow
 
 ## 4. First APOLO booking integration
 
-**Status:** planned; concrete business scenario and host compatibility still require specification. Business discovery and read-only build analysis can proceed alongside engine work. Runtime integration depends on the engine capabilities actually needed by that scenario.
+**Status:** waiting for owner access to APOLO. Resume integration work when access is available; the concrete business scenario and actual host compatibility still require specification. ALL design and sandbox delivery proceed independently.
 
 - Select one cross-team booking approval from the [booking analysis](integrations/apolo/booking-business-analysis.md) and [approval requirements](integrations/apolo/approval-capability.md). APOLO decides approver sources, access/no-self-approval rules, protected material, review membership, final business effects and required recovery paths. Do not invent unresolved overbooking or alternative-resource policy.
 - Preserve one identified immutable approval basis across all steps of an attempt. Specify protection against material edits, transaction-time membership/material/eligibility checks, durable invalidation and historical retention. Same-instance resubmission remains provisional; a failed completion alone does not persist invalidation.
@@ -133,9 +133,13 @@ Update the current-position and priority sections when delivery changes. Keep de
 
 Follow [AGENTS.md](../AGENTS.md) for verification authorization. Isolated unit tests and guarded integration tests on `localhost:1433/apolo_workflow_test` are authorized; other database targets require task-specific authorization. Documentation-only changes use content, link and whitespace checks, without builds or host startup.
 
+### Priority decision — 2026-11-13
+
+The owner selected ALL collective review as the next feature because APOLO access is unavailable. Start with design discussion, then specification and planning. APOLO integration waits for access; the designer remains after successful first integration. Open ALL contracts remain open until discussed and specified.
+
 ### Review baseline — 2026-11-13
 
-Reviewed against feature records through F020 and repository HEAD `cbc64e2`. This reorganization changes no feature status or acceptance outcome. The next-priority proposal remains a proposal.
+Reviewed against feature records through F020 and repository HEAD `cbc64e2`. This reorganization changes no feature status or acceptance outcome. The earlier integration-first proposal was superseded by the owner decision below.
 
 F017–F020 have recorded focused verification. F020 explicitly has no open verification item within its slice; browser rendering checks used prepared NgModule states, while guarded SQL/MVC tests covered real read wiring. APOLO and production acceptance were not run.
 
