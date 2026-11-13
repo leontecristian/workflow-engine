@@ -16,12 +16,25 @@ public class SandboxSharedAssignmentResolver implements SingleTaskAssignmentReso
     private final String identifier;
     private final TaskAssignmentTarget target;
     private final SandboxRequestStore requests;
+
     public SandboxSharedAssignmentResolver(String identifier, TaskAssignmentTarget target, SandboxRequestStore requests) {
-        this.identifier = identifier; this.target = target; this.requests = requests;
+        this.identifier = identifier;
+        this.target = target;
+        this.requests = requests;
     }
-    @Override public String identifier() { return identifier; }
-    @Override public Set<AssignmentTargetKind> targetKinds() { return Set.of(target.kind()); }
-    @Override public SingleAssignmentResult resolve(AssignmentContext context) {
+
+    @Override
+    public String identifier() {
+        return identifier;
+    }
+
+    @Override
+    public Set<AssignmentTargetKind> targetKinds() {
+        return Set.of(target.kind());
+    }
+
+    @Override
+    public SingleAssignmentResult resolve(AssignmentContext context) {
         if (!"SANDBOX_REQUEST".equals(context.businessType())
                 || !requests.linked(ConsoleWire.decimal(context.businessId(), false), context.instanceId()))
             throw new IllegalStateException("Sandbox link not established");

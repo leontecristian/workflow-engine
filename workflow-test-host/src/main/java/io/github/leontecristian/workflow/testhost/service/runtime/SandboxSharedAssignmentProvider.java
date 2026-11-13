@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /** Development fixture only. Every lookup reads current immutable membership; no login-time cache. */
 public class SandboxSharedAssignmentProvider implements WorkflowSharedAssignmentProvider {
+
     public static final TaskAssignmentTarget FINANCE = new TaskAssignmentTarget(AssignmentTargetKind.GROUP, "sandbox.finance");
     public static final TaskAssignmentTarget APPROVER = new TaskAssignmentTarget(AssignmentTargetKind.ROLE, "sandbox.approver");
     private final Map<TaskAssignmentTarget, Set<String>> memberships = new ConcurrentHashMap<>();
@@ -25,13 +26,17 @@ public class SandboxSharedAssignmentProvider implements WorkflowSharedAssignment
         memberships.put(target, Set.copyOf(actors));
     }
 
-    public void removeTarget(TaskAssignmentTarget target) { memberships.remove(target); }
+    public void removeTarget(TaskAssignmentTarget target) {
+        memberships.remove(target);
+    }
 
-    @Override public boolean targetExists(AssignmentContext context, TaskAssignmentTarget target) {
+    @Override
+    public boolean targetExists(AssignmentContext context, TaskAssignmentTarget target) {
         return memberships.containsKey(target);
     }
 
-    @Override public boolean isCurrentMember(TaskEligibilityContext context) {
+    @Override
+    public boolean isCurrentMember(TaskEligibilityContext context) {
         return memberships.getOrDefault(context.task().assignment(), Set.of()).contains(context.actorRef());
     }
 }
