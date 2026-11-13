@@ -45,9 +45,10 @@ public class WorkflowInstanceViewerService {
         if ("TASK_COMPLETED".equals(summary.eventType()) && summary.detailsSchemaVersion() >= 3
                 && !canReadExactTask(summary)) throw WorkflowViewerException.missing();
         access.requireHistoryEventRead(event.summary());
-        if (!wire.fits(event.detailsJson(), 4 * 1024 * 1024)) throw new WorkflowViewerException(422, "LIMIT_EXCEEDED");
+        if (event.detailsJson().length()*2L > io.github.leontecristian.workflow.core.service.runtime.RuntimeJson.HISTORY_UTF16_BYTES
+                || event.detailsJson().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > io.github.leontecristian.workflow.core.service.runtime.RuntimeJson.HISTORY_UTF8_BYTES) throw new WorkflowViewerException(422, "LIMIT_EXCEEDED");
         var json = wire.json(event);
-        if (json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 8 * 1024 * 1024)
+        if (json.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > io.github.leontecristian.workflow.core.service.runtime.RuntimeJson.HISTORY_RESPONSE_UTF8_BYTES)
             throw new WorkflowViewerException(422, "LIMIT_EXCEEDED");
         return json;
     }

@@ -9,28 +9,28 @@ import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutio
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.util.TreeMap;
 
 /** Strict streaming execution-value codec; limits are relative to this value, never its envelope. */
 final class WorkflowJsonCodec {
-    private static final int VALUE_CHARS = 128 * 1024;
+    private static final int VALUE_CHARS = WorkflowJsonValue.MAX_UTF16_BYTES / 2;
     private static final JsonFactory FACTORY = JsonFactory.builder()
             .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
-            .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(16)
+            .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(WorkflowJsonValue.MAX_DEPTH)
                     .maxNumberLength(128).maxStringLength(32000).build()).build();
 
     private WorkflowJsonCodec() { }
 
     static String canonical(String source) {
         if (source == null) throw error(Category.INVALID_INPUT);
-        if (source.length() > 2 * 1024 * 1024 || source.getBytes(StandardCharsets.UTF_8).length > 2 * 1024 * 1024)
+        if (source.length() > WorkflowJsonValue.MAX_RAW_UTF8_BYTES || utf8Length(source) > WorkflowJsonValue.MAX_RAW_UTF8_BYTES)
             throw error(Category.LIMIT_EXCEEDED);
         try (JsonParser parser = FACTORY.createParser(source)) {
             JsonToken token = parser.nextToken();
             if (token != JsonToken.START_OBJECT && token != JsonToken.START_ARRAY) throw error(Category.INVALID_INPUT);
             String result = read(parser);
             if (parser.nextToken() != null) throw error(Category.INVALID_INPUT);
+            if (utf8Length(result) > WorkflowJsonValue.MAX_UTF8_BYTES) throw error(Category.LIMIT_EXCEEDED);
             return result;
         } catch (com.fasterxml.jackson.core.exc.StreamConstraintsException failure) {
             throw error(Category.LIMIT_EXCEEDED);
@@ -43,7 +43,7 @@ final class WorkflowJsonCodec {
         JsonToken token = parser.currentToken();
         if (token == JsonToken.START_OBJECT) {
             var fields = new TreeMap<String, String>(WorkflowJsonCodec::compareCodePoints);
-            int length = 2;
+            long length = 2;
             while (parser.nextToken() != JsonToken.END_OBJECT) {
                 if (parser.currentToken() != JsonToken.FIELD_NAME) throw error(Category.INVALID_INPUT);
                 String key = parser.currentName(); checkText(key, 256);
@@ -82,7 +82,25 @@ final class WorkflowJsonCodec {
         throw error(Category.INVALID_INPUT);
     }
 
-    private static void bound(int length) { if (length > VALUE_CHARS) throw error(Category.LIMIT_EXCEEDED); }
+    private static void bound(long length) { if (length > VALUE_CHARS) throw error(Category.LIMIT_EXCEEDED); }
+    private static long utf8Length(String value) {
+        long bytes = 0;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            bytes += Character.isHighSurrogate(c) ? 4 : Character.isLowSurrogate(c) ? 0 : c <= 127 ? 1 : c <= 2047 ? 2 : 3;
+        }
+        return bytes;
+    }
+    static void requireDepth(String source, int maxDepth) {
+        try (JsonParser parser = FACTORY.createParser(source)) {
+            int depth = 0;
+            for (JsonToken token; (token = parser.nextToken()) != null;) {
+                if (token == JsonToken.START_OBJECT || token == JsonToken.START_ARRAY) {
+                    if (++depth > maxDepth) throw error(Category.LIMIT_EXCEEDED);
+                } else if (token == JsonToken.END_OBJECT || token == JsonToken.END_ARRAY) depth--;
+            }
+        } catch (IOException failure) { throw error(Category.INVALID_INPUT); }
+    }
     private static void checkText(String text, int limit) {
         if (text.codePointCount(0, text.length()) > limit) throw error(Category.LIMIT_EXCEEDED);
         for (int i = 0; i < text.length(); i++) {

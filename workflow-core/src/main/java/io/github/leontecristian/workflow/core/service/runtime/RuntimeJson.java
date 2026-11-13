@@ -43,12 +43,20 @@ import org.springframework.stereotype.Component;
 public class RuntimeJson {
     static final String FINGERPRINT_VERSION = "wf-runtime-request-v3";
     private static final String RESULT_FINGERPRINT_VERSION = "wf-runtime-request-v4";
+    static final int MAP_UTF16_BYTES = 10 * 1024 * 1024;
+    static final int MAP_UTF8_BYTES = 15 * 1024 * 1024;
+    public static final int HISTORY_UTF16_BYTES = 24 * 1024 * 1024;
+    public static final int HISTORY_UTF8_BYTES = 36 * 1024 * 1024;
+    static final int COMMAND_HISTORY_UTF16_BYTES = 64 * 1024 * 1024;
+    static final int COMMAND_HISTORY_UTF8_BYTES = 96 * 1024 * 1024;
+    public static final int HISTORY_RESPONSE_UTF8_BYTES = 40 * 1024 * 1024;
+    public static final int LARGE_READ_UTF8_BYTES = 16 * 1024 * 1024;
     private final ObjectMapper mapper;
     public RuntimeJson() {
         mapper = com.fasterxml.jackson.databind.json.JsonMapper.builder(JsonFactory.builder()
                 .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
                 .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(32)
-                        .maxStringLength(131072).maxNumberLength(128).build()).build())
+                        .maxStringLength(HISTORY_UTF16_BYTES / 2).maxNumberLength(128).build()).build())
                 .disable(com.fasterxml.jackson.databind.cfg.JsonNodeFeature.STRIP_TRAILING_BIGDECIMAL_ZEROES)
                 .build();
         SimpleModule numbers = new SimpleModule();
@@ -108,7 +116,7 @@ public class RuntimeJson {
             throw new WorkflowExecutionException(Category.HOST_CONFIGURATION, failure);
         }
     }
-    String encode(Object value) { return DefinitionContentCanonicalizer.canonical(mapper.valueToTree(value)); }
+    String encode(Object value) { return DefinitionContentCanonicalizer.canonical(mapper.valueToTree(value), HISTORY_RESPONSE_UTF8_BYTES, HISTORY_RESPONSE_UTF8_BYTES); }
     static byte[] hash(String value) { return DefinitionContentCanonicalizer.hash(value); }
     static boolean fits(String text, int bytes) {
         return text != null && text.length() * 2L <= bytes && text.getBytes(StandardCharsets.UTF_8).length <= bytes;
@@ -118,11 +126,16 @@ public class RuntimeJson {
         RuntimeInputs.require(fits(json, 128 * 1024), Category.LIMIT_EXCEEDED); return json;
     }
     String history(Object value) {
-        String result = DefinitionContentCanonicalizer.canonical(mapper.valueToTree(value),2*1024*1024,4*1024*1024);
-        RuntimeInputs.require(fits(result,4*1024*1024),Category.LIMIT_EXCEEDED); return result;
+        try {
+            return DefinitionContentCanonicalizer.canonical(mapper.valueToTree(value),HISTORY_UTF16_BYTES / 2,HISTORY_UTF8_BYTES);
+        } catch (WorkflowExecutionException failure) {
+            if (failure.category() == Category.LIMIT_EXCEEDED)
+                throw WorkflowExecutionException.resultLimit("The complete history record exceeds its capacity.");
+            throw failure;
+        }
     }
     JsonNode tree(String source) {
-        RuntimeInputs.require(fits(source, 4 * 1024 * 1024) && RuntimeInputs.unicode(source), Category.HOST_CONFIGURATION);
+        RuntimeInputs.require(source != null && source.length()*2L<=HISTORY_UTF16_BYTES && utf8Fits(source,HISTORY_UTF8_BYTES) && RuntimeInputs.unicode(source), Category.HOST_CONFIGURATION);
         try { return mapper.readTree(source); }
         catch (IOException failure) { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION); }
     }
@@ -186,7 +199,7 @@ public class RuntimeJson {
         boolean hasResult = operation == WorkflowOperation.COMPLETE_TASK && RESULT_FINGERPRINT_VERSION.equals(storedFingerprintVersion);
         RuntimeInputs.require(FINGERPRINT_VERSION.equals(storedFingerprintVersion) || hasResult, Category.UNSUPPORTED_VERSION);
         RuntimeInputs.require(fingerprintVersion.equals(storedFingerprintVersion), Category.COMMAND_ID_CONFLICT);
-        RuntimeInputs.require(Short.valueOf((short) 5).equals(version) || historical && !hasResult && !ownershipOperation(operation),
+        RuntimeInputs.require((Short.valueOf((short) 5).equals(version) || Short.valueOf((short) 6).equals(version)) || historical && !hasResult && !ownershipOperation(operation),
                 Category.UNSUPPORTED_VERSION);
         RuntimeInputs.require(Arrays.equals(receipt.getRequestFingerprint(), fingerprint), Category.COMMAND_ID_CONFLICT);
         JsonNode stored = tree(receipt.getResultJson());
@@ -230,8 +243,10 @@ public class RuntimeJson {
                     || (RuntimeInputs.key(instance.businessType()) && RuntimeInputs.text(instance.businessId(), 200, 200, true)))
                 && RuntimeInputs.key(activity.nodeKey()) && activity.activationSequence()>0 && activity.activationSequence()<=result.lastHistorySequence()
                 && (operation==WorkflowOperation.START_WORKFLOW ? activity.activationSequence()>=result.firstHistorySequence() : activity.activationSequence()<result.firstHistorySequence()) && activity.taskTypeId() > 0
-                && activity.completionPolicy() == CompletionPolicy.SINGLE
-                && activity.requiredTaskCount() == 1 && activity.contributionOutcomeKey() == null
+                && (activity.completionPolicy() == CompletionPolicy.SINGLE
+                    ? activity.requiredTaskCount() == 1 && activity.contributionOutcomeKey() == null
+                    : receipt.getResultSchemaVersion() == 6 && activity.completionPolicy() == CompletionPolicy.ALL
+                        && activity.requiredTaskCount() >= 1 && activity.requiredTaskCount() <= 100 && RuntimeInputs.key(activity.contributionOutcomeKey()))
                 && (activity.reviewRevisionRef() == null || RuntimeInputs.text(activity.reviewRevisionRef(), 200, 200, true))
                 && validTime(activity.enteredAt()) && !activity.enteredAt().isBefore(instance.startedAt()) && activity.enteredAt().equals(task.createdAt())
                 && RuntimeInputs.key(task.taskKey()) && task.assignment() != null && task.assignment().kind() != null
@@ -266,6 +281,19 @@ public class RuntimeJson {
                     && task.outcomeKey() == null && task.closedAt() == null && task.closedBy() == null && task.closureReason() == null
                     && instance.startedBy().equals(receipt.getActorRef()) && instance.startedAt().equals(RuntimeViews.instant(receipt.getRecordedAt())),
                     Category.HOST_CONFIGURATION);
+        } else if (activity.status() == ActivityStatus.ACTIVE && activity.completionPolicy() == CompletionPolicy.ALL) {
+            RuntimeInputs.require(receipt.getResultSchemaVersion() == 6 && instance.status() == InstanceStatus.ACTIVE
+                    && instance.currentNodeKey().equals(activity.nodeKey()) && instance.resultKey() == null
+                    && instance.endedAt() == null && instance.endedBy() == null
+                    && activity.requiredTaskCount() > 1 && activity.outcomeKey() == null && activity.closedAt() == null
+                    && activity.closedBy() == null && activity.closureReason() == null
+                    && task.status() == TaskStatus.COMPLETED && task.closureReason() == TaskClosureReason.TASK_OUTCOME
+                    && activity.contributionOutcomeKey().equals(task.outcomeKey()) && validTime(task.closedAt())
+                    && !task.closedAt().isBefore(task.createdAt()) && receipt.getActorKind() == ActorKind.USER
+                    && receipt.getActorRef().equals(task.closedBy())
+                    && (task.assigneeRef() == null || task.assigneeRef().equals(task.closedBy()))
+                    && (!userTarget || task.assignment().ref().equals(task.closedBy()))
+                    && task.closedAt().equals(RuntimeViews.instant(receipt.getRecordedAt())),Category.HOST_CONFIGURATION);
         } else {
             boolean terminal = instance.status() == InstanceStatus.COMPLETED;
             RuntimeInputs.require((terminal || instance.status() == InstanceStatus.ACTIVE)

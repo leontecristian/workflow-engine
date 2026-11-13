@@ -4,13 +4,14 @@ import type { TaskView, TaskContract, TaskSubmission } from '@workflow-engine/ui
 import { RuntimeState } from './runtime-state';
 import { PAGE_IMPORTS } from './page-imports';
 import { download } from './variables';
+import { currentWork } from './current-work';
 @Component({selector:"workflow-task",standalone:true,imports:[...PAGE_IMPORTS],styleUrl:"./runtime.scss",templateUrl:"./task.html"})
 export class WorkflowTaskComponent extends RuntimeState {
   @Input() diagnosticsEnabled = false;
   get uncertain(): boolean {
     return this.commands.buffer.entries.some(e => e.kind !== "start" && e.body["taskId"] === this.id && this.commands.observations.get(e.body["commandId"]!)?.outcome === "UNKNOWN_OUTCOME");
   }
- protected clearContent(){this.detail.set(null);this.contract.set(null);this.submission.set(null);this.comment="";this.outcome="";this.reason="";this.resultDraft="";}
+ protected clearContent(){this.detail.set(null);this.contract.set(null);this.submission.set(null);this.currentTasks.set([]);this.comment="";this.outcome="";this.reason="";this.resultDraft="";}
   get meta() {return {
     title: this.messages.taskTitle,
     eyebrow: "ASSIGNED WORK",
@@ -22,6 +23,7 @@ export class WorkflowTaskComponent extends RuntimeState {
   contract = signal<TaskContract | null>(null);
   readonly inputs = computed(() => Object.entries(this.contract()?.inputs ?? {}));
   submission = signal<TaskSubmission | null>(null);
+  currentTasks = signal<TaskView[]>([]);
   outcome = "";
   comment = "";
   reason = "";
@@ -96,6 +98,7 @@ export class WorkflowTaskComponent extends RuntimeState {
     if (this.busy() || !this.commandProvider || !this.detail() || !this.contract()?.canComplete || this.uncertain) return;
     this.completing=true;
     let conflict = false;
+    let completionNotice = 'Task completed.';
     const succeeded = await this.run(async (signal,current) => {
       const selected = this.contract()?.outcomes.find(o => o.key === outcomeKey);
       if (!selected || this.detail()?.status !== "OPEN") throw new Error("Choose an available outcome on an open task.");
@@ -115,7 +118,13 @@ export class WorkflowTaskComponent extends RuntimeState {
         },
         expectedToken: this.contract()!.instanceLockVersion,
       });
-      try { await this.commands.execute(false,signal); }
+      try {
+        await this.commands.execute(false,signal);
+        const activity = this.commands.execution()?.activity;
+        if (activity?.completionPolicy === 'ALL') completionNotice = activity.status === 'ACTIVE'
+          ? 'Your contribution was accepted. The review is waiting for other tasks.'
+          : 'Your submission resolved the review.';
+      }
       catch (error) {
         const failure = error as {httpStatus?:number;code?:string};
         const status = failure?.httpStatus;
@@ -129,7 +138,13 @@ export class WorkflowTaskComponent extends RuntimeState {
     this.completing=false;
     if (succeeded && !this.diagnosticsEnabled) {
       await this.load();
-      this.notice.set("Task completed.");
+      await this.run(async(signal,current) => {
+        const instanceId = this.detail()?.instanceId;
+        if (!instanceId) return;
+        const tasks = await currentWork(this.api,instanceId,signal);
+        if(current())this.currentTasks.set(tasks);
+      });
+      this.notice.set(completionNotice);
     } else if (conflict) {
       await this.load();
       this.error.set("The task changed. Current details have been refreshed.");

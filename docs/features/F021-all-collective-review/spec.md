@@ -1,6 +1,6 @@
 # Specification — F021 ALL collective review
 
-**Revision:** 2 — 2026-11-13. **Status:** READY; implementation is not authorized by this document. **Owner:** project owner. **Constitution:** 6.5.0.
+**Revision:** 2 — 2026-11-13. **Status:** IMPLEMENTED; implementation authorized by the owner on 2026-11-13. **Owner:** project owner. **Constitution:** 6.5.0.
 
 ## Purpose, authority and scope
 
@@ -10,7 +10,7 @@ Owner decisions from the design discussion: support USER/GROUP/ROLE with existin
 
 Apply constitution C02/C03/C05–C10; CON-03–10/12–14 in [constraints](../../constraints.md); ASM-02/03/10/11 in [assumptions](../../assumptions.md). [Language design sections 9.2–9.4 and 12.1.11](../../architecture/workflow-definition-language-design.md) govern fixed rosters, contribution outcomes and early resolution. F021 extends [F016](../F016-shared-group-role-task-assignment/spec.md), [F017](../F017-task-claim-release/spec.md), [F018](../F018-structured-task-submissions/spec.md), [F019](../F019-named-task-output-variables/spec.md) and [F020](../F020-human-task-input-bindings/spec.md) only as stated here. See [source precedence](../../design-sources.md).
 
-Includes core behavior, shared web/UI adaptation, sandbox capabilities and focused acceptance. Excludes implementation in this planning pass, APOLO changes, separate workflow branches/joins, loops, mutable rosters, optional participants, waivers, ANY/QUORUM, new cancellation/reassignment commands, new resolver input-binding language, generated forms and designer work. Cancellation of open siblings on activity resolution is included; general cancellation remains separate.
+Includes core behavior, shared web/UI adaptation, sandbox capabilities and focused acceptance. Excludes APOLO changes, separate workflow branches/joins, loops, mutable rosters, optional participants, waivers, ANY/QUORUM, new cancellation/reassignment commands, new resolver input-binding language, generated forms and designer work. Cancellation of open siblings on activity resolution is included; general cancellation remains separate.
 
 ## R01 — Pinned completion and common task contracts
 

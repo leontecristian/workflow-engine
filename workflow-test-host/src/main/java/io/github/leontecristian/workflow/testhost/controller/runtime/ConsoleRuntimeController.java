@@ -53,7 +53,7 @@ public class ConsoleRuntimeController {
     private SandboxStart startBody(HttpServletRequest r) {
         var b =
                 wire.body(
-                        r, 2*1024*1024,
+                        r, io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue.MAX_RAW_UTF8_BYTES,
                         "commandId",
                         "definitionVersionId",
                         "requestId",

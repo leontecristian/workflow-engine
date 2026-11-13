@@ -15,6 +15,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class RuntimeHostSupport {
     private final Map<String, SingleTaskAssignmentResolver> resolvers;
+    private Map<String, AllTaskAssignmentResolver> allResolvers = Map.of();
+    private RuntimeException allResolverConfigurationFailure;
     private final WorkflowTaskEligibilityService eligibility;
     private final io.github.leontecristian.workflow.core.service.definition.DefinitionCapabilityProvider capabilities;
     private final List<WorkflowEventRecorder> recorders;
@@ -35,6 +37,59 @@ public class RuntimeHostSupport {
         } catch (RuntimeException failure) { error = failure; }
         this.resolvers = Map.copyOf(registered); this.resolverConfigurationFailure = error;
         this.recorders = recorders.stream().toList();
+    }
+    @org.springframework.beans.factory.annotation.Autowired
+    public RuntimeHostSupport(ObjectProvider<SingleTaskAssignmentResolver> resolvers, ObjectProvider<WorkflowEventRecorder> recorders,
+            WorkflowTaskEligibilityService eligibility,
+            ObjectProvider<io.github.leontecristian.workflow.core.service.definition.DefinitionCapabilityProvider> capabilities,
+            ObjectProvider<AllTaskAssignmentResolver> allResolvers) {
+        this(resolvers,recorders,eligibility,capabilities);
+        var registered = new HashMap<String, AllTaskAssignmentResolver>();
+        try {
+            for (var resolver : allResolvers.stream().toList()) {
+                String id = resolver.identifier();
+                RuntimeInputs.require(RuntimeInputs.text(id,100,200,true) && registered.putIfAbsent(id,resolver) == null,
+                        Category.HOST_CONFIGURATION);
+            }
+            this.allResolvers = Map.copyOf(registered);
+        } catch (RuntimeException failure) { allResolverConfigurationFailure = failure; }
+    }
+    public void requireAllResolver(String id, java.util.Set<io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind> kinds) {
+        RuntimeInputs.require(allResolverConfigurationFailure == null, Category.HOST_CONFIGURATION);
+        var resolver = allResolvers.get(id);
+        RuntimeInputs.require(resolver != null, Category.HOST_CONFIGURATION);
+        try {
+            RuntimeInputs.require(kinds != null && !kinds.isEmpty() && kinds.equals(resolver.targetKinds()), Category.HOST_CONFIGURATION);
+            eligibility.requireSupport(kinds);
+        } catch (WorkflowExecutionException failure) { throw failure; }
+        catch (RuntimeException failure) { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION,failure); }
+    }
+    io.github.leontecristian.workflow.core.dto.runtime.AllAssignmentResult resolveAll(String id, AssignmentContext context) {
+        RuntimeInputs.require(capabilities != null, Category.HOST_CONFIGURATION);
+        try {
+            var descriptor = capabilities.snapshot().allAssignments().stream().filter(c -> c.resolver().equals(id)).findFirst()
+                    .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
+            requireAllResolver(id, descriptor.targetKinds());
+        } catch (WorkflowExecutionException failure) { throw failure; }
+        catch (RuntimeException failure) { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION,failure); }
+        var resolver = allResolvers.get(id);
+        io.github.leontecristian.workflow.core.dto.runtime.AllAssignmentResult result;
+        try { result = resolver.resolve(context); }
+        catch (WorkflowExecutionException failure) {
+            if (failure.category() == Category.INVALID_ASSIGNMENT) throw failure;
+            throw new WorkflowExecutionException(Category.HOST_CONFIGURATION,failure);
+        } catch (RuntimeException failure) { throw RuntimePersistenceErrors.translate(failure); }
+        RuntimeInputs.require(result != null && result.tasks() != null && result.tasks().size() >= 1 && result.tasks().size() <= 100
+                && (result.reviewRevisionRef() == null || RuntimeInputs.text(result.reviewRevisionRef(),200,200,true)), Category.INVALID_ASSIGNMENT);
+        var keys = new java.util.HashSet<String>();
+        for (var task : result.tasks()) {
+            RuntimeInputs.require(task != null && RuntimeInputs.key(task.taskKey()) && keys.add(task.taskKey())
+                    && task.assignment() != null && task.assignment().kind() != null
+                    && RuntimeInputs.text(task.assignment().ref(),200,200,true)
+                    && resolver.targetKinds().contains(task.assignment().kind()), Category.INVALID_ASSIGNMENT);
+            eligibility.requireTarget(context, task.assignment());
+        }
+        return result;
     }
     WorkflowEventRecorder recorder() {
         RuntimeInputs.require(recorders.size() == 1, Category.HOST_CONFIGURATION); return recorders.get(0);

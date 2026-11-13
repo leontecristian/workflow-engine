@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "key": "sandbox-all-review",
+  "version": 1,
+  "name": "Sandbox collective review",
+  "startPolicy": {
+    "inputContract": [{"key":"requestData","type":"JSON","required":false,"nullable":false,"default":{}}],
+    "initialize": {"requestData":{"source":"startInput","key":"requestData"}}
+  },
+  "variables": [{"key":"requestData","type":"JSON","nullable":false}],
+  "nodes": [
+    {"key":"BEGIN","type":"START","name":"Start"},
+    {
+      "key":"review","type":"HUMAN_TASK","name":"Collect independent reviews",
+      "taskType":"SANDBOX_REVIEW",
+      "assignment":{"resolver":"sandbox.allReviewers","inputs":{}},
+      "completion":{"policy":"ALL","contributionOutcome":"APPROVE"},
+      "inputs":{"request":{"source":"variable","key":"requestData"}},
+      "outputVariable":"reviewCollection",
+      "resultContract":{"mode":"REQUIRED","schema":{"type":"object","properties":{"note":{"type":"string","maxLength":500}},"required":["note"],"additionalProperties":false}},
+      "outcomes":[{"key":"APPROVE","label":"Approve","requiresComment":false},{"key":"REJECT","label":"Reject","requiresComment":true}]
+    },
+    {"key":"recordApproved","type":"SERVICE_TASK","name":"Record original accepted contributions","action":"sandbox.recordReviewCollection","inputs":{"reviews":{"source":"submission","nodeKey":"review"}},"outputs":{}},
+    {"key":"recordRejected","type":"SERVICE_TASK","name":"Record original early resolution","action":"sandbox.recordReviewCollection","inputs":{"reviews":{"source":"submission","nodeKey":"review"}},"outputs":{}},
+    {"key":"APPROVED","type":"END","name":"Approved","result":"APPROVED"},
+    {"key":"REJECTED","type":"END","name":"Rejected","result":"REJECTED"}
+  ],
+  "transitions":[
+    {"key":"begin","from":"BEGIN","to":"review"},
+    {"key":"approve","from":"review","to":"recordApproved","outcome":"APPROVE"},
+    {"key":"reject","from":"review","to":"recordRejected","outcome":"REJECT"},
+    {"key":"approved","from":"recordApproved","to":"APPROVED"},
+    {"key":"rejected","from":"recordRejected","to":"REJECTED"}
+  ]
+}

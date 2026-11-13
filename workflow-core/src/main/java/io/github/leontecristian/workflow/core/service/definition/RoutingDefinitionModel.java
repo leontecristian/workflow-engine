@@ -14,6 +14,7 @@ import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWor
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition.Transition;
 import io.github.leontecristian.workflow.core.dto.definition.document.TaskResultContract;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
+import io.github.leontecristian.workflow.core.dto.runtime.CompletionPolicy;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy;
 import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
 import io.github.leontecristian.workflow.core.exception.expression.ExpressionException;
@@ -64,6 +65,13 @@ final class RoutingDefinitionModel {
                     String resolver = n.path("assignment").path("resolver").textValue();
                     if (!DefinitionInputs.text(resolver, 100, 400, true))
                         d.error("INVALID_STRUCTURE", DiagnosticStage.CONTRACT, "Resolver must be a bounded logical identifier.", "/nodes/" + nodeIndex + "/assignment/resolver");
+                    CompletionPolicy completionPolicy = CompletionPolicy.valueOf(n.path("completion").path("policy").textValue());
+                    String contributionOutcome = n.path("completion").path("contributionOutcome").textValue();
+                    if (completionPolicy == CompletionPolicy.ALL && !outcomeKeys.contains(contributionOutcome)) {
+                        d.error("INVALID_STRUCTURE", DiagnosticStage.CONTRACT,
+                                "Contribution outcome must identify a declared outcome.",
+                                "/nodes/" + nodeIndex + "/completion/contributionOutcome");
+                    }
                     String claimPolicy = n.path("claimPolicy").asText("OPTIONAL");
                     var resultContract = TaskResultSchema.readContract(n.path("resultContract"),
                             "/nodes/" + nodeIndex + "/resultContract", d, schemaBudget, authoring);
@@ -73,7 +81,7 @@ final class RoutingDefinitionModel {
                                 variables, namedOutputs, d);
                     }
                     humans.put(key,new Human(key,n.path("taskType").textValue(),new Assignment(resolver),outcomes,
-                            TaskClaimPolicy.valueOf(claimPolicy), resultContract, outputVariable));
+                            TaskClaimPolicy.valueOf(claimPolicy), resultContract, outputVariable, Map.of(), completionPolicy, contributionOutcome));
                     humanIndices.put(key,nodeIndex);
                 }
                 case "END" -> ends.put(key,new Node(key,"END",n.path("name").textValue(),n.path("result").textValue()));
@@ -146,7 +154,8 @@ final class RoutingDefinitionModel {
             var humanInputs = humanInputs(bindings, variables, humans, d,
                     "/nodes/" + humanIndices.get(human.key()) + "/inputs/");
             humans.put(human.key(), new Human(human.key(), human.taskType(), human.assignment(), human.outcomes(),
-                    human.claimPolicy(), human.resultContract(), human.outputVariable(), humanInputs));
+                    human.claimPolicy(), human.resultContract(), human.outputVariable(), humanInputs,
+                    human.completionPolicy(), human.contributionOutcome()));
         }
         if(d.failed()) return null;
         return new MinimalWorkflowDefinition(new Node(startKey,"START",start.path("name").textValue(),null),
@@ -174,7 +183,7 @@ final class RoutingDefinitionModel {
                             "Submission source must be a human node with an optional or required result.",
                             pointer + entry.getKey());
                 } else {
-                    inputs.put(entry.getKey(), new HumanInput(binding, VariableValueType.JSON, false));
+                    inputs.put(entry.getKey(), new HumanInput(binding, VariableValueType.JSON, false, source.completionPolicy() == io.github.leontecristian.workflow.core.dto.runtime.CompletionPolicy.ALL));
                 }
             }
         }

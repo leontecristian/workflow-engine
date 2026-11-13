@@ -35,7 +35,7 @@ final class RuntimeValueBindings {
         return f.booleanNode(((BooleanLiteral)value).value());
     }
     static ObjectNode tokens(Map<String,WorkflowValue> values,RuntimeJson json) {
-        var envelope=new TokenEnvelope(json,512*1024);
+        var envelope=new TokenEnvelope(json,RuntimeJson.MAP_UTF16_BYTES / 2);
         values.forEach((k,v)->envelope.add(k,v.value())); return envelope.values;
     }
     private static final class TokenEnvelope {
@@ -49,13 +49,14 @@ final class RuntimeValueBindings {
             String encoded=literal instanceof io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue value ? value.toJson() : json.encode(scalar);
             long punctuation=key.length()+3L+(values.isEmpty() ? 0 : 1);
             chars+=punctuation+encoded.length(); bytes+=punctuation+encoded.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
-            RuntimeInputs.require(chars<=maxChars && bytes<=2*1024*1024,Category.LIMIT_EXCEEDED);
+            if (chars > maxChars || bytes > RuntimeJson.MAP_UTF8_BYTES)
+                throw WorkflowExecutionException.resultLimit("The complete execution value map exceeds its capacity.");
             values.set(key,scalar==null ? token(literal) : scalar);
         }
     }
     static void basic(StartInputs inputs,RuntimeJson json) {
         RuntimeInputs.require(inputs!=null && inputs.values().size()<=100,Category.INVALID_INPUT);
-        var raw=new TokenEnvelope(json,2*1024*1024);
+        var raw=new TokenEnvelope(json,RuntimeJson.MAP_UTF16_BYTES / 2);
         for (var e:inputs.values().entrySet()) {
             RuntimeInputs.require(RuntimeInputs.key(e.getKey()),Category.INVALID_INPUT);
             if (e.getValue() instanceof TextLiteral t) RuntimeInputs.require(RuntimeInputs.unicode(t.value()) && t.value().length()<=4000,Category.INVALID_INPUT);
@@ -107,10 +108,12 @@ final class RuntimeValueBindings {
         envelope(json.encode(tokens(values,json)));
     }
     static void envelope(String value) {
-        RuntimeInputs.require(value.length()*2L<=1024*1024 && RuntimeJson.utf8Fits(value,2*1024*1024),Category.LIMIT_EXCEEDED);
+        if (value.length()*2L > RuntimeJson.MAP_UTF16_BYTES || !RuntimeJson.utf8Fits(value,RuntimeJson.MAP_UTF8_BYTES))
+            throw WorkflowExecutionException.resultLimit("The complete execution value map exceeds its capacity.");
     }
     static ObjectNode source(Binding b,RuntimeJson json) {
         var n=json.object(); n.put("source",b.source());
+        if (b.source().equals("activitySubmissions")) { n.put("nodeKey",b.key()); return n; }
         if (b.source().equals("literal")) n.set("value",token(b.value())); else n.put("key",b.key()); return n;
     }
 }

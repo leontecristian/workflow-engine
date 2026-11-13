@@ -50,14 +50,15 @@ final class RuntimeHistoryBatch {
         RuntimeInputs.require(sequence==this.sequence+1 && events.size()<6000,io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.LIMIT_EXCEEDED);
         String encoded=json.history(details);
         utf8Bytes+=encoded.getBytes(java.nio.charset.StandardCharsets.UTF_8).length; utf16Bytes+=encoded.length()*2L;
-        RuntimeInputs.require(utf8Bytes<=16*1024*1024 && utf16Bytes<=16*1024*1024,io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.LIMIT_EXCEEDED);
+        if (utf8Bytes > RuntimeJson.COMMAND_HISTORY_UTF8_BYTES || utf16Bytes > RuntimeJson.COMMAND_HISTORY_UTF16_BYTES)
+            throw io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.resultLimit("The cumulative command history exceeds its capacity.");
         this.sequence=sequence;
         WorkflowHistorySummary fact = new WorkflowHistorySummary(instanceId, sequence, type, commandId, context.correlationId(),
                 context.actorKind(), context.actorRef(), context.occurredAt(), activityId, taskId,
                 transition == null ? null : transition.from(), transition == null ? null : transition.to(),
                 transition == null ? null : transition.key(), detailsVersion);
         RuntimeInputs.require(json.encode(new io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistoryEvent(fact,encoded))
-                .getBytes(java.nio.charset.StandardCharsets.UTF_8).length<=8*1024*1024,
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8).length<=RuntimeJson.HISTORY_RESPONSE_UTF8_BYTES,
                 io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.LIMIT_EXCEEDED);
         entityManager.persist(new WorkflowHistoryEntity(fact, encoded));
         var event=new WorkflowEvent((short) ("TASK_CREATED".equals(type) ? 3 : 1), instanceId + ":" + sequence, commandId, instanceId, definitionVersionId,

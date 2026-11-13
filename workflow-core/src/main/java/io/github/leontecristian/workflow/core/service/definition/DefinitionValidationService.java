@@ -6,6 +6,9 @@ import io.github.leontecristian.workflow.core.dto.definition.DefinitionCapabilit
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionValidationReport;
 import io.github.leontecristian.workflow.core.dto.definition.DiagnosticStage;
 import io.github.leontecristian.workflow.core.dto.definition.SingleAssignmentCapability;
+import io.github.leontecristian.workflow.core.dto.definition.AllAssignmentCapability;
+import io.github.leontecristian.workflow.core.dto.runtime.CompletionPolicy;
+import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
 import io.github.leontecristian.workflow.core.dto.definition.TaskTypeCapability;
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition;
 import io.github.leontecristian.workflow.core.dto.tasktype.TaskTypeView;
@@ -20,7 +23,7 @@ import org.springframework.stereotype.Component;
 /** Internal publication-subset checker. No represented host function is ever executed. */
 @Component
 public class DefinitionValidationService {
-    static final String IDENTIFIER = "wf-task-claim-validator-v1";
+    static final String IDENTIFIER = "wf-all-task-validator-v1";
     private final TaskTypeCatalogService catalog;
     private final DefinitionCapabilityProvider provider;
     private final io.github.leontecristian.workflow.core.service.runtime.RuntimeHostSupport runtimeHost;
@@ -78,20 +81,29 @@ public class DefinitionValidationService {
                     ObjectNode descriptor = humanContext.putObject("task"); descriptor.put("code", task.code());
                     descriptor.put("selectable", task.selectable()); descriptor.put("lockVersion", task.lockVersion());
                 }
-                SingleAssignmentCapability assignment = capabilities == null ? null : capabilities.assignments().stream()
-                        .filter(c -> c.resolver().equals(human.assignment().resolver())).findFirst().orElse(null);
+                String resolver = human.assignment().resolver();
+                Set<AssignmentTargetKind> assignmentKinds = null;
+                if (capabilities != null) {
+                    assignmentKinds = human.completionPolicy() == CompletionPolicy.ALL
+                            ? capabilities.allAssignments().stream().filter(c -> c.resolver().equals(resolver))
+                                    .map(AllAssignmentCapability::targetKinds).findFirst().orElse(null)
+                            : capabilities.assignments().stream().filter(c -> c.resolver().equals(resolver))
+                                    .map(SingleAssignmentCapability::targetKinds).findFirst().orElse(null);
+                }
                 TaskTypeCapability presentation = capabilities == null ? null : capabilities.taskTypes().stream()
                         .filter(c -> c.taskType().equals(human.taskType())).findFirst().orElse(null);
-                if (assignment != null) {
-                    runtimeHost.requireResolver(assignment.resolver(), assignment.targetKinds());
-                    var descriptor = humanContext.putObject("assignmentCapability"); descriptor.put("resolver", assignment.resolver());
-                    var kinds = descriptor.putArray("targetKinds"); assignment.targetKinds().stream().map(Enum::name).sorted().forEach(kinds::add);
+                if (assignmentKinds != null) {
+                    if (human.completionPolicy() == CompletionPolicy.ALL) runtimeHost.requireAllResolver(resolver, assignmentKinds);
+                    else runtimeHost.requireResolver(resolver, assignmentKinds);
+                    var descriptor = humanContext.putObject("assignmentCapability"); descriptor.put("resolver", resolver);
+                    descriptor.put("policy", human.completionPolicy().name());
+                    var kinds = descriptor.putArray("targetKinds"); assignmentKinds.stream().map(Enum::name).sorted().forEach(kinds::add);
                 }
                 if (presentation != null) {
                     ObjectNode descriptor = humanContext.putObject("taskCapability"); descriptor.put("taskType", presentation.taskType());
                     var outcomes = descriptor.putArray("supportedOutcomes"); presentation.supportedOutcomes().stream().sorted().forEach(outcomes::add);
                 }
-                if (assignment == null || presentation == null || !human.outcomes().stream().allMatch(outcome -> presentation.supportedOutcomes().contains(outcome.key())))
+                if (assignmentKinds == null || presentation == null || !human.outcomes().stream().allMatch(outcome -> presentation.supportedOutcomes().contains(outcome.key())))
                     diagnostics.error("HOST_CAPABILITY_UNAVAILABLE", DiagnosticStage.HOST, "Required deployed host capability is unavailable.", pointer);
             }
         } else if (capabilities == null) {
@@ -117,6 +129,11 @@ public class DefinitionValidationService {
             for (SingleAssignmentCapability c : snapshot.assignments()) {
                 if (c == null || !DefinitionInputs.text(c.resolver(), 100, 400, true) || !ids.add(c.resolver()))
                     throw new IllegalArgumentException("Invalid resolver descriptor");
+            }
+            ids.clear();
+            for (AllAssignmentCapability c : snapshot.allAssignments()) {
+                if (c == null || !DefinitionInputs.text(c.resolver(), 100, 400, true) || !ids.add(c.resolver()))
+                    throw new IllegalArgumentException("Invalid ALL resolver descriptor");
             }
             ids.clear();
             for (TaskTypeCapability c : snapshot.taskTypes()) {

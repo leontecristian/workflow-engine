@@ -47,6 +47,13 @@ public class RuntimeWire {
         return jsonResponse(json(value));
     }
 
+    public ResponseEntity<String> largeResponse(Object value) {
+        String encoded = json(value);
+        if (utf8Length(encoded) > io.github.leontecristian.workflow.core.service.runtime.RuntimeJson.LARGE_READ_UTF8_BYTES)
+            throw new WorkflowRuntimeException(422,"LIMIT_EXCEEDED");
+        return jsonResponse(encoded);
+    }
+
     private static ResponseEntity<String> jsonResponse(String json) {
         return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(json);
     }

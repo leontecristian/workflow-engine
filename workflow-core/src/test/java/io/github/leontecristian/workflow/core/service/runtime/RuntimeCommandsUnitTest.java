@@ -138,6 +138,7 @@ class RuntimeCommandsUnitTest {
         when(receipts.findById(any())).thenAnswer(i -> Optional.ofNullable(storedReceipts.get(i.getArgument(0))));
         when(history.findById(any())).thenAnswer(i -> Optional.ofNullable(facts.get(((WorkflowHistoryId)i.getArgument(0)).getSequenceNumber())));
         when(history.findCompletionByTaskId(3L)).thenReturn(Optional.empty());
+        when(history.findCreationByTaskId(3L)).thenAnswer(i -> facts.values().stream().filter(f -> "TASK_CREATED".equals(f.getEventType()) && Long.valueOf(3).equals(f.getTaskId())).findFirst());
         long[] last={-1};
         doAnswer(i -> {
             persisted.stream().filter(WorkflowInstanceEntity.class::isInstance).map(WorkflowInstanceEntity.class::cast).findFirst().ifPresent(row -> {

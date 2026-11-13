@@ -40,7 +40,11 @@ public class RuntimeVariables {
         apply(instanceId,nodeKey,bindings,before,writes,batch,null,null);
     }
     Map<String,WorkflowValue> afterTaskCompletion(long instanceId, MinimalWorkflowDefinition model,
-            MinimalWorkflowDefinition.Human human, WorkflowJsonValue result, long activityId, long taskId,
+            MinimalWorkflowDefinition.Human human, WorkflowJsonValue result, long activityId, long taskId, RuntimeHistoryBatch batch) {
+        return afterTaskResolution(instanceId,model,human,result,activityId,taskId,batch);
+    }
+    Map<String,WorkflowValue> afterTaskResolution(long instanceId, MinimalWorkflowDefinition model,
+            MinimalWorkflowDefinition.Human human, WorkflowJsonValue result, long activityId, Long taskId,
             RuntimeHistoryBatch batch) {
         String key = human.outputVariable();
         if (key == null || result == null) return read(instanceId, model);
@@ -48,14 +52,14 @@ public class RuntimeVariables {
         var state = read(instanceId, model);
         RuntimeInputs.require(!state.containsKey(key),Category.CONFLICT);
         var writes = Map.of(key,new WorkflowValue(VariableValueType.JSON,result));
-        apply(instanceId,human.key(),Map.of(key,new Binding("taskResult",human.key(),null)),
+        apply(instanceId,human.key(),Map.of(key,new Binding(taskId == null ? "activitySubmissions" : "taskResult",human.key(),null)),
                 state,writes,batch,activityId,taskId);
         return state;
     }
     private void apply(long instanceId,String nodeKey,Map<String,Binding> bindings,Map<String,WorkflowValue> before,
             Map<String,WorkflowValue> writes,RuntimeHistoryBatch batch,Long activityId,Long taskId) {
         Map<String,WorkflowValue> after=new TreeMap<>(before); after.putAll(writes);
-        RuntimeInputs.require(json.encode(RuntimeValueBindings.tokens(after,json)).length()*2L<=1024*1024,Category.LIMIT_EXCEEDED);
+        RuntimeInputs.require(json.encode(RuntimeValueBindings.tokens(after,json)).length()*2L<=RuntimeJson.MAP_UTF16_BYTES,Category.LIMIT_EXCEEDED);
         if (writes.isEmpty()) return;
         var orderedWrites=new TreeMap<>(writes);
         var details=json.object(); details.put("nodeKey",nodeKey);
@@ -69,10 +73,11 @@ public class RuntimeVariables {
         }
         // Check complete per-record/cumulative evidence before changing any variable. The history
         // append and subsequent writes participate in the same host transaction and roll back together.
-        batch.next("VARIABLES_WRITTEN",activityId,taskId,null,details,
-                Map.of("nodeKey",nodeKey,"writeCount",Integer.toString(orderedWrites.size())));
+        batch.next("VARIABLES_WRITTEN",activityId,taskId,details,
+                Map.of("nodeKey",nodeKey,"writeCount",Integer.toString(orderedWrites.size())),
+                (short)(activityId != null && taskId == null ? 3 : 2));
         for (var e:orderedWrites.entrySet()) {
-            var row=taskId==null ? repository.findById(new WorkflowVariableId(instanceId,e.getKey())).orElse(null) : null;
+            var row=activityId==null ? repository.findById(new WorkflowVariableId(instanceId,e.getKey())).orElse(null) : null;
             if(row==null) entityManager.persist(new WorkflowVariableEntity(instanceId,e.getKey(),e.getValue()));
             else row.replace(e.getValue());
         }

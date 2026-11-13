@@ -25,6 +25,8 @@
       </button>
     </div>
     @if(diagnosticsEnabled){<console-details [value]="detail()" />}
+    @if(detail()?.status === 'CANCELLED'){<p>This task was cancelled because the review resolved. No submission was recorded for this task.</p>}
+    @for(task of currentTasks(); track task.id){<a mat-stroked-button [routerLink]="link({kind:'task',id:task.id})">Open current task #{{task.id}}</a>}
     @if(diagnosticsEnabled && commands.buffer.command){<a mat-button [routerLink]="link({kind:'commands'})">Command recovery</a>}</mat-card-content
 ></mat-card>
 @if(!commandProvider && diagnosticsEnabled){<mat-card appearance="outlined"><mat-card-header><h2>Pinned contract</h2></mat-card-header><mat-card-content><console-details [value]="contract()" /></mat-card-content></mat-card>}

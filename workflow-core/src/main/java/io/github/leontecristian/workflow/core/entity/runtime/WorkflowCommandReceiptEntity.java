@@ -72,7 +72,7 @@ public class WorkflowCommandReceiptEntity {
     }
     public WorkflowCommandReceiptEntity(UUID commandId,long instanceId,String operation,ActorKind actorKind,String actorRef,
             byte[] fingerprint,String fingerprintVersion,LocalDateTime time,String resultJson,short schemaVersion) {
-        if (schemaVersion != 3 && schemaVersion != 4 && schemaVersion != 5) throw new IllegalArgumentException("Unsupported receipt schema");
+        if (schemaVersion != 3 && schemaVersion != 4 && schemaVersion != 5 && schemaVersion != 6) throw new IllegalArgumentException("Unsupported receipt schema");
         if (instanceId <= 0 || fingerprint == null || fingerprint.length != 32) throw new IllegalArgumentException("Invalid receipt");
         this.commandId = java.util.Objects.requireNonNull(commandId); this.instanceId = instanceId;
         this.operationType = java.util.Objects.requireNonNull(operation); this.actorKind = java.util.Objects.requireNonNull(actorKind);

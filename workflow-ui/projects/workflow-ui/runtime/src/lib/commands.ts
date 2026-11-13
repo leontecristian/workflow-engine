@@ -3,6 +3,7 @@ import { CommandRecovery, WORKFLOW_RUNTIME_COMMANDS, WORKFLOW_VIEWER_READS, type
 import { RuntimeState } from './runtime-state';
 import { PAGE_IMPORTS } from './page-imports';
 import { download } from './variables';
+import { currentWork } from './current-work';
 @Component({selector:'workflow-commands',standalone:true,imports:[...PAGE_IMPORTS],styleUrl:'./runtime.scss',templateUrl:'./commands.html'})
 export class WorkflowCommandsComponent extends RuntimeState {
  readonly commands=inject(CommandRecovery);readonly commandProvider=inject(WORKFLOW_RUNTIME_COMMANDS,{optional:true});
@@ -44,9 +45,9 @@ export class WorkflowCommandsComponent extends RuntimeState {
    const generation=++this.readGeneration,id=this.commands.buffer.command?.body['commandId'];
    this.currentInstance.set(null);this.currentTasks.set([]);
    const execution=this.commandExecution();if(!execution)return;
-   const [instance,tasks]=await Promise.all([this.viewer.instance(execution.instance.id,signal),this.api.instanceTasks(execution.instance.id,undefined,50,signal)]);
+   const [instance,tasks]=await Promise.all([this.viewer.instance(execution.instance.id,signal),currentWork(this.api,execution.instance.id,signal)]);
    if(!current()||generation!==this.readGeneration||id!==this.commands.buffer.command?.body['commandId'])return;
-   this.currentInstance.set(instance);this.currentTasks.set(tasks.items.filter(t=>t.status==='OPEN'));
+   this.currentInstance.set(instance);this.currentTasks.set(tasks);
   });
  }
  refresh(){void this.refreshCurrent();}

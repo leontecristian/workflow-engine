@@ -47,4 +47,11 @@ public interface WorkflowHistoryRepository extends Repository<WorkflowHistoryEnt
             where history.taskId = :taskId and history.eventType = 'TASK_COMPLETED'
             """)
     Optional<WorkflowHistoryEntity> findCompletionByTaskId(@Param("taskId") Long taskId);
+
+    @Query("select h from WorkflowHistoryEntity h where h.taskId = :taskId and h.eventType = 'TASK_CREATED'")
+    Optional<WorkflowHistoryEntity> findCreationByTaskId(@Param("taskId") Long taskId);
+
+    @Query("select h from WorkflowHistoryEntity h where h.activityId = :activityId and h.eventType = :eventType order by h.id.sequenceNumber")
+    List<WorkflowHistoryEntity> findActivityFacts(@Param("activityId") Long activityId,
+            @Param("eventType") String eventType, Pageable pageable);
 }

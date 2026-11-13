@@ -100,6 +100,12 @@
       />
       <p class="field-note">
         Task #{{commandExecution()!.task.id}}: {{commandExecution()!.task.status}}.
+        @if(commandExecution()!.operation === 'START_WORKFLOW' && commandExecution()!.activity.completionPolicy === 'ALL') {
+          This is the first task in creation order, a representative of the review. Find your authorized current work below.
+        }
+        @if(commandExecution()!.operation === 'COMPLETE_TASK' && commandExecution()!.activity.completionPolicy === 'ALL') {
+          {{commandExecution()!.activity.status === 'ACTIVE' ? 'Your contribution was accepted; the review was still waiting for other tasks.' : 'Your submission resolved the review.'}}
+        }
         @if(commandExecution()!.instance.status === 'ACTIVE') {
           This command left the workflow waiting at {{commandExecution()!.instance.currentNodeKey}}.
         } @else {
@@ -129,7 +135,7 @@
           <a mat-stroked-button [routerLink]="link({kind:'task',id:task.id})">Open assigned task #{{task.id}}</a>
         }
         @if(current.status === 'ACTIVE' && !currentTasks().length) {
-          <p>No open tasks are visible on this authorized page. Read current tasks for further pages.</p>
+          <p>No open tasks are currently visible to you.</p>
         }
       }
       <button mat-button (click)="refresh()" [disabled]="!sessionScope || busy()">Refresh current work</button>

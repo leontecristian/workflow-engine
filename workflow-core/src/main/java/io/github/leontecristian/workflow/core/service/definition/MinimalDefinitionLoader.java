@@ -135,7 +135,7 @@ public class MinimalDefinitionLoader {
                         && "HUMAN_TASK".equals(node.path("type").textValue())) return;
                 boolean unsupported = ((field.equals("guards") || (!extended && Set.of("variables", "inputContract").contains(field))) && value.isArray() && !value.isEmpty())
                         || (!extended && Set.of("inputs", "initialize").contains(field) && value.isObject() && !value.isEmpty())
-                        || (field.equals("policy") && value.isTextual() && !value.textValue().equals("SINGLE"))
+                        || (field.equals("policy") && value.isTextual() && !Set.of("SINGLE", "ALL").contains(value.textValue()))
                         || (field.equals("type") && value.isTextual() && Set.of("DECISION", "PARALLEL_GATEWAY", "INCLUSIVE_GATEWAY").contains(value.textValue()))
                         || (field.equals("expressionPolicy"));
                 String path = pointer + "/" + field.replace("~", "~0").replace("/", "~1");

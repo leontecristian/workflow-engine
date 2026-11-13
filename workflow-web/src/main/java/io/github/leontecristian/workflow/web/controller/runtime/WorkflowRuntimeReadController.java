@@ -60,7 +60,7 @@ public class WorkflowRuntimeReadController {
             item.put("value", v.value() == null ? null : wireValue(v.value())); items.add(item);
         }
         Map<String,Object> result=new LinkedHashMap<>(); result.put("instanceId",page.instanceId()); result.put("lockVersion",page.lockVersion());
-        result.put("items",items); result.put("nextAfterKey",page.nextAfterKey()); return wire.response(result);
+        result.put("items",items); result.put("nextAfterKey",page.nextAfterKey()); return wire.largeResponse(result);
     }
 
     private static Object wireValue(WorkflowValue value) {
@@ -168,7 +168,7 @@ public class WorkflowRuntimeReadController {
                 var inputs = new LinkedHashMap<String, WorkflowTaskContract.Input>();
                 reads.taskInputs(task.instanceId(), task.id()).forEach((key, value) ->
                         inputs.put(key, new WorkflowTaskContract.Input(value.type(), wireValue(value))));
-                return wire.response(new WorkflowTaskContract(
+                return wire.largeResponse(new WorkflowTaskContract(
                         task.id(), task.instanceId(), instance.lockVersion(), node.get("taskType").textValue(),
                         outcomes, canComplete, assignmentLabel(task), claimPolicy,
                         commandsAvailable && open && shared && !assigned && access.canClaimTask(task),

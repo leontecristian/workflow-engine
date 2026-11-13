@@ -1,6 +1,6 @@
 # Plan — F021 ALL collective review
 
-Revision 2 — 2026-11-13. Implements [specification revision 2](spec.md). **Planning only; no implementation, build, migration, database or host startup is authorized by this task.**
+Revision 2 — 2026-11-13. Implements [specification revision 2](spec.md). **Implementation authorized by the owner on 2026-11-13; the original planning-only restriction is superseded.**
 
 ## Baseline and approach
 

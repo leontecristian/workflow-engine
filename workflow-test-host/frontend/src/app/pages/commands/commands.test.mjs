@@ -64,7 +64,7 @@ test("live stage discovery keeps the historical command result and never submits
   }, undefined, undefined, [{ provide: CommandRecovery, useValue: service }]);
   await page.refreshCurrent();
   assert.equal(page.currentInstance().currentNodeKey, "PARTNER");
-  assert.deepEqual(page.currentTasks().map(t => t.id), ["11"]);
+  assert.deepEqual(Array.from(page.currentTasks(), t => t.id), ["11"]);
   assert.equal(service.execution(), original);
   assert.equal(original.task.id, "10");
   assert.equal(executions, 0);
@@ -73,7 +73,7 @@ test("live stage discovery keeps the historical command result and never submits
   await page.refreshCurrent();
   assert.equal(page.currentInstance().status, "COMPLETED");
   assert.equal(original.instance.status, "ACTIVE");
-  assert.deepEqual(page.currentTasks(), []);
+  assert.equal(page.currentTasks().length, 0);
 });
 
 test("a delayed live read cannot replace a newly selected command's current work", async (t) => {
@@ -90,6 +90,28 @@ test("a delayed live read cannot replace a newly selected command's current work
   release({ id: "1" }); await old;
   assert.equal(page.currentInstance().id, "2");
   assert.equal(page.currentTasks()[0].id, "20");
+});
+
+test('ALL current work follows hidden and completed pages without reopening frozen receipt tasks', async t => {
+ const original={operation:'START_WORKFLOW',instance:{id:'1'},activity:{completionPolicy:'ALL'},task:{id:'1',status:'OPEN'}};
+ const calls=[];
+ const service={buffer:new CommandBuffer(),result:core.signal(null),execution:()=>original};
+ const {page}=component(t,CommandsPage,{
+  instance:async()=>({id:'1',status:'ACTIVE'}),
+  instanceTasks:async(_,cursor,limit)=>{calls.push([cursor,limit]);return cursor===undefined
+   ?{items:[{id:'1',status:'CANCELLED'}],nextAfterId:'50'}
+   :cursor==='50'?{items:[],nextAfterId:'100'}:{items:[{id:'101',status:'OPEN'}],nextAfterId:null};},
+ },undefined,undefined,[{provide:CommandRecovery,useValue:service}]);
+ await page.refreshCurrent();
+ assert.deepEqual(calls,[[undefined,50],['50',50],['100',50]]);
+ assert.deepEqual(Array.from(page.currentTasks(),task=>task.id),['101']);
+ assert.equal(original.task.status,'OPEN');
+});
+
+test('current discovery rejects stalled cursors instead of displaying an incomplete success',async t=>{
+ const service={buffer:new CommandBuffer(),result:core.signal(null),execution:()=>({instance:{id:'1'}})};
+ const {page}=component(t,CommandsPage,{instance:async()=>({id:'1'}),instanceTasks:async()=>({items:[],nextAfterId:'50'})},undefined,undefined,[{provide:CommandRecovery,useValue:service}]);
+ await page.refreshCurrent();assert.match(page.error(),/Invalid current-task page cursor/);assert.equal(page.currentInstance(),null);
 });
 
 

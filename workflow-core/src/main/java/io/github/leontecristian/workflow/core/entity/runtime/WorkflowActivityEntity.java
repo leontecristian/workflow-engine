@@ -89,9 +89,21 @@ public class WorkflowActivityEntity {
         this.enteredAt = java.util.Objects.requireNonNull(enteredAt);
     }
 
+    public WorkflowActivityEntity(long instanceId, String nodeKey, long activationSequence,
+            long taskTypeId, String reviewRevisionRef, LocalDateTime enteredAt,
+            CompletionPolicy policy, String contributionOutcome, int requiredTaskCount) {
+        this(instanceId,nodeKey,activationSequence,taskTypeId,reviewRevisionRef,enteredAt);
+        if (policy == null || requiredTaskCount < 1 || requiredTaskCount > 100
+                || (policy == CompletionPolicy.SINGLE ? requiredTaskCount != 1 || contributionOutcome != null
+                    : policy != CompletionPolicy.ALL || contributionOutcome == null))
+            throw new IllegalArgumentException("Invalid completion contract");
+        this.completionPolicy = policy; this.contributionOutcomeKey = contributionOutcome;
+        this.requiredTaskCount = requiredTaskCount;
+    }
+
     public void complete(String outcome, LocalDateTime time, String actor) {
-        if (status != ActivityStatus.ACTIVE || completionPolicy != CompletionPolicy.SINGLE || time.isBefore(enteredAt))
-            throw new IllegalStateException("Active SINGLE activity required");
+        if (status != ActivityStatus.ACTIVE || time.isBefore(enteredAt))
+            throw new IllegalStateException("Active activity required");
         status = ActivityStatus.COMPLETED; outcomeKey = java.util.Objects.requireNonNull(outcome);
         closedAt = time; closedBy = java.util.Objects.requireNonNull(actor); closureReason = "TASK_OUTCOME";
     }

@@ -56,7 +56,7 @@ public class ViewerWire {
                                 JsonFactory.builder()
                                         .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
                                         .streamReadConstraints(com.fasterxml.jackson.core.StreamReadConstraints.builder()
-                                                .maxNestingDepth(64).maxNumberLength(128).maxStringLength(2*1024*1024).build())
+                                                .maxNestingDepth(64).maxNumberLength(128).maxStringLength(io.github.leontecristian.workflow.core.service.runtime.RuntimeJson.HISTORY_UTF16_BYTES / 2).build())
                                         .build())
                         .registerModule(longs)
                         .registerModule(new JavaTimeModule())

@@ -1,5 +1,6 @@
 package io.github.leontecristian.workflow.core.dto.definition.document;
 import java.util.List;
+import io.github.leontecristian.workflow.core.dto.runtime.CompletionPolicy;
 import java.util.Map;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowLiteral;
@@ -41,10 +42,18 @@ public record MinimalWorkflowDefinition(Node start, Map<String,Human> humans, No
     public record Node(String key, String type, String name, String result) {}
     public record Assignment(String resolver) {}
     public record Outcome(String key, String label, boolean requiresComment) {}
-    public record HumanInput(Binding binding, VariableValueType type, boolean nullable) {}
+    public record HumanInput(Binding binding, VariableValueType type, boolean nullable, boolean collection) {
+        public HumanInput(Binding binding, VariableValueType type, boolean nullable) { this(binding,type,nullable,false); }
+    }
     public record Human(String key, String taskType, Assignment assignment, List<Outcome> outcomes,
             TaskClaimPolicy claimPolicy, TaskResultContract resultContract, String outputVariable,
-            Map<String,HumanInput> inputs) {
+            Map<String,HumanInput> inputs, CompletionPolicy completionPolicy, String contributionOutcome) {
+        public Human(String key, String taskType, Assignment assignment, List<Outcome> outcomes,
+                TaskClaimPolicy claimPolicy, TaskResultContract resultContract, String outputVariable,
+                Map<String,HumanInput> inputs) {
+            this(key, taskType, assignment, outcomes, claimPolicy, resultContract, outputVariable, inputs,
+                    CompletionPolicy.SINGLE, null);
+        }
         public Human(String key, String taskType, Assignment assignment, List<Outcome> outcomes,
                 TaskClaimPolicy claimPolicy, TaskResultContract resultContract, String outputVariable) {
             this(key, taskType, assignment, outcomes, claimPolicy, resultContract, outputVariable, Map.of());

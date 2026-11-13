@@ -162,12 +162,26 @@ test('read-only consumer has no execution provider and refuses completion',async
 
 test('normal completion refreshes and confirms; conflict refreshes; ineligible tasks cannot execute', async t => {
  const buffer=new CommandBuffer(), observations=new Map(); let calls=0, reads=0, conflict=false;
- const commands={buffer,observations,async execute(){calls++;if(conflict)throw Object.assign(new Error('conflict'),{httpStatus:409});}};
- const api={async task(){reads++;return {instanceId:'1',status:'OPEN'};},async taskContract(){return {instanceLockVersion:'2',canComplete:true,outcomes:[{key:'OK',label:'OK',requiresComment:false}]};},async taskSubmission(){return null;}};
+ const commands={buffer,observations,execution:()=>null,async execute(){calls++;if(conflict)throw Object.assign(new Error('conflict'),{httpStatus:409});}};
+ const api={async instanceTasks(){return {items:[],nextAfterId:null};},async task(){reads++;return {instanceId:'1',status:'OPEN'};},async taskContract(){return {instanceLockVersion:'2',canComplete:true,outcomes:[{key:'OK',label:'OK',requiresComment:false}]};},async taskSubmission(){return null;}};
  const {page}=component(t,TaskPage,api,routeAt(),undefined,[{provide:CommandRecovery,useValue:commands}]);
  page.id='3';await page.load();page.contract.set({...page.contract(),canComplete:false});await page.complete('OK');assert.equal(calls,0);
  page.contract.set({...page.contract(),canComplete:true});await page.complete('OK');assert.equal(reads,2);assert.equal(page.notice(),'Task completed.');assert.equal(page.diagnosticsEnabled,false);
  conflict=true;await page.complete('OK');assert.equal(reads,3);assert.match(page.error(),/refreshed/);
+});
+
+test('ALL completion reports waiting or resolution and refreshes authorized later-page work',async t=>{
+ for(const status of ['ACTIVE','COMPLETED']){
+  const buffer=new CommandBuffer(),observations=new Map(),receipt={activity:{completionPolicy:'ALL',status}};
+  const commands={buffer,observations,execution:()=>receipt,async execute(){}};
+  const api={task:async()=>({instanceId:'1',status:'COMPLETED'}),taskContract:async()=>({canComplete:false,outcomes:[]}),taskSubmission:async()=>null,
+   instanceTasks:async(_,cursor)=>cursor?{items:[{id:'51',status:status==='ACTIVE'?'OPEN':'CANCELLED'}],nextAfterId:null}:{items:[],nextAfterId:'50'}};
+  const {page}=component(t,TaskPage,api,routeAt(),undefined,[{provide:CommandRecovery,useValue:commands}]);
+  page.id='3';page.detail.set({instanceId:'1',status:'OPEN'});page.contract.set({instanceLockVersion:'1',canComplete:true,outcomes:[{key:'OK',label:'OK'}]});
+  await page.complete('OK');assert.equal(page.error(),'');
+  assert.match(page.notice(),status==='ACTIVE'?/waiting for other tasks/:/resolved the review/);
+  assert.equal(page.currentTasks().length,status==='ACTIVE'?1:0);assert.equal(receipt.activity.status,status);
+ }
 });
 
 test('uncertain completion retains its frozen command and blocks replacement', async t => {

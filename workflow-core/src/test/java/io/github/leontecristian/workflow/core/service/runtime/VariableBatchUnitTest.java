@@ -118,6 +118,54 @@ class VariableBatchUnitTest {
         assertEquals(accepted,((WorkflowVariableEntity) persisted.getAllValues().get(1)).executionValue().value());
     }
 
+    @Test void allResolutionCreatesActivityCollectionOnceAndOrdinaryReplacementUpdatesItsRow() {
+        var single = namedProducer();
+        var human = new MinimalWorkflowDefinition.Human(single.key(),single.taskType(),single.assignment(),
+                single.outcomes(),single.claimPolicy(),single.resultContract(),single.outputVariable(),single.inputs(),
+                io.github.leontecristian.workflow.core.dto.runtime.CompletionPolicy.ALL,"APPROVE");
+        var model = namedModel(human,Map.of());
+        var original = WorkflowJsonValue.parse("[{\"taskId\":\"11\",\"taskKey\":\"finance\",\"outcomeKey\":\"APPROVE\",\"comment\":null,\"result\":{\"amount\":1000.00}},{\"taskId\":\"12\",\"taskKey\":\"legal\",\"outcomeKey\":\"REJECT\",\"comment\":null}]");
+        var persisted = new ArrayList<Object>();
+        doAnswer(call -> { persisted.add(call.getArgument(0)); return null; }).when(em).persist(any());
+        var state = variables.afterTaskResolution(1,model,human,original,3,null,batch);
+        assertEquals(2,persisted.size());
+        var fact = (WorkflowHistoryEntity) persisted.get(0);
+        var row = (WorkflowVariableEntity) persisted.get(1);
+        assertEquals("VARIABLES_WRITTEN",fact.getEventType());
+        assertEquals(Short.valueOf((short)3),fact.getDetailsSchemaVersion());
+        assertEquals(3L,fact.getActivityId()); assertEquals(null,fact.getTaskId());
+        var write = json.tree(fact.getDetailsJson()).path("writes").get(0);
+        assertEquals(json.tree("{\"source\":\"activitySubmissions\",\"nodeKey\":\"review\"}"),write.path("source"));
+        assertEquals(json.tree(original.toJson()),write.path("value"));
+        assertFalse(write.path("value").get(1).has("result"));
+        assertFalse(write.path("previousInitialized").asBoolean());
+        assertEquals(original,row.executionValue().value());
+        assertEquals(original,state.get("copy").value());
+
+        when(repository.findById(row.getId())).thenReturn(Optional.of(row));
+        clearInvocations(em);
+        assertEquals(Category.CONFLICT,assertThrows(WorkflowExecutionException.class,
+                () -> variables.afterTaskResolution(1,model,human,original,3,null,batch)).category());
+        verifyNoInteractions(em);
+        assertEquals(1,batch.last());
+        assertEquals(original,row.executionValue().value());
+
+        var replacement = WorkflowJsonValue.parse("{\"working\":true}");
+        variables.apply(1,"later",Map.of("copy",new Binding("actionOutput","replacement",null)),state,
+                Map.of("copy",new WorkflowValue(VariableValueType.JSON,replacement)),batch);
+        assertEquals(replacement,row.executionValue().value());
+        assertEquals(replacement,state.get("copy").value());
+        assertEquals(2,batch.last());
+        assertEquals(3,persisted.size()); // Two history facts, only the original variable insertion.
+        assertEquals(1L,persisted.stream().filter(WorkflowVariableEntity.class::isInstance).count());
+        var replacementFact = (WorkflowHistoryEntity) persisted.get(2);
+        assertEquals(Short.valueOf((short)2),replacementFact.getDetailsSchemaVersion());
+        var replacementWrite = json.tree(replacementFact.getDetailsJson()).path("writes").get(0);
+        assertTrue(replacementWrite.path("previousInitialized").asBoolean());
+        assertEquals(json.tree(original.toJson()),replacementWrite.path("previousValue"));
+        assertEquals(json.tree(original.toJson()),json.tree(fact.getDetailsJson()).path("writes").get(0).path("value"));
+    }
+
     @Test void completionCopyNeverOverwritesAnExistingRow() {
         var human = namedProducer();
         var existing = new WorkflowVariableEntity(1,"copy",new WorkflowValue(VariableValueType.JSON,
@@ -135,11 +183,11 @@ class VariableBatchUnitTest {
         var human = namedProducer();
         var declarations = new TreeMap<String,ActionField>();
         var existing = new ArrayList<WorkflowVariableEntity>();
-        String large = "{\"text\":\"" + "x".repeat(3900) + "\"}";
+        String large = "{\"text\":\"" + "x".repeat(3953) + "\"}";
         for (int i = 0; i < 66; i++) {
             String key = "value" + i;
             declarations.put(key,new ActionField(key,VariableValueType.JSON,false,false));
-            var value = WorkflowJsonValue.parse("[" + String.join(",",java.util.Collections.nCopies(2,large)) + "]");
+            var value = WorkflowJsonValue.parse("[" + String.join(",",java.util.Collections.nCopies(20,large)) + "]");
             existing.add(new WorkflowVariableEntity(1,key,new WorkflowValue(VariableValueType.JSON,value)));
         }
         when(repository.findByInstanceId(1,org.springframework.data.domain.PageRequest.of(0,101))).thenReturn(existing);
@@ -208,7 +256,9 @@ class VariableBatchUnitTest {
     @Test void oversizedCombinedEvidenceFailsBeforeAnyVariableOrHistoryMutation() {
         var state = new TreeMap<String, WorkflowValue>();
         var writes = new TreeMap<String, WorkflowValue>();
-        for (int i = 0; i < 30; i++) writes.put("v" + i, text("\u0000".repeat(4000)));
+        for (int i = 0; i < 30; i++) writes.put("v" + i, new WorkflowValue(VariableValueType.JSON,
+                WorkflowJsonValue.parse("[" + String.join(",", java.util.Collections.nCopies(12,
+                        "\"" + "x".repeat(16000) + "\"")) + "]")));
         assertEquals(Category.LIMIT_EXCEEDED, assertThrows(WorkflowExecutionException.class,
                 () -> variables.apply(1, "LARGE", bindings(writes), state, writes, batch)).category());
         assertTrue(state.isEmpty());
@@ -217,7 +267,7 @@ class VariableBatchUnitTest {
     }
 
     @Test void cumulativeBudgetFailureDoesNotMutateExistingVariableOrSnapshot() {
-        for (int i = 0; i < 139; i++) batch.next("TEST", null, null, null, Map.of("value", "x".repeat(60000)), Map.of());
+        for (int i = 0; i < 559; i++) batch.next("TEST", null, null, null, Map.of("value", "x".repeat(60000)), Map.of());
         var state = new TreeMap<String, WorkflowValue>();
         var writes = new HashMap<String, WorkflowValue>();
         for (int i = 0; i < 15; i++) { state.put("v" + i, text("x".repeat(100))); writes.put("v" + i, text("y".repeat(4000))); }
@@ -227,7 +277,7 @@ class VariableBatchUnitTest {
                 () -> variables.apply(1, "OVERFLOW", bindings(writes), state, writes, batch)).category());
         assertEquals(original, state);
         verifyNoInteractions(repository, em);
-        assertEquals(139, batch.last());
+        assertEquals(559, batch.last());
     }
 
     @Test void eachOperationGetsItsOwnSequenceAndBatch() {

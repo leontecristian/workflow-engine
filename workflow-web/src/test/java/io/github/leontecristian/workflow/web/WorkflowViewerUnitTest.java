@@ -6,6 +6,7 @@ import io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistorySummary
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistoryPage;
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
+import io.github.leontecristian.workflow.core.service.runtime.RuntimeJson;
 import io.github.leontecristian.workflow.web.configuration.WorkflowViewerConfiguration;
 import io.github.leontecristian.workflow.web.configuration.WorkflowViewerOptions;
 import io.github.leontecristian.workflow.web.controller.instance.WorkflowInstanceViewerController;
@@ -254,11 +255,11 @@ class WorkflowViewerUnitTest {
     @Test void exactEventUnicodeStoredBoundsAreIndependentOfEscaping() {
         var reads = mock(WorkflowRuntimeQueryService.class);
         var viewer = new WorkflowInstanceViewerService(reads, mock(WorkflowViewerAccess.class), new ViewerWire());
-        String unicode = "{\"v\":\"" + "漢".repeat(1398098) + "\"}";
-        assertThat(unicode.getBytes(java.nio.charset.StandardCharsets.UTF_8).length).isLessThanOrEqualTo(4 * 1024 * 1024);
+        String unicode = "{\"v\":\"" + "漢".repeat(RuntimeJson.HISTORY_UTF16_BYTES / 2 - 8) + "\"}";
+        assertThat(unicode.getBytes(java.nio.charset.StandardCharsets.UTF_8).length).isLessThanOrEqualTo(RuntimeJson.HISTORY_UTF8_BYTES);
         when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), unicode)));
         assertThat(viewer.event(1, 1)).contains("漢");
-        when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), unicode + "漢")));
+        when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), unicode.substring(0, unicode.length() - 2) + "漢\"}")));
         assertThatThrownBy(() -> viewer.event(1, 1)).isInstanceOf(WorkflowViewerException.class);
     }
     private WorkflowHistorySummary summary(long sequence, String actor) {
@@ -273,17 +274,17 @@ class WorkflowViewerUnitTest {
         var json = viewer.event(1, 1);
         assertThat(wire.tree(json).path("detailsJson").textValue()).isEqualTo(exact);
         assertThat(json).contains("\"instanceId\":\"9007199254740993\"", "FUTURE_EVENT");
-        // Exactly 4 MiB UTF-16 details, well above the ordinary summary cap.
-        String maximum = "{\"v\":\"" + "a".repeat(2 * 1024 * 1024 - 8) + "\"}";
-        assertThat(maximum.length()).isEqualTo(2 * 1024 * 1024);
+        // Exactly 24 MiB UTF-16 details, well above the ordinary summary cap.
+        String maximum = "{\"v\":\"" + "a".repeat(RuntimeJson.HISTORY_UTF16_BYTES / 2 - 8) + "\"}";
+        assertThat(maximum.length()).isEqualTo(RuntimeJson.HISTORY_UTF16_BYTES / 2);
         when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), maximum)));
         assertThat(viewer.event(1, 1)).contains(maximum.substring(10, 100));
         // Valid stored JSON whose backslashes expand in the final detailsJson envelope.
-        String escaping = "{\"v\":\"" + "\\u0001".repeat(349524) + "\"}";
+        String escaping = "{\"v\":\"" + "\\u0001".repeat((RuntimeJson.HISTORY_UTF16_BYTES / 2 - 8) / 6) + "\"}";
         when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), escaping)));
-        assertThat(viewer.event(1, 1).getBytes(java.nio.charset.StandardCharsets.UTF_8).length).isLessThan(8 * 1024 * 1024);
+        assertThat(viewer.event(1, 1).getBytes(java.nio.charset.StandardCharsets.UTF_8).length).isLessThan(RuntimeJson.HISTORY_RESPONSE_UTF8_BYTES);
         // Oversized final envelope fails, never returning a partial event.
-        when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "\u0001".repeat(1400000)), exact)));
+        when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "\u0001".repeat(RuntimeJson.HISTORY_RESPONSE_UTF8_BYTES / 6 + 1)), exact)));
         assertThatThrownBy(() -> viewer.event(1, 1)).isInstanceOfSatisfying(WorkflowViewerException.class, e -> assertThat(e.code()).isEqualTo("LIMIT_EXCEEDED"));
         when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), maximum + " ")));
         assertThatThrownBy(() -> viewer.event(1, 1)).isInstanceOf(WorkflowViewerException.class);

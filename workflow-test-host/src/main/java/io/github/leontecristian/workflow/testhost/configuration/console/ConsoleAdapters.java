@@ -1,11 +1,13 @@
 package io.github.leontecristian.workflow.testhost.configuration.console;
 
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionCapabilities;
+import io.github.leontecristian.workflow.core.dto.definition.AllAssignmentCapability;
 import io.github.leontecristian.workflow.core.dto.definition.SingleAssignmentCapability;
 import io.github.leontecristian.workflow.core.dto.definition.TaskTypeCapability;
 import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
 import io.github.leontecristian.workflow.core.service.definition.DefinitionCapabilityProvider;
 import io.github.leontecristian.workflow.core.service.runtime.SingleTaskAssignmentResolver;
+import io.github.leontecristian.workflow.core.service.runtime.AllTaskAssignmentResolver;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowEventRecorder;
 import io.github.leontecristian.workflow.testhost.repository.event.ConsoleEventStore;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
@@ -14,6 +16,7 @@ import io.github.leontecristian.workflow.testhost.service.event.ConsoleEventReco
 import io.github.leontecristian.workflow.testhost.service.runtime.SandboxSharedAssignmentProvider;
 import io.github.leontecristian.workflow.testhost.service.runtime.SandboxSharedAssignmentResolver;
 import io.github.leontecristian.workflow.testhost.service.sandbox.SandboxAssignmentResolver;
+import io.github.leontecristian.workflow.testhost.service.sandbox.SandboxAllAssignmentResolver;
 import java.util.Set;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -32,7 +35,8 @@ public class ConsoleAdapters {
                                         new SingleAssignmentCapability("sandbox.sharedRoleReviewer", Set.of(AssignmentTargetKind.ROLE))),
                                 Set.of(
                                         new TaskTypeCapability(
-                                                "SANDBOX_REVIEW", Set.of("COMPLETE", "APPROVE", "REJECT"))))
+                                                "SANDBOX_REVIEW", Set.of("COMPLETE", "APPROVE", "REJECT"))),
+                                Set.of(new AllAssignmentCapability("sandbox.allReviewers", Set.of(AssignmentTargetKind.values()))))
                         : new DefinitionCapabilities(Set.of(), Set.of());
     }
 
@@ -49,6 +53,12 @@ public class ConsoleAdapters {
     @Bean
     SandboxSharedAssignmentProvider sandboxMembership(ConsoleSettings settings) {
         return new SandboxSharedAssignmentProvider(Set.of(settings.reviewer, settings.reviewer2));
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "workflow.console.capabilities", havingValue = "sample", matchIfMissing = true)
+    AllTaskAssignmentResolver sandboxAllResolver(SandboxRequestStore requests, ConsoleSettings settings) {
+        return new SandboxAllAssignmentResolver(requests, settings);
     }
 
     @Bean

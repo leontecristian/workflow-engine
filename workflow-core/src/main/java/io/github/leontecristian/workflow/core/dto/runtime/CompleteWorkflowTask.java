@@ -37,6 +37,7 @@ public record CompleteWorkflowTask(
 
     static void requireResultObject(WorkflowJsonValue result) {
         if (!result.toJson().startsWith("{")) throw new WorkflowExecutionException(Category.INVALID_INPUT);
+        WorkflowJsonCodec.requireDepth(result.toJson(), 16);
         if (result.toJson().length() > 32768) {
             throw WorkflowExecutionException.resultLimit("The result exceeds 64 KiB of canonical UTF-16 JSON.");
         }

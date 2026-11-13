@@ -34,6 +34,11 @@ public class RuntimeServiceProgression {
     }
     MinimalWorkflowDefinition.Node traverse(MinimalWorkflowDefinition model,String from,String stop,ServiceActionContext context,
             Map<String,WorkflowValue> state,RuntimeProgression budget,RuntimeHistoryBatch batch,String definitionHash,String selectedOutcome) {
+        return traverse(model,from,stop,context,state,budget,batch,definitionHash,selectedOutcome,new java.util.HashMap<>());
+    }
+    MinimalWorkflowDefinition.Node traverse(MinimalWorkflowDefinition model,String from,String stop,ServiceActionContext context,
+            Map<String,WorkflowValue> state,RuntimeProgression budget,RuntimeHistoryBatch batch,String definitionHash,String selectedOutcome,
+            Map<String,io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue> submissions) {
         String cursor=from;
         while (true) {
             String current=cursor;
@@ -58,7 +63,7 @@ public class RuntimeServiceProgression {
                 var b=node.inputs().get(f.key());
                 RuntimeInputs.require(b!=null || !f.required(),Category.HOST_CONFIGURATION);
                 if (b!=null) {
-                    var value=resolveInput(model,b,context.instanceId(),state);
+                    var value=resolveInput(model,b,context.instanceId(),state,submissions);
                     RuntimeValueBindings.validate(f,value,Category.HOST_CONFIGURATION); args.put(f.key(),value);
                 }
             }
@@ -82,13 +87,21 @@ public class RuntimeServiceProgression {
             variables.apply(context.instanceId(),cursor,node.outputs(),state,writes,batch);
         }
     }
+    io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue resolveSubmission(long instanceId,String nodeKey,Mode mode) {
+        return queries.resolveSubmission(instanceId,nodeKey,mode);
+    }
     WorkflowValue resolveInput(MinimalWorkflowDefinition model, MinimalWorkflowDefinition.Binding binding,
             long instanceId, Map<String,WorkflowValue> state) {
+        return resolveInput(model,binding,instanceId,state,new java.util.HashMap<>());
+    }
+    WorkflowValue resolveInput(MinimalWorkflowDefinition model, MinimalWorkflowDefinition.Binding binding,
+            long instanceId, Map<String,WorkflowValue> state,
+            Map<String,io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue> submissions) {
         if ("submission".equals(binding.source())) {
             var human = model.humans().get(binding.nodeKey());
             RuntimeInputs.require(human != null && human.resultContract().mode() != Mode.FORBIDDEN, Category.HOST_CONFIGURATION);
             return new WorkflowValue(VariableValueType.JSON,
-                    queries.resolveSubmission(instanceId, binding.nodeKey(), human.resultContract().mode()));
+                    submissions.computeIfAbsent(binding.nodeKey(), key -> queries.resolveSubmission(instanceId, key, human.resultContract().mode())));
         }
         RuntimeInputs.require("variable".equals(binding.source()), Category.HOST_CONFIGURATION);
         var value = state.get(binding.key());

@@ -39,21 +39,23 @@ class JsonExecutionUnitTest {
                 .endsWith("1.00000000000000000000]");
     }
     static String sized(int chars) {
-        // Nine bounded strings, with punctuation included in the exact canonical capacity.
-        StringBuilder out=new StringBuilder("["); int remaining=chars-2-8-18;
-        for(int i=0;i<9;i++) { if(i>0) out.append(','); int n=Math.min(16000,remaining); out.append('"').append("x".repeat(n)).append('"'); remaining-=n; }
+        // Bounded strings, with punctuation included in the exact canonical capacity.
+        int count=(chars+16002)/16003;
+        StringBuilder out=new StringBuilder("["); int remaining=chars-3*count-1;
+        for(int i=0;i<count;i++) { if(i>0) out.append(','); int n=Math.min(16000,remaining); out.append('"').append("x".repeat(n)).append('"'); remaining-=n; }
         return out.append(']').toString();
     }
     @Test void inclusiveValueDepthCountsAndRawIngressBounds() {
-        String max=sized(128*1024);
-        assertThat(WorkflowJsonValue.parse(max).toJson()).hasSize(128*1024);
-        assertThatThrownBy(()->WorkflowJsonValue.parse(sized(128*1024+1))).isInstanceOf(WorkflowExecutionException.class);
-        assertThat(WorkflowJsonValue.parse("[".repeat(16)+"0"+"]".repeat(16))).isNotNull();
-        assertThatThrownBy(()->WorkflowJsonValue.parse("[".repeat(17)+"0"+"]".repeat(17))).isInstanceOf(WorkflowExecutionException.class);
+        int maximumChars=WorkflowJsonValue.MAX_UTF16_BYTES/2;
+        String max=sized(maximumChars);
+        assertThat(WorkflowJsonValue.parse(max).toJson()).hasSize(maximumChars);
+        assertThatThrownBy(()->WorkflowJsonValue.parse(sized(maximumChars+1))).isInstanceOf(WorkflowExecutionException.class);
+        assertThat(WorkflowJsonValue.parse("[".repeat(18)+"0"+"]".repeat(18))).isNotNull();
+        assertThatThrownBy(()->WorkflowJsonValue.parse("[".repeat(19)+"0"+"]".repeat(19))).isInstanceOf(WorkflowExecutionException.class);
         assertThat(WorkflowJsonValue.parse("["+"null,".repeat(999)+"null]")).isNotNull();
         assertThatThrownBy(()->WorkflowJsonValue.parse("["+"null,".repeat(1000)+"null]")).isInstanceOf(WorkflowExecutionException.class);
-        assertThatThrownBy(()->WorkflowJsonValue.parse(" ".repeat(2*1024*1024)+"[]")).isInstanceOf(WorkflowExecutionException.class);
-        assertThat(WorkflowJsonValue.parse("[]"+" ".repeat(2*1024*1024-2)).toJson()).isEqualTo("[]");
+        assertThatThrownBy(()->WorkflowJsonValue.parse(" ".repeat(WorkflowJsonValue.MAX_RAW_UTF8_BYTES)+"[]")).isInstanceOf(WorkflowExecutionException.class);
+        assertThat(WorkflowJsonValue.parse("[]"+" ".repeat(WorkflowJsonValue.MAX_RAW_UTF8_BYTES-2)).toJson()).isEqualTo("[]");
     }
     @Test void replacementAndTypedNullUseOneExistingStorageColumn() {
         var row=new WorkflowVariableEntity(1,"booking",new WorkflowValue(VariableValueType.JSON,WorkflowJsonValue.parse("{\"n\":1.00,\"obsolete\":true}")));
@@ -83,10 +85,11 @@ class JsonExecutionUnitTest {
     }
     @Test void exactCurrentStateAndStartServiceEnvelopeBoundariesIncludeKeysAndPunctuation() {
         var json=new RuntimeJson(); var values=new java.util.TreeMap<String,WorkflowValue>();
-        for(String key:List.of("a","b","c")) values.put(key,new WorkflowValue(VariableValueType.JSON,WorkflowJsonValue.parse(sized(128*1024))));
-        values.put("d",new WorkflowValue(VariableValueType.JSON,WorkflowJsonValue.parse(sized(128*1024-21))));
+        int quarterMapChars=RuntimeJson.MAP_UTF16_BYTES/8;
+        for(String key:List.of("a","b","c")) values.put(key,new WorkflowValue(VariableValueType.JSON,WorkflowJsonValue.parse(sized(quarterMapChars))));
+        values.put("d",new WorkflowValue(VariableValueType.JSON,WorkflowJsonValue.parse(sized(quarterMapChars-21))));
         String maximum=json.encode(RuntimeValueBindings.tokens(values,json));
-        assertThat(maximum.length()*2).isEqualTo(1024*1024);
+        assertThat(maximum.length()*2).isEqualTo(RuntimeJson.MAP_UTF16_BYTES);
         assertThatCode(()->RuntimeValueBindings.envelope(maximum)).doesNotThrowAnyException();
         var fields=values.keySet().stream().map(k->new io.github.leontecristian.workflow.core.dto.runtime.ActionField(k,VariableValueType.JSON,true,false)).toList();
         assertThatCode(()->RuntimeValueBindings.output(fields,values,json)).doesNotThrowAnyException();
@@ -107,9 +110,9 @@ class JsonExecutionUnitTest {
             assertThat(write.path("previousInitialized").asBoolean()).isTrue();
             assertThat(write.path("previousValue")).isEqualTo(write.path("value"));
         });
-        values.put("d",new WorkflowValue(VariableValueType.JSON,WorkflowJsonValue.parse(sized(128*1024-20))));
+        values.put("d",new WorkflowValue(VariableValueType.JSON,WorkflowJsonValue.parse(sized(quarterMapChars-20))));
         String overflow=maximum.replaceFirst("x","xx");
-        assertThat(overflow.length()*2).isEqualTo(1024*1024+2);
+        assertThat(overflow.length()*2).isEqualTo(RuntimeJson.MAP_UTF16_BYTES+2);
         assertThatThrownBy(()->RuntimeValueBindings.envelope(overflow)).isInstanceOf(WorkflowExecutionException.class);
         assertThatThrownBy(()->RuntimeValueBindings.output(fields,values,json)).isInstanceOf(WorkflowExecutionException.class);
         org.mockito.Mockito.clearInvocations(em,repository);
@@ -123,25 +126,27 @@ class JsonExecutionUnitTest {
         return out.append(']').toString();
     }
     @Test void historyAndCumulativeBudgetsAcceptExactLimitsAndStopBeforeNextPersistence() throws Exception {
-        var json=new RuntimeJson(); var details=json.tree(historyArray(2*1024*1024));
-        assertThat(json.history(details)).hasSize(2*1024*1024);
-        var overflow=new com.fasterxml.jackson.databind.ObjectMapper().readTree(historyArray(2*1024*1024).replaceFirst("x","xx"));
+        var json=new RuntimeJson(); int historyChars=RuntimeJson.HISTORY_UTF16_BYTES/2;
+        var details=json.tree(historyArray(historyChars));
+        assertThat(json.history(details)).hasSize(historyChars);
+        var overflow=new com.fasterxml.jackson.databind.ObjectMapper().readTree(historyArray(historyChars).replaceFirst("x","xx"));
         assertThatThrownBy(()->json.history(overflow)).isInstanceOfSatisfying(WorkflowExecutionException.class,e->assertThat(e.category()).isEqualTo(WorkflowExecutionException.Category.LIMIT_EXCEEDED));
         var em=org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class);
         var batch=new RuntimeHistoryBatch(em,json,1,2,UUID.randomUUID(),new WorkflowCommandContext(ActorKind.USER,"tester",Instant.EPOCH,null));
-        for(int i=0;i<4;i++) batch.next("TEST",null,null,null,details,Map.of());
+        var quarterCommand=json.tree(historyArray(RuntimeJson.COMMAND_HISTORY_UTF16_BYTES/8));
+        for(int i=0;i<4;i++) batch.next("TEST",null,null,null,quarterCommand,Map.of());
         assertThat(batch.last()).isEqualTo(4);
         org.mockito.Mockito.clearInvocations(em);
         assertThatThrownBy(()->batch.next("TEST",null,null,null,Map.of(),Map.of())).isInstanceOf(WorkflowExecutionException.class);
         org.mockito.Mockito.verifyNoInteractions(em); assertThat(batch.last()).isEqualTo(4);
     }
-    @Test void historyUtf8BudgetIsIndependentOfItsUtf16Allowance() throws Exception {
+    @Test void historyUnicodeEncodingFitsTheAlignedUtf8Allowance() throws Exception {
         var json=new RuntimeJson();
-        String raw=historyArray(4*1024*1024/3).replace("x","中");
-        int remaining=4*1024*1024-raw.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
-        String exact=raw.replaceFirst("中","x".repeat(remaining)+"中");
+        // C01 aligns UTF-8 at 1.5 times UTF-16; valid canonical text reaches UTF-16 first.
+        String exact=historyArray(RuntimeJson.HISTORY_UTF16_BYTES/2).replace("x","中");
         var node=json.tree(exact);
-        assertThat(json.history(node).getBytes(java.nio.charset.StandardCharsets.UTF_8)).hasSize(4*1024*1024);
+        assertThat(json.history(node)).hasSize(RuntimeJson.HISTORY_UTF16_BYTES/2);
+        assertThat(json.history(node).getBytes(java.nio.charset.StandardCharsets.UTF_8).length).isLessThanOrEqualTo(RuntimeJson.HISTORY_UTF8_BYTES);
         var overflow=new com.fasterxml.jackson.databind.ObjectMapper().readTree(exact.replaceFirst("中","x中"));
         assertThatThrownBy(()->json.history(overflow)).isInstanceOfSatisfying(WorkflowExecutionException.class,e->assertThat(e.category()).isEqualTo(WorkflowExecutionException.Category.LIMIT_EXCEEDED));
     }

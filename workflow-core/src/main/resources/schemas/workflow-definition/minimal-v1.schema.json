@@ -237,16 +237,23 @@
           "additionalProperties": false
         },
         "completion": {
-          "type": "object",
-          "properties": {
-            "policy": {
-              "const": "SINGLE"
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {"policy": {"const": "SINGLE"}},
+              "required": ["policy"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "policy": {"const": "ALL"},
+                "contributionOutcome": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,99}$"}
+              },
+              "required": ["policy", "contributionOutcome"],
+              "additionalProperties": false
             }
-          },
-          "required": [
-            "policy"
-          ],
-          "additionalProperties": false
+          ]
         },
         "inputs": {
           "type": "object",

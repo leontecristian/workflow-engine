@@ -88,7 +88,7 @@ public class WorkflowRuntimeQueryService {
             String k=keys.get(i); var value=values.get(k);
             items.add(new WorkflowVariableView(k,model.variables().get(k).type(),value!=null,value));
             next=i+1<keys.size() ? k : null;
-            if(!RuntimeJson.utf8Fits(json.variablePage(new WorkflowVariablePage(instanceId,before,items,next)),1024*1024)) {
+            if(!RuntimeJson.utf8Fits(json.variablePage(new WorkflowVariablePage(instanceId,before,items,next)),RuntimeJson.LARGE_READ_UTF8_BYTES)) {
                 items.remove(items.size()-1); RuntimeInputs.require(!items.isEmpty(),Category.LIMIT_EXCEEDED); next=items.get(items.size()-1).key(); break;
             }
         }
@@ -128,9 +128,9 @@ public class WorkflowRuntimeQueryService {
             RuntimeInputs.require(activity.getInstanceId().equals(instanceId), Category.NOT_FOUND);
             var inputs = pinnedHuman(activity).inputs();
             if (inputs.isEmpty()) return Map.of();
-            var fact = history.findById(new WorkflowHistoryId(instanceId, RuntimeProgression.advance(activity.getActivationSequence(), 1)))
+            var fact = history.findCreationByTaskId(taskId)
                     .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
-            return RuntimeTaskCreationEvidence.read(fact, task, activity, inputs, json);
+            return RuntimeTaskCreationEvidence.read(fact, task, activity, inputs, json, history);
         });
     }
     /** Pinned policy for an exact task already authorized by the host. */
@@ -215,8 +215,9 @@ public class WorkflowRuntimeQueryService {
         if (fact.isEmpty()) return Optional.empty();
         var entity = fact.get();
         var summary = RuntimePersistenceErrors.call(() -> RuntimeViews.history(entity));
+        if ("ACTIVITY_INPUTS_CAPTURED".equals(summary.eventType())) return Optional.empty();
         boolean creation = "TASK_CREATED".equals(summary.eventType());
-        boolean protectedInputs = creation && summary.detailsSchemaVersion() >= RuntimeTaskCreationEvidence.INPUTS_VERSION;
+        boolean protectedInputs = creation && summary.detailsSchemaVersion() == RuntimeTaskCreationEvidence.INPUTS_VERSION;
         if (protectedInputs && (summary.taskId() == null || summary.activityId() == null || !canReadTaskInputs.test(summary)))
             return Optional.empty();
         return RuntimePersistenceErrors.call(() -> {
@@ -224,13 +225,14 @@ public class WorkflowRuntimeQueryService {
                 var task = tasks.findById(summary.taskId())
                         .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
                 var activity = owner(task);
-                RuntimeTaskCreationEvidence.read(entity, task, activity, pinnedHuman(activity).inputs(), json);
+                RuntimeTaskCreationEvidence.read(entity, task, activity, pinnedHuman(activity).inputs(), json, history);
             } else if (creation) {
                 RuntimeInputs.require(!json.tree(entity.getDetailsJson()).has("inputs"), Category.HOST_CONFIGURATION);
             }
-            RuntimeInputs.require(RuntimeJson.fits(entity.getDetailsJson(), 4 * 1024 * 1024), Category.LIMIT_EXCEEDED);
+            RuntimeInputs.require(entity.getDetailsJson().length()*2L <= RuntimeJson.HISTORY_UTF16_BYTES
+                    && RuntimeJson.utf8Fits(entity.getDetailsJson(),RuntimeJson.HISTORY_UTF8_BYTES), Category.LIMIT_EXCEEDED);
             var result=new WorkflowHistoryEvent(summary, entity.getDetailsJson());
-            RuntimeInputs.require(RuntimeJson.utf8Fits(json.encode(result),8*1024*1024),Category.LIMIT_EXCEEDED);
+            RuntimeInputs.require(RuntimeJson.utf8Fits(json.encode(result),RuntimeJson.HISTORY_RESPONSE_UTF8_BYTES),Category.LIMIT_EXCEEDED);
             return Optional.of(result);
         });
     }
@@ -262,6 +264,7 @@ public class WorkflowRuntimeQueryService {
         RuntimeInputs.require(activity.getInstanceId().equals(instanceId) && activity.getNodeKey().equals(nodeKey),
                 Category.HOST_CONFIGURATION);
         RuntimeInputs.require(activity.getStatus() == ActivityStatus.COMPLETED, Category.SUBMISSION_UNAVAILABLE);
+        if (activity.getCompletionPolicy() == CompletionPolicy.ALL) return collectiveSubmission(activity,mode);
         RuntimeInputs.require(activity.getCompletionPolicy() == CompletionPolicy.SINGLE && activity.getRequiredTaskCount() == 1,
                 Category.HOST_CONFIGURATION);
         var roster = tasks.findPageByActivityId(activity.getId(), 0, PageRequest.of(0, 2));
@@ -274,6 +277,47 @@ public class WorkflowRuntimeQueryService {
                 && Objects.equals(task.getClosedAt(), activity.getClosedAt()), Category.HOST_CONFIGURATION);
         RuntimeInputs.require(result != null, Category.SUBMISSION_UNAVAILABLE);
         return result;
+    }
+    private WorkflowJsonValue collectiveSubmission(WorkflowActivityEntity activity,Mode mode) {
+        var roster = tasks.findPageByActivityId(activity.getId(),0,PageRequest.of(0,101));
+        var facts = history.findActivityFacts(activity.getId(),"TASK_COMPLETED",PageRequest.of(0,101));
+        RuntimeInputs.require(roster.size() == activity.getRequiredTaskCount() && roster.size() >= 1 && roster.size() <= 100
+                && TaskClosureReason.TASK_OUTCOME.name().equals(activity.getClosureReason()),Category.HOST_CONFIGURATION);
+        var byTask = new java.util.HashMap<Long,io.github.leontecristian.workflow.core.entity.runtime.WorkflowHistoryEntity>();
+        for (var fact : facts) RuntimeInputs.require(fact.getTaskId() != null && byTask.putIfAbsent(fact.getTaskId(),fact) == null,Category.HOST_CONFIGURATION);
+        var collection = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.arrayNode();
+        int completed = 0;
+        var keys = new java.util.HashSet<String>();
+        for (var task : roster.stream().sorted(java.util.Comparator.comparing(WorkflowTaskEntity::getTaskKey)).toList()) {
+            RuntimeInputs.require(RuntimeInputs.key(task.getTaskKey()) && keys.add(task.getTaskKey()) && task.getActivityId().equals(activity.getId()),Category.HOST_CONFIGURATION);
+            if (task.getStatus() != TaskStatus.COMPLETED) {
+                RuntimeInputs.require(task.getStatus() == TaskStatus.CANCELLED && task.getClosureReason() == TaskClosureReason.ACTIVITY_RESOLVED
+                        && !byTask.containsKey(task.getId()) && task.getOutcomeKey() == null
+                        && Objects.equals(task.getClosedAt(),activity.getClosedAt()) && Objects.equals(task.getClosedBy(),activity.getClosedBy()),Category.HOST_CONFIGURATION);
+                continue;
+            }
+            var fact = byTask.get(task.getId());
+            RuntimeInputs.require(fact != null,Category.HOST_CONFIGURATION);
+            var accepted = submission(task,activity,mode,fact);
+            var entry = collection.addObject(); entry.put("taskId",Long.toString(task.getId())); entry.put("taskKey",task.getTaskKey());
+            entry.put("outcomeKey",accepted.outcomeKey()); entry.put("comment",accepted.comment());
+            if (accepted.result() != null) entry.set("result",json.tree(accepted.result().toJson()));
+            completed++;
+        }
+        RuntimeInputs.require(completed > 0 && completed == facts.size(),Category.HOST_CONFIGURATION);
+        var decisive = facts.stream().max(java.util.Comparator.comparing(f -> f.getId().getSequenceNumber())).orElseThrow();
+        var decisiveTask = roster.stream().filter(t -> t.getId().equals(decisive.getTaskId())).findFirst().orElseThrow();
+        RuntimeInputs.require(Objects.equals(decisiveTask.getOutcomeKey(),activity.getOutcomeKey())
+                && Objects.equals(decisive.getActorRef(),activity.getClosedBy()) && Objects.equals(decisive.getOccurredAt(),activity.getClosedAt())
+                && (!Objects.equals(activity.getOutcomeKey(),activity.getContributionOutcomeKey()) || completed == roster.size())
+                && roster.stream().filter(t -> t.getStatus() == TaskStatus.COMPLETED && !t.getId().equals(decisiveTask.getId()))
+                    .allMatch(t -> Objects.equals(t.getOutcomeKey(),activity.getContributionOutcomeKey())),Category.HOST_CONFIGURATION);
+        try { return WorkflowJsonValue.parse(json.encode(collection)); }
+        catch (WorkflowExecutionException failure) {
+            if (failure.category() == Category.LIMIT_EXCEEDED)
+                throw WorkflowExecutionException.resultLimit("The original activity submission collection exceeds its capacity.");
+            throw failure;
+        }
     }
     private WorkflowActivityEntity owner(WorkflowTaskEntity task) {
         return activities.findById(task.getActivityId()).orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
@@ -291,6 +335,10 @@ public class WorkflowRuntimeQueryService {
     private TaskSubmission submission(WorkflowTaskEntity task, WorkflowActivityEntity activity, Mode mode) {
         RuntimeInputs.require(activity.getId().equals(task.getActivityId()), Category.HOST_CONFIGURATION);
         var fact = history.findCompletionByTaskId(task.getId()).orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
+        return submission(task,activity,mode,fact);
+    }
+    private TaskSubmission submission(WorkflowTaskEntity task, WorkflowActivityEntity activity, Mode mode,
+            io.github.leontecristian.workflow.core.entity.runtime.WorkflowHistoryEntity fact) {
         short version = fact.getDetailsSchemaVersion();
         RuntimeInputs.require(version == 2 || version == 3, Category.UNSUPPORTED_VERSION);
         var details = json.tree(fact.getDetailsJson());
