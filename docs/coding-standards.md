@@ -4,6 +4,8 @@ These standards apply to Java, Maven configuration and related implementation wo
 
 Prefer clear, maintainable code that implements the agreed behavior. Apply the guidance proportionately: there are no arbitrary method-length limits, mandatory design patterns or requirements for an interface around every class. Preserve existing conventions and keep unrelated cleanup out of a feature change.
 
+For `workflow-ui` and its frontend consumers, follow the [frontend style guide](frontend-style-guide.md) for Material 3 components, local Material Symbols, host-owned styling, layout and visual review. Feature specifications continue to govern behavior.
+
 ## 1. Name concepts and operations precisely
 
 Follow the [package structure](package-structure.md): technical layers first, features underneath. Use `dto` for commands, queries and returned data. Documented concrete services, DTOs and errors form the supported integration boundary; entities, repositories, mappers and private helpers remain implementation details. Feature plans must assign exact packages before code is added or moved.

@@ -1,5 +1,7 @@
 # Workflow UI library
 
+Follow the [frontend style guide](../docs/frontend-style-guide.md) for the agreed Material 3, icon, layout and visual-review conventions. This README describes the library's consumer setup and contracts.
+
 `@workflow-engine/ui` is an Angular 19.2 partial-compiled library. It owns read-only instance metadata, pinned graphs, ordered history, exact events, definition/catalog administration, runtime inspection and optional task/recovery components. It has no application bootstrap, authentication, HTTP providers, routes, translation service or global theme. Angular (including Forms), Router, Material, CDK, RxJS and jsonc-parser are peers.
 
 Icons use direct native `<mat-icon>refresh</mat-icon>` markup and Google Material Symbols names, including page metadata/collection icon inputs. The former `ConsoleIcon` wrapper, semantic aliases and custom SVG registry are removed. The library packages an opt-in local Material Symbols Outlined font stylesheet, selected at weight 400, fill 0, grade 0 and optical size 24; no external runtime font request is needed. Graph visualizations remain separate.
