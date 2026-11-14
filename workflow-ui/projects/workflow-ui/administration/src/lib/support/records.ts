@@ -19,6 +19,7 @@ const COLUMNS: Record<string, RecordColumn[]> = {
     { key: "createdAt", label: "Created" },
   ],
   definition: [
+    { key: "id", label: "ID" },
     { key: "version", label: "Version" },
     { key: "status", label: "Status" },
     { key: "contentRevision", label: "Revision" },
@@ -48,9 +49,10 @@ const COLUMNS: Record<string, RecordColumn[]> = {
     :host(.definition-records) .definition-id { color:var(--mat-sys-primary); text-decoration:none; }
     :host(.version-records) { overflow:visible; min-width:0; }
     :host(.version-records) .table-scroll { margin:0; overflow-x:auto; }
-    :host(.version-records) table { table-layout:fixed; min-width:600px; }
+    :host(.version-records) table { table-layout:fixed; min-width:760px; }
     :host(.version-records) th, :host(.version-records) td { overflow-wrap:anywhere; }
     :host(.version-records) .mat-column-actions { width:80px; }
+    :host(.version-records) .mat-column-id { width:6rem; }
     :host(.version-records) .mat-column-version { width:8rem; }
     :host(.version-records) .version-link { color:var(--mat-sys-primary); text-decoration:none; }
   `],
@@ -78,13 +80,12 @@ const COLUMNS: Record<string, RecordColumn[]> = {
               } @else {
                 <span class="monospace">#{{row.id}}</span>
               }
-            } @else if (kind() === 'definition' && column.key === 'version') {
+            } @else if (kind() === 'definition' && column.key === 'id') {
               @if (versionRoute(row); as destination) {
-                <a class="version-link" [routerLink]="destination">{{row.version}}</a>
+                <a class="version-link monospace" [routerLink]="destination">#{{row.id}}</a>
               } @else {
-                <span>{{row.version}}</span>
+                <span class="monospace">#{{row.id}}</span>
               }
-              <small class="record-id">#{{row.id}}</small>
             } @else if (isStatus(column.key)) {
               <console-status [value]="cell(row, column.key)" />
             } @else if (isDate(column.key, cell(row, column.key))) {

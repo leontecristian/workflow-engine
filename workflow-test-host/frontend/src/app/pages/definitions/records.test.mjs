@@ -42,7 +42,7 @@ test('a consumer without a navigation adapter renders definition IDs without a l
   assert.equal(records.versionRoute({id:'52'}), null);
 });
 
-test('version number links use the exact retained version destination and guarded fallback', t => {
+test('version ID precedes the plain version number and uses the guarded retained destination', t => {
   let request;
   const destination = {hostVersionUrl:true};
   const injector = core.createEnvironmentInjector([
@@ -51,6 +51,9 @@ test('version number links use the exact retained version destination and guarde
   t.after(() => injector.destroy());
   const records = core.runInInjectionContext(injector, () => new ConsoleRecords());
   records.kind = () => 'definition'; records.disabled = () => false;
+  assert.deepEqual(Array.from(records.columns(), column => [column.key, column.label]), [
+    ['id','ID'], ['version','Version'], ['status','Status'], ['contentRevision','Revision'], ['updatedAt','Updated'],
+  ]);
   assert.equal(records.versionRoute({id:'9007199254740993'}), destination);
   assert.equal(request.kind, 'version');
   assert.equal(request.id, '9007199254740993');
