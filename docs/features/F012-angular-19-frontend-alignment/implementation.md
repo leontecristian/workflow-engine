@@ -1,5 +1,20 @@
 # Implementation — F012 Angular 19 frontend alignment
 
+## Maintenance — path-based console routing (2026-11-14)
+
+Implemented the [routing amendment](spec.md#maintenance-amendment--path-based-console-routing-2026-11-14): default Angular path routing, unchanged `/console/` base/proxy, explicit Spring forwards for all 24 declared root/page patterns, route-parity coverage and updated README URLs/deployment guidance. Unknown server paths stay 404; old hash bookmarks must be replaced. Existing controller enablement/security configuration is unchanged. No core, shared UI, dependency, API or migration changes. The pre-existing architecture design edit was preserved.
+
+Fresh verification on the uncommitted maintenance worktree:
+
+- PASS — Node 22.22.0/npm 10.9.4, `node --experimental-strip-types --test src/app/app.routes.test.mjs`: 2 tests, including Angular/Spring route parity. The existing component-loader emits component-ID collision warnings.
+- PASS — `npm run build`: strict production compilation and CSP stylesheet check. Sass deprecation warnings and the 935.19 kB initial bundle warning (900 kB warning threshold; below 1 MB error threshold) remain; styling/dependencies were unchanged.
+- PASS — Corretto JDK 21.0.13, root `./mvnw.cmd -pl workflow-test-host -am '-Dtest=ConsolePageRoutingUnitTest,ConsoleAdministrationUnitTest' '-Dsurefire.failIfNoSpecifiedTests=false' test`: 3 database-free tests, no failures. Page GETs, detail parameters/query strings, root redirect, excluded API/assets/unknown paths and POST rejection verified; existing administration security checks passed. Initial sandbox run could not write Maven cache locks; rerun with cache access passed.
+- PASS — temporary Angular dev server, direct HTTP GET `/console/my-tasks` and `/console/history-event/123/4?filter=active`: both 200 with Angular root and `/console/` base. Initial CLI attempt rejected unsupported `--no-progress`; corrected invocation built. Network-isolated server on 14200 could not be reached from the HTTP-check context and was stopped; rerun outside isolation on 14201 passed.
+- REUSED — original F012 final acceptance below for unchanged rendering/command behavior only. Its hash-route observations do not establish the new routing behavior.
+- NOT RUN — browser navigation/back/forward and live packaged-host refresh. MVC dispatch and development HTTP fallback were checked separately; no complete host/database was started. Maven packaging was not repeated; frontend build and Java compilation passed separately.
+
+Temporary frontend servers were stopped after checks. No database was accessed. The owner subsequently requested review and a routing-only commit. Manual review of router/base-path configuration, page mapping parity, API/asset exclusions, existing security coverage and verification records found no blocking issues. Prior maintenance checks above remain applicable because production and test code are unchanged; they were not rerun. This commit contains only routing source, tests and documentation. The architecture work, already committed separately at review time, was left untouched. Final diff/content/whitespace and staged-scope review completed; no push requested.
+
 ## Review and commit handoff — 2026-11-07
 
 The owner subsequently requested review and a scoped F012 commit, leaving F013 untouched and prohibiting push. Manual review of the dialog, lazy loading, focus/cancellation behavior, destruction/navigation guards, test adaptation and acceptance traceability found no blocking issues. Production code remains identical to the isolated packaged source used in final acceptance; the existing 87-test, production-build, Maven and browser results remain applicable. No source fix or repeated runtime verification was needed during this documentation/commit handoff. The commit includes only the Material dialog follow-up, its tests/loader adaptation and F012 acceptance/navigation records. Generated artifacts, credentials, logs and the unrelated untracked F013 directory are excluded. Historical uncommitted/no-commit statements below describe their original runs; this later request authorizes the scoped commit only.

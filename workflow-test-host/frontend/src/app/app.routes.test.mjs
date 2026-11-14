@@ -46,7 +46,22 @@ test("all retained URLs have explicit distinct page boundaries and a wildcard fa
     new URL("../main.ts", import.meta.url),
     "utf8",
   );
-  assert.match(bootstrap, /withHashLocation\(\)/);
+  assert.match(bootstrap, /provideRouter\(APP_ROUTES\)/);
+  assert.doesNotMatch(bootstrap, /withHashLocation|HashLocationStrategy/);
   assert.ok(!bootstrap.includes("@Component"));
   assert.ok(bootstrap.split("\n").length < 25);
+});
+
+test("Spring serves every declared Angular page without capturing backend or asset paths", () => {
+  const controller = readFileSync(new URL(
+    "../../../src/main/java/io/github/leontecristian/workflow/testhost/controller/console/ConsoleSessionController.java",
+    import.meta.url,
+  ), "utf8");
+  const mapping = controller.match(/@GetMapping\(\{([\s\S]*?)\}\)/)[1];
+  const forwarded = [...mapping.matchAll(/"\/console\/([^"]*)"/g)].map((m) => m[1]).sort();
+  const pages = Array.from(APP_ROUTES, (r) => r.path)
+    .filter((path) => path !== "**")
+    .map((path) => path.replace(/:(\w+)/g, "{$1}"))
+    .sort();
+  assert.deepEqual(forwarded, pages);
 });

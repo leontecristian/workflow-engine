@@ -1,7 +1,7 @@
 import "zone.js";
 import { ENVIRONMENT_INITIALIZER, inject, provideZoneChangeDetection } from "@angular/core";
 import { bootstrapApplication } from "@angular/platform-browser";
-import { provideRouter, withHashLocation } from "@angular/router";
+import { provideRouter } from "@angular/router";
 import { AppShell } from "./app/shell/app-shell";
 import { APP_ROUTES } from "./app/app.routes";
 import { WORKFLOW_VIEWER_READS, WORKFLOW_VIEWER_NAVIGATION, WORKFLOW_ADMINISTRATION_API, WORKFLOW_RUNTIME_READS, WORKFLOW_RUNTIME_COMMANDS } from '@workflow-engine/ui';
@@ -18,6 +18,6 @@ bootstrapApplication(AppShell, {
     {provide:WORKFLOW_VIEWER_READS,useExisting:ConsoleViewerReads},
     {provide:WORKFLOW_VIEWER_NAVIGATION,useExisting:ConsoleViewerNavigation},
     provideZoneChangeDetection(),
-    provideRouter(APP_ROUTES, withHashLocation()),
+    provideRouter(APP_ROUTES),
   ],
 }).catch(console.error);

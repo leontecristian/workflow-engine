@@ -11,3 +11,9 @@
 Historical T01 authorization covered only documentation preparation, review corrections and the documentation commit. Dependency/source/build changes and runtime verification were excluded during that preparation.
 
 The subsequent owner requests authorize T02–T07, the isolated closing run and a reviewed F012-only commit without push. **All F012 tasks and sandbox acceptance scenarios are complete.** Earlier partial/blocked observations remain historical in [implementation.md](implementation.md); its final acceptance section records how the remaining gates were closed. F011 historical records, the unrelated F013 files and APOLO/library-integration gates remain unchanged.
+
+## Maintenance — path-based routing (2026-11-14)
+
+- [x] Replace hash routing and add explicit Spring page forwards for all declared console routes; retain base path and backend handling.
+- [x] Verify route parity, MVC dispatch, existing administration security and frontend production build/CSP.
+- [x] Verify nested development-server HTTP fallback, stop the temporary server and finish the maintenance handover.

@@ -24,7 +24,16 @@ public class ConsoleSessionController {
         return new org.springframework.web.servlet.ModelAndView("redirect:/console/");
     }
 
-    @GetMapping("/console/")
+    // Keep page forwards explicit so missing API endpoints and assets never return the SPA HTML.
+    @GetMapping({
+        "/console/", "/console/my-tasks", "/console/definitions", "/console/definition/{id}",
+        "/console/version/{id}", "/console/catalog", "/console/requests", "/console/request/{id}",
+        "/console/instances", "/console/instance/{id}", "/console/instance-tasks/{id}",
+        "/console/task/{id}", "/console/activity/{id}", "/console/history/{id}",
+        "/console/history-event/{id}/{sequence}", "/console/submissions/{id}", "/console/commands",
+        "/console/events", "/console/event/{id}", "/console/inbox", "/console/inbox-event/{id}",
+        "/console/audit", "/console/audit-event/{id}", "/console/capabilities"
+    })
     public org.springframework.web.servlet.ModelAndView consoleIndex() {
         return new org.springframework.web.servlet.ModelAndView("forward:/console/index.html");
     }

@@ -74,3 +74,9 @@ Do not rewrite historical feature evidence or declare prior acceptance gaps clos
 ## Decisions and readiness
 
 The major/minor target, scope, toolchain, change-detection approach and observable behavior are selected by this specification. Exact compatible patch pins remain T02 engineering work; resolve them before dependency changes and retain the matrix in implementation.md. If the selected contract proves infeasible, revise spec/plan/tasks before dependent implementation. APOLO's exact installed packages and future library contracts remain OPEN and do not block this bounded console alignment.
+
+## Maintenance amendment — path-based console routing (2026-11-14)
+
+The owner requested URLs such as `/console/my-tasks` instead of `/console/#/my-tasks`. Use Angular's default path location strategy while retaining `/console/` as the base path. Both the development server and packaged Spring host must serve the Angular entry point on direct GET/refresh of every declared console page, including parameterized detail routes. Spring forwards only declared page routes: API, login/logout and asset requests retain their existing handling, and unknown server paths remain 404. Angular's existing wildcard still handles unknown in-app navigation. Existing authentication and disabled-console behavior remain in force. Old hash bookmarks are not migrated; use the new page URLs.
+
+This amendment supersedes the hash-routing requirements above only. Verify the routing configuration, frontend production build and database-free Spring MVC route dispatch; no runtime command or persistence behavior changes are intended. This is host UI maintenance within CON-03's library/host boundary; no database/provider assumption changes.
