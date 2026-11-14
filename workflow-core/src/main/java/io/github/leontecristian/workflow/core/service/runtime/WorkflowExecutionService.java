@@ -82,15 +82,25 @@ public class WorkflowExecutionService {
     private final ThreadLocal<Boolean> executing = new ThreadLocal<>();
 
     public WorkflowExecutionService(WorkflowInstanceRepository instances, WorkflowActivityRepository activities,
-            WorkflowTaskRepository tasks, WorkflowHistoryRepository history, WorkflowCommandReceiptRepository receipts,
-            EntityManager entityManager, WorkflowDefinitionRuntimeReader definitions, TaskTypeCatalogService catalog,
-            RuntimeJson json, RuntimeHostSupport host, RuntimeDefinitionPins pins, RuntimeVariables variables, RuntimeServiceProgression services, WorkflowTaskEligibilityService eligibility,
-            ObjectProvider<WorkflowTaskSubmissionValidator> submissionValidator) {
+                                    WorkflowTaskRepository tasks, WorkflowHistoryRepository history, WorkflowCommandReceiptRepository receipts,
+                                    EntityManager entityManager, WorkflowDefinitionRuntimeReader definitions, TaskTypeCatalogService catalog,
+                                    RuntimeJson json, RuntimeHostSupport host, RuntimeDefinitionPins pins, RuntimeVariables variables, RuntimeServiceProgression services, WorkflowTaskEligibilityService eligibility,
+                                    ObjectProvider<WorkflowTaskSubmissionValidator> submissionValidator) {
         this.submissionValidator = submissionValidator;
         this.eligibility = eligibility;
-        this.variables=variables; this.services=services;
-        this.instances = instances; this.activities = activities; this.tasks = tasks; this.history = history; this.receipts = receipts;
-        this.entityManager = entityManager; this.definitions = definitions; this.catalog = catalog; this.json = json; this.host = host; this.pins = pins;
+        this.variables = variables;
+        this.services = services;
+        this.instances = instances;
+        this.activities = activities;
+        this.tasks = tasks;
+        this.history = history;
+        this.receipts = receipts;
+        this.entityManager = entityManager;
+        this.definitions = definitions;
+        this.catalog = catalog;
+        this.json = json;
+        this.host = host;
+        this.pins = pins;
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -581,7 +591,10 @@ public class WorkflowExecutionService {
     private <T> T guarded(Supplier<T> command) {
         RuntimeInputs.require(!Boolean.TRUE.equals(executing.get()), Category.HOST_CONFIGURATION);
         executing.set(true);
-        try { return RuntimePersistenceErrors.call(command); }
-        finally { executing.remove(); }
+        try {
+            return RuntimePersistenceErrors.call(command);
+        } finally {
+            executing.remove();
+        }
     }
 }

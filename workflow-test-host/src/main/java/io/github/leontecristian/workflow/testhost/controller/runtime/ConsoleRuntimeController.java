@@ -41,18 +41,18 @@ public class ConsoleRuntimeController {
     private final ConsoleRuntimeCoordinator commands;
     private final ConsoleRuntimeTransaction transactions;
     private final ConsoleContext context;
-    private final ConsoleWire wire;
+    private final ConsoleWire consoleWire;
     private final io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxServiceEffectStore effects;
 
     public ConsoleRuntimeController(ConsoleRuntimeAccess access, ConsoleRuntimeCoordinator commands,
-            ConsoleRuntimeTransaction transactions, ConsoleContext context, ConsoleWire wire,
+            ConsoleRuntimeTransaction transactions, ConsoleContext context, ConsoleWire consoleWire,
             io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxServiceEffectStore effects) {
         this.access = access; this.commands = commands; this.transactions = transactions;
-        this.context = context; this.wire = wire; this.effects = effects;
+        this.context = context; this.consoleWire = consoleWire; this.effects = effects;
     }
     private SandboxStart startBody(HttpServletRequest r) {
         var b =
-                wire.body(
+                consoleWire.body(
                         r, io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue.MAX_RAW_UTF8_BYTES,
                         "commandId",
                         "workflowKey",
@@ -102,18 +102,18 @@ public class ConsoleRuntimeController {
         query(r,"afterId","limit"); long key=decimal(id,false); access.instance(key);
         int count=limit(r.getParameter("limit")); var rows=effects.page(key,after(r.getParameter("afterId")),count+1);
         Long next=rows.size()>count ? rows.get(count-1).id() : null;
-        return wire.response(wire.page(rows.subList(0,Math.min(count,rows.size())),next,"nextAfterId",io.github.leontecristian.workflow.testhost.dto.sandbox.SandboxServiceEffect::id));
+        return consoleWire.response(consoleWire.page(rows.subList(0,Math.min(count,rows.size())),next,"nextAfterId",io.github.leontecristian.workflow.testhost.dto.sandbox.SandboxServiceEffect::id));
     }
     @PostMapping("/instances/start")
     @PreAuthorize("hasRole('CONSOLE_ADMIN')")
     public ResponseEntity<String> start(HttpServletRequest r) {
-        return wire.response(
+        return consoleWire.response(
                 commands.start(startBody(r), context.runtime(ConsoleErrors.correlation(r))));
     }
     @PostMapping("/commands/start/replay")
     @PreAuthorize("hasRole('CONSOLE_ADMIN')")
     public ResponseEntity<String> replayStart(HttpServletRequest r) {
-        return wire.response(
+        return consoleWire.response(
                 replay(
                         transactions
                                 .replayStart(
