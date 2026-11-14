@@ -1,18 +1,19 @@
-import { Component, input, output } from "@angular/core";
+import { Component, inject, input, output } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
 import { MatTableModule } from "@angular/material/table";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { MatIconModule } from "@angular/material/icon";
-import { ConsoleStatus } from "@workflow-engine/ui";
+import { ConsoleStatus, WORKFLOW_VIEWER_NAVIGATION } from "@workflow-engine/ui";
 export interface RecordColumn {
   key: string;
   label: string;
 }
 const COLUMNS: Record<string, RecordColumn[]> = {
   definitions: [
-    { key: "name", label: "Workflow" },
+    { key: "id", label: "ID" },
+    { key: "name", label: "Name" },
     { key: "key", label: "Workflow key" },
     { key: "createdBy", label: "Created by" },
     { key: "createdAt", label: "Created" },
@@ -37,11 +38,11 @@ const COLUMNS: Record<string, RecordColumn[]> = {
   styles: [":host{display:block;overflow:auto}table{width:100%}.record-id,.date-cell small{display:block}.monospace{font-family:monospace}", `
     :host(.definition-records) { overflow:visible; min-width:0; }
     :host(.definition-records) .table-scroll { margin:0; overflow-x:auto; }
-    :host(.definition-records) table { table-layout:fixed; }
+    :host(.definition-records) table { table-layout:fixed; min-width:760px; }
     :host(.definition-records) th, :host(.definition-records) td { overflow-wrap:anywhere; }
     :host(.definition-records) .mat-column-actions { width:80px; }
-    :host(.definition-records) .record-link { max-width:100%; white-space:normal; overflow-wrap:anywhere; }
-    @media(max-width:600px) { :host(.definition-records) table { min-width:600px; } }
+    :host(.definition-records) .mat-column-id { width:6rem; }
+    :host(.definition-records) .definition-id { color:var(--mat-sys-primary); text-decoration:none; }
   `],
   imports: [
     CommonModule,
@@ -61,7 +62,13 @@ const COLUMNS: Record<string, RecordColumn[]> = {
         <ng-container [matColumnDef]="column.key"
           ><th mat-header-cell *matHeaderCellDef>{{ column.label }}</th>
           <td mat-cell *matCellDef="let row">
-            @if (isStatus(column.key)) {
+            @if (kind() === 'definitions' && column.key === 'id') {
+              @if (definitionRoute(row); as destination) {
+                <a class="definition-id monospace" [routerLink]="destination">#{{row.id}}</a>
+              } @else {
+                <span class="monospace">#{{row.id}}</span>
+              }
+            } @else if (isStatus(column.key)) {
               <console-status [value]="cell(row, column.key)" />
             } @else if (isDate(column.key, cell(row, column.key))) {
               <span class="date-cell"
@@ -81,7 +88,8 @@ const COLUMNS: Record<string, RecordColumn[]> = {
                 [disabled]="disabled()"
               >
                 {{ cell(row, column.key) ?? "—" }}</button
-              ><small class="record-id"
+              >
+              <small class="record-id"
                 >#{{ row.id || row.taskId || row.historySequence }}</small
               >
             } @else {
@@ -118,11 +126,16 @@ const COLUMNS: Record<string, RecordColumn[]> = {
   </div>`,
 })
 export class ConsoleRecords {
+  private readonly navigation = inject(WORKFLOW_VIEWER_NAVIGATION, { optional:true });
   rows = input<any[]>([]);
   kind = input("");
   label = input("Records");
   disabled = input(false);
   inspect = output<any>();
+  definitionRoute(row: { id:string }) {
+    return this.kind() === 'definitions' && !this.disabled()
+      ? this.navigation?.destination({ kind:'definition', id:row.id }) ?? null : null;
+  }
   columns(): RecordColumn[] {
     return COLUMNS[this.kind()] || COLUMNS["definitions"];
   }

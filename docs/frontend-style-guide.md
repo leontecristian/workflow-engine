@@ -53,7 +53,7 @@ These are local decisions, not automatic changes to every page:
 | Surface | Agreed choice |
 | --- | --- |
 | Instance viewer | Fixed **50% default and reset graph zoom**; manual zoom/scroll remain. Improve typography and bounds without replacing this with automatic fit. |
-| Definitions | Header import action opens the existing import form in a Material dialog. Bottom cursor pagination offers page size, current-page information and Previous/Next; refresh stays at the top. |
+| Definitions | Header import action opens the existing import form in a Material dialog. Bottom cursor pagination offers page size, current-page information and Previous/Next; refresh stays at the top. Separate ID and Name columns: ID is a host-mapped link without underline, colored by the theme primary token; Name is plain text. Preserve visible keyboard focus. |
 | Definitions lookup | Exact-version lookup remains below the list. Its right-hand placement was left unchanged, not selected as a universal layout pattern. |
 | Sign out | Native Material text-button appearance with balanced horizontal padding. |
 
