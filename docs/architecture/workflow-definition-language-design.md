@@ -2,23 +2,23 @@
 
 **Previous-decision comments — 2026-11-13:** [F022 revision 1](../features/F022-previous-decision-comments/spec.md), IMPLEMENTED, specifies `previousDecisions` at the definition root (NONE/ALL_PREVIOUS) and human node (INHERIT/NONE/ALL_PREVIOUS/SELECTED with nodeKeys). It controls receiving-task context from earlier completed stages, not comment acceptance, result bindings or variables. F022 governs exact validation, omitted-setting compatibility and authorization. F021's later delivery record establishes implemented ALL support; earlier planning-only statements below retain their historical scope.
 
-**ALL specification — 2026-11-13:** [F021 revision 2](../features/F021-all-collective-review/spec.md) specifies the already agreed ALL completion policy with per-task USER/GROUP/ROLE assignment/claims, shared immutable node inputs and one result contract. Explicit submission bindings yield the resolved task-identified collection; an optional outputVariable is created only at resolution. F021 governs precise collection shape, history placement, enlarged capacities and compatibility; F019/F020 SINGLE behavior remains unchanged. This is a READY specification, not implemented support.
+**ALL specification — 2026-11-13:** [F021 revision 2](../features/F021-all-collective-review/spec.md) specifies the already agreed ALL completion policy with per-task USER/GROUP/ROLE assignment/claims, shared immutable node inputs and one result contract. Explicit submission bindings yield the resolved task-identified collection; an optional outputVariable is created only at resolution. F021 governs precise collection shape, history placement, enlarged capacities and compatibility; F019/F020 SINGLE behavior remains unchanged. F021 revision 2 is IMPLEMENTED; its implementation record contains scoped verification and remaining integration limitations.
 
 **Owner decision — 2026-11-10:** [F020](../features/F020-human-task-input-bindings/spec.md), implemented at revision 3, adds optional human-node inputs for read-only data from variable/key or submission/nodeKey. Resolve and retain immutable values at task creation; receiving-task read authorization governs the copy. Revision 3 uses a single inputs binding map with source-derived types, without reviewInputContract. resultContract describes the reviewer answer; human inputContract is removed from new authoring, with historical empty values supported only when loading published legacy definitions. startPolicy.inputContract remains unchanged. This supersedes the older plan to implement scalar submission fields in section 12.1.12 for the selected scope. F020's bounded incoming bindings are authoritative for this slice; it adds no taskInput guard source, expression access or other-node inputs.
 
 **Named-output extension — 2026-11-10:** [F019 revision 2](../features/F019-named-task-output-variables/spec.md), under constitution 6.3.0, adds optional HUMAN_TASK outputVariable and restricted #hasVariable with a literal known key. Output names need no top-level variable declaration or duplicate result schema; reject collisions across all producers/declarations. Only accepted completion creates the variable. Start initializers cannot target it; explicit service bindings may replace it only after creation. Earlier declaration-only grammar is the baseline; F019 is the authoritative additive contract. F019 also supports explicit service input bindings to the original submission by human node key, independent of the current variable value or triggering completion.
 
-**Shared assignment amendment — 2026-11-07:** One SINGLE task has one stable USER, GROUP or ROLE assignment target. Any currently eligible member may complete it without claiming; one completion commits and records the actual actor. Hosts own membership and business authorization. Membership changes do not change the task roster or reopen completed tasks. Claiming/releasing is the next separate feature, with contracts still pending. [F016](../features/F016-shared-group-role-task-assignment/spec.md) is IMPLEMENTED revision 2; see its implementation record for scoped verification. Constitution 6.1.0 supersedes earlier direct-user-only assignment and blanket candidate-group deferral for this SINGLE slice. F016 implements the closed assignment, membership, access and preserving-migration contracts; APOLO integration remains separate. Existing user-assignment examples remain valid.
+**Shared assignment amendment — 2026-11-07:** One SINGLE task has one stable USER, GROUP or ROLE assignment target. Under F016's original unclaimed-task contract, any currently eligible member could complete it; F017 adds the claim rules below. One completion commits and records the actual actor. Hosts own membership and business authorization. Membership changes do not change the task roster or reopen completed tasks. F017 subsequently implemented claim/release; claim policy and ownership now qualify direct completion as described in section 9.2. [F016](../features/F016-shared-group-role-task-assignment/spec.md) is IMPLEMENTED revision 2; see its implementation record for scoped verification. Constitution 6.1.0 supersedes earlier direct-user-only assignment and blanket candidate-group deferral for this SINGLE slice. F016 implements the closed assignment, membership, access and preserving-migration contracts; APOLO integration remains separate. Existing user-assignment examples remain valid.
 
-**F009 test-baseline exception — owner decision, 2026-11-06:** [F009 revision 2, D17](../features/F009-json-execution-variables/spec.md) removes backward-compatibility obligations for pre-F009 Java APIs, formats and existing test data. Core/test-host callers may change together; old readers, compatibility overloads, dual limit profiles and old-data conversion are unnecessary. D15 capacities remain, but fresh test-schema/rebaseline or migration setup may establish them instead of a mandatory preserving forward migration. New executions still require history/evidence, pinned immutable definitions, concurrency, transactions and authorized idempotent replay. This scoped exception supersedes contrary older wording below; it grants no production compatibility waiver and authorizes no code/data changes in this documentation-only task.
+**F009 test-baseline exception — owner decision, 2026-11-06:** [F009 revision 2, D17](../features/F009-json-execution-variables/spec.md) removes backward-compatibility obligations for pre-F009 Java APIs, formats and existing test data. Core/test-host callers may change together; old readers, compatibility overloads, dual limit profiles and old-data conversion are unnecessary. Within that historical baseline, D15 capacities remained, but fresh test-schema/rebaseline or migration setup may establish them instead of a mandatory preserving forward migration. New executions still require history/evidence, pinned immutable definitions, concurrency, transactions and authorized idempotent replay. This scoped exception supersedes contrary older wording below; it grants no production compatibility waiver and authorizes no code/data changes in this documentation-only task.
 
-**F009 capacity decision — 2026-11-06:** [F009 D15](../features/F009-json-execution-variables/spec.md) raises each JSON variable/start/service value to 256 KiB UTF-16 and retains the 1 MiB UTF-16 current-variable total. Its table specifies larger JSON-profile input/service/history envelopes, history-read capacity and a required history-only forward constraint migration. It supersedes older 64 KiB variable/input and smaller related-envelope wording only for that profile. Scalar legacy limits, task-result scope and receipt/handoff bounds remain unchanged. No migration or implementation has been performed.
+**F009 capacity decision — 2026-11-06:** [F009 D15](../features/F009-json-execution-variables/spec.md) raises each JSON variable/start/service value to 256 KiB UTF-16 and retains the 1 MiB UTF-16 current-variable total. Its table specifies larger JSON-profile input/service/history envelopes, history-read capacity and a required history-only forward constraint migration. It supersedes older 64 KiB variable/input and smaller related-envelope wording only for that profile. Scalar legacy limits, task-result scope and receipt/handoff bounds remain unchanged. This records the decision-time scope; F009 subsequently implemented its baseline and F021 supersedes these capacities with the current contract in section 14.2.
 
-**D09 owner decision — 2026-11-06:** F009 adopts standard SpEL navigation over read-only JSON, including explicit null-safe property/index access, fixed/computed keys and indices, and native escaping/evaluation order, subject to the agreed JSON adaptations in D02–D08. Missing properties/out-of-range indices return null; numeric leaves use BigDecimal. Existing method/reflection/mutation restrictions remain. Routine navigation details are engineering work, not separate owner approval gates; material behavior conflicts must be raised. No implementation is authorized.
+**D09 owner decision — 2026-11-06:** F009 adopts standard SpEL navigation over read-only JSON, including explicit null-safe property/index access, fixed/computed keys and indices, and native escaping/evaluation order, subject to the agreed JSON adaptations in D02–D08. Missing properties/out-of-range indices return null; numeric leaves use BigDecimal. Existing method/reflection/mutation restrictions remain. Routine navigation details are engineering work, not separate owner approval gates; material behavior conflicts must be raised. This decision alone did not authorize implementation; F009 subsequently delivered the specified navigation.
 
-**D04 owner correction — 2026-11-06:** for F009, reading a missing property of an initialized JSON object returns null, just like explicit JSON null. APOLO may omit null-valued fields. This supersedes earlier missing-JSON-property failure wording only; undeclared/uninitialized variables and other evaluation errors remain failures. Stored missing/null distinctions remain. D05 subsequently selects explicit per-access `?.` property navigation; ordinary dot access on null fails. Array/index behavior and normalization remain specification work. See F009 D04.
+**D04 owner correction — 2026-11-06:** for F009, reading a missing property of an initialized JSON object returns null, just like explicit JSON null. APOLO may omit null-valued fields. This supersedes earlier missing-JSON-property failure wording only; undeclared/uninitialized variables and other evaluation errors remain failures. Stored missing/null distinctions remain. D05 subsequently selects explicit per-access `?.` property navigation; ordinary dot access on null fails. F009 D05–D09 subsequently specified and implemented property/index navigation and exact-value behavior; section 11 reflects that contract.
 
-**Owner decision — 2026-11-06:** the initial JSON execution-data slice uses declared JSON variables and explicit start/service whole-value mappings without per-field structure schemas. APOLO supplies DTO-derived snapshots; core evaluates bounded read-only object/array navigation under `#vars`. Arbitrary nested fields are accepted within JSON validity, exact-value and resource constraints. Structure schemas are DEFERRED for these start inputs, service values and variables; workflow-document validation and task-result contracts are unchanged. This scoped amendment supersedes earlier mandatory embedded-schema wording for this slice, not the remaining schema design. See [F009](../features/F009-json-execution-variables/spec.md). Documentation only; no runtime implementation is claimed.
+**Owner decision — 2026-11-06:** the initial JSON execution-data slice uses declared JSON variables and explicit start/service whole-value mappings without per-field structure schemas. APOLO supplies DTO-derived snapshots; core evaluates bounded read-only object/array navigation under `#vars`. Arbitrary nested fields are accepted within JSON validity, exact-value and resource constraints. Structure schemas are DEFERRED for these start inputs, service values and variables; workflow-document validation and task-result contracts are unchanged. This scoped amendment supersedes earlier mandatory embedded-schema wording for this slice, not the remaining schema design. See [F009](../features/F009-json-execution-variables/spec.md). The dated decision authorized documentation only; F009 subsequently implemented this scope.
 
 **Owner correction — 2026-11-05:** expression arithmetic follows native SpEL numeric behavior, including floating-point approximation, promotion, rounding and integral overflow. Do not reject a result solely for precision loss or compare it with an exact reference calculation. Declared DECIMAL variables enter evaluation as BigDecimal; decimal literals retain native SpEL types. Native evaluation errors and resource limits still fail the command. Exact decoding, transport, persistence and accepted-submission rules remain unchanged. This supersedes earlier expression-arithmetic exactness wording and the misinterpreted numeric owner decision.
 
@@ -26,19 +26,19 @@
 
 | Document field | Value |
 | --- | --- |
-| Version | 0.2 |
-| Date | 31 October 2026 |
-| Status | Design draft for discussion; language contract not frozen |
+| Version | 0.3 |
+| Date | 14 November 2026 |
+| Status | Agreed language design reconciled with the implemented subset through F022; broader and deferred scope identified separately |
 | Project | Reusable workflow engine, initially embedded in APOLO |
 | Current documentation path | `docs/architecture/workflow-definition-language-design.md` |
-| Architecture baseline | Workflow engine design v0.9, 31 October 2026 |
+| Architecture baseline | Workflow engine design v0.12, reconciled through F022 |
 | Later design input | Workflow engine database design v1.4, 25 October 2026 |
-| Scope of this revision | Standards assessment, inherited constraints, conceptual semantics, candidate notation and decisions to resolve |
-| Relationship to F003 | Design input for later specification work; creation of this document does not start or implement F003 |
+| Scope of this revision | Reconcile delivered language contracts through F022 while preserving historical decisions, standards research and deferred scope |
+| Relationship to delivery | F003 and subsequent feature records own their implementation and verification evidence; this revision changes documentation only |
 
 **Agreed language direction (L01):** develop a compact JSON workflow language informed by BPMN, with explicit human-work contracts, registered host integrations and the existing single-position execution model. BPMN conformance and file interchange are outside the current commitment. The agreed validation approach uses JSON Schema for document structure and a separate engine semantic validator for graph, contract and host-capability checks (L02).
 
-This revision gives the language design a stable discussion baseline. Exact field names, encodings, validation codes, limits and completion-policy details remain proposals unless identified as established decisions below.
+This document preserves the original language decisions and standards research while describing the supported subset through F022. AGREED does not itself mean implemented: guards, fact providers, human review loops and other deferred capabilities remain broader design. Delivered feature specifications govern exact contracts; their implementation records govern verification claims.
 
 ## Contents
 
@@ -98,7 +98,7 @@ The **workflow definition language** provides the shared vocabulary and rules fo
 
 ### 1.2 Purpose of this document
 
-This document develops the language design for review. Its purpose is to establish a shared understanding of what a workflow can express, what each concept means and how the engine should behave when following a definition. Those decisions will guide the detailed language specification, validation rules, engine implementation and future visual designer.
+This document records the language design and its current supported subset. Its purpose is to establish a shared understanding of what a workflow can express, what each concept means and how the engine should behave when following a definition. Delivered feature specifications refine those decisions into validation and execution contracts; broader decisions continue to guide future increments and the visual designer.
 
 The review separates four concerns so that the process concepts and their behavior can be agreed before their exact fields and syntax are finalized:
 
@@ -113,17 +113,18 @@ The following chapters introduce the existing architectural constraints, define 
 
 ### 1.3 Status vocabulary
 
-This is a design draft under review. The status of a statement determines whether it records an existing decision or introduces something we still need to resolve.
+This is a language design with an implemented subset. The status of a statement distinguishes selected behavior, delivered support and unresolved or deferred work.
 
 | Status | Meaning in this document |
 | --- | --- |
 | **Established** | An explicitly selected architecture or owner decision carried forward from the source documents. |
-| **Current baseline** | Behavior already described by the architecture, retained for this discussion; exact specification may still be pending. |
+| **Current baseline** | The applicable architectural contract; implementation status must be stated separately. |
+| **Implemented** | Delivered within the named feature scope; its implementation record identifies actual checks and remaining gaps. |
 | **Proposed** | A concrete recommendation or existing design proposal that still requires review. |
 | **Open** | A choice whose alternatives or exact contract have not been settled. |
 | **Deferred** | A capability or host-owned business policy outside the current language increment. |
 
-A detailed proposal is still a proposal. The owner confirmed `SINGLE`, `ALL` and the fixed task list on 31 October 2026 (sections 9.2–9.3). Exact limits and API contracts still require specification. Neither generic engine policy selects APOLO's business approval rules. [A2, §1][A2]
+A detailed proposal is still a proposal. The owner confirmed `SINGLE`, `ALL` and the fixed task list on 31 October 2026 (sections 9.2–9.3). F021 now specifies and implements the ALL contract and capacities. Neither generic engine policy selects APOLO's business approval rules. [A2, §1][A2]
 
 ### 1.4 Source precedence
 
@@ -133,7 +134,7 @@ The owner-selected routing revision of 31 October 2026 supersedes the earlier re
 
 The research supplies comparisons and reasoning. It does not override selected project constraints. The source documents' illustrative schemas, interfaces and examples remain illustrative. [A1, introduction and §22][A1] [A2, introduction and §1][A2]
 
-This file records a language design. Definition publication, database migrations, application code, a production validator and feature implementation artifacts belong to subsequent authorized work.
+Delivered feature specifications and implementation records refine this design: F004 definition management, F007–F011 bindings/routing/stages, and F017–F022 claims, results, outputs, inputs, collective review and previous decisions. See section 18.1. This reconciliation does not authorize new behavior or establish APOLO integration verification.
 
 ## 2. Existing design decisions
 
@@ -156,7 +157,7 @@ The workflow definition language builds on the engine architecture and database 
 | Expressions | Restricted SpEL over explicitly supplied data; Boolean routing conditions. | Established direction — A1 §§5, 7; A2 §12.2 |
 | Business ownership | APOLO owns booking membership, material changes, business authorization and aggregation policy. | Established — A1 §8; A2 §§1, 17 |
 
-The table summarizes the two project design sources rather than observed implementation behavior. Transaction participation and other integration details still need their documented verification. [A1] [A2]
+The table preserves architectural constraints. Delivered human-task contracts now include F017 claiming, F018 results, F019 named outputs, F020 captured inputs, F021 ALL resolution and F022 previous decisions. Declared guards remain broader design. Implementation records supply scoped evidence; transaction participation in APOLO remains a separate integration responsibility. [A1] [A2]
 
 ### 2.1 Changes from earlier designs
 
@@ -173,7 +174,7 @@ The language should let us describe the processes needed for the first version o
 When reviewing the language, we should assess it against the following goals:
 
 - **Understand the process from its definition.** A reader should be able to follow the steps, see which require human work or automated actions, and understand how each possible outcome determines what happens next.
-- **Describe a review involving several people.** A single review step should be able to collect submissions from multiple assigned reviewers. The process remains at that step until its completion rule is satisfied. The exact completion rules still require agreement.
+- **Describe a review involving several people.** A single review step should be able to collect submissions from multiple assigned reviewers. The process remains at that step until its completion rule is satisfied. SINGLE and ALL are agreed and implemented within the contracts in section 9.3.
 - **Make information flow explicit.** A definition should identify each step's inputs and their sources, its outputs, and any workflow variables updated from those outputs.
 - **Keep validation responsibilities clear.** The engine checks information against the workflow's declared contracts. The application checks permissions and business rules.
 - **Keep existing processes consistent when definitions change.** A running instance should continue to follow the published version it started with. That version must remain understandable to the engine for the lifetime of the instance.
@@ -190,11 +191,11 @@ These goals guide the language design; they do not mean the corresponding engine
 | --- | --- |
 | One sandbox review | Entry, one required task, a declared outcome and terminal result. |
 | Manager followed by partner | Sequential human activities with distinct contracts. |
-| Conditional additional review | Read-only routing over declared facts or variables. |
+| Conditional additional review | Read-only routing over workflow variables; direct facts remain deferred. |
 | Multiple reviewers at one stage | One activity, fixed task obligations, individual submissions and one aggregate outcome. |
 | Structured review of several items | Per-task JSON evidence followed by explicit host aggregation. |
 | Apply an approved business change | Registered service action with declared bindings and transactional failure behavior. |
-| Revisit a human node | New activation and new evidence, without changing the published graph. |
+| Revisit a human node | Broader agreed design: new activation and evidence; current publication rejects all cycles. |
 
 The scenarios exercise generic engine behavior. The exact APOLO approval chain, approver sources, resubmission flow and material-field rules remain host decisions. [A1, §22.2][A1] [A2, §17][A2]
 
@@ -202,7 +203,7 @@ The scenarios exercise generic engine behavior. The exact APOLO approval chain, 
 
 ### 3.3 Initial exclusions
 
-The current baseline excludes general parallel branches and joins, subprocesses, external workers, asynchronous service waiting, live definition migration, arbitrary scripts, candidate claiming, delegation, mutable task rosters, optional participants, `ANY`, `QUORUM` and weighted voting. A standalone business-decision engine remains deferred. [A1, §§1, 6, 22][A1] [A2, §1][A2]
+The current baseline excludes general parallel branches and joins, subprocesses, external workers, asynchronous service waiting, live definition migration, arbitrary scripts, delegation, mutable task rosters, optional participants, `ANY`, `QUORUM` and weighted voting. A standalone business-decision engine remains deferred. [A1, §§1, 6, 22][A1] [A2, §1][A2]
 
 Timers, reminders, escalation scheduling and task expiration also remain deferred. A due date is informational metadata in the current model. A future timeout field must not appear to promise scheduling until its execution and persistence semantics are specified. [A2, §1][A2]
 
@@ -268,7 +269,7 @@ CMMN addresses case models and work whose planning depends on evolving circumsta
 
 **AGREED — 31 October 2026 (L02):** workflow-language version 1 uses JSON Schema Draft 2020-12 for the workflow-document schema and embedded data schemas. JSON Schema provides constraints for object properties, alternatives, arrays and values, together with error-location concepts. Its `default` annotation does not initialize omitted application values during validation. [S10] [S11] [S12]
 
-**Design consequence:** use separate layers for workflow-document structure, embedded data contracts, graph semantics and runtime checks. Initialization and default application must be defined by our language. Supporting a workflow schema does not imply unrestricted support for arbitrary embedded schemas.
+**Design consequence:** use separate layers for workflow-document structure, embedded data contracts, graph semantics and runtime checks. Initialization and default application must be defined by our language. Supporting a workflow schema does not imply unrestricted support for arbitrary embedded schemas. F018 implements the task-result profile; F009 defers field schemas for JSON start/service/variable data.
 
 ## 5. BPMN correspondence and deliberate differences
 
@@ -396,14 +397,16 @@ This chapter introduces the main concepts used to describe a workflow and track 
 | Instance | One execution pinned to a definition version. | Runtime instance identity. |
 | Node | Declared process position and its behavior. | Stable key within the definition. |
 | Transition | Declared route between nodes. | Stable key, unique among transitions within the definition. |
-| Activity | One activation of a human node. | Runtime activity identity; repeated visits create new identities. |
+| Activity | One activation of a human node. | Runtime activity identity; repeated visits remain future loop scope. |
 | Task / work item | One required obligation within an activity. | Runtime task identity and activity-local task key. |
 | Task outcome | Action/result key submitted for a task. | Declared by the pinned human node. |
 | Activity outcome | Result of applying the completion policy. | Selects the outgoing route. |
 | Process result | Value recorded at a normal end node. | Defined by the end node. |
-| Submission | Immutable accepted outcome, comment, scalar inputs and optional structured result. | Exact completed task/activity. |
-| Variable | Mutable declared execution data. | Instance + variable key. |
-| Host capability | Registered guard, action, resolver, permission or data-provider contract. | Logical identifier resolved by the host. |
+| Submission | Immutable accepted outcome, comment and optional structured result. | Exact completed task/activity. |
+| Captured inputs | Immutable incoming values shared by an activity's tasks. | Activity/task entry; receiving-task access. |
+| Previous decisions | Policy-filtered earlier decision/comment context. | Receiving activity's entry cutoff. |
+| Variable | Mutable execution data from declarations or named human outputs. | Instance + variable key. |
+| Host capability | Registered action/resolver/task support; guards and fact providers remain broader design. | Logical identifier resolved by the host. |
 
 This model preserves the source designs' separation between definition, runtime, evidence and host data. [A1, §§7–10][A1] [A2, §§2, 4, 8–12][A2]
 
@@ -467,12 +470,12 @@ Conceptually, the engine handles the request as follows:
 
 1. **Identify the request and caller.** Validate the request format and obtain the caller's trusted identity and the command identifier used to recognize retries.
 2. **Check whether this command already succeeded.** If the same identifier and request have a saved successful result, check the caller's permission to retrieve it and return it without repeating the work. Reusing the identifier with different input is an error. This check happens before rejecting an outdated instance version: a retry can legitimately refer to the version from before the original success.
-3. **Check whether new work is allowed.** Use the instance's pinned definition, or the selected published version when starting an instance. For human-task completion, the engine executes the selected outcome's declared guards, including authorization only when configured, before accepting the submission. The engine checks assignment, the current workflow state and protection against conflicting updates. Validate submitted values and any business preconditions supplied by the application.
+3. **Check whether new work is allowed.** Use the instance's pinned definition, or the selected published version when starting an instance. For human-task completion, enforce host authorization, current assignment/claim eligibility, comment/result validation and the optional host submission validator before accepting the submission. Declared outcome guards remain unsupported. The engine checks assignment, the current workflow state and protection against conflicting updates. Validate submitted values and any business preconditions supplied by the application.
 4. **Apply the requested change.** For example, accept a task submission and record its history. Determine whether the review activity can now finish under its completion rule or must keep waiting.
 5. **Advance when appropriate.** If the command starts the process or resolves the current activity, follow the defined routes and run automatic steps within the execution limit. Create the next human activity and its tasks, or record normal process completion at an end node.
 6. **Save the result together.** Commit the participating business changes, workflow state, submissions, history, durable event handoff and saved command result in the same transaction. These changes become accepted together; a failure rolls back the changes made by this command.
 
-The resulting saved state therefore shows the instance waiting for human work or completed normally. Earlier commands' committed work remains intact if a later command fails. A failed permission check, business precondition or automated action does not by itself cancel the instance or mark it invalid. The exact command APIs and database operation order remain separate specification work.
+The resulting saved state therefore shows the instance waiting for human work or completed normally. Earlier commands' committed work remains intact if a later command fails. A failed permission check, business precondition or automated action does not by itself cancel the instance or mark it invalid. The delivered runtime feature specifications define command APIs, early instance writes and replay ordering; broader unsupported operations still require specification.
 
 ### 8.2 Node responsibilities
 
@@ -501,17 +504,18 @@ These rules define which workflow graphs are valid before publication. They reje
 | **Decisions** | Each route has a condition or is the default. Evaluate conditions in declared order and take the first true result, with at most one separate unconditional default. An evaluated-condition error, or no match without a default, fails the command (section 5.2). |
 | **Unreachable steps** | Every node must have a path from `START`. Disconnected draft work must be connected or removed before publication. |
 | **Paths to completion** | Every node must have a possible path to an `END`. |
-| **Loops** | Review loops that pass through a human step are allowed. Reject every cycle made entirely of automatic steps, including one inside a larger review loop (section 8.4). |
+| **Loops** | Current supported subset: reject every cycle. Broader agreed design permits human review loops but rejects all automatic-only cycles (section 8.4). |
+| **Human participation** | Every supported START-to-END path must include at least one human stage; automatic-only workflows remain deferred. |
 
-**A possible path to an end does not guarantee eventual completion.** These structural checks follow declared connections; they do not prove that runtime conditions will select an exit. For example, a review may return to a human step when changes are requested, provided it also has a route to an end. People could keep requesting changes, but the definition offers a way to finish. A closed review loop with no exit is rejected.
+**Broader loop design, not current supported graphs:** a possible path to an end does not guarantee eventual completion. These structural checks follow declared connections; they do not prove that runtime conditions will select an exit. For example, a review may return to a human step when changes are requested, provided it also has a route to an end. People could keep requesting changes, but the definition offers a way to finish. A closed review loop with no exit is rejected.
 
 ### 8.4 Loops and execution bounds
 
-A return to a human node creates a new activity and new tasks; prior submissions remain historical evidence. A supported loop can therefore represent another review round without rewriting previous approvals. Its use for APOLO resubmission remains provisional. [A2, §2][A2] [A1, §22.2 O3][A1]
+**Broader agreed design, not implemented:** a return to a human node creates a new activity and new tasks; prior submissions remain historical evidence. A supported loop can therefore represent another review round without rewriting previous approvals. Its use for APOLO resubmission remains provisional. [A2, §2][A2] [A1, §22.2 O3][A1]
 
 Automatic-cycle validation must detect a cycle made entirely of automatic nodes even when those nodes also belong to a larger graph region containing a human node. Merely finding one human node somewhere in that region is insufficient.
 
-Retain a per-command progression limit as a second protection. L16 selects initial limits of 50 automatic steps per command and 100 required tasks per activity. Section 14.2 defines automatic-step counting; verification against representative workflows remains pending. [A1, §7.5][A1] [A2, §4.1][A2]
+Retain a per-command progression limit as a second protection. L16 selects initial limits of 50 automatic steps per command and 100 required tasks per activity. Section 14.2 defines automatic-step counting; F007/F008 and F021 records contain scoped verification. [A1, §7.5][A1] [A2, §4.1][A2]
 
 ### 8.5 Failure, retry and atomicity
 
@@ -532,13 +536,15 @@ The language needs a way to describe:
 - **Assignment:** how the application selects reviewers and what information it needs to do so.
 - **Available decisions:** permitted outcomes, their labels and display order.
 - **Checks before submission:** business preconditions and comments; action authorization belongs to APOLO.
-- **Submitted information:** allowed simple fields and structured results, including what is required and how it is validated.
+- **Incoming information and submitted answers:** read-only inputs captured at entry, separate from the structured result a reviewer submits.
 - **Completion:** when the step finishes and how reviewers' submissions determine its outcome.
 - **Next steps:** a route for each possible outcome of the completed review.
 
-**AGREED — 31 October 2026:** each human step has one explicit simple-input contract and one explicit structured-result contract, shared by every outcome. Outcome-specific input/result overrides are outside the initial contract. Guards and comment requirements belong to individual outcomes—for example, a required comment for `REJECT`. Routes remain in the transitions. Input descriptors and literal defaults are agreed in section 12.1.2. Additional field constraints are a deferred idea; section 12.1.12 defines resultContract.mode and embedded resultContract.schema.
+**Current contract — F018/F020:** each human node has one `resultContract`, shared by every outcome, and an optional `inputs` map of read-only incoming bindings. F020 supersedes the earlier scalar submission-input design for current authoring; `inputContract` is absent, except for historical empty values accepted only when loading published legacy definitions. Comments remain per outcome; routes remain in transitions. Section 12.1.12 defines the input/result separation.
 
 #### Optional authorization through outcome guards
+
+**Historical agreed direction, not implemented:** the guard design below is retained for future specification. Current schemas reject nonempty start/outcome guards. Hosts enforce operation/read/replay authorization through the delivered adapters; core enforces assignment and claim eligibility. F018 supplies an optional `WorkflowTaskSubmissionValidator` for business validation, not a general declared-guard registry. The historical `taskInput` source below is not F020 incoming data.
 
 **AGREED — 31 October 2026:** use the same optional authorization-guard approach for starting a workflow and submitting a human-task outcome. Outcomes contain no dedicated `permission` field and there is no mandatory completion authorization hook. An outcome can declare a host guard such as `hasAuthorisation`; without an authorization guard on the selected outcome, the engine performs no additional business-permission check for that submission. Host endpoint/form access controls may still apply.
 
@@ -556,11 +562,13 @@ When a human step begins, the engine asks one application-provided assignment fu
 
 - **Create the full task list together.** The review activity and all its tasks are created in the same transaction. An empty list, too many tasks, a missing assignee or duplicate task keys causes the command to fail. The agreed initial maximum is 100 tasks per activity; `SINGLE` still requires exactly one.
 - **Identify the work separately from the person.** Each task has a key identifying its required contribution within the review. Two tasks may be assigned to the same person unless the application requires different reviewers. The application also enforces any rule against reviewing one's own request.
-- **Keep required work when reassigning it.** A task may be reassigned with an audit record, while retaining its identity. While the review remains active, individual required tasks cannot be waived, deleted or cancelled to remove their contribution from the review.
+- **Keep required work fixed.** Audited reassignment remains broader design, not a delivered command. Current tasks retain their original assignment target. While the review remains active, individual required tasks cannot be waived, deleted or cancelled to remove their contribution from the review.
 
-This is the agreed **fixed task list** model: the required tasks are established when the review starts. Tasks cannot be added or removed while it remains active; their assignees can change through controlled reassignment. [A2, §§2, 4.1][A2]
+This is the agreed **fixed task list** model: the required tasks are established when the review starts. Tasks cannot be added or removed while it remains active; general controlled reassignment remains deferred. [A2, §§2, 4.1][A2]
 
-**AGREED for assignment:** use a named registered resolver with explicitly declared, validated input bindings. Under `SINGLE`, it must return exactly one task with a valid USER/GROUP/ROLE target under F016; under `ALL`, one to 100. Invalid cardinality, missing assignees or duplicate task keys fail the command entering the step. Section 12.1.10 defines the assignment fields and variable bindings; the exact resolver API and returned field names remain specification work.
+**Current assignment contract — F016/F021:** use a named registered resolver with `inputs: {}`; nonempty resolver bindings remain deferred. SINGLE returns exactly one task and ALL one to 100, each with a unique task key and stable USER/GROUP/ROLE target. Invalid cardinality or targets fail entry atomically. Group/role membership is host-owned and checked at operation time; ALL counts tasks, not members.
+
+**Claiming — F017:** optional human-node `claimPolicy` is `OPTIONAL` (default) or `REQUIRED`. Direct USER tasks do not require claims. An unclaimed shared task may be completed by an eligible member under OPTIONAL; REQUIRED needs a claim first. Once claimed, only its eligible claimant can complete it; ownership does not bypass current membership or authorization. An owner may release their shared-task claim with host business access even after membership loss, without a reason; administrator release requires authorization and a recorded reason. USER tasks cannot be claimed or released. Claim/release preserves the original target, task roster and captured inputs; read access and successful-command replay follow their separate authorization rules.
 
 ### 9.3 Initial completion policies
 
@@ -568,8 +576,8 @@ This is the agreed **fixed task list** model: the required tasks are established
 
 | Policy | Cardinality | Behavior | Status |
 | --- | --- | --- | --- |
-| `SINGLE` | Exactly one required task. | Its permitted task outcome becomes the activity outcome. | Agreed. |
-| `ALL` | One or more required tasks, within a specified bound. | Every task must contribute one configured outcome; any other permitted outcome is immediately decisive. | Agreed. |
+| `SINGLE` | Exactly one required task. | Its permitted task outcome becomes the activity outcome. | Implemented. |
+| `ALL` | One or more required tasks, within a specified bound. | Every task must contribute one configured outcome; any other permitted outcome is immediately decisive. | Implemented in F021. |
 
 The `ALL` policy waits for every required task to return one designated outcome, unless someone submits another permitted outcome that ends the review early:
 
@@ -583,7 +591,7 @@ For example, with three required tasks collecting `APPROVE`, the first two appro
 
 **Four consequences of this decision:**
 
-1. **The required work stays fixed.** Reassignment preserves task identity and is audited. Adding, removing or waiving tasks cannot change the required contributions during an active review. `ALL` counts tasks, so one person may hold several unless the application forbids it.
+1. **The required work stays fixed.** General reassignment remains deferred; its agreed future design preserves task identity and audit. Adding, removing or waiving tasks cannot change the required contributions during an active review. `ALL` counts tasks, so one person may hold several unless the application forbids it.
 2. **Early completion stops collection.** Cancelled tasks cannot accept new submissions. Earlier completed tasks keep their evidence; cancelled tasks are not votes. To collect everyone's feedback regardless of their answers, use a common contribution outcome such as `REVIEW_SUBMITTED` and interpret the results afterward (section 9.4).
 3. **Competing decisions have no automatic priority.** Under concurrency protection, the first decisive command that successfully commits determines the result. A competing command receives a state or concurrency error and cannot overwrite it. A rolled-back command has not settled the review; neither click order nor outcome display order gives `REJECT` priority over `REQUEST_CHANGES`. An identical authorized retry of a previously successful command still returns its recorded result.
 4. **Completion and progression succeed together.** The final or decisive submission, activity outcome, sibling cancellations, routing and synchronous downstream work share one transaction. If downstream work fails, all changes from that command roll back, including the submission and cancellations. Contributions committed by earlier commands remain. [A2, §4.2][A2]
@@ -601,9 +609,9 @@ In the second example, a later application service interprets the answers and de
 
 An accepted submission records what a reviewer sent and cannot be edited afterward. Workflow variables hold execution data that may change through permitted operations. These serve different purposes:
 
-- **Preserve each submission.** Later work must not rewrite an accepted reviewer's answer. Under the current proposal, submitting a task while the review still awaits others cannot change the shared review material or workflow variables. [A2, §§4.3, 12][A2]
+- **Preserve each submission.** Later work must not rewrite an accepted reviewer's answer. Under F021, submitting a task while the review still awaits others cannot change the shared review material or workflow variables. [A2, §§4.3, 12][A2]
 - **Keep the reviewed material fixed.** APOLO identifies and protects the information covered by an approval attempt, including across successive review steps. A material change requires APOLO's invalidation and fresh-review rules. Unrelated variables may still change through authorized operations; the engine gives no special meaning to a variable named, for example, `approvalBaseline`. [A2, §§12, 17][A2]
-- **Read the exact submissions needed.** Later steps must identify the relevant task or review activity, especially when a workflow revisits the same step. They must also be able to read the final accepted submission within the same transaction. [A2, §11.1][A2]
+- **Read the exact submissions needed.** Later steps must identify the relevant task or review activity, with loop occurrence selection still deferred because supported graphs are acyclic. They must also be able to read the final accepted submission within the same transaction. [A2, §11.1][A2]
 
 APOLO owns the choice of protected information and how it is stored and enforced. The exact edit restrictions and checks remain integration specification work.
 
@@ -619,13 +627,14 @@ The following categories distinguish information by its role. They help us decid
 | --- | --- | --- |
 | **Business data** | Application records, such as bookings and their associations. | The application owns the authoritative records and updates them through its business rules and services. |
 | **Start input** | Values supplied when starting a workflow instance. | The engine validates the declared inputs and uses explicit mappings to initialize the workflow. |
-| **Facts** | Values the application supplies for a check or decision, such as a booking amount. | Expressions can read them but cannot change them. The design must identify whether they come from a saved snapshot or current application data. |
-| **Workflow variables** | Values retained by an instance for use in later steps. | The workflow declares them. Updates require authorized, version-checked commands or declared mappings. They may hold simple values or structured JSON. |
-| **Simple task inputs** | Individual values submitted when completing a task, such as a confirmation flag. | The human step defines the allowed fields and validation rules. Accepted values belong to that task's submission. |
+| **Facts** | Broader design for application-supplied decision data. | Direct `#facts` access and provider bindings remain unsupported; current host data enters through explicit start/service bindings. |
+| **Workflow variables** | Values retained by an instance for use in later steps. | Top-level declarations and explicit human `outputVariable` producers define them. Current writes use start/service mappings or output creation; a standalone update command remains deferred. They may hold simple values or structured JSON. |
+| **Human-task inputs** | Read-only scalar/JSON values captured when the activity is entered. | F020 variable/submission bindings derive types and retain immutable inputs; receiving-task read authorization governs the copy. ALL siblings share one captured snapshot. |
+| **Previous decisions** | Earlier accepted outcome/comment context. | F022 uses pinned display policy, receiving-task authorization and an activity-entry cutoff; it exposes neither result payloads nor source-task access. |
 | **Structured task result** | A JSON submission containing detailed answers, such as decisions for several reviewed items. | The human step defines its requirements. Once accepted, it cannot be edited or automatically merged into workflow variables. |
 | **Caller identity and execution context** | Trusted information about who is acting and the context of the command. | The application supplies it through trusted mechanisms; callers cannot establish their identity or permissions by setting ordinary workflow fields. |
 
-The key distinction is that **variables describe changeable execution state**, while **accepted task submissions record what was submitted**. Both may contain JSON, but they have different rules. Task results use structured objects with nested objects and arrays; section 10.3 records their agreed presence rules. Exact schema features, encoding and size limits still require specification. [A2, §§1, 8.2, 11.1, 12][A2]
+The key distinction is that **variables describe changeable execution state**, while **accepted task submissions record what was submitted**. Both may contain JSON, but they have different rules. Task results use structured objects with nested objects and arrays; section 10.3 records their agreed presence rules. F018 defines the result profile and codecs; F021 defines current execution-data capacities. [A2, §§1, 8.2, 11.1, 12][A2]
 
 ### 10.2 Variable types and exact values
 
@@ -692,7 +701,7 @@ For example:
 
 The schema can declare `reviewCount` as `integer`, `score` as `number` and `amount` as `string`. APOLO validates the amount's decimal spelling and business rules; standard numeric constraints such as `minimum` do not validate a string. Use strings for large identifiers and precision-sensitive amounts exchanged with ordinary JavaScript clients. The engine preserves the number it receives but cannot recover digits lost by a client before submission. [JSON interoperability](https://www.rfc-editor.org/rfc/rfc8259#section-6).
 
-**Remaining work:** encode and verify these agreed value rules in the validation and codec contracts. Initialization/read behavior is selected in section 10.3; aggregate size and processing limits remain under L16. L11's schema feature selection is complete.
+**Delivered contracts:** F007/F009 define scalar and exact JSON codecs; F018 defines result validation. Schema comparison uses a private mathematical projection (for example, `1` and `1.00` compare equally for enum/const/integer checks), while accepted JSON, evidence and fingerprints retain numeric scale. Feature implementation records identify verification and remaining integration gaps.
 
 ### 10.3 Missing, null and empty values
 
@@ -704,13 +713,13 @@ The variable model distinguishes uninitialized/absent, typed explicit null, and 
 - **Null must be permitted explicitly.** Required and nullable are separate: a required input must be present, but may contain null if its declaration permits it.
 - **Defaults apply only to missing values at the declared initialization boundary.** Use a valid typed default; never replace explicit null, invalid input or failed evaluation with a default. JSON Schema's `default` annotation does not perform application initialization. [S12]
 
-For simple start/task inputs, section 12.1.2 permits literal defaults only on optional fields; a default cannot satisfy a required input. Variable initialization uses independent mappings in section 12.1.6, without a separate variable-default field. The agreed output-binding rules in section 10.4 continue to apply.
+For start inputs, section 12.1.2 permits literal defaults only on optional fields; a default cannot satisfy a required input. Variable initialization uses independent mappings in section 12.1.6, without a separate variable-default field. The agreed output-binding rules in section 10.4 continue to apply.
 
 **Reading and clearing variables — AGREED, 31 October 2026 (L10):**
 
 - **An evaluated read of an uninitialized variable fails the command.** Do not substitute zero, null or false, or select a gateway's default route because of the error. This applies even when the variable is nullable. Explicitly assigned null remains a value handled by normal SpEL null semantics; null-safe operations do not hide an uninitialized-variable error.
 - **Only reads actually evaluated trigger this rule.** A branch skipped through short-circuit evaluation, or a route condition skipped after an earlier match, does not read its variables. This does not waive definition validation.
-- **Do not clear an assigned variable back to uninitialized.** Permitted writes may replace it with a valid value or explicitly set it to null when nullable. There is no initial operation to remove its value entirely. This concerns whole workflow variables; replacing a JSON value may still omit optional properties allowed by its schema.
+- **Do not clear an assigned variable back to uninitialized.** Permitted writes may replace it with a valid value or explicitly set it to null when nullable. There is no initial operation to remove its value entirely. This concerns whole workflow variables; replacing a JSON value may still omit properties within the generic JSON bounds; execution-data field schemas remain deferred.
 
 For example, a condition comparing `riskScore` with 50 fails if no step has assigned `riskScore`. A condition checking it for null also fails in that state. After assignment, a null check returns true for explicit null and false for a non-null value.
 
@@ -718,13 +727,13 @@ For example, a condition comparing `riskScore` with 50 fails if no step has assi
 
 1. Check supplied inputs, required fields and applicable limits.
 2. Apply declared defaults to missing optional inputs, producing validated, defaulted inputs.
-3. Run start guards using those inputs.
+3. In the broader guard design, run start guards using those inputs; current definitions permit only empty/omitted guards and hosts own start authorization.
 4. Prepare and validate all initialization mappings, then apply them together.
 5. Enter the workflow.
 
-An omitted optional input without a default leaves its mapped variable uninitialized. All effects remain in the same transaction; a later failure rolls them back. For task completion, validate inputs/defaults, result and comment requirements before outcome guards, as specified in section 12.1.14. This ordering describes data validation and initialization; the detailed command protocol must also enforce the existing trusted-context, concurrency and idempotency rules.
+An omitted optional input without a default leaves its mapped variable uninitialized. All effects remain in the same transaction; a later failure rolls them back. For current task completion, validate the result and comment requirements plus host business validation; incoming inputs are already captured and are not resubmitted/defaulted. The historical guard ordering is retained in section 12.1.14. This ordering describes data validation and initialization; the detailed command protocol must also enforce the existing trusted-context, concurrency and idempotency rules.
 
-**L10 behavior decisions complete — 31 October 2026:** sections 10.2–10.3 select value representations, exactness, presence, defaults and initialization/read behavior. Formal codec, accessor and command contracts and implementation verification remain work; resource limits and diagnostics remain under L16 and L15.
+**L10 behavior decisions complete — 31 October 2026:** sections 10.2–10.3 select value representations, exactness, presence, defaults and initialization/read behavior. Delivered codec, accessor and command contracts are specified in F007–F009 and F018–F021; their records own verification, while broader scope remains deferred; resource limits and diagnostics remain under L16 and L15.
 
 **Task-result presence — AGREED, 31 October 2026:** `FORBIDDEN` requires the result field to be absent. `OPTIONAL` allows absence, but a supplied result must be a valid object. `REQUIRED` requires a valid object. Explicit top-level null is rejected in all three cases; nested nulls follow the result schema. These rules apply to task results, not to nullable workflow variables.
 
@@ -736,7 +745,7 @@ Variable updates replace the whole value. The initial contract does not support 
 
 **AGREED — 31 October 2026:** bindings follow these four rules:
 
-1. **Declare the sources available at each stage.** Start inputs initialize workflow variables. Initial automated-action input bindings read declared workflow variables. Output mappings may read the action's returned outputs and permitted workflow variables. Every source must be explicitly identified and access must be authorized. Direct bindings to application facts or earlier task/activity submissions are deferred future extensions, superseding their earlier inclusion in the initial binding scope.
+1. **Declare the sources available at each stage.** Start inputs initialize workflow variables. Initial automated-action input bindings read declared workflow variables. Output mappings may read the action's returned outputs and permitted workflow variables. Every source must be explicitly identified and access must be authorized. Direct application-fact bindings remain deferred. F019/F020/F021 extend this original rule with explicit `submission` sources for service/human inputs.
 2. **Distinguish missing outputs from null values.** A missing required output fails the command and rolls it back. A missing optional output skips its associated variable update, preserving the existing value or leaving the variable uninitialized. An explicit `null` sets the destination to null only if its declaration permits it. Later use must still satisfy the variable's presence and type requirements.
 3. **Allow only one mapping per destination in an action's outputs.** Two output mappings targeting the same workflow variable are rejected during definition validation before publication. Different steps may update that variable at different times.
 4. **Keep mappings independent of each other's updates.** All output mappings read the same workflow-variable values from before those mappings are applied, alongside the action's returned outputs. Prepare and validate all updates before applying them together. A mapping cannot read a value written by another mapping in the same group; reordering mappings must not change the result.
@@ -745,7 +754,9 @@ For example, if `riskLevel` currently holds `LOW` and an action returns `HIGH`, 
 
 The action sequence is therefore: validate inputs, run the registered action synchronously, validate its outputs, then prepare and apply the permitted variable updates. The action and updates remain within the same transaction; a failure rolls back the command.
 
-Start initialization and write boundaries are agreed in section 12.1.6; service-node fields and variable/action-output mappings are agreed in section 12.1.8. Direct fact and prior-submission bindings are future ideas, not prerequisites for the initial language. Remaining selected binding details, limits and diagnostic codes still require specification. These decisions do not claim an implemented binding mechanism.
+Start initialization and write boundaries are defined in section 12.1.6; section 12.1.8 defines service mappings. A `submission` source identifies an earlier human `nodeKey`: SINGLE supplies its original accepted result, while resolved ALL supplies a deterministic task-key-ordered array of `{taskId, taskKey, outcomeKey, comment, result?}` entries. Open/cancelled tasks contribute no entry; an omitted OPTIONAL result omits only that entry's result property. Skipped/uncompleted sources and missing OPTIONAL SINGLE results fail `SUBMISSION_UNAVAILABLE`; there is no latest/fallback lookup. The final accepted submission is visible to downstream work in the same transaction.
+
+An optional human `outputVariable` creates a separate mutable JSON value only on accepted SINGLE result or ALL resolution, never on a nonfinal contribution. OPTIONAL SINGLE without a result creates no variable. Names need no top-level declaration; reject collisions across all declarations/producers, including mutually exclusive paths, and count them together toward 100. Start cannot initialize outputs; a service may replace one only after creation, with a nonnull JSON value. Original submission evidence is unaffected. Submission sources are not general expression, guard or assignment-resolver history access.
 
 ### 10.5 Validating JSON structure
 
@@ -788,16 +799,16 @@ Here, `type`, `properties`, `required` and `additionalProperties` have meanings 
 | **JSON Schema** | Existing validation standard. | Expresses rules for acceptable data. |
 | **Our workflow language** | This project. | Defines steps, routes, tasks and execution behavior. |
 
-In our project, schemas have four uses:
+The design distinguishes four schema uses, with the execution-data uses deferred:
 
 | Schema | What it checks |
 | --- | --- |
 | **Workflow document schema** | The structure of the definition itself, including its node, transition and variable declarations. Separate validation checks whether those declarations form a valid executable workflow. |
-| **Variable data schema** | The structure allowed inside a particular JSON variable. |
-| **Structured start-input schema** | The object or array accepted for a declared JSON start input. |
+| **Variable data schema** | Broader design, deferred by F009; current variables have generic JSON bounds without field schemas. |
+| **Structured start-input schema** | Broader design, deferred by F009; current start inputs have type/presence/nullability and generic JSON bounds. |
 | **Task result schema** | The structure a reviewer may submit as a task's detailed result. |
 
-A **schema profile** is the documented set of JSON Schema features and limits our engine supports. The L11 profile applies to variable, structured start-input and task-result schemas. References, discussed in example 8 below, are an additional JSON Schema feature for reusing rules; basic schemas such as the one above do not need them. Defining the profile lets authors know which rules they can use and keeps validation predictable and bounded.
+A **schema profile** is the documented set of JSON Schema features and limits our engine supports. The implemented L11 profile applies to task-result schemas; its earlier variable/start-input application remains deferred under F009. References, discussed in example 8 below, are an additional JSON Schema feature for reusing rules; basic schemas such as the one above do not need them. Defining the profile lets authors know which rules they can use and keeps validation predictable and bounded.
 
 **AGREED for L11 — 31 October 2026:** embed variable and task-result schemas in the workflow definition and allow local references within each embedded schema. Support declared properties, required fields, types, explicit nullability, fixed values, enumerations, nested objects/arrays and length/count/value bounds. Use closed objects, conditional requirements and alternatives with a required identifying field. Reject external and circular references; defer arbitrary text patterns. Only explicitly documented format checks are supported, and unsupported validation features are rejected before publication. Numeric limits in the examples below are illustrative.
 
@@ -931,7 +942,7 @@ If an author supplies a schema containing `pattern`, reject the definition befor
 | `date-time` | `"2026-10-31T14:30:00+02:00"` | An RFC 3339 timestamp with an offset. |
 | `uuid` | `"550e8400-e29b-41d4-a716-446655440000"` | A standard plain UUID string. |
 
-These formats retain Draft 2020-12 meanings; date/date-time use RFC 3339 and do not accept every ISO 8601 representation. Reject unsupported format names before publication, including email, URL-related and custom formats in the initial profile. Remaining precision, normalization and edge-case alignment with L10 must be specified without silently changing a standard format's meaning. [Format specification](https://json-schema.org/draft/2020-12/json-schema-validation#section-7.3)
+These formats retain Draft 2020-12 meanings; date/date-time use RFC 3339 and do not accept every ISO 8601 representation. Reject unsupported format names before publication, including email, URL-related and custom formats in the initial profile. F018 specifies exact validation projections and selected format assertions without changing accepted data or a standard format's meaning. [Format specification](https://json-schema.org/draft/2020-12/json-schema-validation#section-7.3)
 
 **Selected metadata — AGREED, 31 October 2026:** support `title` and `description` as strings, and `examples` as an array of illustrative values. These annotations do not change validation or populate data. As an additional authoring rule, every example must satisfy the schema where it appears; invalid examples reject the definition before publication. Metadata and examples remain within schema/definition budgets under L16. [Schema annotations](https://json-schema.org/understanding-json-schema/reference/annotations)
 
@@ -1007,16 +1018,16 @@ Workflows use **expressions** to evaluate conditions over supplied data and **ho
 
 ### 11.1 Rules for evaluating expressions
 
-**AGREED — 31 October 2026 (L12):** use standard Spring Expression Language (SpEL) syntax and semantics within a controlled, read-only evaluation context. Retain SpEL's documented operators, precedence, short-circuit evaluation and null handling within that context; do not invent a second expression language or impose a blanket ban on ordinary arithmetic. The engine supplies declared application facts under `#facts` and permitted workflow variables under `#vars`.
+**AGREED — 31 October 2026 (L12):** use standard Spring Expression Language (SpEL) syntax and semantics within a controlled, read-only evaluation context. Retain SpEL's documented operators, precedence, short-circuit evaluation and null handling within that context; do not invent a second expression language or impose a blanket ban on ordinary arithmetic. The implemented context exposes permitted workflow variables under `#vars`; `#facts` remains broader agreed design and is rejected. F019 adds only `#hasVariable` with a literal known variable/output key, allowing existence checks without reading an uninitialized value.
 
 The engine's integration contract must specify:
 
 - **Typed inputs:** decode values according to their declared workflow types before evaluation. For example, a string-encoded `DECIMAL` becomes a typed decimal value. Preserve exact input decoding; expression arithmetic follows native SpEL numeric behavior, including approximation and rounding.
 - **Read-only access:** expose only declared, validated data, including permitted bounded JSON field/index access. Expressions cannot access application services, Spring beans or arbitrary Java objects, construct objects, invoke general methods, mutate data or fetch hidden time/random values. Existing restrictions on unrestricted regular expressions and collection traversal remain; they do not redefine the meaning of supported operators.
-- **Results and errors:** routing conditions must produce a Boolean. Missing required inputs or paths and evaluation errors fail the command. An evaluated read of an uninitialized workflow variable fails even when nullable; skipped reads do not fail. Explicitly assigned null retains SpEL's null semantics, and null-safe operations cannot hide an uninitialized-variable error (section 10.3). The accessor implementation must enforce these rules while retaining the selected operator semantics.
-- **Resource bounds:** enforce L16's selected source-length, parsed-size/depth, navigation, evaluation-count and per-evaluation operation limits (section 14.2). Configure enforcement locally for the workflow engine; dependency support and counter behavior must be verified before execution support is claimed.
+- **Results and errors:** routing conditions must produce a Boolean. Undeclared/uninitialized variable reads, invalid accesses and evaluation errors fail the command. Missing object properties and valid out-of-range array indexes return null under F009; per-access `?.` permits null-safe property traversal, while ordinary access on null fails. An evaluated read of an uninitialized workflow variable fails even when nullable; skipped reads do not fail. Explicitly assigned null retains SpEL's null semantics, and null-safe operations cannot hide an uninitialized-variable error (section 10.3). The accessor implementation must enforce these rules while retaining the selected operator semantics.
+- **Resource bounds:** enforce L16's selected source-length, parsed-size/depth, navigation, evaluation-count and per-evaluation operation limits (section 14.2). Configure enforcement locally for the workflow engine; F008/F009 specify and implement local AST enforcement and retained read evidence; their implementation records bound verification claims.
 
-Expression rules belong to the workflow-language version. Every definition using that version follows the same centrally enforced rules; authors cannot select a different policy or relax its restrictions. There is no separate `expressionPolicy` field. An engine upgrade must preserve the declared language version's behavior or explicitly reject it, including across Spring/SpEL upgrades. Incompatible behavior changes require a new language version. Context configuration, typed input conversion, necessary syntax/access restrictions, enforcement of the selected limits and diagnostics remain specification and verification work. See [architecture section 5.3](workflow-engine-design.md#53-restricted-spel-execution-rules) and [source precedence](../design-sources.md).
+Expression rules belong to the workflow-language version. Every definition using that version follows the same centrally enforced rules; authors cannot select a different policy or relax its restrictions. There is no separate `expressionPolicy` field. An engine upgrade must preserve the declared language version's behavior or explicitly reject it, including across Spring/SpEL upgrades. Incompatible behavior changes require a new language version. F008/F009/F019 define the supported context, typed conversion, access restrictions, limits and diagnostics; arbitrary functions and direct facts remain excluded. See [architecture section 5.3](workflow-engine-design.md#53-restricted-spel-execution-rules) and [source precedence](../design-sources.md).
 
 Spring's restricted evaluation context is a starting point; the engine must still explicitly enforce its supported operations and data access. [S20]
 
@@ -1033,7 +1044,7 @@ An expression returning `false` is a normal result. An expression that cannot be
 | A condition has invalid syntax | Reject the definition during validation before publication, even if that condition might be skipped at runtime. |
 | An evaluated condition has missing required data, an invalid conversion, a non-Boolean result or another evaluation error | Fail the command. Do not try later routes or use the default. |
 
-Conditions after a match are **not evaluated**, rather than treated as false. Within each condition, SpEL's standard operator, short-circuit and null semantics apply to the validated data exposed by the context. This does not turn missing required data into an allowed null or waive the Boolean-result requirement. Expressions only read explicitly supplied data: they cannot call application services, access Spring beans, create objects, change state or fetch time, random values or other hidden data. Context enforcement and compatibility with the workflow's typed-value rules still require specification and verification. [A1, §5][A1]
+Conditions after a match are **not evaluated**, rather than treated as false. Within each condition, SpEL's standard operator, short-circuit and null semantics apply to the validated data exposed by the context. This does not turn missing required data into an allowed null or waive the Boolean-result requirement. Expressions only read explicitly supplied data: they cannot call application services, access Spring beans, create objects, change state or fetch time, random values or other hidden data. F008/F009 own context enforcement and typed-value compatibility; upgrades still require applicable verification. [A1, §5][A1]
 
 ### 11.3 Functions provided by the application
 
@@ -1042,9 +1053,9 @@ A **registered capability** is a function or type of support the application mak
 | Capability | What the application provides |
 | --- | --- |
 | **Authorization** | Checks whether the authenticated caller may perform the operation and access the business data. |
-| **Guard** | Checks business preconditions without changing business data. |
+| **Guard** | Broader agreed named-check design; nonempty declared guards remain unsupported. F018 instead provides an optional host task-submission validator. |
 | **Assignment resolver** | Determines the required review tasks and their assignees. |
-| **Data provider** | Supplies the declared facts needed by the workflow. |
+| **Data provider** | Broader design for declared facts; direct providers/`#facts` remain deferred. Current data flows use explicit start/service bindings. |
 | **Service action** | Performs a business operation and returns its declared results. |
 | **Durable event recorder** | Records work for later delivery in the same transaction as the workflow change. |
 | **Task-type support** | Presents and handles tasks identified by a stable task-type code, following the rules of each workflow step. |
@@ -1064,27 +1075,28 @@ Before publication, the engine checks that the required capabilities are registe
 
 These rules apply to actions, assignment resolvers, guards and data providers. They do not freeze current user permissions or business data: authorization and business checks still use the applicable runtime context. The task-type catalog retains its existing stable-code model, and the pinned human node still owns its submission contract.
 
-Declared-contract comparison can detect structural incompatibilities, but cannot prove that application code preserves the promised behavior. The application must verify behavioral compatibility during upgrades; a contract fingerprint cannot replace that responsibility. Exact registration metadata, compatibility-check mechanisms and diagnostics remain specification work.
+Declared-contract comparison can detect structural incompatibilities, but cannot prove that application code preserves the promised behavior. The application must verify behavioral compatibility during upgrades; a contract fingerprint cannot replace that responsibility. Delivered action/resolver/task-support contracts are specified by their features; general guards and fact-provider contracts remain future work.
 
 ## 12. Document representation and versioning
 
-This chapter describes how a workflow definition could be organized as a JSON document. It separates the information that defines the process from metadata used to manage publication and execution, and explains the different versions used to identify the language, the workflow and changes to editable content.
+This chapter describes the selected JSON representation, reconciled with the implemented subset. It separates the information that defines the process from metadata used to manage publication and execution, and explains the different versions used to identify the language, the workflow and changes to editable content.
 
 ### 12.1 Top-level document structure
 
-The **envelope** is the top-level structure of the definition: it identifies the workflow and its language version, then contains the process declarations, nodes and routes. **AGREED — 31 October 2026 (L18):** use the fields below and the nested structures in sections 12.1.1–12.1.16. L18 settles field names, placement and permitted combinations; formal schemas, host APIs and remaining validation/encoding details are separate specification work (section 16.3).
+The **envelope** is the top-level structure of the definition: it identifies the workflow and its language version, then contains the process declarations, nodes and routes. **AGREED — 31 October 2026 (L18):** use the fields below and the nested structures in sections 12.1.1–12.1.16. L18 records the original field choices; the tables below reconcile them with delivered feature contracts. Nonempty guards remain broader design, explicitly marked where retained. Formal schemas and supported APIs exist for the implemented subset (section 18.1).
 
 | Field | JSON type | Required? | Purpose |
 | --- | --- | --- | --- |
 | `schemaVersion` | Integer | Yes | Workflow-language version, including expression rules; initially `1`. |
 | `key` | String | Yes | Stable workflow family identity, using L04's case-sensitive key rules and L16's 100-character limit. |
-| `version` | Integer | Yes | Positive workflow-definition version; allocation rules remain specification work. |
+| `version` | Integer | Yes | Explicit caller-supplied positive workflow-definition version, at most 2147483647; F004 owns family/version uniqueness. |
 | `name` | String | Yes | Nonempty human-readable workflow name. |
 | `description` | String | No | Additional explanation for authors and administrators. |
 | `startPolicy` | Object | Yes | Groups accepted start inputs, initialization and optional guards, including authorization when declared. |
 | `variables` | Array | Yes | Declares workflow variables using section 12.1.5; use `[]` when none exist. |
 | `nodes` | Array | Yes | Declares the steps, including exactly one `START`; common fields and START/END structures are defined in section 12.1.7. |
 | `transitions` | Array | Yes | Declares connections and routing rules. |
+| `previousDecisions` | Object | No | F022 default policy: `{ "mode": "NONE" }` (omitted default) or `{ "mode": "ALL_PREVIOUS" }`. |
 | `designer` | Object | No | Non-executable diagram information governed by L13. |
 
 Omit unused optional top-level fields rather than supplying `null`. Required fields must be present with the declared type; use explicit empty collections where meaningful, such as `variables: []`. Node and transition arrays must still satisfy the agreed graph rules. Reject unknown top-level fields; L13's bounded allowance for unknown metadata applies inside `designer`.
@@ -1093,7 +1105,7 @@ Keep `startPolicy` at the top level because it describes the requirements for st
 
 Database IDs, publication lifecycle, validation timestamps, draft revisions and lock tokens belong to administration/runtime envelopes. Portable document identity must agree with indexed persistence metadata. [A2, §§6–7][A2]
 
-The existing F001 schema includes an `expression_policy` column from the earlier design. It does not imply a field in the revised JSON contract. Its removal or transitional handling requires a separate persistence specification and forward migration; this document does not change the applied schema or existing feature evidence.
+F001 originally included `expression_policy`. F004 implemented its removal in the gated legacy-column migration; it is not a portable JSON field. Preserve applied migration identities and the historical evidence in the F004 record.
 
 #### 12.1.1 Start requirements: `startPolicy`
 
@@ -1102,7 +1114,7 @@ The existing F001 schema includes an `expression_policy` column from the earlier
 | Field | JSON type | Required? | Meaning |
 | --- | --- | --- | --- |
 | `inputContract` | Array | Yes | Declares scalar and structured start-input fields using sections 12.1.2 and 12.1.4. An explicit `[]` accepts no additional input fields. |
-| `guards` | Array | No | Registered application checks that must all pass in array order. Omission means `[]`; entries follow section 12.1.3. |
+| `guards` | Array | No | Current support: omitted or `[]` only. Section 12.1.3 retains broader agreed named-check syntax. |
 | `initialize` | Object | No | Maps declared variable names to start-input or literal sources (section 12.1.6). Omission means no initialization mappings. |
 
 ```json
@@ -1112,13 +1124,13 @@ The existing F001 schema includes an `expression_policy` column from the earlier
 }
 ```
 
-**AGREED — 31 October 2026:** remove `startPolicy.permission`. Start authorization is optional and expressed through a declared host guard, such as `hasAuthorisation`; there is no mandatory start authorization hook. If no authorization guard is declared, the engine performs no start authorization check. Host endpoint access controls may still apply. Input validation, declared guards and other workflow rules remain enforced.
+**Historical guard direction — 31 October 2026, not implemented:** remove `startPolicy.permission`. Start authorization is optional and expressed through a declared host guard, such as `hasAuthorisation`; there is no mandatory start authorization hook. If no authorization guard is declared, the engine performs no start authorization check. Host endpoint access controls may still apply. Input validation, declared guards and other workflow rules remain enforced.
 
 Reject unknown fields, including the removed `permission` field, and explicit null values for these fields. Invalid input or any declared guard's rejection or failure fails the start command; no partial instance or tasks may be committed. Guards can read validated start inputs after defaults or fixed literal arguments as described in section 12.1.3. Human-task outcomes use the same optional authorization-guard approach (section 9.1).
 
 #### 12.1.2 Simple input-field descriptors
 
-An input-field descriptor declares one value the caller may supply. **AGREED — 31 October 2026 (L18):** use the same basic descriptor structure for simple start inputs and simple human-task inputs.
+An input-field descriptor declares one start value the caller may supply. The original L18 design also applied these descriptors to scalar task submissions; F020 supersedes that human-task use with captured incoming bindings (section 12.1.12).
 
 | Field | JSON type | Required? | Meaning |
 | --- | --- | --- | --- |
@@ -1161,7 +1173,7 @@ The caller supplies values, not descriptors:
 
 This example rejects a missing `bookingId`, explicit null for either field, a non-Boolean `urgent` such as `"yes"`, and undeclared inputs. Omitting `urgent` is valid: without a declared default, it remains absent rather than automatically becoming false. Required and nullable are independent; a required nullable field must be supplied but may contain null.
 
-Input declarations do not automatically create or update workflow variables; explicit bindings remain required. Structured task submissions use the separate `resultContract`. Start inputs additionally support the JSON descriptor extension in section 12.1.4; simple human-task inputs remain scalar.
+Input declarations do not automatically create or update workflow variables; explicit bindings remain required. Structured task submissions use the separate `resultContract`. Start inputs additionally support the JSON descriptor extension in section 12.1.4; human incoming bindings instead derive scalar/JSON types from their sources.
 
 **AGREED — input defaults:** an optional `default` provides a literal value when the caller omits an optional input. For example:
 
@@ -1184,6 +1196,8 @@ Input declarations do not automatically create or update workflow variables; exp
 **Future idea — additional field constraints (DEFERRED):** a later extension could add a `constraints` object with `enum`, STRING length bounds and inclusive LONG/DECIMAL bounds. These fields are not part of the initial descriptor contract and must not be accepted or silently ignored now. A future proposal must define typed comparison, reject contradictory or inapplicable constraints, validate defaults against them and prevent relaxing engine limits. For now, type, presence, nullability and engine limits still apply; additional business checks belong to the application. This deferral does not remove the agreed JSON Schema features for structured variables and task results.
 
 #### 12.1.3 Start guard entries and inputs
+
+**Broader agreed design, not implemented:** current publication accepts only omitted/empty guards. The following syntax records the future guard contract; it does not bypass host start authorization.
 
 **AGREED — 31 October 2026 (L18):** each entry in `startPolicy.guards` is an object identifying one registered application check and its explicit input bindings.
 
@@ -1234,42 +1248,22 @@ These are the selected bindings for start guards, not a blanket source restricti
 
 #### 12.1.4 Structured start inputs
 
-**F009 precedence — 2026-11-06:** the mandatory-schema descriptor/example below records the earlier broader design. The initial slice retains type/presence/nullability and explicit mappings without a field schema. Extra nested fields and new structures are allowed within generic bounds; nested nulls are data. Defaults satisfy generic JSON/type/nullability/bound checks. Schema support is deferred, not silently accepted and ignored. Final syntax is an F009 readiness gate.
+**Current contract — F009:** one `startPolicy.inputContract` array contains scalar and JSON descriptors. JSON uses the same presence/nullability/default fields with `type: "JSON"`; no `schema` field is accepted. The earlier L18 mandatory-field-schema design remains deferred for execution data, not silently ignored.
 
-**AGREED — 31 October 2026 (L18):** keep one `startPolicy.inputContract` array containing both scalar and structured descriptors. A structured start input uses the fields from section 12.1.2 with `type: "JSON"` and a required embedded `schema` object. This extension applies only to start inputs; human-task structured submissions remain in `resultContract`.
-
-For example, a descriptor can accept a nonempty list of booking identifiers:
+For example:
 
 ```json
 {
   "key": "bookingIds",
   "type": "JSON",
   "required": true,
-  "nullable": false,
-  "schema": {
-    "type": "array",
-    "items": {"type": "string"},
-    "minItems": 1
-  }
+  "nullable": false
 }
 ```
 
-The caller supplies the structured value directly:
+The caller supplies `{"bookingIds": ["B-42", "B-43"]}`. Core checks an object/array non-null root, exact values and generic JSON bounds; the host checks that this is an appropriate nonempty booking-ID list and authorizes its use. Nested nulls and additional properties are data, without field-schema validation.
 
-```json
-{
-  "bookingIds": ["B-42", "B-43"]
-}
-```
-
-- **Use the agreed schema profile.** The embedded schema follows L11, including closed objects, local noncircular references, supported features and limits. Every non-null root must be an object or array. The descriptor's `schema` is required for JSON start inputs and is not an additional constraint field for scalar descriptors.
-- **Keep presence and nullability separate.** `required` and `nullable` govern absence and top-level null. Validate non-null values against the embedded schema; schema content cannot override the descriptor's presence/null rules. Nested nulls follow the schema.
-- **Reuse literal-default rules.** An optional JSON input may declare a literal object/array default that passes its schema and applicable limits, or null when nullable. Defaults apply only to absent optional inputs and never replace invalid input or explicit null.
-- **Bind the whole value.** Start guards can receive a structured input using the existing `source: "startInput"` and `key` binding. Nested-path bindings are outside this initial start-guard structure.
-- **Keep business checks in the application.** A structurally valid booking list does not establish review membership, record existence or authorization.
-- **Require explicit persistence bindings.** Accepting a structured input does not automatically create or update a workflow variable. Initialization bindings must declare that transfer.
-
-Structured start inputs remain subject to depth, collection and combined request/evidence budgets. Section 14.2 selects 64 KiB UTF-16 per structured start-input value, 128 KiB UTF-16 for the complete input object after defaults and 256 KiB UTF-8 for the complete runtime command request. The detailed start-command envelope remains specification work and must fit all applicable budgets. The scalar `constraints` extension remains deferred.
+Optional defaults must satisfy type/nullability and generic limits; they apply only to absence. Explicit start initialization transfers the whole value into a declared variable. No implicit persistence, membership or authorization follows from accepting a list. Nonempty start guards and nested-path bindings remain unsupported. Section 14.2 gives the current F021 value, complete-map and ingress budgets; scalar additional constraints and execution-data field schemas remain deferred.
 
 #### 12.1.5 Variable declarations
 
@@ -1296,19 +1290,14 @@ For example, the `variables` array can contain:
   {
     "key": "bookingIds",
     "type": "JSON",
-    "nullable": false,
-    "schema": {
-      "type": "array",
-      "items": {"type": "string"},
-      "minItems": 1
-    }
+    "nullable": false
   }
 ]
 ```
 
-Variables do not have a `required` field. That input-descriptor field specifies what a caller must submit; a workflow variable may instead be populated later by an automated step. A non-nullable variable can remain uninitialized until assigned, but cannot be assigned null. An evaluated read of an uninitialized variable fails, whether nullable or not. Once assigned, a variable cannot be cleared back to uninitialized (section 10.3). JSON variables have object/array non-null roots, validated against their schemas; explicit top-level null is governed by `nullable`.
+Variables do not have a `required` field. That input-descriptor field specifies what a caller must submit; a workflow variable may instead be populated later by an automated step. A non-nullable variable can remain uninitialized until assigned, but cannot be assigned null. An evaluated read of an uninitialized variable fails, whether nullable or not. Once assigned, a variable cannot be cleared back to uninitialized (section 10.3). JSON variables have object/array non-null roots, validated against generic exact-value and resource bounds; explicit top-level null is governed by `nullable`.
 
-The declaration defines what a variable may contain, not its initial value or who may write it. Section 12.1.6 defines initialization and permitted-write boundaries, and section 12.1.8 defines service output mappings. Separate variable-update commands remain specification work. An input and variable sharing a key do not create an implicit binding. There is no separate variable-default field initially.
+The declaration defines what a variable may contain, not its initial value or who may write it. Section 12.1.6 defines initialization and permitted-write boundaries, and section 12.1.8 defines service output mappings. F019/F021 also allow human `outputVariable` producers without duplicate top-level declarations or schemas. Their names share the declaration namespace and combined 100-variable limit, and their values are created only at the completion/resolution boundary in section 10.4. Separate variable-update commands remain deferred. An input and variable sharing a key do not create an implicit binding. There is no separate variable-default field initially.
 
 #### 12.1.6 Initializing variables and permitting writes
 
@@ -1337,7 +1326,7 @@ For declared variables `urgent` (BOOLEAN) and `reviewCount` (LONG), an initializ
 - Every destination must be declared and occur only once. Reject duplicate destination properties before parsing can discard an occurrence.
 - Initializers do not contain expressions, read other variables or depend on other initializers. Reordering mappings cannot change the result.
 - A missing optional start-input source leaves its destination uninitialized. A reference to an undeclared input is invalid; explicit null is accepted only if the destination is nullable.
-- Validate source compatibility, literal values and variable type/schema/limit requirements before publication where possible, and validate actual values at runtime. Prepare and validate all updates before applying them together in the start transaction.
+- Validate source compatibility, literal values and variable type/limit requirements before publication where possible, and validate actual values at runtime. Prepare and validate all updates before applying them together in the start transaction.
 - Do not add a separate variable `default` field initially. Input defaults handle omitted inputs; literal initialization supplies independent starting values. Invalid input is never replaced by an initializer fallback.
 
 The following boundaries identify permitted writes without duplicating initialization/output mappings in a separate `writers` list:
@@ -1347,10 +1336,10 @@ The following boundaries identify permitted writes without duplicating initializ
 | Start | Only destinations declared in `startPolicy.initialize`. |
 | Service step | Only destinations in that step's declared output mappings. |
 | Guards and expressions | None; they read supplied data without changing it. |
-| Task submission | No implicit writes. Retain submission evidence; a subsequent service step may perform declared updates. |
+| Task submission / activity resolution | No implicit merging. Explicit `outputVariable` creates the F019 SINGLE result or F021 resolved ALL collection; a later service can replace it after creation. |
 | Separate variable-update command | Requires its own explicit authorization and write contract. A variable declaration alone grants no permission. |
 
-All writes replace whole values and obey type/schema/limit validation, concurrency protection and transaction rules. Application policies protecting reviewed material still apply. Section 10.3 selects the start data-validation order: supplied inputs, defaults, guards, atomic initialization, then workflow entry. Service-output notation is defined in section 12.1.8; separate variable-update command contracts and detailed command protocols remain specification work. Assigned variables cannot be cleared back to uninitialized. No partial start or downstream failure may leave committed initialization changes.
+All writes replace whole values and obey type/limit validation, concurrency protection and transaction rules. Application policies protecting reviewed material still apply. Section 10.3 selects the start data-validation order: supplied inputs, defaults, guards, atomic initialization, then workflow entry. Service-output notation is defined in section 12.1.8; standalone variable-update commands remain deferred, while delivered runtime feature specifications define current command protocols. Assigned variables cannot be cleared back to uninitialized. No partial start or downstream failure may leave committed initialization changes.
 
 #### 12.1.7 Common node fields, START and END
 
@@ -1375,7 +1364,7 @@ All writes replace whole values and obey type/schema/limit validation, concurren
 
 Its key need not be `START`; the engine identifies the entry node by its type, and exactly one is required. Start authorization, input contracts, guards and initialization stay in `startPolicy`. The graph rules require no incoming transitions and exactly one unconditional outgoing transition.
 
-**END** adds a required `result` string containing a nonempty business-result code:
+**END** adds a required `result` business-result identifier matching `^[A-Za-z][A-Za-z0-9._-]{0,99}$`:
 
 ```json
 {
@@ -1388,7 +1377,7 @@ Its key need not be `START`; the engine identifies the entry node by its type, a
 
 The engine records this result when the instance completes normally. It is distinct from task outcomes and lifecycle status: `result: "REJECTED"` still means normal workflow completion, with a rejected business result. An END node performs no business action; required business work belongs in a preceding service node. END has no outgoing transitions, and a definition may have several END nodes.
 
-SERVICE_TASK adds the fields in section 12.1.8. EXCLUSIVE_GATEWAY uses only the common fields, as described in section 12.1.9. HUMAN_TASK fields are defined in sections 12.1.10–12.1.15; exact host API contracts and diagnostics remain specification work.
+SERVICE_TASK adds the fields in section 12.1.8. EXCLUSIVE_GATEWAY uses only the common fields, as described in section 12.1.9. HUMAN_TASK fields are defined in sections 12.1.10–12.1.15; delivered feature specifications own the associated host APIs and diagnostics.
 
 #### 12.1.8 Service nodes: `SERVICE_TASK`
 
@@ -1425,11 +1414,11 @@ This reads workflow variable `bookingId`, passes it as the action's `bookingId` 
 
 The selected binding forms are `source: "variable"` with a declared variable `key`, and `source: "actionOutput"` with a returned output `key`. Variable sources can also be used in output mappings, reading pre-update values under section 10.4. Action-output sources are only available after the action, in output mappings.
 
-**Future idea — additional input sources (DEFERRED):** direct bindings to application fact providers and exact earlier task/activity submissions may be added later. No `fact`, `activitySubmissions` or automatic `completedActivity` binding is selected now, for service tasks or other node/capability inputs. Reject unsupported source forms rather than silently resolving them. This deferral concerns declarative input bindings; it does not remove existing application-owned business-data access, authorized exact-task/activity retrieval APIs or the separate declared `#facts` expression context. Any application integration still needs explicit, authorized data access and exact review identity; no “latest review for node” shortcut is introduced.
+**Implemented extension — F019/F021:** service inputs also accept `{ "source": "submission", "nodeKey": "REVIEW" }`, supplying the original accepted SINGLE result or resolved ALL collection described in section 10.4. This does not read a subsequently replaced output variable. Sources must be valid preceding human nodes under the supported acyclic graph; unavailable submissions fail explicitly. Direct fact providers, generic history sources and nested-path bindings remain deferred; `#facts` is not available either.
 
 The registered application action owns its input/output type contract; the node does not duplicate it. Before publication, check the action registration, argument/output names and binding compatibility with that contract and variable declarations where detectable. Validate actual values at runtime, including required/optional output behavior from section 10.4.
 
-Execute synchronously: validate inputs, run the action, validate outputs, then prepare and apply variable updates together. Every destination must be declared and occur once; mappings do not depend on each other's updates. A failure rolls back the command, including participating action effects. Success follows the single unconditional transition declared separately in `transitions`; the node has no error route or automatic retry configuration. L17's stable-capability rules apply to the action identifier.
+Execute synchronously: validate inputs, run the action, validate outputs, then prepare and apply variable updates together. Every destination must be a known declaration or named human output and occur once; a human output must already exist before replacement. Mappings do not depend on each other's updates. A failure rolls back the command, including participating action effects. Success follows the single unconditional transition declared separately in `transitions`; the node has no error route or automatic retry configuration. L17's stable-capability rules apply to the action identifier.
 
 #### 12.1.9 Choosing one route: `EXCLUSIVE_GATEWAY`
 
@@ -1453,32 +1442,22 @@ The node uses only the common fields from section 12.1.7. Its transitions declar
 
 #### 12.1.10 Human-task assignment
 
-**AGREED — 31 October 2026 (L18):** each `HUMAN_TASK` requires an `assignment` object describing how the host determines the required tasks and their direct assignees when the step begins.
-
-| Field | JSON type | Required? | Meaning |
-| --- | --- | --- | --- |
-| `resolver` | String | Yes | Nonempty logical identifier of a registered host assignment function. |
-| `inputs` | Object | Yes | Maps resolver argument names to explicit variable bindings; use `{}` when no arguments are needed. |
+Each `HUMAN_TASK` requires an `assignment` object with a nonempty registered `resolver` identifier and required `inputs: {}`:
 
 ```json
 {
   "assignment": {
     "resolver": "bookingReviewers",
-    "inputs": {
-      "bookingId": {
-        "source": "variable",
-        "key": "bookingId"
-      }
-    }
+    "inputs": {}
   }
 }
 ```
 
-The resolver's `bookingId` argument receives the declared workflow variable `bookingId`. Initially, each binding uses `source: "variable"` and a declared variable `key`; direct fact and prior-submission bindings remain deferred. Actor identity and trusted execution context are supplied separately, not established through these inputs.
+Nonempty assignment bindings from the original L18 design remain deferred and are rejected, including variable and submission sources. Trusted execution context is supplied separately; hosts resolve their own business links and authorization.
 
-Validate the resolver registration, argument names and binding types before publication where detectable. On entry, resolve and validate actual input values, invoke the resolver and validate its complete returned task list before committing the activity and tasks together. A missing required argument, invalid result or resolver failure fails the entering command. Unknown fields, unsupported binding sources and explicit null in place of required assignment fields are rejected.
+Check resolver registration before publication and validate its complete result at entry. SINGLE returns exactly one task; ALL returns one to 100, with unique task keys and valid USER/GROUP/ROLE targets. Invalid output or resolver failure rolls back the entering command. Host membership and distinct-person/no-self-approval policies remain host-owned. F016/F021 define the delivered resolver/result contracts; section 9.2 distinguishes the fixed roster, claim/release and deferred general reassignment.
 
-The result identifies each obligation and its assignment target; F016 extends SINGLE to USER/GROUP/ROLE targets. SINGLE requires exactly one task; ALL permits one to 100, with unique task keys within the activity and no missing assignees. The fixed-list and audited-reassignment rules in section 9.2 apply. APOLO owns distinct-person and no-self-approval policies. Exact resolver API/result field names remain open; the earlier illustrative `taskKey` and `assigneeId` names are not a finalized API. The selected HUMAN_TASK field structure is assembled in section 12.1.15.
+The optional sibling human-node field `claimPolicy` is `OPTIONAL` (default) or `REQUIRED`, governed by F017. It does not change the resolver's stable assignment target or make USER tasks require a claim.
 
 #### 12.1.11 Human-task completion
 
@@ -1515,15 +1494,14 @@ Fixed task lists, concurrency protection and atomic rollback are engine rules, n
 
 #### 12.1.12 Human-task submission contracts
 
-**AGREED — 31 October 2026 (L18):** each `HUMAN_TASK` requires `inputContract` and `resultContract`. They describe what each reviewer submits, not the business data APOLO displays in its form. Both contracts apply to every outcome; outcome-specific overrides are unsupported. Outcome and comment are separate from these input/result values.
+**Current contract — F018/F020:** each `HUMAN_TASK` requires `resultContract` and may declare an `inputs` binding map. Incoming values are read-only context captured at activity entry; they are not submitted with completion. The result contract describes the reviewer answer and applies to every outcome. Outcome and comment are separate. New authoring rejects human `inputContract`; only loading already-published legacy definitions accepts its historical empty array. Start input descriptors are unchanged.
 
-`inputContract` is an array of the scalar field descriptors and literal defaults from section 12.1.2. Use `[]` when no additional scalar inputs are accepted. Structured submissions belong in `resultContract`, not JSON-typed human-task input descriptors.
+Each optional `inputs` property names an incoming value (at most 50) and uses either `{ "source": "variable", "key": "booking" }` or `{ "source": "submission", "nodeKey": "EARLIER_REVIEW" }`. Types derive from sources; there is no duplicate input schema or `reviewInputContract`. Capture values once at activity entry, including same-command writes and accepted prior results. All tasks in an ALL activity share the snapshot. Claim/release, reads and subsequent variable replacement never refresh it. Receiving-task read authorization governs this copy without granting access to the source task. Unsupported or unavailable sources fail entry atomically.
 
 For a review accepting only an outcome and possibly a comment:
 
 ```json
 {
-  "inputContract": [],
   "resultContract": {
     "mode": "FORBIDDEN"
   }
@@ -1534,7 +1512,6 @@ When a structured result is allowed, place its embedded schema directly under `r
 
 ```json
 {
-  "inputContract": [],
   "resultContract": {
     "mode": "REQUIRED",
     "schema": {
@@ -1555,7 +1532,7 @@ When a structured result is allowed, place its embedded schema directly under `r
 | `OPTIONAL` | Result may be absent; if supplied, it must be a valid object. | Required embedded schema object. |
 | `REQUIRED` | A valid result object must be supplied. | Required embedded schema object. |
 
-Reject explicit top-level result null in every mode. Schemas use the restricted profile in section 10.5, including local references, and must describe object results; nested arrays and nulls follow the schema. Missing contracts/mode, unsupported modes, invalid schema placement and unknown fields fail definition validation. Submission validation enforces the selected presence rule, schema and bounds. Accepted values remain immutable submission evidence and do not automatically update workflow variables.
+Reject explicit top-level result null in every mode. Schemas use the restricted profile in section 10.5, including local references, and must describe object results; nested arrays and nulls follow the schema. Missing resultContract/mode, unsupported modes, invalid schema placement and unknown fields fail definition validation. Submission validation enforces the selected presence rule, schema and bounds. Accepted values remain immutable submission evidence and do not automatically update workflow variables.
 
 #### 12.1.13 Human-task outcomes
 
@@ -1566,7 +1543,7 @@ Reject explicit top-level result null in every mode. Schemas use the restricted 
 | `key` | String | Yes | Stable technical key used by commands, completion policy and transitions; unique within this node. |
 | `label` | String | Yes | Nonempty human-readable action label. |
 | `requiresComment` | Boolean | Yes | Whether acceptance requires a nonblank comment. |
-| `guards` | Array | No | Registered business checks; omission means an empty array. |
+| `guards` | Array | No | Current support: omitted or empty only. Nonempty checks remain broader design. |
 
 ```json
 {
@@ -1590,13 +1567,15 @@ Reject explicit top-level result null in every mode. Schemas use the restricted 
 }
 ```
 
-Outcome keys follow section 12.3's technical-key rules. Different nodes may each declare APPROVE. Array order controls presentation, never priority between competing submissions. When requiresComment is true, reject missing, empty or whitespace-only comments; false still permits a comment. Every possible activity outcome requires exactly one separate transition. Every submission uses the node-wide input/result contracts and its outcome's declared guards; an authorization guard is optional.
+Outcome keys follow section 12.3's technical-key rules. Different nodes may each declare APPROVE. Array order controls presentation, never priority between competing submissions. When requiresComment is true, reject missing, empty or whitespace-only comments; false still permits a comment. Every possible activity outcome requires exactly one separate transition. Every submission uses the node-wide result contract and selected outcome comment rule. Incoming inputs are already captured; current host authorization and optional business validation are separate from the deferred declared-guard design.
 
-Each guard entry uses the existing `guard` identifier and explicit `inputs` object structure, with `{}` when no arguments are needed. For example, bookingReadyForApproval can check business readiness for APPROVE. Authorization determines whether this actor may act; a guard checks a business precondition. Section 12.1.14 defines the allowed guard input sources.
+**Broader guard design, not implemented:** each guard entry uses the `guard` identifier and explicit `inputs` object structure, with `{}` when no arguments are needed. For example, bookingReadyForApproval can check business readiness for APPROVE. Authorization determines whether this actor may act; a guard checks a business precondition. Section 12.1.14 defines the allowed guard input sources.
 
 Reject missing required fields, invalid field types, duplicate outcome keys and unknown fields, including `permission` and outcome-specific input/result overrides. Explicit null does not substitute for required fields or for the optional guards array. Exact guard API and diagnostic details remain specification work.
 
 #### 12.1.14 Outcome guard inputs
+
+**Historical agreed design, not implemented:** the following forms remain outside current publication. In particular, `taskInput` refers to the original scalar-submission proposal, superseded for current authoring by F020; it does not expose captured incoming values. Any future guard feature must explicitly reconcile that source before implementation. Implemented `submission` bindings apply only to service/human inputs, not guards.
 
 **AGREED — 31 October 2026 (L18):** outcome guards may read workflow variables and the submission currently being checked through explicit bindings. Current submission values are not yet accepted evidence; bindings to earlier task/activity submissions remain deferred.
 
@@ -1649,12 +1628,18 @@ The assembled human-node fields are:
 | `key`, `type`, `name` | Yes | Common node fields; type is HUMAN_TASK (section 12.1.7). |
 | `description` | No | Common optional description. |
 | `taskType` | Yes | Existing stable catalog code, as above. |
-| `assignment` | Yes | Resolver and explicit input bindings (section 12.1.10). |
+| `assignment` | Yes | Registered resolver and empty `inputs` object (section 12.1.10). |
+| `claimPolicy` | No | OPTIONAL (default) or REQUIRED, subject to USER/shared-target rules (section 9.2). |
 | `completion` | Yes | SINGLE or ALL configuration (section 12.1.11). |
-| `inputContract`, `resultContract` | Yes | Explicit shared submission contracts (section 12.1.12). |
+| `inputs` | No | Captured variable/submission bindings; omitted means no incoming values (section 12.1.12). |
+| `resultContract` | Yes | Shared reviewer-answer contract (section 12.1.12). |
+| `outputVariable` | No | Unique name for explicit result/collection creation; no duplicate declaration (section 10.4). |
+| `previousDecisions` | No | F022 override: INHERIT (default), NONE, ALL_PREVIOUS, or SELECTED with `nodeKeys`. |
 | `outcomes` | Yes | Nonempty declared outcomes, with optional guards (sections 12.1.13–12.1.14). |
 
-Reject missing required fields, null in place of required values, unknown task-type codes and unsupported node fields. Authorization, when needed, uses an optional outcome guard from section 9.1, not a dedicated permission field or mandatory hook. Routes remain in the top-level transitions array. This settles the human-node field placement; exact host API contracts and diagnostics remain specification work.
+Reject missing required fields, null in place of required values, unknown task-type codes and unsupported node fields. Routes remain in the top-level transitions array. Declared guards remain unsupported; host authorization, assignment/claims and F018 business validation use their delivered contracts.
+
+**Previous decisions — F022:** root `previousDecisions` selects NONE (omitted default) or ALL_PREVIOUS; a human node may inherit, hide, show all, or select preceding human `nodeKeys`. SELECTED references must satisfy the acyclic graph rules. The receiving activity's retained ACTIVITY_ENTERED sequence is an exclusive cutoff: only earlier completed source activities contribute accepted decisions. Same-stage ALL peers, open/cancelled tasks and later completions do not appear. Reads use current receiving-task authorization without requiring source-task access and return narrow actor/time/outcome/comment context, not results or inputs. The cutoff remains stable after advancement; missing/corrupt required evidence fails explicitly. F022 specifies count/byte pagination (section 14.2).
 
 #### 12.1.16 Transitions and routing order
 
@@ -1767,7 +1752,7 @@ For each exclusive gateway, the relative order of its conditional transitions in
 
 This compares **document content, not equivalent workflow behavior**. Two differently written expressions may return the same result and still produce different document fingerprints. Catalog display-name changes do not change the definition document. [A2, §5.1][A2]
 
-The exact canonicalization algorithm, fingerprint algorithm/format and version representation remain specification work. They must preserve the numeric precision required by L10 and be settled before fingerprints are relied on for content comparison or import checks.
+The implemented identifier is `wf-json-c14n-v2`: compact canonical JSON sorts object keys by Unicode code point, preserves array order and exact numeric scale, and is hashed with SHA-256 over UTF-8. See F009 and `DefinitionContentCanonicalizer` for the exact codec. Mathematical equivalence for schema comparison does not authorize normalizing accepted document numbers or replacing historical fingerprints.
 
 ## 13. Validation and diagnostics
 
@@ -1777,21 +1762,19 @@ Validation checks whether a definition is well formed, its declared behavior is 
 
 Different checks need different information. The engine can inspect document structure and references before publication, while permissions and actual submitted values must also be checked when an operation runs. The stages below separate these responsibilities and show what each check can—and cannot—establish.
 
-**AGREED — 31 October 2026 (L02):** use JSON Schema Draft 2020-12, fixed by workflow-language version 1, to check document structure, such as required fields, allowed node types and value types. Use a separate engine semantic validator to check relationships and meaning, including node references, outcome routes, data contracts and registered application capabilities. For example, structural validation checks that a transition destination is a string; semantic validation checks that the destination node exists. Embedded data schemas use the same dialect with L11's restricted profile. Exact profile features and detailed validation rules remain specification work, and runtime checks still apply.
+**AGREED — 31 October 2026 (L02):** use JSON Schema Draft 2020-12, fixed by workflow-language version 1, to check document structure, such as required fields, allowed node types and value types. Use a separate engine semantic validator to check relationships and meaning, including node references, outcome routes, data contracts and registered application capabilities. For example, structural validation checks that a transition destination is a string; semantic validation checks that the destination node exists. Embedded data schemas use the same dialect with L11's restricted profile. F018 specifies and implements the task-result profile; execution-data field schemas remain deferred and runtime checks still apply.
 
-**Implementation candidate — NetworkNT:** its Jackson 2 release line supports Draft 2020-12 and Java 8+, fitting the project's Java 17 target and Jackson 2 baseline in principle. This is a candidate, not a selected dependency or verified integration. The inspected project uses Spring Boot 3.4.5 with managed Jackson 2.18.3; NetworkNT 2.0.4 declares Jackson 2.18.4. Select and verify an exact compatible dependency set during implementation. Keep the language contract independent of the validator library. [NetworkNT documentation](https://github.com/networknt/json-schema-validator), [2.0.4 dependency declaration](https://github.com/networknt/json-schema-validator/blob/2.0.4/pom.xml)
-
-The implementation must enforce the selected dialect/profile, local-only embedded references and supported format assertions explicitly, preserve exact values, and leave workflow default application to engine logic. NetworkNT documents that formats are annotations by default for modern drafts and provides assertion configuration; simply selecting Draft 2020-12 is not sufficient to enforce our format rules. [NetworkNT 2.0.4 configuration](https://github.com/networknt/json-schema-validator/blob/2.0.4/README.md) No validator dependency, formal schema or runtime implementation is introduced by this selection.
+**Implemented baseline — F018:** NetworkNT JsonSchemaValidator 2.0.8 with Jackson BOM 2.22.3 on Spring Boot 3.4.5. Use the engine-private Draft 2020-12 SchemaRegistry with offline/local-only resolution, explicit selected-format assertions, strict profile checks and exact mathematical validation projections. Accepted data retains its original exact numeric scale. No global host ObjectMapper changes or product-level schema registry are implied. F018 C01 specifies the conservative preflight work bound; its implementation record supplies scoped compatibility evidence, not proof of APOLO compatibility.
 
 | Stage | Checks | What it cannot establish |
 | --- | --- | --- |
 | Parse | Valid JSON, duplicate properties, encoding and document bounds. | Graph validity or authorization. |
 | Structural | Supported version, required fields, node variants, types, local cardinality and unknown fields. | Cross-reference or host correctness. |
-| Graph | Identity/reference checks, entry/end rules, reachability, routes and automatic cycles. | Runtime termination for arbitrary data. |
+| Graph | Identity/reference checks, entry/end rules, reachability, routes, acyclicity and a human stage on every START-to-END path. | Runtime termination for arbitrary data. |
 | Contract/type | Declarations, binding compatibility, outcomes, result schemas and initialization where provable. | Every possible runtime value. |
 | Expression | Syntax, allowlist, declared accesses, expected result types and bounds. | Success for all future inputs. |
-| Host compatibility | Registered types/actions/resolvers/guards, supported policies and contract capabilities. | Future actor permission or live domain validity. |
-| Runtime | State, version, assignment, authorization, actual values, guards, action outputs and collective completion. | Future success of later commands. |
+| Host compatibility | Registered types/actions/resolvers, supported policies and contract capabilities. | Future actor permission or live domain validity. |
+| Runtime | State, version, assignment, authorization, actual values, host business validation, action outputs and collective completion. | Future success of later commands. |
 
 This follows the source designs' static/runtime split. JSON Schema is one layer of validation. [A1, §10.4][A1] [A2, §§7–8, 12][A2]
 
@@ -1815,15 +1798,16 @@ Diagnostics explain what failed and where, so authors can fix definitions and ap
 
 A JSON Pointer such as `/transitions/1/to` identifies the `to` field of the second transition; array positions start at zero. JSON Pointer provides a standard location syntax, also used by JSON Schema's output model. [S11] [S21]
 
-The diagnostic content is agreed; the following field names and code remain illustrative pending the API contract and error catalog:
+The following code/message remain illustrative. Field names match the delivered `DefinitionDiagnostic` contract; the feature-specific catalogs define actual codes and stages:
 
 ```json
 {
   "stage": "GRAPH",
   "code": "WF_GRAPH_TARGET_UNKNOWN",
   "severity": "ERROR",
-  "instanceLocation": "/transitions/1/to",
-  "transitionKey": "REVIEW_COMPLETED",
+  "pointer": "/transitions/1/to",
+  "elementKey": "REVIEW_COMPLETED",
+  "relatedPointer": null,
   "message": "Target node UNKNOWN_END is not declared."
 }
 ```
@@ -1836,13 +1820,13 @@ The following behavior is also agreed:
 - **Keep failure categories distinguishable.** Malformed JSON, unsupported language, invalid graph, unavailable capability, invalid runtime input, denied access, stale state and expression failure must not collapse into one generic error. A failed command must not appear as a successful committed transition.
 - **Keep diagnostics safe and useful.** Do not expose internal stack traces, secrets or unauthorized data. Applications rely on stable codes, not exact message wording.
 
-Section 14.2 selects the diagnostic count, text and byte limits and the behavior when details are omitted. The complete error-code catalog, exact response fields and HTTP mapping remain specification work. HTTP mapping belongs to the host-facing API contract and does not introduce endpoints into core.
+Section 14.2 selects the diagnostic count, text and byte limits and the behavior when details are omitted. F004 and subsequent feature specifications define delivered error codes, DTOs and optional web mappings; F018 result diagnostics additionally identify instance/schema paths within their bounded response contract. HTTP mapping belongs to the host-facing API contract and does not introduce endpoints into core.
 
 ### 13.3 Definition validation and publication
 
 Validation results belong to an exact draft revision and the relevant language-version, validator and host-capability context. The language version includes the expression rules. Editing the content or changing the validation context can invalidate previous validation. Publication rechecks the current definition. [A1, §10.4][A1] [A2, §6][A2]
 
-This document specifies no publication endpoint or persistence implementation. Those contracts follow once the language decisions are settled.
+F004 implements publication and persistence contracts; the optional administration adapter is owned by F014. Their implementation records retain historical verification gaps rather than being superseded by this documentation reconciliation.
 
 ## 14. Compatibility, limits and evolution
 
@@ -1856,7 +1840,7 @@ The metadata-preservation rules below are **AGREED — 31 October 2026 (L13)**. 
 
 | Content | Behavior |
 | --- | --- |
-| Unknown executable field or node type | Reject. |
+| Unknown executable field or node type | Reject. F020 permits only historical empty human `inputContract: []` when loading published legacy definitions, not new authoring. |
 | Unsupported workflow-language version, including its expression rules | Reject explicitly; never substitute newer rules. |
 | Unsupported completion policy or binding operation | Reject. |
 | Registered capability unavailable | Report compatibility failure. |
@@ -1881,7 +1865,7 @@ Workflows must fit documented size and execution limits. For workflow authors, t
 <details>
 <summary>Detailed limits and engineering reference</summary>
 
-The following tables retain the previously recorded values, counting rules and rationale. Read them with the implementation-scope note above.
+The following tables reconcile the original engineering reference with F018/F021/F022. Dated original decisions remain provenance; delivered feature specifications govern refined enforcement and capacities. Unimplemented guard limits remain explicitly historical.
 
 | Area | Enforcement rule |
 | --- | --- |
@@ -1900,12 +1884,12 @@ The following tables retain the previously recorded values, counting rules and r
 | Automatic progression | 50 automatic steps | Per command; count each visit to START, SERVICE_TASK, EXCLUSIVE_GATEWAY or END using the rules below. |
 | Technical keys | 100 ASCII characters | Matches existing technical-key storage and L04 character rules. |
 | Structured task result | 64 KiB of serialized UTF-16 | Per result, still subject to the complete history-event budget. |
-| Individual JSON variable | 256 KiB of serialized UTF-16 for F009 (D15); earlier design 64 KiB | Per value; retain 1 MiB current-state total and apply the F009 related-envelope table. |
-| Runtime JSON nesting | 16 container levels | Root object/array is level 1; each nested container adds one. Count each runtime value separately from its command envelope. |
+| Ordinary JSON execution value / resolved ALL collection | 8 MiB UTF-16 and 12 MiB UTF-8 | F021 C01; applies to variable/start/service/human input values and complete submission collections. |
+| Runtime JSON nesting | 18 container levels for execution values; 16 for individual task results | F021 permits the collection array/entry wrappers around a depth-16 result. Measure value depth separately from envelopes. |
 | Runtime JSON collections | 100 properties per object; 1,000 items per array | Applies alongside byte/depth limits; does not set collection limits for definitions or designer metadata. |
 | Expression source | 2,000 Unicode code points | Per decoded expression string; operation/complexity and per-command evaluation budgets are also required. |
 | Alternative schemas | 16 alternatives per `oneOf` | Nested alternatives remain subject to total schema complexity and validation-work budgets. |
-| Read page size | 50 by default; 100 maximum | Items per page, also bounded by a response-byte limit. |
+| Read page size | Endpoint-specific; general pages use 50 default / 100 maximum, F022 previous decisions use 20 / 50 | Complete response-byte limits also apply; consult the owning read contract. |
 | Returned diagnostics | 100 maximum | Report when additional diagnostics were omitted; total bytes and per-detail limits also apply. |
 
 **Automatic-step counting — AGREED, 31 October 2026 (L16):** count each visit to an automatically executed node within the command, rather than counting distinct node keys or transitions.
@@ -1926,28 +1910,36 @@ Allow the 50th automatic step, but fail before executing a 51st, including befor
 
 **Counting and measurement — AGREED, 31 October 2026 (L16):**
 
-- **JSON depth:** the root object or array is level 1. Each nested object or array adds one level; scalar values add none. Empty containers still count. Measure the maximum container depth within each runtime JSON value, excluding its surrounding command envelope. Accept level 16; reject level 17. For example, `{"approved":true}` has depth 1, `{"review":{"approved":true}}` depth 2 and `{"reviews":[{"approved":true}]}` depth 3.
+- **JSON depth:** the root object or array is level 1. Each nested object or array adds one level; scalar values add none. Empty containers still count. Measure the maximum container depth within each runtime JSON value, excluding its surrounding command envelope. For task results accept level 16 and reject 17; execution values accept 18 and reject 19. For example, `{"approved":true}` has depth 1, `{"review":{"approved":true}}` depth 2 and `{"reviews":[{"approved":true}]}` depth 3.
 - **Collection counts:** count immediate properties in each object and every element in each array, including nulls and repeated array values. Nested collections have their own counts. Reject duplicate property names before parsing can discard them. The 100-property and 1,000-item limits apply alongside combined size limits; they are not allowances for unlimited totals.
 - **Character counts:** limits expressed in characters use Unicode code points in the decoded string, including expression source and JSON Schema string-length validation. `A` and `😀` each count as one code point; a visible symbol composed of several code points counts as several. Do not trim or normalize text before counting. Reject malformed Unicode, including unpaired surrogates. Technical keys remain ASCII. Storage-byte and physical-column limits still apply independently. [JSON Schema string length](https://json-schema.org/draft/2020-12/json-schema-validation#section-6.3.1).
 - **Stored bytes:** use a consistent compact JSON serializer and measure the exact serialized text that will be persisted as UTF-16 bytes, including property names, quotes, escaping, punctuation and the complete applicable envelope. Validate and persist the same serialization; counting only decoded text fields is insufficient. This matches the existing SQL Server `DATALENGTH` checks. Serializer details must be fixed in the codec contract without losing numeric precision or rewriting existing published documents. [Storage byte measurement](https://learn.microsoft.com/en-us/sql/t-sql/functions/datalength-transact-sql).
 - **Network bytes:** measure actual UTF-8 request/response bytes separately from stored UTF-16 bytes. Every applicable network, value and stored-envelope limit must pass; one does not replace another.
-- **Boundaries and scope:** the maximum itself is allowed; anything larger is rejected. KiB means 1,024 bytes and MiB means 1,048,576 bytes. Runtime depth and collection limits do not automatically apply to schema documents or designer metadata; their separate budgets are selected below. Formal codec/validator implementation and verification remain work.
+- **Boundaries and scope:** the maximum itself is allowed; anything larger is rejected. KiB means 1,024 bytes and MiB means 1,048,576 bytes. Runtime depth and collection limits do not automatically apply to schema documents or designer metadata; their separate budgets are selected below. Delivered codec/validator contracts and scoped verification belong to F009/F018/F021.
 
-**F009 override — 2026-11-06:** D15 replaces earlier start aggregate/request/history/read capacities for the JSON profile, with explicit legacy compatibility and a forward history migration. The 1 MiB current-state total remains. The dated baseline below is retained for comparison; D15 governs F009.
+**Capacity history:** the original 31 October limits were enlarged by F009 D15, then superseded for the delivered collective-review baseline by F021 revision 2 C01. The F009 test-baseline exception remains historically scoped; it does not waive later preserving migrations. Current limits are inclusive and apply together, including wrappers/metadata.
 
-**Combined size budgets — AGREED, 31 October 2026 (L16):** these initial project limits apply together with individual-value limits and physical storage ceilings. They are not evidence of measured capacity.
-
-| Resource | Limit | Measurement scope |
+| Resource | Canonical UTF-16 limit | UTF-8 limit / scope |
 | --- | --- | --- |
-| One structured start input | 256 KiB UTF-16 for F009; earlier design 64 KiB | Complete compact value; see F009 D15 for aggregate, request and evidence limits. |
-| All start inputs | 128 KiB UTF-16 | The complete compact input object, including field names and applied defaults. |
-| Current variables per instance | 1 MiB UTF-16 | One compact object containing all initialized variable names and values, including scalars and explicit nulls; omit uninitialized variables. This is a measurement projection, not a new storage format. |
-| Runtime command request | 256 KiB UTF-8 | The complete JSON request body. Definition uploads use the separate allowance below. |
-| Runtime read response | 1 MiB UTF-8 | The complete response body, including its envelope and pagination information. |
+| Individual task result | 64 KiB | Existing completion/result checks; depth remains 16 |
+| One JSON execution value or resolved ALL collection | 8 MiB | 12 MiB |
+| Complete initialized variable map | 10 MiB | 15 MiB |
+| Complete normalized start map, service argument/output map or typed human input snapshot | 10 MiB each | 15 MiB each |
+| One history details record | 24 MiB | 36 MiB |
+| Cumulative history details per command | 64 MiB | 96 MiB |
+| History detail response | — | 40 MiB |
+| Variable page / exact task contract with inputs | — | 16 MiB |
+| Raw JSON-value parsing and start/start-replay ingress | — | 16 MiB, measured before normalization |
+| Completion/replay ingress | — | 256 KiB, unchanged |
+| Successful-command receipt / durable handoff | 128 KiB | 128 KiB |
+| Ordinary metadata/submission pages, including history summaries | — | 1 MiB |
+| Previous-decision page (F022) | 256 KiB | 256 KiB; 20 items default, 50 maximum |
+
+These are scoped capacities, not global HTTP configuration. Multiple large maps/evidence records may exhaust the command budget and roll back; there is no per-task reservation or promise that every individually valid collection fits its surrounding evidence. Gateway evaluation evidence retains its separate 4 MiB dual-encoding allowance.
 
 - **Measure the resulting variable state.** Prepare all proposed updates, then measure the complete resulting variable object before applying the updates atomically. Count each variable's resulting value once, not both old and new versions. This budget covers current state, not accumulated history or separately recorded submissions.
-- **Paginate by bytes and item count.** A requested page may contain fewer items than its requested count to stay within the response-byte limit. Return continuation information whenever more items remain; never truncate an individual submission. Detailed pagination fields and ordering remain API specification work.
-- **Keep all evidence within its own budget.** Each complete stored history event and receipt remains subject to the existing 256 KiB UTF-16 ceiling. Reject and roll back a command whose required evidence cannot fit, even if its request and individual values fit. Never discard required evidence to make a command succeed.
+- **Paginate by bytes and item count.** A requested page may contain fewer items than its requested count to stay within the response-byte limit. Return continuation information whenever more items remain; never truncate an individual submission. The owning feature read contracts define pagination fields and ordering.
+- **Keep all evidence within its own budget.** Each history details record, command-wide evidence total and receipt must fit its separate current limit above. Reject and roll back a command whose required evidence cannot fit, even if its request and individual values fit. Never discard required evidence to make a command succeed.
 
 For example, 100 reviewers may each submit a valid 64 KiB result, subject to each command/event's other checks. The separate submissions are retrieved in pages and do not consume the current-variable budget unless explicitly copied into variables. A smaller read response does not remove the requirement to retain complete accepted submissions.
 
@@ -1964,9 +1956,9 @@ For example, 100 reviewers may each submit a valid 64 KiB result, subject to eac
 | Designer metadata depth | 16 container levels | Count from the designer value's own root container using the agreed container-depth convention. |
 | Designer collections | 100 properties per object; 1,000 items per array | Count each collection locally, including null-valued properties and all array elements. |
 
-The definition-depth allowance accommodates schema containers such as `properties`; it does not increase the runtime-data limit of 16. Count embedded schemas as written: a local `$ref` does not expand or duplicate its target for byte measurement. Separate embedded copies each count toward the combined schema budget. Repeated reference evaluation consumes the separate validation-work budget selected below.
+The definition-depth allowance accommodates schema containers such as `properties`; it does not increase the separate depth-16 task-result or depth-18 execution-value limits. Count embedded schemas as written: a local `$ref` does not expand or duplicate its target for byte measurement. Separate embedded copies each count toward the combined schema budget. Repeated reference evaluation consumes the separate validation-work budget selected below.
 
-Designer metadata remains opaque to execution. Its size/shape limits do not prescribe diagram fields or authorize dropping unfamiliar metadata. Every applicable budget must pass; fitting the upload limit alone does not establish that the definition fits storage. Formal serializer contracts and verification against representative workflows remain work.
+Designer metadata remains opaque to execution. Its size/shape limits do not prescribe diagram fields or authorize dropping unfamiliar metadata. Every applicable budget must pass; fitting the upload limit alone does not establish that the definition fits storage. F009/F018 define serializer contracts and retain their scoped verification records.
 
 **Expression and schema-validation work — AGREED, 31 October 2026 (L16):** use structural checks and documented evaluation counters alongside the selected byte, collection and automatic-step limits. These are initial project limits requiring verification against representative workflows, not measured capacity guarantees.
 
@@ -1980,36 +1972,35 @@ Designer metadata remains opaque to execution. Its size/shape limits do not pres
 
 The existing 2,000-code-point source limit also applies. Validate structural limits before publication. Skipped route conditions do not consume an evaluation; operations in short-circuited branches are not executed. A gateway still costs one automatic step, independently of how many condition evaluations it starts. Do not reset the per-command evaluation count between nodes.
 
-Spring exposes a configurable operation counter in newer versions, including 6.2.19. Configure it locally for the workflow engine, not through global host settings. Verify support and counting behavior in the actual dependency version; the currently selected project dependencies are not evidence that these controls are already available or enforced. [Spring parser configuration](https://docs.spring.io/spring-framework/docs/6.2.19/javadoc-api/org/springframework/expression/spel/SpelParserConfiguration.html).
+F008 implements engine-local guarded AST accounting on the selected Spring baseline: charge original visited syntax nodes before execution and retain short-circuit behavior. Do not infer enforcement from counters documented for newer Spring releases or change global host settings. F008/F009 specify the exact access and accounting contract and retain scoped verification evidence.
 
-| Schema-validation resource | Limit | Counting rule |
+| Schema-validation resource | Limit | Current F018 C01 enforcement |
 | --- | --- | --- |
-| Active evaluation depth | 128 frames | Include the root and active reference/schema-processing frames; this is not JSON container depth. |
-| Work for one value/schema validation | 100,000 steps | Count schema entry and keyword dispatch, including repeated work through references and alternatives. |
-| Combined schema-validation work | 1,000,000 steps | Share one allowance across a runtime command or a definition-validation request. |
+| Expanded schema depth | 128 | Memoized acyclic-reference preflight; not runtime JSON depth. |
+| Expanded schema weight | 100,000 | Count schema objects, keywords and literal nodes, including each reference occurrence and alternative; do not materialize expansion. |
+| One value/schema validation charge | 100,000 | Precharge expanded weight multiplied by input-node count before provider validation. |
+| Combined validation charge | 1,000,000 | Shared by the definition-validation request or runtime command; examples do not reset it. |
 
-All applicable per-validation and combined counters apply together. Include every schema validation performed by the operation, including checks of defaults, examples and service outputs where applicable. Starting another validation does not reset the shared allowance. Byte measurement does not expand `$ref` targets, but repeated evaluation through them consumes work.
-
-NetworkNT remains an implementation candidate. Its current documentation describes evaluation-step and depth controls; availability and counting behavior must be verified in the release selected for implementation. Counters do not bound all work inside an individual keyword, so payload, collection and supported-feature limits remain necessary. Do not substitute a returned-error cap or fail-fast output mode for an evaluation-work limit. [NetworkNT execution controls](https://github.com/networknt/json-schema-validator#execution-configuration).
+Input-node count includes containers, property entries and scalars; even an empty root counts as one. Saturating arithmetic prevents overflow. These are conservative engine-owned bounds, not measured NetworkNT instructions or native provider depth quotas. They may reject an expensive combination before evaluation. Payload/profile limits remain independently necessary; fail-fast diagnostics, timeouts and returned-error caps do not replace this preflight. See F018 C01 for exact counting and its implementation record for evidence.
 
 **Limit failure:** stop before exceeding an applicable allowance and report a distinct evaluation-limit failure. Block publication or roll back the runtime command; never treat exhaustion as a false condition, an ordinary schema mismatch, or permission to try a default route or another schema alternative. Do not automatically retry with a larger allowance. Exact diagnostic codes remain under L15.
 
-Timeouts may provide an additional operational safeguard, but documented counters define these language-versioned work limits. Fix the mapping to parser/validator counters in the implementation contract and preserve its observable behavior across upgrades; verification remains required before claiming enforcement.
+Timeouts may provide an additional operational safeguard, but documented counters define these language-versioned work limits. Preserve the delivered AST/preflight contracts across upgrades; use their feature records for actual verification rather than claiming provider counters.
 
 **Declaration counts — AGREED, 31 October 2026 (L16):** the owner delegated the final recommendations to close L16. Use the following initial limits alongside the selected graph, document-size and work budgets.
 
 | Declaration | Maximum | Scope |
 | --- | --- | --- |
-| Workflow variables | 100 | Per definition. |
-| Start input fields | 50 | In `startPolicy.inputContract`. |
-| Human-task scalar input fields | 50 | Per node's `inputContract`. |
+| Workflow variables | 100 | Combined top-level declarations and human output producers, including mutually exclusive paths. |
+| Start input fields | 100 | F007 G01 engineering contract supersedes the original L16 reference of 50. |
+| Human-task incoming names | 50 | Per node's F020 `inputs` map; scalar submission inputContract is obsolete. |
 | Human-task outcomes | 16 | Per human node. |
-| Guards | 8 | Per start-policy or outcome guard list. |
-| Capability input bindings | 32 | Per guard, service-action or assignment-resolver call. |
+| Guards | 8 in broader historical design; 0 supported | Current start/outcome lists must be empty or omitted. |
+| Capability input bindings | 100 per service input/output contract or mapping | F007 G01 supersedes the original 32-binding reference for services. Assignment inputs must be empty; guards retain only their broader historical design. |
 | Initialization mappings | 100 | Also limited to one mapping per declared destination variable. |
 | Service output mappings | 100 | Per service node, also limited to one mapping per declared destination variable. |
 
-Count declarations as written, not only those used on a particular route. Nested properties of a structured input are governed by its schema and runtime-data limits, not by the 50-field input-contract limit. Schema fragments, examples and enumerations remain bounded by the selected schema bytes, container depth and validation-work budgets; no additional collection-specific count is introduced for them.
+Count declarations as written, not only those used on a particular route. Nested execution data follows generic JSON bounds, while task results additionally follow their schema; neither is counted as separate human incoming names. Schema fragments, examples and enumerations remain bounded by the selected schema bytes, container depth and validation-work budgets; no additional collection-specific count is introduced for them.
 
 **Text and encoded-value limits — AGREED, 31 October 2026 (L16):** character counts mean decoded Unicode code points. For fields with a raw UTF-16 byte limit below, measure the decoded text without JSON quotes or escaping; serialized value/envelope limits still apply separately. Apply the more specific field limit where one exists.
 
@@ -2017,7 +2008,7 @@ Count declarations as written, not only those used on a particular route. Nested
 | --- | --- | --- |
 | Names, presentation labels and schema titles | 200 code points and 400 raw UTF-16 bytes | Workflow/node names, input/outcome labels and schema titles. |
 | Descriptions, submission comments and command reasons | 2,000 code points and 4,000 raw UTF-16 bytes | Includes schema descriptions; longer review material belongs in bounded structured data or host records. |
-| Declared scalar `STRING` values | 4,000 code points and 8,000 raw UTF-16 bytes | Start/task inputs, defaults, initialized variables and service values supplied under a STRING contract. |
+| Declared scalar `STRING` values | 4,000 code points and 8,000 raw UTF-16 bytes | Start/incoming task values, defaults, initialized variables and service values supplied under a STRING contract. |
 | Other strings inside structured JSON or designer metadata | 16,000 code points | Existing per-value and combined byte limits may reject a shorter value. |
 | Property names inside structured JSON, schemas or designer metadata | 256 code points | Technical identifiers retain their separate 100-character rules. |
 | Logical capability identifiers and capability argument names | 100 code points | Existing technical-key grammar still applies wherever already required; this length rule does not introduce a new identifier grammar. |
@@ -2044,9 +2035,9 @@ Preserve stable codes and failure categories. If an individual message/detail wo
 
 **L16 direction settled — 31 October 2026:** preserve the author-facing limits and failure behavior. Use the retained engineering details when implementing the relevant feature, checking dependency support and realistic boundary cases then. A complete set of codec, counter, pagination and diagnostic specifications is not a prerequisite for starting the minimal workflow slice. Existing physical ceilings and published-workflow compatibility remain mandatory.
 
-Validate the initial limits against realistic workflows and the persistence budget, including large reviews, Unicode text, nested results and downstream aggregation. A task result shares its stored completion-event budget with scalar inputs, comment and envelope; these must not each independently consume the full event allowance. A result or variable within its individual limit must still be rejected if the complete command or required evidence exceeds a combined budget. [A2, §5][A2]
+Validate the initial limits against realistic workflows and the persistence budget, including large reviews, Unicode text, nested results and downstream aggregation. A task result shares its stored completion-event budget with comment and envelope; these must not each independently consume the full event allowance. A result or variable within its individual limit must still be rejected if the complete command or required evidence exceeds a combined budget. [A2, §5][A2]
 
-The applied [F001 storage contract](../features/F001-initial-database-schema/schema-contract.md) already caps definitions at 2 MiB and validation/history/receipt documents at 256 KiB each, measured in stored UTF-16 bytes, and activity task counts at 100. These are physical ceilings, not a complete runtime limit profile. Runtime limits must fit them or require a separately specified forward migration. Network byte limits must name their encoding; a UTF-8 request limit is not interchangeable with the stored UTF-16 limit. No migration or runtime enforcement is implemented by these design decisions.
+The original [F001 storage contract](../features/F001-initial-database-schema/schema-contract.md) set 2 MiB definitions, 256 KiB validation/history/receipt documents and 100 tasks per activity. F021 implemented a preserving forward migration raising the history-details CHECK to 24 MiB UTF-16 while retaining JSON validity. Definition/validation/receipt physical limits do not all increase with history; runtime receipts remain more tightly bounded at 128 KiB. Apply the coordinated F021 engine/web/UI/host baseline and retain applied migration identities. UTF-8 transport limits remain independent of UTF-16 storage.
 
 </details>
 
@@ -2087,7 +2078,9 @@ flowchart TD
 
 ### 15.1 Proposed JSON
 
-The definition uses section 12.1's selected fields. APOLO supplies the illustrative capabilities in section 15.3. Both human stages accept an outcome and an optional or required comment; scalar submission fields and structured results are not used. Start/outcome authorization is explicitly configured through guards in this example and remains optional in the language.
+**Broader illustrative design, not a currently publishable definition:** this example retains the agreed future guard and assignment-binding notation. Current schemas reject those nonempty fields. SINGLE/ALL staged execution is implemented, but these APOLO capabilities and policies are not production integrations. For executable subset examples, see [F011 sequential review](../features/F011-sequential-human-stages/sequential-review.json) and [F021 ALL review](../features/F021-all-collective-review/sandbox-all-review.json).
+
+The definition uses section 12.1's selected fields. APOLO supplies the illustrative capabilities in section 15.3. Both human stages accept an outcome and an optional or required comment; incoming bindings and structured results are not used. Start/outcome authorization uses the historical guard design in this example; current hosts instead enforce authorization through delivered adapters.
 
 ```json
 {
@@ -2194,7 +2187,6 @@ The definition uses section 12.1's selected fields. APOLO supplies the illustrat
         "policy": "ALL",
         "contributionOutcome": "APPROVE"
       },
-      "inputContract": [],
       "resultContract": {
         "mode": "FORBIDDEN"
       },
@@ -2272,7 +2264,6 @@ The definition uses section 12.1's selected fields. APOLO supplies the illustrat
       "completion": {
         "policy": "SINGLE"
       },
-      "inputContract": [],
       "resultContract": {
         "mode": "FORBIDDEN"
       },
@@ -2512,13 +2503,13 @@ The language behavior is agreed; the booking roles and policies are illustrative
 
 The graph has one START, two END nodes, nine nodes and ten transitions. Every node is reachable and has a path to an end; there are no cycles. Each human node has one route per outcome. Both final service nodes may write bookingStatus, but each mapping has only one writer per destination.
 
-The structures and resource rules remain those of sections 12.1 and 14.2. Exact host APIs, diagnostics and formal codecs still need feature-level specification and verification. This example is not runtime evidence or an expansion of the first implementation slice.
+Supported portions follow sections 12.1 and 14.2. The retained nonempty guards and resolver bindings are broader design; their APIs still require specification. Delivered codecs and diagnostics are owned by the feature specifications, while APOLO policy/integration remains unverified. This example is not runtime evidence.
 
 ### 15.5 Additional example: one review stage
 
 The earlier example remains useful for a **single** ALL activity. All required reviewers belong to one stage and their tasks are created together. Returning a manager and partner in that roster does not make their reviews successive.
 
-Its optional automatic-approval branch is a secondary illustration only, pending an APOLO policy that requires it. In that variant, assessBookingApproval supplies requiresReview; true creates the one ALL activity, while false goes directly to the approval action. It does not replace the staged principal example.
+Its optional automatic-approval branch is a secondary broader-design illustration only: current graph validation rejects the path that bypasses every human stage, independently of whether APOLO selects such a policy. The example also retains unsupported nonempty guards and assignment bindings. In that variant, assessBookingApproval supplies requiresReview; true creates the one ALL activity, while false goes directly to the approval action. It does not replace the staged principal example.
 
 ```mermaid
 flowchart TD
@@ -2647,7 +2638,6 @@ This retains the earlier structure under a distinct illustrative workflow key. I
         "policy": "ALL",
         "contributionOutcome": "APPROVE"
       },
-      "inputContract": [],
       "resultContract": {
         "mode": "FORBIDDEN"
       },
@@ -2805,7 +2795,7 @@ This retains the earlier structure under a distinct illustrative workflow key. I
 
 ## 16. Decision register and next design steps
 
-This chapter brings together the decisions discussed throughout the document: what is agreed, what is still proposed and what remains open. It also identifies the policies owned by the application and suggests an order for resolving the remaining questions before writing the language specification.
+This chapter brings together the decisions discussed throughout the document: what is agreed, what is still proposed and what remains open. It also identifies the policies owned by the application and distinguishes delivered contracts from questions remaining for future specifications.
 
 ### 16.1 Language decisions
 
@@ -2814,23 +2804,23 @@ This table summarizes the language choices and the questions still to resolve. *
 | ID | Status | Decision in plain language | Still to resolve |
 | --- | --- | --- | --- |
 | L01 | Agreed | **Relationship to BPMN:** use our own JSON language, drawing on BPMN concepts without promising BPMN compliance or file exchange. | None for this decision. Future interchange would require a separate scope decision. |
-| L02 | Agreed | **Validating definitions:** workflow-language version 1 fixes JSON Schema Draft 2020-12 for the document schema and embedded data schemas. Use a separate engine semantic validator for graph, contract and application-capability checks (section 13.1). | Formal document schema and detailed validation rules; exact embedded feature profile under L11. NetworkNT remains an implementation candidate pending dependency selection and verification. |
+| L02 | Agreed | **Validating definitions:** workflow-language version 1 fixes JSON Schema Draft 2020-12 for the document schema and embedded data schemas. Use a separate engine semantic validator for graph, contract and application-capability checks (section 13.1). | Formal subset schemas and F018 result validation are implemented using NetworkNT 2.0.8/Jackson 2.22.3. Broader unsupported features still need their own specifications. |
 | L03 | Agreed | **Choosing a route:** `EXCLUSIVE_GATEWAY` (formerly `DECISION`) uses Boolean conditions on outgoing transitions, with no node-level calculation or output. Take the first true condition in declared order. Use the default only if all are false. An evaluated-condition error, or no match without a default, fails the command. | Route order is settled by relative array position (section 12.1.16). Decision tables and inclusive/parallel gateways remain deferred (section 12.1.9). |
 | L04 | Agreed | **Identifying a definition:** use integer `schemaVersion` (initially `1`), `key`, `version` and exactly one `START`; omit `startNodeKey`. Store nodes and transitions in arrays with stable, case-sensitive keys following section 12.3. Each collection has definition-wide key uniqueness in its own namespace. | None for these choices. Maximum key length belongs to L16; route-priority notation is defined in section 12.1.16. |
 | L05 | Agreed | **Where human-step rules live:** each human step defines its allowed outcomes, submission requirements and completion rules in the workflow definition. Running instances keep using those rules from their original workflow version. | Field placement is defined in sections 12.1.10–12.1.15. Exact host APIs belong to the integration specification coordinated with L17. |
-| L06 | Agreed | **Completing human steps:** use `SINGLE` or `ALL` with a fixed task list. `ALL` waits for every contribution or ends early on another permitted outcome. The first decisive command to commit wins; completion and progression succeed or roll back together (section 9.3). | Field placement and initial task bounds are selected. Resolver APIs and runtime command details remain specification work (section 16.3). |
-| L07 | Agreed | **What reviewers submit:** each node shares one input/result contract across its outcomes. Guards and comments can differ by outcome. Authorization is optional through declared guards; outcomes contain no dedicated permission field. Results are forbidden, optional or required; a supplied result must be an object, never top-level `null`. | Field descriptions and supported schema features. |
-| L08 | Agreed | **Reading and updating data:** use explicit sources, defined missing/null rules and one mapping per destination. Prepare all updates from the same pre-update values (section 10.4). Direct fact/prior-submission input bindings are deferred. | Runtime binding behavior and separate variable-update command authorization/write contracts; limits and errors under L16/L15. Additional sources require a future scope decision. |
-| L09 | Agreed | **Checking workflow paths:** apply the [graph rules in section 8.3](#83-workflow-graph-validation-rules) before publication, covering connections, routes, start/end nodes, reachability and loops. Every node must have a possible path to an end; eventual completion is not guaranteed. | Detailed validation diagnostics remain under L15; route-priority notation is defined in section 12.1.16. |
-| L10 | Agreed | **Representing values:** use the exact formats and capacities in section 10.2, including string-encoded integers/decimals, UTC timestamps and exact nested JSON numbers. Section 10.3 distinguishes missing/null/defaults, rejects evaluated reads of uninitialized variables, prohibits clearing assigned variables back to uninitialized and specifies input/default/guard/initialization order. | No remaining behavior decisions for this scope. Formal codec, accessor and command contracts and implementation verification remain. Schema features: L11; resource limits: L16; diagnostics: L15. |
-| L11 | Agreed; F009 execution-data exception | **Validating structured data:** use the complete language-versioned profile in section 10.5: object-form embedded schemas, local noncircular references with supported sibling rules, closed objects, basic constraints, conditional requirements, identified alternatives and selected formats/metadata. Reject external references, arbitrary patterns and unsupported features. | No remaining feature-selection decisions. Formal validation contract and implementation verification remain. Diagnostics: L15; numeric limits: L16; numeric/time details: L10; Draft 2020-12 dialect: L02. |
-| L12 | Agreed | **Evaluating expressions:** use standard SpEL semantics within a controlled, read-only context over typed `#facts` and `#vars`. Preserve Boolean routing, strict errors, access restrictions and language-version compatibility; no separate `expressionPolicy` field (section 11.1). | Context/access enforcement, typed conversion and precision/missing-data reconciliation, necessary restrictions and diagnostics. Numeric execution limits: L16. |
+| L06 | Agreed | **Completing human steps:** use `SINGLE` or `ALL` with a fixed task list. `ALL` waits for every contribution or ends early on another permitted outcome. The first decisive command to commit wins; completion and progression succeed or roll back together (section 9.3). | F016/F017/F021 specify delivered assignment, claims and ALL commands; their implementation records own verification. |
+| L07 | Agreed | **What reviewers submit:** F018 resultContract is shared across outcomes; F020 incoming inputs are separate captured data, superseding scalar submission inputs. Comments differ by outcome. Outcomes contain no permission field. Results are forbidden, optional or required; a supplied result is an object, never top-level null. | Nonempty guards remain historical agreed design, not supported execution. F018/F020 define implemented fields and validation. |
+| L08 | Agreed | **Reading and updating data:** use explicit sources, defined missing/null rules and one mapping per destination. Prepare all updates from the same pre-update values (section 10.4). F019/F020/F021 add explicit submission inputs and named output creation. | Direct facts and standalone variable-update commands remain deferred; implemented binding contracts are in the owning feature specifications. |
+| L09 | Agreed | **Checking workflow paths:** apply the [graph rules in section 8.3](#83-workflow-graph-validation-rules) before publication, covering connections, routes, start/end nodes, reachability and loops. Every node must have a possible path to an end; eventual completion is not guaranteed. | Current supported graphs are acyclic with at least one human on every START-to-END path. Human review loops remain broader agreed scope; diagnostics follow delivered feature contracts. |
+| L10 | Agreed | **Representing values:** use the exact formats and capacities in section 10.2, including string-encoded integers/decimals, UTC timestamps and exact nested JSON numbers. Section 10.3 distinguishes missing/null/defaults, rejects evaluated reads of uninitialized variables, prohibits clearing assigned variables back to uninitialized and specifies input/default/guard/initialization order. | F007/F009/F018 define delivered codecs/accessors; their records own verification. Schema features: L11; resource limits: L16; diagnostics: L15. |
+| L11 | Agreed; F009 execution-data exception | **Validating structured data:** use the complete language-versioned profile in section 10.5: object-form embedded schemas, local noncircular references with supported sibling rules, closed objects, basic constraints, conditional requirements, identified alternatives and selected formats/metadata. Reject external references, arbitrary patterns and unsupported features. | F018 specifies and implements the result-schema profile; execution-data field schemas remain deferred. Diagnostics: L15; numeric limits: L16; numeric/time details: L10; Draft 2020-12 dialect: L02. |
+| L12 | Agreed | **Evaluating expressions:** use standard SpEL semantics within a controlled, read-only context over `#vars`, with restricted literal-key `#hasVariable`; the original `#facts` direction remains deferred. Preserve Boolean routing, strict errors, access restrictions and language-version compatibility; no separate `expressionPolicy` field (section 11.1). | F008/F009/F019 specify delivered enforcement, conversion, missing-data behavior and diagnostics. Numeric execution limits: L16. |
 | L13 | Agreed | **Designer information:** use an optional `designer` section independent of execution. Preserve unknown metadata values within its limits; block saves that cannot preserve them. Published metadata stays immutable (sections 12.3 and 14.1). | Exact layout fields and structural validation in the designer specification; numeric limits under L16. |
-| L14 | Agreed | **Comparing document content:** ignore formatting and object-property order while preserving values and array order. Include designer metadata, reject duplicate properties and version the canonicalization rules without silently replacing published fingerprints (section 12.4). | Exact canonicalization and fingerprint algorithms, fingerprint format and version representation, consistent with L10 numeric precision. |
-| L15 | Agreed | **Explaining errors:** provide stable codes, stages, severity, useful messages and applicable locations/element keys. Errors block publication; warnings do not. Report bounded independent errors, preserve distinct failure categories and avoid exposing internal or unauthorized data (section 13.2). | Complete error catalog, exact response fields and host HTTP mapping. Numeric diagnostic limits: L16. |
+| L14 | Agreed | **Comparing document content:** ignore formatting and object-property order while preserving values and array order. Include designer metadata, reject duplicate properties and version the canonicalization rules without silently replacing published fingerprints (section 12.4). | Implemented `wf-json-c14n-v2` and SHA-256, preserving exact scale; future changes require explicit compatibility handling. |
+| L15 | Agreed | **Explaining errors:** provide stable codes, stages, severity, useful messages and applicable locations/element keys. Errors block publication; warnings do not. Report bounded independent errors, preserve distinct failure categories and avoid exposing internal or unauthorized data (section 13.2). | Delivered feature specifications define their codes, DTOs and optional web mappings; future scope adds only necessary diagnostics. Numeric limits: L16. |
 | L16 | Agreed | **Keep workflows bounded:** enforce documented author-facing limits, reject oversized input and roll back commands that exceed execution limits. Preserve complete required evidence and support for published workflows. | No further language decision is needed now. Apply and verify the relevant safeguards as each feature is built; section 14.2 retains the detailed engineering reference. |
-| L17 | Agreed | **Keeping application support compatible:** stable identifiers represent stable contracts; breaking changes use new identifiers. Check compatibility before publication and application upgrades, retain required old support and fail explicitly rather than substitute capabilities. No separate capability-version system initially (sections 11.3 and 14.3). | Host resolver/guard/action API signatures and registration metadata in the integration specification, compatibility-check mechanisms and diagnostics. Application behavior still requires upgrade verification. |
-| L18 | Agreed; F009 JSON field schemas deferred | **Complete JSON document structure:** section 12.1 defines the envelope, start policy, inputs/defaults, variables/initialization, all five node types, human-task contracts, guard/binding forms and transitions with relative array ordering. Start and outcome authorization use optional declared guards. Additional scalar constraints and fact/prior-submission bindings remain deferred. | None for the selected document structure. Formal schemas belong to L02/L11; values/limits to L10/L16; diagnostics to L15; host APIs to the integration specification coordinated with L17; separate variable-update commands to the runtime specification coordinated with L08. |
+| L17 | Agreed | **Keeping application support compatible:** stable identifiers represent stable contracts; breaking changes use new identifiers. Check compatibility before publication and application upgrades, retain required old support and fail explicitly rather than substitute capabilities. No separate capability-version system initially (sections 11.3 and 14.3). | Action/resolver contracts are delivered; guards/fact providers remain deferred. Application behavior and APOLO integration still require their own compatibility verification. |
+| L18 | Agreed; F009 JSON field schemas deferred | **Complete JSON document structure:** section 12.1 defines the envelope, start policy, inputs/defaults, variables/initialization, all five node types, human-task contracts, guard/binding forms and transitions with relative array ordering. F017–F022 refine claims, input/result/output fields, submission bindings and previous decisions. Nonempty guards, additional scalar constraints and direct facts remain deferred. | None for the selected document structure. Formal schemas belong to L02/L11; values/limits to L10/L16; diagnostics to L15; host APIs to the integration specification coordinated with L17; separate variable-update commands to the runtime specification coordinated with L08. |
 
 ### 16.2 Host-owned decisions
 
@@ -2844,7 +2834,7 @@ The **host application** is the application that embeds the workflow engine—in
 | **Who must review, and who may act?** | The application's assignment resolver identifies the required reviewers. Its authorization rules determine who may submit or perform an override. |
 | **Must approvals come from different people?** | The application enforces distinct-person and no-self-approval rules where required, including during reassignment and overrides. Multiple required tasks alone do not guarantee different reviewers. |
 | **How do individual item decisions produce a business result?** | An application service explicitly combines submitted answers. For example, it decides what a mixture of approved and rejected bookings means for the request; the engine does not infer that policy from the JSON. |
-| **Does a revised request reuse the same workflow instance?** | This remains a provisional business-flow decision. The engine's support for review loops does not choose APOLO's resubmission policy. |
+| **Does a revised request reuse the same workflow instance?** | This remains a provisional business-flow decision. The broader agreed review-loop design does not choose APOLO's resubmission policy; current execution remains acyclic. |
 | **How are notifications and external events delivered reliably?** | The host supplies delivery infrastructure using the durable handoff recorded with the workflow command. Delivery occurs after commit. |
 | **How long are submissions and history retained?** | The host defines retention and any redaction arrangements while preserving the evidence and access required by the agreed audit contract. Exact operational rules remain integration work. |
 
@@ -2852,21 +2842,15 @@ These boundaries derive from the project sources and are not new engine features
 
 ### 16.3 Completing the language specification
 
-The next deliverable is one minimal workflow we can validate and execute: `START → HUMAN_TASK (SINGLE) → END`, with one assigned task and one completion outcome. The agreed design is the reference; we do not need to specify every future API or internal mechanism before building this slice.
+**Historical first milestone — 31 October 2026:** the selected initial delivery was `START → HUMAN_TASK (SINGLE) → END`, with explicit unsupported-feature rejection and proportional acceptance evidence. F004/F005 subsequently delivered definition management and minimal execution; F007–F011 added service bindings, routing, JSON values, outcomes and successive stages. F017–F022 delivered claims, structured results, named outputs, incoming snapshots, ALL review and previous decisions.
 
-1. **Specify the example and its acceptance criteria.** Use the agreed document fields and behavior. Define the inputs, assignment, completion outcome and expected failures needed for this workflow.
-2. **Build the smallest complete path.** Add the validation and host integration needed to load a valid definition, start an instance, inspect its assigned task, complete it and reach END. Apply the relevant data, transaction, concurrency, idempotency and resource rules. Explicitly reject features not yet supported; do not claim full language support from this slice.
-3. **Demonstrate the result and record evidence.** Show successful execution, rejection of invalid definitions/commands, rollback without partial effects and replay without duplicate effects. Use the applicable chapter 17 scenarios and record what remains unverified.
-
-Extend from that working baseline to service tasks, gateway routing and collective review. Specify additional APIs, diagnostics and engineering controls when those features need them. Chapter 15 remains the broader booking example, not the first implementation requirement.
-
-This section sets the next delivery scope. The present document revision does not start implementation, authorize automated tests or change F003's status.
+The feature specifications now own exact supported contracts; implementation records retain actual outcomes and unperformed checks. This reconciliation does not close historical evidence gaps or establish APOLO acceptance. Broader guards, fact providers, review loops, automatic-only workflows, standalone variable updates and designer work remain separately selected future increments. The project roadmap governs the next authorized delivery; chapter 15 remains a broader business illustration.
 
 ## 17. Design review scenarios
 
 These scenarios turn the design rules into concrete situations: what should happen when a workflow runs successfully, when a definition is invalid or when a command fails. Use them to check that the intended behavior is clear and consistent, and later as acceptance criteria for the relevant feature.
 
-Start with the scenarios needed for the minimal `START → HUMAN_TASK (SINGLE) → END` workflow in section 16.3. Review the others as those capabilities are introduced; completing every scenario is not a prerequisite for the first working workflow. The expected results describe the design, not implemented behavior or executed tests.
+Apply scenarios only to the relevant implemented or explicitly selected feature. F004–F022 specifications and implementation records own detailed acceptance criteria and evidence; this table is a design reference, not a fresh test result or a requirement to rerun the entire matrix. Historical guard/loop behavior is identified as future scope.
 
 | Scenario | Expected interpretation / decision to verify |
 | --- | --- |
@@ -2883,25 +2867,25 @@ Start with the scenarios needed for the minimal `START → HUMAN_TASK (SINGLE) �
 | Transition references a missing source or destination | Reject the definition. |
 | Human activity outcome has no route or several routes | Reject the definition. |
 | Disconnected node or no END node | Reject at publication. |
-| Review loop has an exit path to END | Structurally allowed if it contains no automatic-only cycle; eventual completion is not guaranteed. |
+| Review loop has an exit path to END | Reject in the current acyclic subset. Broader agreed design would allow human review loops without automatic-only cycles; eventual completion would not be guaranteed. |
 | Reachable review loop has no path to END | Reject even though it includes a human step. |
 | Nodes or transitions supplied as a map | Reject: both collections must be JSON arrays with stable element keys. |
 | Duplicate node keys or duplicate transition keys | Reject duplicates within each collection, including transition keys reused under different source nodes. A node and a transition may share a key. |
 | Technical key characters and case | Accept `REVIEW`, `review.finance` and `review-approved`; reject leading digits, spaces and non-ASCII characters. `REVIEW` and `review` are distinct keys. |
 | SINGLE resolver returns zero or multiple tasks, or no assignee | Fail the command entering the human step; do not create a partial activity. |
-| Input contract missing versus explicitly empty | Missing required declaration is invalid; an empty contract rejects additional input fields. |
+| Input contract missing versus explicitly empty | Start inputContract is required and an empty array accepts no fields. New human authoring has no inputContract; optional incoming inputs are separate from required resultContract. |
 | Declared LONG or DECIMAL supplied as a JSON number | Reject: these declared types use strings for their JSON representation; schemaVersion remains an integer field. |
 | BOOLEAN supplied as `"true"` or `1` | Reject rather than convert. |
 | DATE is invalid or DATETIME has no offset | Reject; valid ISO forms follow section 10.2. |
 | Default configured and input is explicit null or invalid | Do not apply the default. Accept null only where permitted; reject invalid input. |
 | Task result forbidden, optional or required | FORBIDDEN rejects every supplied result, including a valid object. OPTIONAL permits absence or a valid object; REQUIRED needs a valid object. Top-level null is rejected in every mode. |
-| Different outcomes of one human step | Apply the same input/result contracts, while the engine executes the selected outcome's declared guards and checks its comment rules; authorization is checked only when configured. |
-| Form access allowed, but a declared authorization guard denies completion | Run that guard at submission time; reject completion without committed submission, task changes or effects. |
-| Declared outcome authorization guard is unregistered or fails | Reject the invalid registration before publication where detectable; runtime failure prevents completion. |
+| Different outcomes of one human step | Use the same captured incoming inputs and resultContract, with outcome-specific comments. Host authorization and business validation apply; nonempty declared guards remain unsupported. |
+| Form access allowed, but a declared authorization guard denies completion | Historical future guard scenario: denial would block acceptance. Current hosts must authorize completion independently of form access; nonempty guards are rejected at publication. |
+| Declared outcome authorization guard is unregistered or fails | Current publication rejects every nonempty guard list. Registration/execution failure handling remains part of the preserved future guard design. |
 | Missing completion policy, unsupported policy, ALL without a declared contribution outcome, or SINGLE with contributionOutcome | Reject the definition before publication. |
 | Host authorization allows an invalid workflow command | Still reject an invalid state, assignment, outcome or submission; authorization cannot bypass workflow rules. |
-| Human-task outcome contains a permission field | Reject the dedicated permission field; a permission argument may instead appear under a declared authorization guard's inputs. |
-| Guards omitted | Treat as an empty list; no engine-side business authorization check is performed. Assignment, state, outcome and submission rules remain enforced. |
+| Human-task outcome contains a permission field | Reject the dedicated field. Literal permission arguments belong only to the deferred guard design; current authorization is host-owned. |
+| Guards omitted | Treat as an empty list. Host authorization, assignment/claim eligibility, state, outcome, comments and result validation still apply. |
 | Engine upgrade with an older supported language version | Preserve that version's expression rules; no separate policy selection is needed. |
 | Definition declares an unsupported language version | Reject explicitly instead of interpreting its expressions under another version. |
 | Required action output missing | Fail and roll back the command. |
@@ -2929,14 +2913,14 @@ Start with the scenarios needed for the minimal `START → HUMAN_TASK (SINGLE) �
 | Decisive non-contribution outcome | Immediate resolution; open siblings cancelled without fabricated votes; earlier submissions preserved. |
 | Different decisive commands race | First successful commit under concurrency protection wins; the other fails without overwriting the result; no implicit outcome ranking. |
 | New submission to a cancelled sibling | Reject without changing evidence or the activity outcome; authorized replay of an earlier successful command remains supported. |
-| Required tasks changed during an active review | Reject additions, removals and waivers; audited reassignment preserves the same task identity and obligation. |
+| Required tasks changed during an active review | Reject additions, removals and waivers. General audited reassignment remains deferred; claim/release does not change the target or roster. |
 | Final contribution followed by service failure | Last attempted submission and downstream effects roll back; prior committed evidence remains. |
 | Decisive outcome followed by service failure | Submission, activity resolution, sibling cancellations and downstream effects roll back together; previously open tasks remain open and prior contributions remain committed. |
 | Two obligations share an assignee | Allowed by the generic model unless the host requires distinct people. |
 | Structured result contains an item rejection | No automatic activity rejection; explicit aggregation interprets item decisions. |
 | Reviewer submits a field named like a variable | No implicit variable write. |
 | Approval basis changes between stages | Host detects material inconsistency; prior approval does not silently cover changed content. |
-| Same human node visited again | New activity/tasks; prior submissions retrieved by exact identity. |
+| Same human node visited again | Reject cycles before publication. New activity/task identities on a revisit remain broader agreed design. |
 | Automatic cycle inside a larger human-containing region | Still rejected as an automatic-only cycle. |
 | START → SERVICE_TASK → EXCLUSIVE_GATEWAY → HUMAN_TASK | Count three automatic steps, create the human tasks and pause. |
 | Final human contribution advances through SERVICE_TASK → END | Count two automatic steps within that completion command's fresh allowance. A nonfinal ALL contribution counts zero. |
@@ -2951,19 +2935,19 @@ Start with the scenarios needed for the minimal `START → HUMAN_TASK (SINGLE) �
 | Only whitespace outside strings or object-property order changes | Same canonical content and fingerprint under the same canonicalization/fingerprint versions. |
 | Array order, an actual value or embedded designer metadata changes | Different canonical content; do not treat it as a formatting-only edit. |
 | Object contains a duplicate property | Reject before normalization can discard either occurrence. |
-| Runtime JSON reaches container depth 16 or 17 | Accept depth 16 if all other checks pass; reject depth 17. Count the value's root container as level 1, excluding the command envelope. |
+| Runtime JSON reaches container depth 16 or 17 | Task results accept 16 and reject 17; execution values accept up to 18 and reject 19. Count value containers independently from command envelopes. |
 | Runtime collection contains nulls or repeated array values | Count them normally: null-valued properties count toward 100 properties and all array elements count toward 1,000 items. |
 | String contains a supplementary Unicode character such as 😀 | Count one code point for character limits; independently measure the actual serialized UTF-16 storage bytes. Reject unpaired surrogates. |
 | Value fits its own size allowance but the complete stored envelope exceeds its allowance | Reject; measure and validate the same compact serialization that would be persisted. Network UTF-8 limits also apply independently. |
-| Start defaults bring the complete input object above 128 KiB UTF-16 | Reject before start guards or initialization, even if the supplied request fits 256 KiB UTF-8. |
-| Prepared variable updates exceed 1 MiB UTF-16 of resulting current state | Reject and roll back the command; do not apply a partial set of updates. Count replaced values only in their resulting form. |
-| Requested read page fits its item count but exceeds 1 MiB UTF-8 | Return fewer whole items with continuation information; include envelope/pagination bytes in the limit. |
+| Start defaults bring the complete input object above 128 KiB UTF-16 | The former 128 KiB limit is superseded: apply 10 MiB UTF-16 / 15 MiB UTF-8 to the complete normalized start map and 16 MiB UTF-8 to raw start ingress. Reject excess before initialization. |
+| Prepared variable updates exceed 1 MiB UTF-16 of resulting current state | The former 1 MiB limit is superseded: apply 10 MiB UTF-16 / 15 MiB UTF-8 to resulting state. Reject excess atomically; count resulting values once. |
+| Requested read page fits its item count but exceeds 1 MiB UTF-8 | For ordinary metadata/submission pages, return fewer whole items with continuation. Other read groups have the specific F021/F022 limits in section 14.2; no blanket 1 MiB rule applies. |
 | Definition upload fits 4 MiB UTF-8 but its stored definition exceeds 2 MiB UTF-16 | Reject; network and stored-definition budgets apply independently. |
 | Each embedded schema fits 64 KiB UTF-16 but their sum exceeds 512 KiB | Reject; count every embedded occurrence as written, including `$defs`, without expanding local references for size measurement. |
-| Definition container depth reaches 65, or designer-relative depth reaches 17 | Reject; the respective maximum depths are 64 and 16. Runtime JSON still has its separate depth-16 limit. |
+| Definition container depth reaches 65, or designer-relative depth reaches 17 | Reject; the respective maximum depths are 64 and 16. Task results and execution JSON retain separate depth-16/depth-18 limits. |
 | Designer metadata contains unfamiliar fields within its budgets | Preserve them under L13; exceeding its size or collection limits is an error, not permission to discard fields. |
-| Definition declares 101 variables, 51 input fields in one contract, 17 outcomes on one human node or 9 guards in one list | Reject before publication; count declarations even on routes not selected at runtime. |
-| Capability call declares 33 input bindings | Reject before publication; initialization/output mappings instead follow their 100-mapping and unique-destination limits. |
+| Definition declares 101 variables, 51 input fields in one contract, 17 outcomes on one human node or 9 guards in one list | Reject 101 combined declarations/output producers, 51 human incoming names, 17 outcomes or any nonempty guard list. Start inputs separately allow 100 under F007 G01. |
+| Capability call declares 33 input bindings | F007 G01 permits up to 100 service input bindings, superseding the original 32-binding reference; 33 is not itself an error. Assignment bindings remain empty and nonempty guards unsupported. Initialization/output mappings retain their 100 and unique-destination limits. |
 | Scalar STRING contains 4,000 ASCII characters versus 4,000 supplementary Unicode characters | The ASCII value meets the character/raw-byte limits; the supplementary-character value exceeds 8,000 raw UTF-16 bytes and is rejected without truncation. Other budgets still apply. |
 | Exact decimal/timestamp has harmless trailing zeros but its encoding exceeds 128 code points | Reject on encoded-length grounds, even if its numeric/time value would otherwise fit. |
 | Diagnostic output reaches its count or byte budget while errors remain | Retain failed status and a bounded error summary, indicate omitted details and block publication; never report a pass because errors were omitted. |
@@ -2975,6 +2959,17 @@ Start with the scenarios needed for the minimal `START → HUMAN_TASK (SINGLE) �
 | Capability contract metadata is unchanged after a code update | Structural checks do not prove behavioral compatibility; application upgrade verification is still required. |
 | Optional business correlation omitted | Generic workflow execution remains possible. |
 
+**Delivered extensions — focused references**
+
+| Scenario | Expected behavior / owning contract |
+| --- | --- |
+| Shared task is claimed or uses REQUIRED claim policy | Enforce F017 ownership and current eligibility; reads/replay remain separately authorized. |
+| Later variable replacement or task claim/read | Preserve the F020 entry snapshot; ALL siblings use the same captured inputs. |
+| Named output producer is skipped, or OPTIONAL SINGLE result is omitted | No output exists; F019 literal-key #hasVariable can check existence without an uninitialized read. |
+| Nonfinal ALL contribution versus resolution | No output/progression while waiting; F021 resolves the original accepted collection, excluding cancelled/open tasks, atomically with downstream work. |
+| Service/human input binds a prior submission | Read immutable original evidence, not the current output variable; fail unavailable sources explicitly (F019–F021). |
+| Receiving task is read after later work completes | F022 retains the entry cutoff and current receiving-task authorization; later or same-stage decisions do not appear. |
+
 **Implementation-reference scenarios**
 
 Apply these when implementing expression and schema-validation controls. Use the applicable engine-configured budgets; section 14.2 retains initial engineering values, not additional author-configurable language fields. Verify refinements against the agreed behavior and published-workflow compatibility.
@@ -2983,10 +2978,10 @@ Apply these when implementing expression and schema-validation controls. Use the
 | --- | --- |
 | Expression exceeds an applicable parsed-size, syntax-depth or navigation budget | Reject before publication even if the expression could be skipped at runtime. |
 | A command would exceed its expression-evaluation budget, or an evaluation would exceed its operation budget | Report an evaluation-limit failure and roll back the command; do not select a default route. Skipped conditions consume no evaluations. |
-| Schema validation would exceed its active-frame or per-validation work budget | Stop with an evaluation-limit failure, not an ordinary mismatch that could permit another alternative. |
+| Schema validation would exceed its active-frame or per-validation work budget | F018 conservative preflight rejects excessive expanded depth/weight or weight × input-node charge before provider work; this is a limit failure, not an ordinary mismatch or measured provider counter. |
 | Individually bounded schema validations collectively exceed the operation's shared work budget | Fail the definition-validation request or roll back the runtime command; starting another validation does not reset the shared counter. |
 
-Later specification artifacts should trace each accepted rule to positive and negative examples. Their creation belongs to the subsequent specification stage.
+The owning feature specifications trace delivered rules to acceptance scenarios and implementation evidence; future increments add only the checks needed for their selected scope.
 
 ## 18. References and provenance
 
@@ -2994,10 +2989,23 @@ Later specification artifacts should trace each accepted rule to positive and ne
 
 | ID | Source | How used |
 | --- | --- | --- |
-| A1 | [Reusable Workflow Engine — Technical Design — APOLO-first Embedded Library, v0.9][A1] | General architecture and existing proposals, including the owner-selected first-match revision. Original shared file: `workflow-engine-design(1).md`; current path `docs/architecture/workflow-engine-design.md`. |
+| A1 | [Reusable Workflow Engine — Technical Design — APOLO-first Embedded Library, current v0.12][A1] | General architecture and existing proposals, including first-match routing; original research used v0.9, current reconciliation uses v0.12. Original shared file: `workflow-engine-design(1).md`; current path `docs/architecture/workflow-engine-design.md`. |
 | A2 | [Workflow engine database design, v1.4][A2] | Explicit later selections and detailed persistence/execution proposals. Shared filename remains `Workflow_Engine_Database_Design_v1.md`. |
 
 Both documents were originally read from the shared project copies. This records the provenance of the design draft, not a new verification of its content. The active copies now live alongside this document in `docs/architecture/` in the engine repository.
+
+The following feature specifications govern the delivered subset. Their sibling `implementation.md` records identify actual verification and remaining gaps; this documentation review adds no runtime evidence.
+
+| Feature | Current contract |
+| --- | --- |
+| [F004](../features/F004-definition-management-validation/spec.md) | Definition lifecycle, validation, explicit versions and legacy-column migration. |
+| [F007](../features/F007-typed-bindings-service-tasks/spec.md), [F008](../features/F008-restricted-expressions-routing/spec.md), [F009](../features/F009-json-execution-variables/spec.md) | Typed bindings, restricted expressions, exact JSON and canonicalization. |
+| [F011](../features/F011-sequential-human-stages/spec.md) | Sequential/conditional stages; acyclic, mandatory-human graph subset. |
+| [F016](../features/F016-shared-group-role-task-assignment/spec.md), [F017](../features/F017-task-claim-release/spec.md) | Stable shared targets, membership, claim/release and eligibility. |
+| [F018](../features/F018-structured-task-submissions/spec.md) | Structured results, private schema validation, exact numeric comparison and bounded preflight. |
+| [F019](../features/F019-named-task-output-variables/spec.md), [F020](../features/F020-human-task-input-bindings/spec.md) | Named outputs, original-submission sources and immutable incoming snapshots. |
+| [F021](../features/F021-all-collective-review/spec.md) | ALL resolution/collections, current capacities and preserving history migration. |
+| [F022](../features/F022-previous-decision-comments/spec.md) | Previous-decision policy, cutoff, access and pagination. |
 
 ### 18.2 External primary references
 
@@ -3055,5 +3063,6 @@ Research checked on **25 October 2026**. Versioned standards are identified expl
 
 | Version | Date | Change |
 | --- | --- | --- |
+| 0.3 | 14 November 2026 | Reconciles the body with delivered contracts through F022: claims, results, outputs, captured inputs, ALL collections, previous decisions, validation and capacities. Preserves historical guard/loop decisions, deferred scope, original research and prior verification gaps; no runtime changes. |
 | 0.2 | 31 October 2026 | Clarifies chapters and records owner-selected first-match routing, the four binding rules, and centrally enforced expression rules tied to the language version without expressionPolicy. Section 15.4 additionally selects integer schemaVersion, one START without startNodeKey, explicit empty-input/result declarations, node-wide submission contracts, strict result presence and SINGLE behavior. Sections 9.2–9.3 select ALL and the fixed task list, including early completion, competing commands and atomic rollback. Examples, decision register and review scenarios are aligned. Exact limits, remaining notation and persistence reconciliation stay open; no runtime implementation is claimed. |
 | 0.1 | 25 October 2026 | Initial standards-informed design draft. Reconciles architecture v0.8 with explicitly selected database v1.4 revisions; records conceptual semantics, current routing, proposed collective completion, candidate minimal notation and open language decisions. |
