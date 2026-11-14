@@ -1,5 +1,7 @@
 # Workflow engine roadmap
 
+**Next feature selection — 2026-11-14:** the owner selected [F025 workflow cancellation](features/F025-workflow-cancellation/spec.md) after agreeing its scope. Its specification and [plan](features/F025-workflow-cancellation/plan.md) are READY; implementation is explicitly not yet authorized. This supersedes the unselected cancellation portion of older priority rows below. F024 status/evidence remains independent, reassignment is deferred and APOLO access is still unavailable.
+
 **Authoring follow-up — 2026-11-14:** [F023 — Create next definition version](features/F023-create-next-definition-version/spec.md) is IMPLEMENTED at revision 3: draft creation/deletion, permanent family counter, strict new-import floor and preserving migration, with coordinated creation/import/deletion. Focused unit/UI/build, browser and all 15 selected SQL results are in its [handover](features/F023-create-next-definition-version/implementation.md). Test-database recovery and fixture cleanup are complete. This authoring convenience does not change graphical-designer sequencing.
 
 **Updated:** 2026-11-13 · **Delivery baseline:** F022 previous-decision comments, IMPLEMENTED revision 1
