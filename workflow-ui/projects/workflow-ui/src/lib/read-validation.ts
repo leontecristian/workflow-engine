@@ -47,7 +47,7 @@ export function validateGraph(value: unknown, id: string): asserts value is Inst
   const keys = new Set<string>();
   for (const node of value['nodes'] as unknown[]) {
     requireValid(object(node) && text(node['key']) && text(node['name']) && text(node['type'])
-      && ['ACTIVE','COMPLETED','PENDING'].includes(String(node['state'])) && nullableId(node['activityId']) && nullableId(node['taskId']) && !keys.has(node['key'] as string));
+      && ['ACTIVE','COMPLETED','PENDING','CANCELLED'].includes(String(node['state'])) && nullableId(node['activityId']) && nullableId(node['taskId']) && !keys.has(node['key'] as string));
     keys.add(node['key'] as string);
   }
   for (const edge of value['edges'] as unknown[]) requireValid(object(edge) && text(edge['key']) && keys.has(edge['from'] as string)

@@ -110,9 +110,15 @@ export interface ReplayResult {
   found: boolean;
   result: CommandResult | null;
 }
+export interface CancellationExecution {
+  commandId: string; operation: 'CANCEL_WORKFLOW'; instance: InstanceView; activity: ActivityView;
+  cancelledTaskCount: number; firstHistorySequence: Decimal; lastHistorySequence: Decimal;
+}
+export interface CancellationResult { replayed: boolean; execution: CancellationExecution; }
+export interface CancellationReplay { found: boolean; result: CancellationResult | null; }
 export interface Observation {
   outcome: string;
-  result?: CommandResult | ReplayResult;
+  result?: CommandResult | ReplayResult | CancellationResult | CancellationReplay;
   message?: string;
 }
 

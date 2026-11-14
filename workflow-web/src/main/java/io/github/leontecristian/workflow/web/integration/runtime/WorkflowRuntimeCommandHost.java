@@ -5,11 +5,15 @@ import io.github.leontecristian.workflow.core.dto.runtime.ClaimWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
+import io.github.leontecristian.workflow.core.dto.runtime.CancelWorkflow;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationCommandResult;
 import java.util.Optional;
 /** Host owns trusted actor/time, policy and transactions. Replay never executes a missing command.
  * Normal completion preserves receipt-before-current-state validation, without an exact-read precheck.
  */
 public interface WorkflowRuntimeCommandHost {
+    WorkflowCancellationCommandResult cancel(CancelWorkflow command, String correlation);
+    Optional<WorkflowCancellationCommandResult> replayCancellation(CancelWorkflow command, String correlation);
     WorkflowCommandResult complete(CompleteWorkflowTask command, String correlation);
     Optional<WorkflowCommandResult> replayComplete(CompleteWorkflowTask command, String correlation);
     WorkflowCommandResult claim(ClaimWorkflowTask command, String correlation);

@@ -104,9 +104,10 @@ export function loadTs(url) {
   return exports;
 }
 
-export function component(t, Type, reads={}, navigation={destination:i=>[i.kind, i.id ?? i.instanceId, i.sequence].filter(Boolean)}) {
+export function component(t, Type, reads={}, navigation={destination:i=>[i.kind, i.id ?? i.instanceId, i.sequence].filter(Boolean)}, providers=[]) {
   const {WORKFLOW_VIEWER_READS,WORKFLOW_VIEWER_NAVIGATION}=loadTs(new URL('../projects/workflow-ui/src/lib/contracts.ts',import.meta.url));
-  const injector=core.createEnvironmentInjector([{provide:WORKFLOW_VIEWER_READS,useValue:reads},{provide:WORKFLOW_VIEWER_NAVIGATION,useValue:navigation}],null);
+  const {CommandRecovery}=loadTs(new URL('../projects/workflow-ui/src/lib/runtime/command/command-recovery.ts',import.meta.url));
+  const injector=core.createEnvironmentInjector([CommandRecovery,{provide:modules.get('@angular/material/dialog').MatDialog,useValue:{closeAll(){}}},{provide:WORKFLOW_VIEWER_READS,useValue:reads},{provide:WORKFLOW_VIEWER_NAVIGATION,useValue:navigation},...providers],null);
   const page=core.runInInjectionContext(injector,()=>new Type());
   if ('sessionScope' in page) {page.sessionScope={};page.instanceId='9007199254740993';}
   t.after(()=>{page.ngOnDestroy?.();injector.destroy();});

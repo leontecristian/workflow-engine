@@ -6,6 +6,8 @@ import io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
+import io.github.leontecristian.workflow.core.dto.runtime.CancelWorkflow;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationCommandResult;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
 import io.github.leontecristian.workflow.testhost.exception.console.SandboxRequestConflict;
@@ -72,6 +74,15 @@ public class ConsoleRuntimeCoordinator {
     public WorkflowCommandResult claim(ClaimWorkflowTask command, WorkflowCommandContext context) {
         return executeOwnership(() -> transactions.claim(command, context),
                 () -> transactions.replayClaim(command, context));
+    }
+
+    public WorkflowCancellationCommandResult cancel(CancelWorkflow command, WorkflowCommandContext context) {
+        try {
+            return transactions.cancel(command, context);
+        } catch (RuntimeException original) {
+            if (eligible(original)) return transactions.replayCancellation(command, context).orElseThrow(() -> original);
+            throw original;
+        }
     }
 
     public WorkflowCommandResult release(ReleaseWorkflowTask command, WorkflowCommandContext context) {

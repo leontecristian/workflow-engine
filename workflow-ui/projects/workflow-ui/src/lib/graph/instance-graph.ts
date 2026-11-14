@@ -35,6 +35,7 @@ export class WorkflowInstanceGraphComponent {
   }
   activityRoute(id: string) { return this.navigation?.destination({kind:'activity',id}) ?? null; }
   label(node: InstanceGraphNode): string {
+    if (node.state === "CANCELLED") return this.messages().presentation?.cancelled ?? 'Cancelled';
     if (node.state === "ACTIVE") return this.messages().current;
     if (node.state === "COMPLETED")
       return node.key === this.graph().instance.currentNodeKey &&

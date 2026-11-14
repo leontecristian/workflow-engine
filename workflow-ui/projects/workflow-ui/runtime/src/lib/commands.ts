@@ -17,6 +17,7 @@ export class WorkflowCommandsComponent extends RuntimeState {
  protected onInvalidate(){this.readGeneration++;}
  resultNotFound(){const result=this.result()?.result;return !!result&&'found' in result&&!result.found;}
  commandExecution(){return this.commands.execution();}
+ commandTask(){const execution=this.commandExecution();return execution&&'task' in execution?execution.task:null;}
  async load(){await this.refreshCurrent();}
  async retry(replay:boolean){
   if(!this.commandProvider)return;

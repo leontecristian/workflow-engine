@@ -104,6 +104,13 @@ public class WorkflowTaskEntity {
         assigneeRef = null;
     }
 
+    public void cancelForInstance(LocalDateTime time, String actor) {
+        if (status != TaskStatus.OPEN || time.isBefore(createdAt))
+            throw new IllegalStateException("OPEN task required");
+        status = TaskStatus.CANCELLED; closedAt = time; closedBy = java.util.Objects.requireNonNull(actor);
+        closureReason = TaskClosureReason.INSTANCE_CANCELLED;
+    }
+
     public void cancelForResolution(LocalDateTime time, String actor) {
         if (status != TaskStatus.OPEN || time.isBefore(createdAt))
             throw new IllegalStateException("OPEN task required");

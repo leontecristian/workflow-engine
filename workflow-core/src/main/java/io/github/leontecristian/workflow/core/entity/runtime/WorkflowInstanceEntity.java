@@ -109,6 +109,13 @@ public class WorkflowInstanceEntity {
         currentNodeKey = java.util.Objects.requireNonNull(humanKey); lastHistorySequence = finalSequence;
     }
 
+    public void cancel(String reason, long finalSequence, LocalDateTime time, String actor) {
+        if (status != InstanceStatus.ACTIVE || finalSequence <= lastHistorySequence || time.isBefore(startedAt))
+            throw new IllegalStateException("Invalid cancellation");
+        status = InstanceStatus.CANCELLED; terminationReason = java.util.Objects.requireNonNull(reason);
+        endedAt = time; endedBy = java.util.Objects.requireNonNull(actor); lastHistorySequence = finalSequence;
+    }
+
     public void complete(String endKey, String result, long finalSequence, LocalDateTime time, String actor) {
         if (status != InstanceStatus.ACTIVE || finalSequence <= lastHistorySequence || time.isBefore(startedAt))
             throw new IllegalStateException("Invalid completion");

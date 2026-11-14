@@ -101,6 +101,13 @@ public class WorkflowActivityEntity {
         this.requiredTaskCount = requiredTaskCount;
     }
 
+    public void cancel(LocalDateTime time, String actor) {
+        if (status != ActivityStatus.ACTIVE || time.isBefore(enteredAt))
+            throw new IllegalStateException("Active activity required");
+        status = ActivityStatus.CANCELLED; closedAt = time;
+        closedBy = java.util.Objects.requireNonNull(actor); closureReason = "INSTANCE_CANCELLED";
+    }
+
     public void complete(String outcome, LocalDateTime time, String actor) {
         if (status != ActivityStatus.ACTIVE || time.isBefore(enteredAt))
             throw new IllegalStateException("Active activity required");

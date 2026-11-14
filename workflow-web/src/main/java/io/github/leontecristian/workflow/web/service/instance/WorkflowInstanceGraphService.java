@@ -51,7 +51,8 @@ public class WorkflowInstanceGraphService {
         // Authorize first, before disclosing pinned topology or reading retained evidence.
         access.requireInstanceRead(id);
         var instance = reads.findInstance(id).orElseThrow(WorkflowViewerException::missing);
-        require(instance.status() == InstanceStatus.ACTIVE || instance.status() == InstanceStatus.COMPLETED);
+        require(instance.status() == InstanceStatus.ACTIVE || instance.status() == InstanceStatus.COMPLETED
+                || instance.status() == InstanceStatus.CANCELLED);
         long watermark = instance.lastHistorySequence();
         if (watermark > MAX_HISTORY) throw new WorkflowViewerException(422, "LIMIT_EXCEEDED");
         require(watermark > 0);
@@ -109,11 +110,17 @@ public class WorkflowInstanceGraphService {
                             && position.equals(instance.currentNodeKey()) && "END".equals(nodes.get(position).type()));
                     completed.add(position); ended = true;
                 }
+                case "INSTANCE_CANCELLED" -> {
+                    require(started && instance.status() == InstanceStatus.CANCELLED
+                            && position.equals(instance.currentNodeKey()) && "HUMAN_TASK".equals(nodes.get(position).type())
+                            && latestLinks.containsKey(position) && fact.activityId() == null && fact.taskId() == null);
+                    ended = true;
+                }
                 default -> require(started); // Scalar/service facts do not disclose values or invent topology.
             }
         }
         require(started && position.equals(instance.currentNodeKey())
-                && (instance.status() != InstanceStatus.COMPLETED || ended));
+                && (instance.status() == InstanceStatus.ACTIVE || ended));
         List<Node> displayedNodes = new ArrayList<>();
         var candidates = latestLinks.values().stream()
                 .map(links -> new ViewerLinkReference(links.activityId, links.singleTaskId))
@@ -128,7 +135,8 @@ public class WorkflowInstanceGraphService {
             boolean taskReadable = links != null && links.singleTaskId != null
                     && readable.contains(new ViewerLinkReference(links.activityId, links.singleTaskId));
             State state = instance.status() == InstanceStatus.ACTIVE && key.equals(instance.currentNodeKey())
-                    ? State.ACTIVE : completed.contains(key) ? State.COMPLETED : State.PENDING;
+                    ? State.ACTIVE : instance.status() == InstanceStatus.CANCELLED && key.equals(instance.currentNodeKey())
+                    ? State.CANCELLED : completed.contains(key) ? State.COMPLETED : State.PENDING;
             displayedNodes.add(new Node(key, node.name(), node.type(), state,
                     activityReadable ? links.activityId : null, taskReadable ? links.singleTaskId : null));
         }

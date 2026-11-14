@@ -21,8 +21,9 @@ import org.springframework.context.annotation.Import;
 @Import({WorkflowRuntimeReadConfiguration.class, WorkflowRuntimeCommandConfiguration.class})
 public class ConsoleRuntimeConfiguration {
     @Bean WorkflowRuntimeOptions consoleRuntimeOptions() { return new WorkflowRuntimeOptions("/console/api", "console.correlation"); }
-    @Bean WorkflowRuntimeReadHost consoleRuntimeReadHost(WorkflowRuntimeQueryService reads, ConsoleRuntimeAccess access, ConsoleContext context) {
-        return new ConsoleRuntimeReadHost(reads, access, context);
+    @Bean WorkflowRuntimeReadHost consoleRuntimeReadHost(WorkflowRuntimeQueryService reads, ConsoleRuntimeAccess access, ConsoleContext context,
+            io.github.leontecristian.workflow.testhost.service.runtime.ConsoleWorkflowCancellationAuthorization cancellation) {
+        return new ConsoleRuntimeReadHost(reads, access, context, cancellation);
     }
     @Bean WorkflowRuntimeCommandHost consoleRuntimeCommandHost(ConsoleRuntimeCoordinator commands,
             ConsoleRuntimeTransaction transactions, ConsoleRuntimeAccess access, ConsoleContext context) {

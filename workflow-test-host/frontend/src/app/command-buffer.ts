@@ -25,6 +25,10 @@ export function freezeInputs(value:unknown):ScalarInputs {
 export function parseScalarInputs(text:string):ScalarInputs{return freezeInputs(text);}
 export function commandRequest(envelope:Envelope,replay:boolean):{path:string;body:Readonly<Record<string,unknown>>|string;token:string|null} {
  if(envelope.kind==='start')return {path:replay?'/commands/start/replay':'/instances/start',body:startRequest(envelope.body),token:null};
+ if(envelope.kind==='cancel'){
+  const {instanceId,...body}=envelope.body;
+  return {path:replay?'/commands/cancel/replay':`/instances/${instanceId}/cancel`,body:replay?envelope.body:body,token:envelope.expectedToken};
+ }
  const {instanceId,taskId,...body}=envelope.body;
  const path=replay?`/commands/${envelope.kind}/replay`:`/instances/${instanceId}/tasks/${taskId}/${envelope.kind}`;
  const requestBody=replay?envelope.body:body;

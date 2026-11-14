@@ -17,8 +17,22 @@ public class ConsoleRuntimeReadHost implements WorkflowRuntimeReadHost {
     private final WorkflowRuntimeQueryService reads;
     private final ConsoleRuntimeAccess access;
     private final ConsoleContext context;
-    public ConsoleRuntimeReadHost(WorkflowRuntimeQueryService reads, ConsoleRuntimeAccess access, ConsoleContext context) {
+    private final ConsoleWorkflowCancellationAuthorization cancellation;
+    public ConsoleRuntimeReadHost(WorkflowRuntimeQueryService reads, ConsoleRuntimeAccess access, ConsoleContext context,
+            ConsoleWorkflowCancellationAuthorization cancellation) {
         this.reads = reads; this.access = access; this.context = context;
+        this.cancellation = cancellation;
+    }
+    @Override public boolean canCancelWorkflow(WorkflowInstanceView instance) {
+        if (instance.status() != io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus.ACTIVE) return false;
+        var authorization = new io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationAuthorizationContext(
+                instance.id(), instance.definitionVersionId(), instance.businessType(), instance.businessId(), context.runtime(null));
+        try { return cancellation.canAccess(authorization) && cancellation.canCancel(authorization); }
+        catch (RuntimeException unavailable) {
+            throw new io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException(
+                    io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.AUTHORIZATION_LOOKUP_FAILED,
+                    unavailable);
+        }
     }
     @Override public void requireMonitorAccess() {
         if (!context.admin()) throw new WorkflowRuntimeException(403, "FORBIDDEN");

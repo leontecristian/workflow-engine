@@ -8,7 +8,8 @@ import { Observable, firstValueFrom, fromEvent, takeUntil } from 'rxjs';
 import { WorkflowInstanceViewerComponent, WorkflowHistoryComponent, WorkflowHistoryEventComponent, WORKFLOW_VIEWER_READS, WORKFLOW_VIEWER_NAVIGATION, DEFAULT_VIEWER_MESSAGES, normalizeViewerReadError } from '@workflow-engine/ui';
 import type {WorkflowViewerReads, WorkflowViewerNavigation, ViewerDestination, InstanceView, HistoryPage, HistoryEvent, InstanceGraph} from '@workflow-engine/ui';
 import { WORKFLOW_ADMINISTRATION_API } from '@workflow-engine/ui';
-import { WORKFLOW_RUNTIME_READS, WORKFLOW_RUNTIME_COMMANDS, CommandRecovery } from '@workflow-engine/ui';
+import { WORKFLOW_RUNTIME_READS, WORKFLOW_RUNTIME_COMMANDS, WORKFLOW_CANCELLATION, CommandRecovery } from '@workflow-engine/ui';
+import type { WorkflowCancellation, CancellationResult } from '@workflow-engine/ui';
 import type { WorkflowRuntimeReads, WorkflowRuntimeCommands, TaskView, TaskContract, Envelope, CommandResult, ReplayResult, PreviousDecisionPage } from '@workflow-engine/ui';
 import { WorkflowTaskComponent, WorkflowCommandsComponent } from '@workflow-engine/ui/runtime';
 import { WorkflowDefinitionsComponent } from '@workflow-engine/ui/administration';
@@ -20,6 +21,26 @@ const summary={instanceId:id,historySequence:'4',eventType:'UNKNOWN_FUTURE',comm
 const namedOutputEvidence = new URLSearchParams(location.search).has('namedOutputEvidence');
 const taskInputEvidence = new URLSearchParams(location.search).get('taskInputEvidence');
 const previousDecisionEvidence = new URLSearchParams(location.search).get('previousDecisionEvidence');
+const cancellationEvidence = new URLSearchParams(location.search).has('cancellationEvidence');
+function cancellationFixture():WorkflowCancellation|null {
+ if(!cancellationEvidence)return null;
+ let committed:CancellationResult|null=null;
+ return {
+  availability:async()=>({allowed:instance.status==='ACTIVE',lockVersion:instance.lockVersion}),
+  cancel:async envelope=>{
+   if(committed)return {...committed,replayed:true};
+   const at='2026-11-14T12:00:00Z';
+   Object.assign(instance,{status:'CANCELLED',endedAt:at,endedBy:'fixture-admin',terminationReason:envelope.body['reason'],lockVersion:'9007199254740994',lastHistorySequence:'7'});
+   graph.nodes[1].state='CANCELLED';
+   Object.assign(fixtureTask,{status:'CANCELLED',closedAt:at,closedBy:'fixture-admin',closureReason:'INSTANCE_CANCELLED'});
+   fixtureContract.canComplete=false;
+   const {task,...execution}=fixtureResult(envelope).execution;
+   committed={replayed:false,execution:{...execution,operation:'CANCEL_WORKFLOW',instance:{...instance},activity:{...execution.activity,status:'CANCELLED',outcomeKey:null,closureReason:'INSTANCE_CANCELLED',closedBy:'fixture-admin',closedAt:at},cancelledTaskCount:1,firstHistorySequence:'5',lastHistorySequence:'7'}};
+   return committed;
+  },
+  replay:async()=>({found:!!committed,result:committed&&{...committed,replayed:true}}),
+ };
+}
 const evidenceEvents: HistoryEvent[] = [
   {
     summary: {...summary, historySequence:'3', eventType:'VARIABLES_WRITTEN', activityId:'20', taskId:'30'},
@@ -145,6 +166,7 @@ class ReadOnlyTask {scope={};}
 }
 @NgModule({declarations:[App,Destination,ReadOnlyTask],imports:[BrowserModule,RouterLink,RouterOutlet,WorkflowInstanceViewerComponent,WorkflowHistoryComponent,WorkflowHistoryEventComponent,WorkflowDefinitionsComponent,WorkflowTaskComponent,WorkflowCommandsComponent],
   providers:[FixtureState,Reads,RuntimeReads,RuntimeCommands,Navigation,
+    {provide:WORKFLOW_CANCELLATION,useFactory:cancellationFixture},
     {provide:ENVIRONMENT_INITIALIZER,multi:true,useValue:()=>inject(MatIconRegistry).setDefaultFontSetClass('material-symbols-outlined','mat-ligature-font')},
     provideRouter([{path:'alternate/:kind/:id',component:Destination}]),
     provideHttpClient(withInterceptors([(request,next)=>next(request.clone({setHeaders:{'X-Consumer':'NgModule'}}))])),

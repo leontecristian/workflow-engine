@@ -27,7 +27,7 @@ export interface InstanceGraphNode {
   key: string;
   name: string;
   type: string;
-  state: "ACTIVE" | "COMPLETED" | "PENDING";
+  state: "ACTIVE" | "COMPLETED" | "PENDING" | "CANCELLED";
   activityId: Decimal | null;
   taskId: Decimal | null;
 }

@@ -1,6 +1,6 @@
 # Plan — F025 workflow cancellation
 
-Targets [specification revision 1](spec.md). Planning only; implement only after a later owner instruction. Existing F024 changes are concurrent work and must be preserved.
+Targets [specification revision 1](spec.md). Implementation authorized on 2026-11-14. Initial git status was clean; F024 revision 1 is now committed in the baseline and must be preserved.
 
 ## Baseline and approach
 
@@ -41,7 +41,7 @@ Fresh checks:
 
 1. Isolated core/web/host/UI suites for reason/authorization/DTO codecs, receipt compatibility, event shaping, partial ALL read invariants, routes, availability and frozen UI command behavior (AC01–AC04/AC07). Use existing suites where they cover affected paths; add only concrete gaps.
 2. Guarded SQL integration tests in workflow-test-host/src/test/java/io/github/leontecristian/workflow/testhost using DatabaseIntegrationTest against localhost:1433/apolo_workflow_test, serialized with other agents. Cover committed SINGLE/partial ALL cancellation, maximum roster, race/duplicate ordering and injected rollback with preserved prior contributions/effects (AC01/02/04/05/06). Exercise real host transaction and outbox; clean only test-owned fixtures.
-3. One selected Maven packaging command using JDK 21 and the wrapper; include console-ui packaging when verifying the built shared frontend. Do not repeat its builds separately. Keep unit, integration and packaging outcomes distinct.
+3. One selected Maven packaging command using JDK 21 and the wrapper. For database-free browser fixtures, verify the shared library and sandbox production frontend separately and package Java in the guarded integration lifecycle; do not repeat those frontend builds through console-ui. A backend-served console package/startup is not selected because the normal host targets an unauthorized database. Keep unit, integration and packaging outcomes distinct.
 4. Focused browser check of instance action/dialog, reason rendering, cancelled graph/tasks, stale/uncertain response handling and read-only consumer wiring (AC07). Use retained/test-owned fixtures and an authorized test-target setup. Normal development-host startup requires task-specific authorization because it migrates apolo_workflow_dev; do not redirect its normal URL. Record and stop only verification processes started by this task. If browser setup is blocked, record that gap rather than access an unauthorized database.
 
 Completion: implemented R01–R06, focused checks complete with honest gaps, exact contracts documented in library READMEs, final diff/whitespace reviewed and tasks/implementation reconciled. Stop after relevant checks pass; do not reopen historical acceptance matrices. APOLO remains a separate gate. No commit or push unless requested.

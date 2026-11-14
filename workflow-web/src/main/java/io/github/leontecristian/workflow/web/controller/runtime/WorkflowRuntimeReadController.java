@@ -66,6 +66,14 @@ public class WorkflowRuntimeReadController {
         result.put("items",items); result.put("nextAfterKey",page.nextAfterKey()); return wire.largeResponse(result);
     }
 
+    @GetMapping("/instances/{id}/cancellation-availability")
+    public ResponseEntity<String> cancellationAvailability(@PathVariable String id, HttpServletRequest request) {
+        query(request);
+        var instance = access.instance(decimal(id, false));
+        boolean allowed = instance.status() == InstanceStatus.ACTIVE && access.canCancelWorkflow(instance);
+        return wire.response(Map.of("allowed", allowed, "lockVersion", instance.lockVersion()));
+    }
+
     private static Object wireValue(WorkflowValue value) {
         if (value.value() instanceof TextLiteral text) return text.value();
         if (value.value() instanceof BooleanLiteral bool) return bool.value();

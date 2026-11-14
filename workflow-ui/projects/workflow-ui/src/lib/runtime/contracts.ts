@@ -24,6 +24,13 @@ export interface WorkflowRuntimeCommands {
  start?: StartEnvelopeAdapter;
 }
 export const WORKFLOW_RUNTIME_COMMANDS = new InjectionToken<WorkflowRuntimeCommands>('Workflow runtime commands');
+/** Optional instance cancellation; hosts own transport, identity and authorization. */
+export interface WorkflowCancellation {
+ availability(id:string,signal:AbortSignal):Promise<{allowed:boolean;lockVersion:string}>;
+ cancel(envelope:Envelope,signal:AbortSignal):Promise<import('./models').CancellationResult>;
+ replay(envelope:Envelope,signal:AbortSignal):Promise<import('./models').CancellationReplay>;
+}
+export const WORKFLOW_CANCELLATION = new InjectionToken<WorkflowCancellation>('Workflow cancellation');
 export const DEFAULT_RUNTIME_MESSAGES = {
  instancesTitle:'Instances', taskTitle:'Task details', assignedTitle:'My tasks', instanceTasksTitle:'Instance tasks',
  activityTitle:'Activity details', submissionsTitle:'Activity submissions', variablesTitle:'Execution variables', commandsTitle:'Command recovery',

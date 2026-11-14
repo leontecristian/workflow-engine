@@ -1,5 +1,10 @@
 package io.github.leontecristian.workflow.core.service.runtime;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
+import io.github.leontecristian.workflow.core.dto.runtime.CancelWorkflow;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationResult;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationCommandResult;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationContext;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationAuthorizationContext;
 import io.github.leontecristian.workflow.core.dto.runtime.ServiceActionContext;
 import io.github.leontecristian.workflow.core.dto.runtime.StartInputs;
 
@@ -79,6 +84,7 @@ public class WorkflowExecutionService {
     private final RuntimeVariables variables;
     private final RuntimeServiceProgression services;
     private final ObjectProvider<WorkflowTaskSubmissionValidator> submissionValidator;
+    private final ObjectProvider<WorkflowCancellationAuthorization> cancellationAuthorization;
     private final ThreadLocal<Boolean> executing = new ThreadLocal<>();
 
     public WorkflowExecutionService(WorkflowInstanceRepository instances, WorkflowActivityRepository activities,
@@ -86,6 +92,19 @@ public class WorkflowExecutionService {
                                     EntityManager entityManager, WorkflowDefinitionRuntimeReader definitions, TaskTypeCatalogService catalog,
                                     RuntimeJson json, RuntimeHostSupport host, RuntimeDefinitionPins pins, RuntimeVariables variables, RuntimeServiceProgression services, WorkflowTaskEligibilityService eligibility,
                                     ObjectProvider<WorkflowTaskSubmissionValidator> submissionValidator) {
+        this(instances, activities, tasks, history, receipts, entityManager, definitions, catalog, json, host,
+                pins, variables, services, eligibility, submissionValidator, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public WorkflowExecutionService(WorkflowInstanceRepository instances, WorkflowActivityRepository activities,
+            WorkflowTaskRepository tasks, WorkflowHistoryRepository history, WorkflowCommandReceiptRepository receipts,
+            EntityManager entityManager, WorkflowDefinitionRuntimeReader definitions, TaskTypeCatalogService catalog,
+            RuntimeJson json, RuntimeHostSupport host, RuntimeDefinitionPins pins, RuntimeVariables variables,
+            RuntimeServiceProgression services, WorkflowTaskEligibilityService eligibility,
+            ObjectProvider<WorkflowTaskSubmissionValidator> submissionValidator,
+            ObjectProvider<WorkflowCancellationAuthorization> cancellationAuthorization) {
+        this.cancellationAuthorization = cancellationAuthorization;
         this.submissionValidator = submissionValidator;
         this.eligibility = eligibility;
         this.variables = variables;
@@ -101,6 +120,164 @@ public class WorkflowExecutionService {
         this.json = json;
         this.host = host;
         this.pins = pins;
+    }
+
+    private void validateCancellation(CancelWorkflow command, WorkflowCommandContext context) {
+        RuntimeInputs.validateContextAndGetOccurredAtUtc(context);
+        RuntimeInputs.require(command != null && command.commandId() != null && command.instanceId() > 0
+                && command.expectedLockVersion() >= 0 && RuntimeInputs.isValidText(command.reason(), 2000, 2000, true)
+                && command.reason().length() <= 2000 && context.actorKind() == ActorKind.USER, Category.INVALID_INPUT);
+    }
+
+    private WorkflowCancellationAuthorization cancellationAdapter() {
+        WorkflowCancellationAuthorization adapter;
+        try { adapter = cancellationAuthorization == null ? null : cancellationAuthorization.getIfAvailable(); }
+        catch (RuntimeException failure) { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION, failure); }
+        RuntimeInputs.require(adapter != null, Category.HOST_CONFIGURATION);
+        return adapter;
+    }
+
+    private WorkflowCancellationAuthorizationContext cancellationAccess(WorkflowInstanceEntity instance,
+            WorkflowCommandContext context, WorkflowCancellationAuthorization adapter) {
+        var authorization = new WorkflowCancellationAuthorizationContext(instance.getId(), instance.getDefinitionVersionId(),
+                instance.getBusinessType(), instance.getBusinessId(), context);
+        boolean accessible;
+        try { accessible = adapter.canAccess(authorization); }
+        catch (RuntimeException failure) { throw new WorkflowExecutionException(Category.AUTHORIZATION_LOOKUP_FAILED, failure); }
+        RuntimeInputs.require(accessible, Category.NOT_FOUND);
+        return authorization;
+    }
+
+    /** Lookup only: business access remains required, fresh cancellation privilege does not. */
+    public Optional<WorkflowCancellationResult> findCancellationReplay(CancelWorkflow command, WorkflowCommandContext context) {
+        validateCancellation(command, context);
+        return RuntimePersistenceErrors.call(() -> {
+            var adapter = cancellationAdapter();
+            var instance = instances.findById(command.instanceId())
+                    .orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
+            cancellationAccess(instance, context, adapter);
+            return json.cancellationReplay(receipts.findById(command.commandId()).orElse(null), command, context);
+        });
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public WorkflowCancellationCommandResult cancelWorkflow(CancelWorkflow command, WorkflowCommandContext context) {
+        return cancelWorkflow(command, context, null);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public WorkflowCancellationCommandResult cancelWorkflow(CancelWorkflow command, WorkflowCommandContext context,
+            WorkflowCancellationEffect effect) {
+        return guarded(() -> {
+            validateCancellation(command, context);
+            var adapter = cancellationAdapter();
+            var instance = instances.findById(command.instanceId())
+                    .orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
+            entityManager.refresh(instance);
+            var authorization = cancellationAccess(instance, context, adapter);
+            var replay = json.cancellationReplay(receipts.findById(command.commandId()).orElse(null), command, context);
+            if (replay.isPresent()) return new WorkflowCancellationCommandResult(true, replay.get());
+            boolean permitted;
+            try { permitted = adapter.canCancel(authorization); }
+            catch (RuntimeException failure) { throw new WorkflowExecutionException(Category.AUTHORIZATION_LOOKUP_FAILED, failure); }
+            RuntimeInputs.require(permitted, Category.CANCELLATION_FORBIDDEN);
+            RuntimeInputs.require(instance.getLockVersion() == command.expectedLockVersion(), Category.STALE_VERSION);
+            RuntimeInputs.require(instance.getStatus() == InstanceStatus.ACTIVE, Category.INVALID_STATE);
+            RuntimeInputs.require(instance.getLastHistorySequence() >= 4 && instance.getResultKey() == null
+                    && instance.getEndedAt() == null && instance.getEndedBy() == null && instance.getTerminationReason() == null,
+                    Category.HOST_CONFIGURATION);
+            long first = instance.reserveHistorySequence();
+            entityManager.flush(); // Real version-checked aggregate claim precedes children and host effects.
+            var activity = activities.findActiveByInstanceId(instance.getId())
+                    .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
+            entityManager.refresh(activity);
+            var roster = tasks.findPageByActivityId(activity.getId(), 0, PageRequest.of(0, 101));
+            roster.forEach(entityManager::refresh);
+            RuntimeInputs.require(activity.getStatus() == ActivityStatus.ACTIVE
+                    && instance.getCurrentNodeKey().equals(activity.getNodeKey())
+                    && activity.getOutcomeKey() == null && activity.getClosedAt() == null && activity.getClosedBy() == null
+                    && activity.getClosureReason() == null && activity.getActivationSequence() < first
+                    && roster.size() >= 1 && roster.size() <= 100 && roster.size() == activity.getRequiredTaskCount()
+                    && (activity.getCompletionPolicy() == CompletionPolicy.SINGLE ? roster.size() == 1
+                        : activity.getCompletionPolicy() == CompletionPolicy.ALL)
+                    && roster.stream().map(WorkflowTaskEntity::getTaskKey).distinct().count() == roster.size(), Category.HOST_CONFIGURATION);
+            var time = RuntimeInputs.validateContextAndGetOccurredAtUtc(context);
+            RuntimeInputs.require(!time.isBefore(activity.getEnteredAt()), Category.INVALID_INPUT);
+            for (var task : roster) {
+                RuntimeInputs.require(RuntimeInputs.isValidKey(task.getTaskKey()) && task.getActivityId().equals(activity.getId())
+                        && (task.getStatus() == TaskStatus.OPEN || task.getStatus() == TaskStatus.COMPLETED), Category.HOST_CONFIGURATION);
+                if (task.getStatus() == TaskStatus.OPEN) {
+                    RuntimeInputs.require(task.getOutcomeKey() == null && task.getClosedAt() == null
+                            && task.getClosedBy() == null && task.getClosureReason() == null, Category.HOST_CONFIGURATION);
+                } else {
+                    RuntimeInputs.require(activity.getCompletionPolicy() == CompletionPolicy.ALL
+                            && java.util.Objects.equals(task.getOutcomeKey(), activity.getContributionOutcomeKey())
+                            && task.getClosureReason() == io.github.leontecristian.workflow.core.dto.runtime.TaskClosureReason.TASK_OUTCOME
+                            && task.getClosedAt() != null && task.getClosedBy() != null, Category.HOST_CONFIGURATION);
+                    RuntimeInputs.require(!time.isBefore(task.getClosedAt()), Category.INVALID_INPUT);
+                }
+                RuntimeInputs.require(!time.isBefore(task.getCreatedAt()), Category.INVALID_INPUT);
+            }
+            var open = roster.stream().filter(t -> t.getStatus() == TaskStatus.OPEN)
+                    .sorted(java.util.Comparator.comparing(WorkflowTaskEntity::getTaskKey)).toList();
+            RuntimeInputs.require(!open.isEmpty(), Category.HOST_CONFIGURATION);
+            var entered = history.findById(new WorkflowHistoryId(instance.getId(), activity.getActivationSequence()))
+                    .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
+            RuntimeInputs.require("ACTIVITY_ENTERED".equals(entered.getEventType())
+                    && activity.getId().equals(entered.getActivityId()) && entered.getTaskId() == null
+                    && activity.getEnteredAt().equals(entered.getOccurredAt()), Category.HOST_CONFIGURATION);
+            var accepted = history.findActivityFacts(activity.getId(), "TASK_COMPLETED", PageRequest.of(0, 101));
+            RuntimeInputs.require(accepted.size() == roster.size() - open.size()
+                    && accepted.stream().map(f -> f.getTaskId()).distinct().count() == accepted.size(), Category.HOST_CONFIGURATION);
+            for (var fact : accepted) {
+                var task = roster.stream().filter(t -> t.getId().equals(fact.getTaskId())).findFirst()
+                        .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION));
+                RuntimeInputs.require(task.getStatus() == TaskStatus.COMPLETED
+                        && instance.getId().equals(fact.getId().getInstanceId())
+                        && fact.getId().getSequenceNumber() > activity.getActivationSequence()
+                        && fact.getId().getSequenceNumber() < first && fact.getActorKind() == ActorKind.USER
+                        && task.getClosedAt().equals(fact.getOccurredAt()) && task.getClosedBy().equals(fact.getActorRef()),
+                        Category.HOST_CONFIGURATION);
+                var details = json.tree(fact.getDetailsJson());
+                RuntimeInputs.require(task.getOutcomeKey().equals(details.path("outcomeKey").asText()), Category.HOST_CONFIGURATION);
+            }
+            RuntimeProgression.advance(first, open.size() + 1);
+            var definition = pins.load(instance); // No capability lookup or progression on stop.
+            var human = definition.model().humans().get(activity.getNodeKey());
+            RuntimeInputs.require(human != null && human.completionPolicy() == activity.getCompletionPolicy()
+                    && java.util.Objects.equals(human.contributionOutcome(), activity.getContributionOutcomeKey()), Category.HOST_CONFIGURATION);
+            var before = new WorkflowCancellationContext(command, context, RuntimeViews.instance(instance, definition), RuntimeViews.activity(activity));
+            if (effect != null) {
+                try { effect.apply(before); }
+                catch (RuntimeException failure) { throw new WorkflowExecutionException(Category.CANCELLATION_EFFECT_FAILED, failure); }
+            }
+            var recorder = host.recorder();
+            var batch = new RuntimeHistoryBatch(entityManager, json, instance.getId(), instance.getDefinitionVersionId(), command.commandId(), context);
+            batch.beginAt(first - 1);
+            for (var task : open) {
+                task.cancelForInstance(time, context.actorRef());
+                var details = Map.of("taskKey", task.getTaskKey(), "closureReason", "INSTANCE_CANCELLED");
+                batch.next("TASK_CANCELLED", activity.getId(), task.getId(), details, details, (short) 1);
+            }
+            activity.cancel(time, context.actorRef());
+            var closure = Map.of("closureReason", "INSTANCE_CANCELLED");
+            batch.next("ACTIVITY_CANCELLED", activity.getId(), null, closure, closure, (short) 1);
+            batch.next("INSTANCE_CANCELLED", null, null, Map.of("reason", command.reason()),
+                    Map.of("cancelledTaskCount", Integer.toString(open.size())), (short) 1);
+            instance.cancel(command.reason(), batch.last(), time, context.actorRef());
+            entityManager.flush();
+            var result = new WorkflowCancellationResult(command.commandId(), WorkflowOperation.CANCEL_WORKFLOW,
+                    RuntimeViews.instance(instance, definition), RuntimeViews.activity(activity), open.size(), first, batch.last());
+            entityManager.persist(new WorkflowCommandReceiptEntity(command.commandId(), instance.getId(), WorkflowOperation.CANCEL_WORKFLOW.name(),
+                    context.actorKind(), context.actorRef(), json.fingerprint(command, context), RuntimeJson.FINGERPRINT_VERSION,
+                    time, json.evidence(result), (short) 7));
+            entityManager.flush();
+            host.record(recorder, batch.events());
+            entityManager.flush();
+            RuntimeInputs.require(result.instance().equals(RuntimeViews.instance(instance, definition))
+                    && result.activity().equals(RuntimeViews.activity(activity)), Category.HOST_CONFIGURATION);
+            return new WorkflowCancellationCommandResult(false, result);
+        });
     }
 
     @Transactional(propagation = Propagation.MANDATORY)

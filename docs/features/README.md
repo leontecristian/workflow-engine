@@ -1,6 +1,6 @@
 # Feature specifications
 
-[F025 — Workflow cancellation](F025-workflow-cancellation/spec.md) is **READY revision 1**, specification/planning only. The owner selected immediate whole-instance cancellation, retained prior effects/submissions, explicit host authorization and shared UI. Implementation is not yet authorized. See its [plan](F025-workflow-cancellation/plan.md), [tasks](F025-workflow-cancellation/tasks.md) and [record](F025-workflow-cancellation/implementation.md). F024 work remains separate and is not superseded.
+[F025 — Workflow cancellation](F025-workflow-cancellation/spec.md) is **IMPLEMENTED revision 1**: immediate whole-instance cancellation, retained prior effects/submissions, explicit host authorization and shared UI. Scoped checks and remaining integration limits are recorded in the handover. See its [plan](F025-workflow-cancellation/plan.md), [tasks](F025-workflow-cancellation/tasks.md) and [record](F025-workflow-cancellation/implementation.md). F024 work remains separate and is not superseded.
 
 [F024 — Start workflow by family](F024-start-workflow-by-family/spec.md) is **IMPLEMENTED revision 1**. Family key/ID starts select the highest-numbered PUBLISHED version server-side while retaining exact-version starts and receipt-first replay. Focused unit and guarded SQL Server checks pass; see the [plan](F024-start-workflow-by-family/plan.md), [tasks](F024-start-workflow-by-family/tasks.md) and [record](F024-start-workflow-by-family/implementation.md). This is separate from F023 draft/version management.
 

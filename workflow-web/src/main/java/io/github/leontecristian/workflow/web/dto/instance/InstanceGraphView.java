@@ -14,6 +14,7 @@ public record InstanceGraphView(WorkflowInstanceView instance, List<Node> nodes,
     public enum State {
         ACTIVE,
         COMPLETED,
+        CANCELLED,
         PENDING
     }
 

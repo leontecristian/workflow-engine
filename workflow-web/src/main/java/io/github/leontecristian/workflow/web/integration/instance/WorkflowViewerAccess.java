@@ -16,7 +16,8 @@ public interface WorkflowViewerAccess {
 
     /** Ownership summaries and details require an exact task grant. */
     default boolean canReadHistorySummary(WorkflowHistorySummary event) {
-        if (!"TASK_CLAIMED".equals(event.eventType()) && !"TASK_RELEASED".equals(event.eventType()))
+        if (!"TASK_CLAIMED".equals(event.eventType()) && !"TASK_RELEASED".equals(event.eventType())
+                && !"TASK_CANCELLED".equals(event.eventType()))
             return true;
         if (event.activityId() == null || event.taskId() == null) return false;
         var task = new ViewerLinkReference(event.activityId(), event.taskId());

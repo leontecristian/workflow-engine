@@ -11,6 +11,7 @@ import io.github.leontecristian.workflow.core.dto.runtime.ClaimWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
+import io.github.leontecristian.workflow.core.dto.runtime.CancelWorkflow;
 import io.github.leontecristian.workflow.web.integration.runtime.WorkflowRuntimeCommandHost;
 import io.github.leontecristian.workflow.web.service.runtime.RuntimeErrors;
 import io.github.leontecristian.workflow.web.service.runtime.RuntimeWire;
@@ -42,6 +43,26 @@ public class WorkflowRuntimeCommandController {
                 text(b, "outcomeKey", false),
                 text(b, "comment", true),
                 body.result());
+    }
+    @PostMapping("/instances/{instanceId}/cancel")
+    public ResponseEntity<String> cancel(@PathVariable String instanceId, HttpServletRequest request) {
+        var body = wire.body(request, "commandId", "reason");
+        var command = new CancelWorkflow(uuid(body), decimal(instanceId, false), token(request), cancellationReason(body));
+        return wire.response(commands.cancel(command, errors.correlation(request)));
+    }
+
+    @PostMapping("/commands/cancel/replay")
+    public ResponseEntity<String> replayCancellation(HttpServletRequest request) {
+        var body = wire.body(request, "commandId", "instanceId", "reason");
+        var command = new CancelWorkflow(uuid(body), id(body, "instanceId", false), token(request), cancellationReason(body));
+        return wire.response(replay(commands.replayCancellation(command, errors.correlation(request)).orElse(null)));
+    }
+
+    private static String cancellationReason(com.fasterxml.jackson.databind.JsonNode body) {
+        String reason = text(body, "reason", false);
+        if (reason.isBlank() || reason.length() > 2000)
+            throw io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException.invalid();
+        return reason;
     }
     @PostMapping("/instances/{instanceId}/tasks/{taskId}/complete")
     public ResponseEntity<String> complete(
@@ -132,7 +153,7 @@ public class WorkflowRuntimeCommandController {
         return reason;
     }
 
-    private Map<String, Object> replay(WorkflowCommandResult result) {
+    private Map<String, Object> replay(Object result) {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("found", result != null);
         map.put("result", result);

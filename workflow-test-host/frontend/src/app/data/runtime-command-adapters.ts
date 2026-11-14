@@ -1,11 +1,11 @@
 import { DestroyRef, Injectable, inject } from '@angular/core';
 import { CommandRecovery } from '@workflow-engine/ui';
-import type { WorkflowRuntimeCommands, StartEnvelopeAdapter, Envelope, CommandResult, ReplayResult } from '@workflow-engine/ui';
+import type { WorkflowRuntimeCommands, WorkflowCancellation, CancellationResult, CancellationReplay, StartEnvelopeAdapter, Envelope, CommandResult, ReplayResult } from '@workflow-engine/ui';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ConsoleSession } from './console-session';
 import { commandRequest, freezeStartBody } from '../command-buffer';
 @Injectable({providedIn:'root'})
-export class ConsoleRuntimeCommands implements WorkflowRuntimeCommands {
+export class ConsoleRuntimeCommands implements WorkflowRuntimeCommands, WorkflowCancellation {
  private readonly session=inject(ConsoleSession);
  readonly start:StartEnvelopeAdapter={freezeBody:freezeStartBody,
   execute:(envelope,signal)=>this.dispatch<CommandResult>(envelope,false,signal),
@@ -13,6 +13,9 @@ export class ConsoleRuntimeCommands implements WorkflowRuntimeCommands {
  complete(envelope:Envelope,signal:AbortSignal){return this.dispatch<CommandResult>(envelope,false,signal);}
  replayComplete(envelope:Envelope,signal:AbortSignal){return this.dispatch<ReplayResult>(envelope,true,signal);}
  ownership(envelope:Envelope,replay:boolean,signal:AbortSignal){return this.dispatch<CommandResult | ReplayResult>(envelope,replay,signal);}
+ availability(id:string,signal:AbortSignal){return this.session.viewerRead<{allowed:boolean;lockVersion:string}>(`/instances/${encodeURIComponent(id)}/cancellation-availability`,signal);}
+ cancel(envelope:Envelope,signal:AbortSignal){return this.dispatch<CancellationResult>(envelope,false,signal);}
+ replay(envelope:Envelope,signal:AbortSignal){return this.dispatch<CancellationReplay>(envelope,true,signal);}
  private dispatch<T>(envelope:Envelope,replay:boolean,signal:AbortSignal):Promise<T>{
   const request=commandRequest(envelope,replay);
   return this.session.runtimeCommand<T>(request.path,request.body,request.token,typeof request.body==='string',signal);

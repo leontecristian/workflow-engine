@@ -4,6 +4,15 @@ import {loadTs,core,ConsoleSession} from '../../../unit/component-loader.mjs';
 import {CommandBuffer,freezeEnvelope} from '@workflow-engine/ui';
 const {ConsoleRuntimeCommands,ConsoleRuntimeSessionBridge}=loadTs(new URL('./runtime-command-adapters.ts',import.meta.url));
 const completion={kind:'complete',body:{commandId:'12345678-1234-1234-1234-123456789abc',instanceId:'9007199254740993',taskId:'9223372036854775807',outcomeKey:'APPROVE',comment:' exact '},expectedToken:'9007199254740999'};
+test('cancellation availability and mutation/replay preserve exact reason, identifiers and token',async t=>{
+ const calls=[],reads=[];const adapter=service(t,ConsoleRuntimeCommands,[{provide:ConsoleSession,useValue:{runtimeCommand:async(...args)=>{calls.push(args);return {};},viewerRead:async(...args)=>{reads.push(args);return {allowed:true,lockVersion:completion.expectedToken};}}}]);
+ const signal=new AbortController().signal,envelope=freezeEnvelope({kind:'cancel',body:{commandId:completion.body.commandId,instanceId:completion.body.instanceId,reason:'  stop\n😀  '},expectedToken:completion.expectedToken});
+ await adapter.availability(envelope.body.instanceId,signal);await adapter.cancel(envelope,signal);await adapter.replay(envelope,signal);
+ assert.equal(reads[0][0],'/instances/9007199254740993/cancellation-availability');assert.equal(reads[0][1],signal);
+ assert.equal(calls[0][0],'/instances/9007199254740993/cancel');assert.deepEqual({...calls[0][1]},{commandId:envelope.body.commandId,reason:envelope.body.reason});
+ assert.equal(calls[1][0],'/commands/cancel/replay');assert.equal(calls[1][1],envelope.body);
+ for(const call of calls){assert.equal(call[2],envelope.expectedToken);assert.equal(call[4],signal);}
+});
 function service(t,Type,providers=[]){const injector=core.createEnvironmentInjector(providers,null);t.after(()=>injector.destroy());return core.runInInjectionContext(injector,()=>new Type());}
 test('completion dispatch preserves paths, exact body, token and cancellation; start dispatch preserves raw inputs',async t=>{
  const calls=[];const adapter=service(t,ConsoleRuntimeCommands,[{provide:ConsoleSession,useValue:{runtimeCommand:async(...args)=>{calls.push(args);return {};}}}]);const signal=new AbortController().signal;

@@ -1,6 +1,6 @@
 # F025 — Workflow cancellation
 
-**Status:** READY. **Revision:** 1 — 2026-11-14. **Owner:** Workflow project owner. **Constitution:** [v6.6.1 plus the F025 scope clarification](../../constitution.md). Specification and planning only; the owner explicitly requested no implementation yet.
+**Status:** IMPLEMENTED. **Revision:** 1 — 2026-11-14. **Owner:** Workflow project owner. **Constitution:** [v6.6.1 plus the F025 scope clarification](../../constitution.md). Implementation authorized by the owner on 2026-11-14; see the implementation record for actual checks and integration limits.
 
 ## Outcome, decisions and scope
 
@@ -84,4 +84,4 @@ After success/recovery refresh authorized instance, graph and availability; rend
 
 Official comparisons informed scope, not imported runtime guarantees: [Camunda 8.9 operational cancellation](https://docs.camunda.io/docs/8.9/apis-tools/orchestration-cluster-api-rest/specifications/cancel-process-instance/), [Camunda 7.24 modeled cancellation/compensation](https://docs.camunda.org/manual/7.24/reference/bpmn20/events/cancel-and-compensation-events/) and [Temporal cancellation versus termination](https://github.com/temporalio/documentation/blob/main/docs/encyclopedia/workflow/cancellation-and-termination.mdx). Temporal distinguishes cooperative cleanup from termination; our selected stop has no cooperative cancellation handlers. Distributed child/activity cancellation semantics are outside this engine slice.
 
-No material product decision remains open. Concrete DTO/route/evidence choices above are engineering contracts under the accepted scope. READY authorizes neither implementation nor tests in this planning-only task. See [plan](plan.md), [tasks](tasks.md) and [implementation record](implementation.md). APOLO policy, production integration and business withdrawal remain deferred.
+No material product decision remains open. Concrete DTO/route/evidence choices above are engineering contracts under the accepted scope. The owner subsequently authorized implementation and focused verification on 2026-11-14. See [plan](plan.md), [tasks](tasks.md) and [implementation record](implementation.md). APOLO policy, production integration and business withdrawal remain deferred.

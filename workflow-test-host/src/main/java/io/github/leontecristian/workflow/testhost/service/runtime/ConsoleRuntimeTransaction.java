@@ -6,6 +6,8 @@ import io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
+import io.github.leontecristian.workflow.core.dto.runtime.CancelWorkflow;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationCommandResult;
 import io.github.leontecristian.workflow.core.dto.runtime.StartInputs;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
@@ -80,6 +82,21 @@ public class ConsoleRuntimeTransaction {
     @Transactional
     public WorkflowCommandResult claim(ClaimWorkflowTask command, WorkflowCommandContext context) {
         return after(execution.claimTask(command, context));
+    }
+
+    @Transactional
+    public WorkflowCancellationCommandResult cancel(CancelWorkflow command, WorkflowCommandContext context) {
+        var result = execution.cancelWorkflow(command, context);
+        if (!result.replayed() && settings.failRuntimeAfterResult)
+            throw new IllegalStateException("Configured post-result failure");
+        return result;
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<WorkflowCancellationCommandResult> replayCancellation(
+            CancelWorkflow command, WorkflowCommandContext context) {
+        return execution.findCancellationReplay(command, context)
+                .map(result -> new WorkflowCancellationCommandResult(true, result));
     }
 
     @Transactional

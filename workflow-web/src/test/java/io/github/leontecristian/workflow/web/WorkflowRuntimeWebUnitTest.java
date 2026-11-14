@@ -75,6 +75,56 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 
 /** Isolated MVC contexts and doubles; no persistence, migrations or listener. */
 class WorkflowRuntimeWebUnitTest {
+    @Test void cancellationTransportPreservesExactReasonAndUsesLookupOnlyRecovery() throws Exception {
+        try (var c = context(Host.class, Commands.class, WorkflowRuntimeCommandConfiguration.class)) {
+            var host = c.getBean(WorkflowRuntimeCommandHost.class);
+            var mvc = mvc(c);
+            String base = "{\"commandId\":\"12345678-1234-1234-1234-123456789abc\",\"reason\":\" exact \"}";
+            when(host.cancel(any(), eq("corr"))).thenReturn(
+                    new io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationCommandResult(false, null));
+            mvc.perform(post("/custom/instances/9007199254740993/cancel").contentType("application/json")
+                    .header("X-Expected-Lock-Version", "9007199254740994").requestAttr("trusted", "corr").content(base))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.replayed").value(false));
+            var command = new io.github.leontecristian.workflow.core.dto.runtime.CancelWorkflow(
+                    UUID.fromString("12345678-1234-1234-1234-123456789abc"), 9007199254740993L, 9007199254740994L, " exact ");
+            verify(host).cancel(command, "corr");
+            when(host.replayCancellation(command, "corr")).thenReturn(Optional.empty());
+            mvc.perform(post("/custom/commands/cancel/replay").contentType("application/json")
+                    .header("X-Expected-Lock-Version", "9007199254740994").requestAttr("trusted", "corr")
+                    .content(base.substring(0, base.length() - 1) + ",\"instanceId\":\"9007199254740993\"}"))
+                    .andExpect(status().isOk()).andExpect(content().json("{\"found\":false,\"result\":null}"));
+            verify(host).replayCancellation(command, "corr");
+            for (String bad : List.of(base.replace(" exact ", " "), base.replace(" exact ", "x".repeat(2001)),
+                    base.replace(" exact ", "x\",\"reason\":\"y"), base.replace(" exact ", "x\",\"actor\":\"fake"),
+                    base.replace(" exact ", "\\ud800"))) {
+                mvc.perform(post("/custom/instances/1/cancel").contentType("application/json")
+                        .header("X-Expected-Lock-Version", "0").content(bad)).andExpect(status().isBadRequest());
+            }
+            mvc.perform(post("/custom/instances/1/cancel").contentType("application/json")
+                    .header("X-Expected-Lock-Version", "0").content(base + " ".repeat(16 * 1024)))
+                    .andExpect(status().is(413));
+            org.mockito.Mockito.verifyNoMoreInteractions(host);
+        }
+    }
+
+    @Test void cancellationAvailabilityUsesAuthorizedSnapshotAndReadOnlyHostDefaults() throws Exception {
+        try (var c = context(Host.class, Reads.class, WorkflowRuntimeReadConfiguration.class)) {
+            var host = c.getBean(WorkflowRuntimeReadHost.class);
+            var instance = mock(io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView.class);
+            when(instance.status()).thenReturn(io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus.ACTIVE);
+            when(instance.lockVersion()).thenReturn(9007199254740994L);
+            when(host.instance(1)).thenReturn(instance);
+            var mvc = mvc(c);
+            mvc.perform(get("/custom/instances/1/cancellation-availability")).andExpect(status().isOk())
+                    .andExpect(content().json("{\"allowed\":false,\"lockVersion\":\"9007199254740994\"}"));
+            when(host.canCancelWorkflow(instance)).thenReturn(true);
+            mvc.perform(get("/custom/instances/1/cancellation-availability")).andExpect(jsonPath("$.allowed").value(true));
+            when(instance.status()).thenReturn(io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus.CANCELLED);
+            mvc.perform(get("/custom/instances/1/cancellation-availability")).andExpect(jsonPath("$.allowed").value(false));
+            when(host.instance(1)).thenThrow(new WorkflowRuntimeException(404, "NOT_FOUND"));
+            mvc.perform(get("/custom/instances/1/cancellation-availability")).andExpect(status().isNotFound());
+        }
+    }
     @Configuration(proxyBeanMethods=false) @EnableWebMvc
     static class Host extends HostBeans {}
     @Configuration(proxyBeanMethods = false)

@@ -26,7 +26,7 @@
       </button>
     </div>
     @if(diagnosticsEnabled){<console-details [value]="detail()" />}
-    @if(detail()?.status === 'CANCELLED'){<p>This task was cancelled because the review resolved. No submission was recorded for this task.</p>}
+    @if(detail()?.status === 'CANCELLED'){<p>{{detail()?.closureReason === 'INSTANCE_CANCELLED' ? 'This task stopped because the workflow was cancelled.' : 'This task was cancelled because the review resolved.'}} No submission was recorded for this task.</p>}
     @for(task of currentTasks(); track task.id){<a mat-stroked-button [routerLink]="link({kind:'task',id:task.id})">Open current task #{{task.id}}</a>}
     @if(diagnosticsEnabled && commands.buffer.command){<a mat-button [routerLink]="link({kind:'commands'})">Command recovery</a>}</mat-card-content
 ></mat-card>
@@ -93,7 +93,7 @@
   <button mat-stroked-button (click)="ownership('admin-release')" [disabled]="busy() || uncertain || reasonBlank()">Administrative release</button>}
 </mat-card-content></mat-card>}
 <div class="two-column">
-@if(commandProvider){
+@if(commandProvider && detail()?.status !== 'CANCELLED'){
   <mat-card appearance="outlined"
     ><mat-card-header
       ><div>

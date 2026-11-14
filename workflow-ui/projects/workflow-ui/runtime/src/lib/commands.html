@@ -99,7 +99,7 @@
         [value]="commandExecution()?.instance"
       />
       <p class="field-note">
-        Task #{{commandExecution()!.task.id}}: {{commandExecution()!.task.status}}.
+        @if(commandTask(); as task) { Task #{{task.id}}: {{task.status}}. }
         @if(commandExecution()!.operation === 'START_WORKFLOW' && commandExecution()!.activity.completionPolicy === 'ALL') {
           This is the first task in creation order, a representative of the review. Find your authorized current work below.
         }
@@ -108,6 +108,8 @@
         }
         @if(commandExecution()!.instance.status === 'ACTIVE') {
           This command left the workflow waiting at {{commandExecution()!.instance.currentNodeKey}}.
+        } @else if(commandExecution()!.instance.status === 'CANCELLED') {
+          This command stopped the workflow at {{commandExecution()!.instance.currentNodeKey}}.
         } @else {
           This command finished the workflow: {{commandExecution()!.instance.resultKey}}.
         }
@@ -118,9 +120,9 @@
           mat-stroked-button
           [routerLink]="link({kind:'instance',instanceId:commandExecution()!.instance.id})"
           >Read current instance</a
-        ><a mat-button [routerLink]="link({kind:'task',id:commandExecution()!.task.id})"
-          >Command task / submission</a
-        ><a mat-button [routerLink]="link({kind:'instanceTasks',id:commandExecution()!.instance.id})"
+        >@if(commandTask(); as task) {<a mat-button [routerLink]="link({kind:'task',id:task.id})"
+          >Command task / submission</a>}
+        <a mat-button [routerLink]="link({kind:'instanceTasks',id:commandExecution()!.instance.id})"
           >Read authorized current tasks</a
         ><a
           mat-button

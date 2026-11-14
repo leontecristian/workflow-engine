@@ -1,10 +1,10 @@
 # Workflow engine roadmap
 
-**Next feature selection — 2026-11-14:** the owner selected [F025 workflow cancellation](features/F025-workflow-cancellation/spec.md) after agreeing its scope. Its specification and [plan](features/F025-workflow-cancellation/plan.md) are READY; implementation is explicitly not yet authorized. This supersedes the unselected cancellation portion of older priority rows below. F024 status/evidence remains independent, reassignment is deferred and APOLO access is still unavailable.
+**Cancellation delivery — 2026-11-14:** the owner authorized and F025 implements [workflow cancellation](features/F025-workflow-cancellation/spec.md). Its [handover](features/F025-workflow-cancellation/implementation.md) records scoped checks and remaining integration limits. This supersedes the unselected cancellation portion of older priority rows below. F024 status/evidence remains independent, reassignment is deferred and APOLO access is still unavailable.
 
-**Updated:** 2026-11-14 · **Delivery baseline:** F024 family-based start, IMPLEMENTED revision 1 · **Next selected feature:** F025 workflow cancellation, READY revision 1
+**Updated:** 2026-11-14 · **Delivery baseline:** F025 workflow cancellation, IMPLEMENTED revision 1
 
-The agreed direction is **working sandbox → first APOLO booking integration → graphical designer**, with reliability required before production. The sandbox, reusable libraries, ALL collective review, previous-decision comments and draft creation/deletion are implemented. F024 runtime starts by workflow family key or ID are implemented and committed. F025 workflow cancellation is READY for implementation only after explicit owner authorization. APOLO integration waits until the owner has access to APOLO.
+The agreed direction is **working sandbox → first APOLO booking integration → graphical designer**, with reliability required before production. The sandbox, reusable libraries, ALL collective review, previous-decision comments and draft creation/deletion are implemented. F024 runtime starts by workflow family key or ID are implemented and committed. F025 workflow cancellation is implemented under subsequent owner authorization. APOLO integration waits until the owner has access to APOLO.
 
 ## Contents
 
@@ -19,9 +19,9 @@ The agreed direction is **working sandbox → first APOLO booking integration �
 
 ## 1. Current position
 
-**✅ Sandbox + shared libraries + F021–F024 → ⏳ F025 cancellation (READY) → ⏸ APOLO integration → ⏳ Graphical designer**
+**✅ Sandbox + shared libraries + F021–F025 → ⏸ APOLO integration → ⏳ Graphical designer**
 
-### ✅ Implemented — F001–F024
+### ✅ Implemented — F001–F025
 
 | Features | Capability |
 | --- | --- |
@@ -34,22 +34,22 @@ The agreed direction is **working sandbox → first APOLO booking integration �
 | ✅ F022 | **Previous decisions** — pinned visibility, receiving-task context and bounded shared reads |
 | ✅ F023 | **Draft lifecycle** — create next draft, delete drafts and permanently reserve allocated version numbers |
 | ✅ F024 | **Family starts** — highest-PUBLISHED selection by key/family ID, immutable pins and receipt-first replay |
+| ✅ F025 | **Cancellation** — immediate whole-instance stop, host permission, retained evidence and shared recovery/UI |
 
-### ✅ Latest delivery
+### ✅ Family-start delivery
 
 > **F024 start workflow by family — IMPLEMENTED revision 1.**
 >
 > Exclusive key/family-ID/exact-version selectors, highest-numbered PUBLISHED selection and receipt-first replay are delivered in commit `b6dff6b`. The [handover](features/F024-start-workflow-by-family/implementation.md) records 72 focused unit tests, 16 guarded integration tests, reactor packaging and independent review. Existing exact-version callers and the sandbox UI remain compatible. F023 authoring remains separate.
 
-### ⏳ Next selected feature
+### ✅ Workflow cancellation
 
-[F025 — Workflow cancellation](features/F025-workflow-cancellation/spec.md) is **READY revision 1**, with specification and planning committed as `581f758`. It selects immediate whole-instance cancellation, explicit host authorization, retained prior effects/submissions and shared web/UI support. Its [plan](features/F025-workflow-cancellation/plan.md) and [tasks](features/F025-workflow-cancellation/tasks.md) await explicit implementation authorization; cancellation is not implemented. Reassignment, compensation and APOLO withdrawal policy remain outside this slice.
+[F025 — Workflow cancellation](features/F025-workflow-cancellation/spec.md) is **IMPLEMENTED revision 1**. It delivers immediate whole-instance cancellation, explicit host authorization, retained prior effects/submissions and shared web/UI support. Its [handover](features/F025-workflow-cancellation/implementation.md) records focused core/web/UI, SQL and browser evidence. Reassignment, compensation and APOLO withdrawal policy remain outside this slice.
 
 ### ⏳ Still to deliver
 
 | Status | Capability | When |
 | --- | --- | --- |
-| ⏳ READY specification; implementation not authorized | **F025 workflow cancellation** | Await explicit owner instruction, then implement and verify its scoped plan. |
 | ⬜ Deferred | **Administrative reassignment** | Select a separate scope when required by a business scenario. |
 | ⏸ Waiting for access | **APOLO booking integration** | Resume when the owner has access to APOLO. |
 | ⬜ Not implemented | **Graphical designer** | After the first successful APOLO integration. |
@@ -58,13 +58,12 @@ The agreed direction is **working sandbox → first APOLO booking integration �
 
 ## 2. Selected priorities
 
-**Current selection — 2026-11-14:** F021–F024 are delivered within their recorded scope. F025 workflow cancellation is READY revision 1; specification and planning are complete, with implementation awaiting explicit owner authorization. APOLO integration still waits for access. Reassignment and business withdrawal policy remain separate decisions.
+**Current selection — 2026-11-14:** F021–F025 are delivered within their recorded scope. F025 workflow cancellation is IMPLEMENTED revision 1; its handover records focused verification. APOLO integration still waits for access. Reassignment and business withdrawal policy remain separate decisions.
 
 | Order | Work | Completion condition |
 | --- | --- | --- |
-| 1 — READY; awaiting authorization | Deliver F025 workflow cancellation after explicit implementation instruction | T02–T06 complete under its scoped plan, preserving authorization, concurrency, replay, evidence and atomicity with focused shared UI verification. |
-| 2 — waiting for access | Specify and deliver the first APOLO booking integration | Access is available, the business scenario and host compatibility are established, and the integration exit in section 4 is met. Select additional engine operations only as required. |
-| 3 | Deliver the graphical designer in workflow-ui | The authoring exit in section 5 is met after successful first APOLO integration. |
+| 1 — waiting for access | Specify and deliver the first APOLO booking integration | Access is available, the business scenario and host compatibility are established, and the integration exit in section 4 is met. Select additional engine operations only as required. |
+| 2 | Deliver the graphical designer in workflow-ui | The authoring exit in section 5 is met after successful first APOLO integration. |
 
 Production readiness applies before any deployment, regardless of designer timing. Historical verification debt is reconciled when relevant to a selected dependency or integration/release gate, rather than becoming a blanket prerequisite for new work.
 
@@ -72,7 +71,6 @@ Production readiness applies before any deployment, regardless of designer timin
 
 | Capability | Scope and dependencies | Exit condition |
 | --- | --- | --- |
-| **F025 workflow cancellation** — READY revision 1 | Immediate whole-instance stop, retained effects/submissions, explicit host authorization and shared web/UI under the [feature plan](features/F025-workflow-cancellation/plan.md). Implementation awaits owner authorization. | Selected cancellation scenarios pass focused core, shared web/UI, transaction and recovery checks; no partial ALL completion/output is produced. |
 | **Audited administrative reassignment** — exact slice open | Specify a separate lifecycle, authorization, API and evidence contract when selected. | Preserve task identity where required, aggregate concurrency, replay, history and atomicity. |
 | **External variable-update command** — conditional scope | F009 supports start/service replacements, not a standalone external update command. Specify one only when a selected scenario requires it. | Authorized updates follow the agreed whole-value and aggregate concurrency contracts, with focused verification. |
 

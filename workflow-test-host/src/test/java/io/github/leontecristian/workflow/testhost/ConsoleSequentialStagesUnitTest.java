@@ -34,7 +34,7 @@ class ConsoleSequentialStagesUnitTest {
                 3,"REVIEW","Review",null,false,0)));
         var context=mock(ConsoleContext.class); when(context.actor()).thenReturn("manager");
         var wire=new ConsoleWire(); var access=new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskOwnershipAuthorization.class));
-        var controller=new WorkflowRuntimeReadController(reads,definitions,catalog,new ConsoleRuntimeReadHost(reads,access,context),new RuntimeWire(),null,false);
+        var controller=new WorkflowRuntimeReadController(reads,definitions,catalog,new ConsoleRuntimeReadHost(reads,access,context,null),new RuntimeWire(),null,false);
         var instance=mock(WorkflowInstanceView.class); when(instance.id()).thenReturn(1L);
         when(instance.definitionVersionId()).thenReturn(2L); when(instance.currentNodeKey()).thenReturn("PARTNER");
         when(reads.findInstance(1)).thenReturn(Optional.of(instance));

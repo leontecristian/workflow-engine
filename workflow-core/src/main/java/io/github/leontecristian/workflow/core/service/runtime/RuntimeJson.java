@@ -23,6 +23,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.CancelWorkflow;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationResult;
 import io.github.leontecristian.workflow.core.dto.runtime.StartWorkflow;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowExecutionResult;
@@ -169,6 +171,74 @@ public class RuntimeJson {
         if (command.result() != null) request.set("result", tree(command.result().toJson()));
         return fingerprint(WorkflowOperation.COMPLETE_TASK, context, request, fingerprintVersion(command));
     }
+    byte[] fingerprint(CancelWorkflow command, WorkflowCommandContext context) {
+        ObjectNode request = object();
+        request.put("instanceId", Long.toString(command.instanceId()));
+        request.put("expectedLockVersion", Long.toString(command.expectedLockVersion()));
+        request.put("reason", command.reason());
+        return fingerprint(WorkflowOperation.CANCEL_WORKFLOW, context, request);
+    }
+
+    Optional<WorkflowCancellationResult> cancellationReplay(WorkflowCommandReceiptEntity receipt,
+            CancelWorkflow command, WorkflowCommandContext context) {
+        if (receipt == null) return Optional.empty();
+        RuntimeInputs.require(receipt.getActorKind() == context.actorKind()
+                && java.util.Objects.equals(receipt.getActorRef(), context.actorRef())
+                && WorkflowOperation.CANCEL_WORKFLOW.name().equals(receipt.getOperationType()), Category.COMMAND_ID_CONFLICT);
+        RuntimeInputs.require(FINGERPRINT_VERSION.equals(receipt.getFingerprintVersion())
+                && Short.valueOf((short) 7).equals(receipt.getResultSchemaVersion()), Category.UNSUPPORTED_VERSION);
+        RuntimeInputs.require(Arrays.equals(receipt.getRequestFingerprint(), fingerprint(command, context)), Category.COMMAND_ID_CONFLICT);
+        JsonNode stored = tree(receipt.getResultJson());
+        requireTimeStrings(stored);
+        try {
+            WorkflowCancellationResult result = mapper.treeToValue(stored, WorkflowCancellationResult.class);
+            verifyCancellationResult(result, receipt, command);
+            return Optional.of(result);
+        } catch (IOException | IllegalArgumentException failure) {
+            throw new WorkflowExecutionException(Category.HOST_CONFIGURATION);
+        }
+    }
+
+    private void verifyCancellationResult(WorkflowCancellationResult result, WorkflowCommandReceiptEntity receipt,
+            CancelWorkflow command) {
+        RuntimeInputs.require(result != null && command.commandId().equals(receipt.getCommandId())
+                && command.commandId().equals(result.commandId()) && result.operation() == WorkflowOperation.CANCEL_WORKFLOW
+                && receipt.getActorKind() == ActorKind.USER && RuntimeInputs.isValidText(receipt.getActorRef(), 200, 200, true)
+                && result.instance() != null && result.activity() != null, Category.HOST_CONFIGURATION);
+        var instance = result.instance();
+        var activity = result.activity();
+        RuntimeInputs.require(receipt.getInstanceId() != null && instance.id() == receipt.getInstanceId()
+                && instance.id() == command.instanceId() && instance.id() > 0 && instance.definitionVersionId() > 0
+                && RuntimeInputs.isValidKey(instance.definitionKey()) && instance.definitionVersion() > 0
+                && instance.definitionHash() != null && instance.definitionHash().matches("[0-9a-f]{64}")
+                && instance.lockVersion() > command.expectedLockVersion() && command.expectedLockVersion() >= 0
+                && ((instance.businessType() == null && instance.businessId() == null)
+                    || (RuntimeInputs.isValidKey(instance.businessType()) && RuntimeInputs.isValidText(instance.businessId(), 200, 200, true)))
+                && RuntimeInputs.isValidKey(instance.currentNodeKey()) && instance.status() == InstanceStatus.CANCELLED
+                && instance.resultKey() == null && RuntimeInputs.isValidText(instance.terminationReason(), 2000, 2000, true)
+                && instance.terminationReason().equals(command.reason())
+                && validTime(instance.startedAt()) && RuntimeInputs.isValidText(instance.startedBy(), 200, 200, true)
+                && validTime(instance.endedAt()) && !instance.endedAt().isBefore(instance.startedAt())
+                && receipt.getActorRef().equals(instance.endedBy())
+                && receipt.getRecordedAt() != null && instance.endedAt().equals(RuntimeViews.instant(receipt.getRecordedAt()))
+                && activity.id() > 0 && activity.instanceId() == instance.id() && activity.taskTypeId() > 0
+                && instance.currentNodeKey().equals(activity.nodeKey()) && activity.status() == ActivityStatus.CANCELLED
+                && activity.outcomeKey() == null && "INSTANCE_CANCELLED".equals(activity.closureReason())
+                && instance.endedAt().equals(activity.closedAt()) && receipt.getActorRef().equals(activity.closedBy())
+                && validTime(activity.enteredAt()) && !activity.enteredAt().isBefore(instance.startedAt())
+                && !activity.enteredAt().isAfter(activity.closedAt())
+                && (activity.reviewRevisionRef() == null || RuntimeInputs.isValidText(activity.reviewRevisionRef(), 200, 200, true))
+                && (activity.completionPolicy() == CompletionPolicy.SINGLE
+                    ? activity.requiredTaskCount() == 1 && activity.contributionOutcomeKey() == null
+                    : activity.completionPolicy() == CompletionPolicy.ALL && activity.requiredTaskCount() >= 1
+                        && activity.requiredTaskCount() <= 100 && RuntimeInputs.isValidKey(activity.contributionOutcomeKey()))
+                && result.cancelledTaskCount() >= 1 && result.cancelledTaskCount() <= activity.requiredTaskCount()
+                && activity.activationSequence() > 0 && activity.activationSequence() < result.firstHistorySequence()
+                && result.firstHistorySequence() > 1 && result.lastHistorySequence() >= result.firstHistorySequence()
+                && result.lastHistorySequence() - result.firstHistorySequence() == result.cancelledTaskCount() + 1L
+                && instance.lastHistorySequence() == result.lastHistorySequence(), Category.HOST_CONFIGURATION);
+    }
+
     byte[] ownershipFingerprint(WorkflowOperation operation, WorkflowCommandContext context, long instanceId,
             long taskId, long expectedLockVersion, String reason) {
         ObjectNode request = object();

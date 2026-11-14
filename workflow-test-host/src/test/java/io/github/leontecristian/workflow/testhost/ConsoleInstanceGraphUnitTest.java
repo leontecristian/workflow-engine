@@ -316,12 +316,20 @@ class ConsoleInstanceGraphUnitTest {
 
     @Test
     void cancellationIsNotGivenInventedExecutionProgress() {
-        when(context.admin()).thenReturn(true);
-        when(reads.findInstance(ID)).thenReturn(Optional.of(instance(InstanceStatus.CANCELLED, 4)));
+        setup(InstanceStatus.CANCELLED, 4);
         assertEquals(
                 "HOST_CONFIGURATION",
                 assertThrows(WorkflowViewerException.class, () -> graphs.find(ID)).code());
-        verifyNoInteractions(definitions);
+        var cancelled = new java.util.ArrayList<>(facts().subList(0, 4));
+        cancelled.add(fact(5, "TASK_CANCELLED", null, null, null));
+        cancelled.add(fact(6, "ACTIVITY_CANCELLED", null, null, null));
+        cancelled.add(fact(7, "INSTANCE_CANCELLED", null, null, null));
+        when(reads.findInstance(ID)).thenReturn(Optional.of(instance(InstanceStatus.CANCELLED, 7)));
+        when(reads.listHistory(ID, 0, 100)).thenReturn(new WorkflowHistoryPage(cancelled, null));
+        var graph = graphs.find(ID);
+        assertEquals(List.of(State.COMPLETED, State.CANCELLED, State.PENDING),
+                graph.nodes().stream().map(n -> n.state()).toList());
+        assertFalse(graph.edges().stream().filter(e -> e.key().equals("finish")).findFirst().orElseThrow().traversed());
         assertEquals(
                 InstanceStatus.CANCELLED,
                 new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskOwnershipAuthorization.class)).instance(ID).status());

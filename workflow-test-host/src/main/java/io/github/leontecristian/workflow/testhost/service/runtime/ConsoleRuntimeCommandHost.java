@@ -5,6 +5,8 @@ import io.github.leontecristian.workflow.core.dto.runtime.ClaimWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
+import io.github.leontecristian.workflow.core.dto.runtime.CancelWorkflow;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationCommandResult;
 import io.github.leontecristian.workflow.testhost.exception.console.ConsoleException;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
 import io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException;
@@ -27,6 +29,12 @@ public class ConsoleRuntimeCommandHost implements WorkflowRuntimeCommandHost {
             access.task(command.taskId());
             return commands.complete(command, context.runtime(correlation));
         });
+    }
+    @Override public WorkflowCancellationCommandResult cancel(CancelWorkflow command, String correlation) {
+        return policy(() -> commands.cancel(command, context.runtime(correlation)));
+    }
+    @Override public Optional<WorkflowCancellationCommandResult> replayCancellation(CancelWorkflow command, String correlation) {
+        return policy(() -> transactions.replayCancellation(command, context.runtime(correlation)));
     }
     @Override public Optional<WorkflowCommandResult> replayComplete(CompleteWorkflowTask command, String correlation) {
         return policy(() -> {

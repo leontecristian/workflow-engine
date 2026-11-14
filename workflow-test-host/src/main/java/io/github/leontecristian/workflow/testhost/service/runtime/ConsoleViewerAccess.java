@@ -33,7 +33,8 @@ public class ConsoleViewerAccess implements WorkflowViewerAccess {
         }
     }
     @Override public boolean canReadHistorySummary(WorkflowHistorySummary event) {
-        if (!"TASK_CLAIMED".equals(event.eventType()) && !"TASK_RELEASED".equals(event.eventType()))
+        if (!"TASK_CLAIMED".equals(event.eventType()) && !"TASK_RELEASED".equals(event.eventType())
+                && !"TASK_CANCELLED".equals(event.eventType()))
             return true;
         if (event.taskId() == null || event.activityId() == null)
             throw new WorkflowViewerException(500, "HOST_CONFIGURATION");

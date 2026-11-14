@@ -25,13 +25,14 @@ public class WorkflowInstanceViewerService {
         access.requireInstanceRead(id); access.requireHistoryRead(id);
         var page = reads.listHistory(id, after, limit);
         var visible = page.items().stream()
-                .filter(event -> !isOwnershipEvent(event)
+                .filter(event -> !isTaskRestrictedEvent(event)
                         || access.canReadHistorySummary(event))
                 .toList();
         return wire.page(visible, page.nextAfterSequence(), "nextAfterSequence", WorkflowHistorySummary::historySequence);
     }
-    private static boolean isOwnershipEvent(WorkflowHistorySummary event) {
-        return "TASK_CLAIMED".equals(event.eventType()) || "TASK_RELEASED".equals(event.eventType());
+    private static boolean isTaskRestrictedEvent(WorkflowHistorySummary event) {
+        return "TASK_CLAIMED".equals(event.eventType()) || "TASK_RELEASED".equals(event.eventType())
+                || "TASK_CANCELLED".equals(event.eventType());
     }
 
     /** Bound the final escaped envelope, independently of ordinary summary pages. */
@@ -39,7 +40,7 @@ public class WorkflowInstanceViewerService {
         access.requireInstanceRead(id); access.requireHistoryRead(id);
         var event = reads.findHistoryEvent(id, sequence, this::canReadExactTask)
                 .orElseThrow(WorkflowViewerException::missing);
-        if (isOwnershipEvent(event.summary()) && !access.canReadHistorySummary(event.summary()))
+        if (isTaskRestrictedEvent(event.summary()) && !access.canReadHistorySummary(event.summary()))
             throw WorkflowViewerException.missing();
         var summary = event.summary();
         if ("TASK_COMPLETED".equals(summary.eventType()) && summary.detailsSchemaVersion() >= 3

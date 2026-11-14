@@ -15,6 +15,8 @@ public interface WorkflowRuntimeReadHost {
     WorkflowInstanceView instance(long id);
     WorkflowTaskView task(long id);
     WorkflowActivityView activity(long id);
+    /** Advisory permission only; defaults to unavailable for read-only hosts. */
+    default boolean canCancelWorkflow(WorkflowInstanceView instance) { return false; }
     /** Presentation hints only; command authorization is always checked again. */
     default boolean canCompleteTask(WorkflowTaskView task) { return false; }
     default boolean canClaimTask(WorkflowTaskView task) { return false; }

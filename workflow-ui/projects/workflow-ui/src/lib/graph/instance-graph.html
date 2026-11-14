@@ -37,7 +37,7 @@
       @let node = item.node;
       <a [routerLink]="route(node)" [attr.tabindex]="route(node) ? 0 : null" [attr.aria-label]="accessibleName(node)"
          [attr.transform]="'translate(' + item.x + ' ' + item.y + ')'"
-         class="node" [class.active]="node.state==='ACTIVE'" [class.completed]="node.state==='COMPLETED'">
+         class="node" [class.active]="node.state==='ACTIVE'" [class.completed]="node.state==='COMPLETED'" [class.cancelled]="node.state==='CANCELLED'">
         <title>{{node.name}} &middot; {{node.key}} &middot; {{node.type}} &middot; {{label(node)}}</title>
         <rect width="250" height="104" [attr.rx]="node.type==='START' || node.type==='END' ? 48 : node.type==='HUMAN_TASK' ? 16 : 8" />
         <text class="node-type" x="125" y="25" text-anchor="middle">{{nodeType(node)}}</text>

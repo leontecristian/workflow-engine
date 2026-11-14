@@ -29,6 +29,43 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 class ConsoleRuntimeAdaptersUnitTest {
+    @Test void cancellationRecoveryLooksUpAfterRollbackWithoutRepeatingTheMutation() {
+        var tx = mock(ConsoleRuntimeTransaction.class);
+        var access = mock(ConsoleRuntimeAccess.class);
+        var context = mock(ConsoleContext.class);
+        var actor = mock(WorkflowCommandContext.class);
+        when(context.runtime("trusted")).thenReturn(actor);
+        var host = new ConsoleRuntimeCommandHost(new ConsoleRuntimeCoordinator(tx, access), tx, access, context);
+        var command = new io.github.leontecristian.workflow.core.dto.runtime.CancelWorkflow(UUID.randomUUID(), 1, 9, "exact");
+        var result = new io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationCommandResult(true, null);
+        when(tx.cancel(command, actor)).thenThrow(new io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException(
+                io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.CONCURRENT_COMMAND));
+        when(tx.replayCancellation(command, actor)).thenReturn(Optional.of(result));
+        assertThat(host.cancel(command, "trusted")).isSameAs(result);
+        var order = inOrder(tx);
+        order.verify(tx).cancel(command, actor);
+        order.verify(tx).replayCancellation(command, actor);
+        verifyNoMoreInteractions(tx);
+        verifyNoInteractions(access);
+    }
+
+    @Test void cancellationPolicyRequiresBusinessLinkAndAdministratorPermission() {
+        var context = mock(ConsoleContext.class);
+        var requests = mock(io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore.class);
+        var policy = new io.github.leontecristian.workflow.testhost.service.runtime.ConsoleWorkflowCancellationAuthorization(context, requests);
+        var commandContext = new WorkflowCommandContext(io.github.leontecristian.workflow.core.dto.runtime.ActorKind.USER,
+                "reviewer", java.time.Instant.EPOCH, null);
+        var authorization = new io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationAuthorizationContext(
+                1, 2, "SANDBOX_REQUEST", "3", commandContext);
+        when(context.isConsoleActor("reviewer")).thenReturn(true);
+        when(requests.linkedToInstance(1)).thenReturn(true);
+        assertThat(policy.canAccess(authorization)).isTrue();
+        assertThat(policy.canCancel(authorization)).isFalse();
+        when(context.admin()).thenReturn(true);
+        assertThat(policy.canCancel(authorization)).isTrue();
+        when(requests.linkedToInstance(1)).thenReturn(false);
+        assertThat(policy.canAccess(authorization)).isFalse();
+    }
     @Test void completionAndReplayCheckAccessBeforeDispatchWithoutRecoveryMutation() {
         var commands=mock(ConsoleRuntimeCoordinator.class); var tx=mock(ConsoleRuntimeTransaction.class);
         var access=mock(ConsoleRuntimeAccess.class); var context=mock(ConsoleContext.class);
@@ -96,7 +133,7 @@ class ConsoleRuntimeAdaptersUnitTest {
                     }
                     return new WorkflowTaskPage(rows,cursor+50);
                 });
-        var host=new ConsoleRuntimeReadHost(reads,access,context);
+        var host=new ConsoleRuntimeReadHost(reads,access,context,null);
         assertThat(host.listTasks(1,0,50)).isEqualTo(new WorkflowTaskPage(List.of(),500L));
         verify(reads,times(10)).listTasks(org.mockito.ArgumentMatchers.eq(1L),org.mockito.ArgumentMatchers.anyLong(),org.mockito.ArgumentMatchers.eq(50));
     }
@@ -104,7 +141,7 @@ class ConsoleRuntimeAdaptersUnitTest {
         var reads=mock(WorkflowRuntimeQueryService.class);var access=mock(ConsoleRuntimeAccess.class);var context=mock(ConsoleContext.class);
         when(context.actor()).thenReturn("reviewer");var task=mock(WorkflowTaskView.class);
         when(reads.listTasks(1,0,50)).thenReturn(new WorkflowTaskPage(List.of(task),null));
-        var host=new ConsoleRuntimeReadHost(reads,access,context);
+        var host=new ConsoleRuntimeReadHost(reads,access,context,null);
         assertThat(host.listTasks(1,0,50)).isEqualTo(new WorkflowTaskPage(List.of(),null));
         verify(access).instance(1);
         when(reads.listEligibleTasks(org.mockito.ArgumentMatchers.eq("reviewer"),org.mockito.ArgumentMatchers.eq(77L),org.mockito.ArgumentMatchers.eq(1),org.mockito.ArgumentMatchers.any())).thenReturn(new WorkflowTaskPage(List.of(),null));
