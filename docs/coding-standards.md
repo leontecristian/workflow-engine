@@ -1,6 +1,6 @@
 # Coding standards
 
-These standards apply to Java, Maven configuration and related implementation work in `workflow-core` and `workflow-test-host`. They make the [constitution](constitution.md) and [constraints](constraints.md) practical during coding and review. Feature contracts remain in [docs/features/](features/README.md); these standards do not settle open business rules, schemas or persistence mappings.
+These standards apply to Java, Maven configuration and related implementation work in `workflow-core`, `workflow-web` and `workflow-test-host`. They make the [constitution](constitution.md) and [constraints](constraints.md) practical during coding and review. Feature contracts remain in [docs/features/](features/README.md); these standards do not settle open business rules, schemas or persistence mappings.
 
 Prefer clear, maintainable code that implements the agreed behavior. Apply the guidance proportionately: there are no arbitrary method-length limits, mandatory design patterns or requirements for an interface around every class. Preserve existing conventions and keep unrelated cleanup out of a feature change.
 
@@ -21,7 +21,7 @@ Follow the [package structure](package-structure.md): technical layers first, fe
 - Give each class a cohesive purpose. Separate graph/routing logic, application orchestration, persistence, document codecs and host adaptation using packages inside core.
 - Keep methods at a coherent level of abstraction. Extract a method when it names a useful operation, isolates a policy or removes meaningful repetition, rather than merely to meet a line count.
 - Prefer guard clauses for invalid input and unsupported state when they make the normal path easier to follow. Keep branching and loops explicit; avoid nested ternaries and streams with hidden mutations or database calls.
-- Thin host controllers translate requests and responses. Application services coordinate commands. Repositories handle persistence. Keep APOLO business policy in host adapters/services.
+- Thin controllers in `workflow-web` or the host translate requests and responses. Application services coordinate commands; repositories handle persistence. Hosts own API activation, authorization policy, business orchestration and transaction infrastructure.
 - Use the smallest visibility needed. Avoid a global utility class, catch-all service or mutable context object that exposes all engine internals.
 
 ## 3. Use SOLID, DRY and simplicity with judgment
@@ -47,7 +47,7 @@ Follow the [package structure](package-structure.md): technical layers first, fe
 - Define nullability and absence explicitly. Use `Optional` where absence is a legitimate return outcome; avoid nullable `Optional` values or adding `Optional` to entity fields and parameters by default.
 - Return empty collections where the contract means no results; preserve the distinction between absent, empty and invalid values when it matters. Do not return `null` or a success-shaped default to hide a failure.
 - Validate external data at boundaries and enforce domain invariants where state changes. Client validation does not replace server checks; advisory queries do not replace transactional authorization/state checks.
-- Preserve numeric precision with decimal arithmetic and explicit rounding policy. Define date/time types and conversion rules from the specification; do not silently use the workstation timezone or select an unresolved persistence encoding.
+- Preserve exact declared-value decoding, transport and storage. Expression arithmetic follows the specified native SpEL numeric behavior; do not add exact-reference comparisons or reject results solely for precision loss. Define date/time types and conversion rules from the specification; do not silently use the workstation timezone or select an unresolved persistence encoding.
 
 ## 6. Use Lombok deliberately
 
@@ -59,12 +59,12 @@ Follow the [package structure](package-structure.md): technical layers first, fe
 
 ## 7. Treat JPA entities as persistence models
 
-- Keep entities and repositories inside core's persistence boundary. Map to workflow-owned commands/results rather than exposing entities through public integration or HTTP contracts.
+- Keep workflow entities and repositories inside core's persistence boundary; host-owned business and infrastructure persistence stays in the host. Map to workflow-owned commands/results rather than exposing entities through public integration or HTTP contracts.
 - Provide the constructor/access pattern required by the chosen JPA mapping. Do not make entities immutable by applying blanket final fields/classes without considering persistence requirements.
 - Prefer meaningful state-changing methods over unrestricted setters where invariants are involved. Do not let arbitrary callers change published content, task assignment or lifecycle state directly.
 - Choose fetch plans deliberately. Avoid globally eager relationships as a workaround for lazy loading, fetching an entire history to answer a small query, or per-row repository calls in loops. Use projections, pagination and targeted queries where appropriate.
 - Keep cascades and orphan removal explicit and consistent with ownership. A relationship must not accidentally delete immutable definitions, task history or audit records.
-- Keep JPA mappings, database constraints and Liquibase changesets aligned. External APOLO references remain logical identifiers. The concurrency-token mapping is still a specification/verification decision.
+- Keep JPA mappings, database constraints and Liquibase changesets aligned. External APOLO references remain logical identifiers. Use Hibernate-managed `BIGINT lock_version` mapped to Java `Long` with JPA `@Version`. Existing-instance mutations require an early version-checked instance write before child mutations or business effects; results and receipts capture the actual final managed version. Host/provider integration remains subject to verification.
 
 ## 8. Keep transaction behavior understandable
 
