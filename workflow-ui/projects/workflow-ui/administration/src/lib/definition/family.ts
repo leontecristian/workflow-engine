@@ -19,7 +19,7 @@ export class WorkflowDefinitionFamilyComponent extends AdministrationState {
     title: "Workflow family",
     eyebrow: "DEFINITION MANAGEMENT",
     description: "Manage family metadata and browse every retained version.",
-    icon: "workflow",
+    icon: "account_tree",
   };
   rows = signal<VersionSummary[]>([]);
   next: string | null = null;

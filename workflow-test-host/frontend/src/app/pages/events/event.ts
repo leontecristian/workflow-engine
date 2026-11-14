@@ -24,7 +24,7 @@ export class EventPage {
     eyebrow: "DURABLE HANDOFF",
     description:
       "Inspect the immutable event payload and its local delivery record.",
-    icon: "events",
+    icon: "bolt",
   };
   id = "";
   detail = signal<OutboxEvent | null>(null);

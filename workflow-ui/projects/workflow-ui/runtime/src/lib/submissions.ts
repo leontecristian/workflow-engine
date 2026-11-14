@@ -11,7 +11,7 @@ export class WorkflowSubmissionsComponent extends RuntimeState {
     eyebrow: "AUTHORITATIVE EVIDENCE",
     description:
       "Read immutable submissions accepted for the selected activity.",
-    icon: "file",
+    icon: "description",
     listTitle: "Submissions",
     listDescription: "These are accepted facts, not editable task drafts.",
   };}

@@ -4,7 +4,7 @@ import { RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
 import { MatTableModule } from "@angular/material/table";
 import { MatTooltipModule } from "@angular/material/tooltip";
-import { ConsoleIcon } from "@workflow-engine/ui";
+import { MatIconModule } from "@angular/material/icon";
 import { WORKFLOW_VIEWER_NAVIGATION, type ViewerDestination } from "@workflow-engine/ui";
 import { ConsoleStatus } from "@workflow-engine/ui";
 export interface RecordColumn {
@@ -46,7 +46,7 @@ const COLUMNS: Record<string, RecordColumn[]> = {
     MatTooltipModule,
     RouterLink,
     ConsoleStatus,
-    ConsoleIcon,
+    MatIconModule,
   ],
   template: `<div
     class="table-scroll"
@@ -115,15 +115,13 @@ const COLUMNS: Record<string, RecordColumn[]> = {
               [routerLink]="link({kind:'instanceTasks',id:row.id})"
               matTooltip="Instance tasks"
               [attr.aria-label]="'Tasks for instance ' + row.id"
-              ><console-icon name="tasks"
-            /></a>
+              ><mat-icon aria-hidden="true">assignment_turned_in</mat-icon></a>
             <a
               mat-icon-button
               [routerLink]="link({kind:'history',instanceId:row.id})"
               matTooltip="Ordered history"
               [attr.aria-label]="'History for instance ' + row.id"
-              ><console-icon name="history"
-            /></a>
+              ><mat-icon aria-hidden="true">history</mat-icon></a>
           }
           <button
             mat-icon-button
@@ -137,7 +135,7 @@ const COLUMNS: Record<string, RecordColumn[]> = {
             (click)="inspect.emit(row)"
             [disabled]="disabled()"
           >
-            <console-icon name="chevron" />
+            <mat-icon aria-hidden="true" iconPositionEnd>chevron_right</mat-icon>
           </button></td
       ></ng-container>
       <tr mat-header-row *matHeaderRowDef="columnKeys()"></tr>

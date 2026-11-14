@@ -37,6 +37,7 @@ for (const name of [
   "expansion",
   "form-field",
   "input",
+  "icon",
   "list",
   "progress-bar",
   "select",

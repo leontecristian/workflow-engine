@@ -14,7 +14,7 @@
   (inspect)="inspect.emit($event)"
 />}@else{
 <div class="empty-state">
-  <span class="empty-icon"><console-icon [name]="icon()" /></span>
+  <span class="empty-icon"><mat-icon aria-hidden="true">{{icon()}}</mat-icon></span>
   <h3>
     {{kind() === 'my-tasks' ? 'No open tasks assigned to you' : 'No records on
     this page'}}

@@ -41,15 +41,6 @@ textarea {
 a {
   color: #5145a7;
 }
-button console-icon,
-a[mat-button] console-icon,
-a[mat-stroked-button] console-icon,
-a[mat-flat-button] console-icon {
-  margin-right: 7px;
-}
-.mat-mdc-icon-button console-icon {
-  margin: 0;
-}
 mat-sidenav-container.console-shell {
   min-height: 100dvh;
   background: #f6f7fb;
@@ -86,9 +77,10 @@ mat-sidenav-container.console-shell {
   background: #5145a7;
   box-shadow: 0 5px 12px #5145a71c;
 }
-.brand-mark console-icon {
+.brand-mark mat-icon {
   width: 25px;
   height: 25px;
+  font-size: 25px;
 }
 .brand-subtitle {
   display: block;
@@ -126,10 +118,8 @@ mat-sidenav-container.console-shell {
   --mat-list-list-item-label-text-color: #5145a7;
   --mat-list-list-item-label-text-weight: 650;
 }
-.sidebar console-icon[matListItemIcon] {
-  width: 19px;
-  height: 19px;
-  margin-right: 14px;
+.sidebar mat-icon[matListItemIcon] {
+  font-size: 24px;
 }
 .sidebar-footer {
   margin-top: auto;
@@ -141,9 +131,8 @@ mat-sidenav-container.console-shell {
   line-height: 1.7;
   margin: 8px 0 16px;
 }
-.sidebar-footer button {
-  padding-left: 0;
-  color: #687387;
+.sidebar-footer .sign-out-button {
+  padding-inline: 12px;
 }
 .environment-label {
   font-weight: 600;
@@ -178,10 +167,11 @@ mat-sidenav-container.console-shell {
   font-weight: 400;
   color: #8992a3;
 }
-.breadcrumbs console-icon {
+.breadcrumbs mat-icon {
   width: 13px;
   height: 13px;
   color: #b0b7c4;
+  font-size: 13px;
 }
 .breadcrumbs strong {
   color: #5f6b7e;
@@ -240,9 +230,10 @@ mat-sidenav-container.console-shell {
   font-size: 11px;
   margin-bottom: 27px;
 }
-.development-note console-icon {
+.development-note mat-icon {
   width: 14px;
   height: 14px;
+  font-size: 14px;
 }
 .page-heading {
   display: flex;
@@ -280,10 +271,11 @@ h1 {
   color: #69758a;
   white-space: nowrap;
 }
-.page-context console-icon {
+.page-context mat-icon {
   color: #8d82be;
   width: 17px;
   height: 17px;
+  font-size: 17px;
 }
 h2 {
   font-size: 17px;
@@ -572,10 +564,11 @@ table .mat-mdc-row:hover {
   gap: 7px;
   font-size: 10px;
 }
-.form-footer .muted console-icon {
+.form-footer .muted mat-icon {
   width: 15px;
   height: 15px;
   color: #9b93b4;
+  font-size: 15px;
 }
 .lookup-card .mat-mdc-card-header {
   padding-top: 27px;
@@ -591,11 +584,12 @@ table .mat-mdc-row:hover {
   margin-top: 24px;
   color: #69758a;
 }
-.hint-box console-icon {
+.hint-box mat-icon {
   color: #a49bc3;
   width: 17px;
   height: 17px;
   margin-top: 2px;
+  font-size: 17px;
 }
 .hint-box p {
   margin: 0;
@@ -679,9 +673,10 @@ mat-progress-bar {
   background: #f5f3fb;
   color: #a79cc9;
 }
-.empty-icon console-icon {
+.empty-icon mat-icon {
   width: 29px;
   height: 29px;
+  font-size: 29px;
 }
 .empty-state h3 {
   margin: 16px 0 7px;
@@ -696,10 +691,11 @@ mat-progress-bar {
 .empty-state.small {
   padding: 34px 20px;
 }
-.empty-state.small > console-icon {
+.empty-state.small > mat-icon {
   color: #b0a6cb;
   width: 32px;
   height: 32px;
+  font-size: 32px;
 }
 .empty-copy {
   color: #929bac;
@@ -804,7 +800,7 @@ mat-progress-bar {
 .restore-panel .mat-expansion-panel-header-title {
   font-size: 13px;
 }
-.restore-panel console-icon {
+.restore-panel mat-icon {
   margin-right: 10px;
   color: #9d91bf;
 }

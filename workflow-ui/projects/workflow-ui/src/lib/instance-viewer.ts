@@ -25,11 +25,13 @@ import { WorkflowInstanceGraphComponent } from './graph/instance-graph';
       @if(detail(); as d) {
         <mat-card appearance="outlined" class="overview">
           <mat-card-content>
+            <div class="overview-heading">
             <p class="identity">{{messages.instance}} #{{d.id}}</p>
             <h2>{{d.status === 'COMPLETED' ? messages.completed : d.status === 'CANCELLED' ? presentation.cancelled : presentation.active}}
               @if(d.resultKey) { <span class="outcome"> · {{presentation.eventLabel(d.resultKey)}}</span> }
             </h2>
-            <p class="workflow">{{d.definitionKey}} · {{presentation.version}} {{d.definitionVersion}}</p>
+            <p class="workflow">{{d.definitionKey}} · <span class="definition-version">{{presentation.version}} {{d.definitionVersion}}</span></p>
+            </div>
             <dl>
               <div><dt>{{messages.currentPosition}}</dt><dd>{{currentStep(d)}}</dd></div>
               <div><dt>{{presentation.started}}</dt><dd>{{d.startedBy}}</dd><dd><time [attr.datetime]="d.startedAt">{{d.startedAt | date:'medium':'UTC'}} UTC</time></dd></div>
@@ -58,18 +60,21 @@ import { WorkflowInstanceGraphComponent } from './graph/instance-graph';
     </section>
   `, styles:[`
     :host { display:block; min-width:0; }
-    .toolbar, dl { display:flex; flex-wrap:wrap; gap:.75rem 1.75rem; align-items:start; }
-    .toolbar { gap:.5rem; align-items:center; }
-    mat-card { margin-block:1rem; }
-    mat-card-content { padding:1.25rem; }
+    .toolbar { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+    mat-card { margin-block:.75rem; }
+    mat-card-content { padding:1rem; }
+    .overview mat-card-content { display:grid; grid-template-columns:minmax(12rem, .8fr) minmax(0, 2fr); gap:1rem 1.5rem; align-items:start; }
     h2, .identity, .workflow { margin:0 0 .5rem; overflow-wrap:anywhere; }
     .overview h2 { font-size:1.65rem; }
     .identity, dt, time { font-size:.85rem; color:var(--mat-sys-on-surface-variant, #475467); }
     .outcome { font-weight:500; }
-    dl { margin:1rem 0 0; }
+    .definition-version { white-space:nowrap; }
+    dl { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap:.75rem 1.25rem; margin:.75rem 0 0; }
+    .overview dl { margin:0; }
     dd { margin:.2rem 0 0; overflow-wrap:anywhere; }
     summary { cursor:pointer; font-weight:600; }
     pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:32rem; overflow:auto; }
+    @media(max-width: 700px) { .overview mat-card-content { grid-template-columns:1fr; } }
   `]})
 export class WorkflowInstanceViewerComponent extends ViewerReadState {
   readonly detail = signal<InstanceView | null>(null);

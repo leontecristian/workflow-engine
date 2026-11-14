@@ -7,7 +7,7 @@
     fixedInViewport
   >
     <a class="brand" routerLink="/my-tasks" aria-label="Workflow console home"
-      ><span class="brand-mark"><console-icon name="workflow" /></span
+      ><span class="brand-mark"><mat-icon aria-hidden="true">account_tree</mat-icon></span
       ><span
         >Workflow<span class="brand-subtitle">SANDBOX CONSOLE</span></span
       ></a
@@ -20,7 +20,7 @@
           routerLink="/my-tasks"
           routerLinkActive="nav-active"
           (click)="compact() && navigation.close()"
-          ><console-icon matListItemIcon name="tasks" /><span matListItemTitle
+          ><mat-icon aria-hidden="true" matListItemIcon>assignment_turned_in</mat-icon><span matListItemTitle
             >My tasks</span
           ></a
         >
@@ -29,7 +29,7 @@
           routerLink="/commands"
           routerLinkActive="nav-active"
           (click)="compact() && navigation.close()"
-          ><console-icon matListItemIcon name="replay" /><span matListItemTitle
+          ><mat-icon aria-hidden="true" matListItemIcon>replay</mat-icon><span matListItemTitle
             >Command recovery</span
           ></a
         >
@@ -39,7 +39,7 @@
           routerLink="/instances"
           routerLinkActive="nav-active"
           (click)="compact() && navigation.close()"
-          ><console-icon matListItemIcon name="workflow" /><span
+          ><mat-icon aria-hidden="true" matListItemIcon>account_tree</mat-icon><span
             matListItemTitle
             >Instances</span
           ></a
@@ -49,7 +49,7 @@
           routerLink="/definitions"
           routerLinkActive="nav-active"
           (click)="compact() && navigation.close()"
-          ><console-icon matListItemIcon name="workflow" /><span
+          ><mat-icon aria-hidden="true" matListItemIcon>account_tree</mat-icon><span
             matListItemTitle
             >Definitions</span
           ></a
@@ -59,7 +59,7 @@
           routerLink="/catalog"
           routerLinkActive="nav-active"
           (click)="compact() && navigation.close()"
-          ><console-icon matListItemIcon name="catalog" /><span matListItemTitle
+          ><mat-icon aria-hidden="true" matListItemIcon>apps</mat-icon><span matListItemTitle
             >Task types</span
           ></a
         >
@@ -73,7 +73,7 @@
           routerLink="/requests"
           routerLinkActive="nav-active"
           (click)="compact() && navigation.close()"
-          ><console-icon matListItemIcon name="start" /><span matListItemTitle
+          ><mat-icon aria-hidden="true" matListItemIcon>play_arrow</mat-icon><span matListItemTitle
             >Requests & start</span
           ></a
         >
@@ -82,7 +82,7 @@
           routerLink="/audit"
           routerLinkActive="nav-active"
           (click)="compact() && navigation.close()"
-          ><console-icon matListItemIcon name="history" /><span matListItemTitle
+          ><mat-icon aria-hidden="true" matListItemIcon>history</mat-icon><span matListItemTitle
             >Management audit</span
           ></a
         >
@@ -91,7 +91,7 @@
           routerLink="/events"
           routerLinkActive="nav-active"
           (click)="compact() && navigation.close()"
-          ><console-icon matListItemIcon name="events" /><span matListItemTitle
+          ><mat-icon aria-hidden="true" matListItemIcon>bolt</mat-icon><span matListItemTitle
             >Event outbox</span
           ></a
         >
@@ -100,7 +100,7 @@
           routerLink="/inbox"
           routerLinkActive="nav-active"
           (click)="compact() && navigation.close()"
-          ><console-icon matListItemIcon name="inbox" /><span matListItemTitle
+          ><mat-icon aria-hidden="true" matListItemIcon>inbox</mat-icon><span matListItemTitle
             >Local inbox</span
           ></a
         >
@@ -109,7 +109,7 @@
           routerLink="/capabilities"
           routerLinkActive="nav-active"
           (click)="compact() && navigation.close()"
-          ><console-icon matListItemIcon name="settings" /><span
+          ><mat-icon aria-hidden="true" matListItemIcon>settings</mat-icon><span
             matListItemTitle
             >Capabilities</span
           ></a
@@ -120,8 +120,8 @@
     <div class="sidebar-footer">
       <div class="environment-label"><span></span> Local development</div>
       <p>A persistent sandbox for authoring and running workflows.</p>
-      <button mat-button (click)="api.logout()">
-        <console-icon name="logout" /> Sign out
+      <button mat-button class="sign-out-button" (click)="api.logout()">
+        <mat-icon aria-hidden="true">logout</mat-icon> Sign out
       </button>
     </div>
   </mat-sidenav>
@@ -132,10 +132,10 @@
         (click)="navigation.toggle()"
         aria-label="Toggle navigation"
       >
-        <console-icon name="menu" />
+        <mat-icon aria-hidden="true">menu</mat-icon>
       </button>
       <div class="breadcrumbs">
-        <span>Workspace</span><console-icon name="chevron" /><strong
+        <span>Workspace</span><mat-icon aria-hidden="true" iconPositionEnd>chevron_right</mat-icon><strong
           >Workflow console</strong
         >
       </div>
@@ -150,14 +150,14 @@
     >
     <main class="workspace">
       <div class="development-note">
-        <console-icon name="info" /><span
+        <mat-icon aria-hidden="true">info</mat-icon><span
           >Development console. Changes persist in the configured
           database.</span
         >
       </div>
       @if(failing()){
       <div class="feedback feedback-error" role="alert">
-        <console-icon name="info" />
+        <mat-icon aria-hidden="true">info</mat-icon>
         <div>
           <strong>Startup failure mode is active</strong>
           <p>{{flags()}}</p>

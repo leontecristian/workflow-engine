@@ -16,6 +16,10 @@
     "tslib": "2.8.1"
   },
   "exports": {
+    "./styles/icons.css": {
+      "style": "./styles/material-symbols.css",
+      "default": "./styles/material-symbols.css"
+    },
     "./styles/graph.scss": {
       "sass": "./styles/instance-graph.scss"
     }

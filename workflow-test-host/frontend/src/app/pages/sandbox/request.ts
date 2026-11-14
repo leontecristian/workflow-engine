@@ -24,7 +24,7 @@ export class RequestPage {
     eyebrow: "HOST RECORD",
     description:
       "Inspect the request, its sandbox business status and committed workflow link.",
-    icon: "file",
+    icon: "description",
   };
   id = "";
   detail = signal<SandboxRequest | null>(null);

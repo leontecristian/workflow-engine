@@ -1,11 +1,11 @@
 import { Component, input, output } from "@angular/core";
-import { ConsoleIcon } from "@workflow-engine/ui";
+import { MatIconModule } from "@angular/material/icon";
 import { ConsoleRecords } from "./records";
 import { ConsolePagination } from "./pagination";
 @Component({
   selector: "console-collection",
   standalone: true,
-  imports: [ConsoleIcon, ConsoleRecords, ConsolePagination],
+  imports: [MatIconModule, ConsoleRecords, ConsolePagination],
   templateUrl: "./collection.html",
 })
 export class ConsoleCollection {

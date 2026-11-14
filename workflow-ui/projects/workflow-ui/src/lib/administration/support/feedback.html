@@ -1,6 +1,6 @@
 @if (error()) {
 <div class="feedback feedback-error" role="alert">
-  <console-icon name="info" />
+  <mat-icon aria-hidden="true">info</mat-icon>
   <div>
     <strong>Action could not be completed</strong>
     <p>{{ error() }}</p>
@@ -8,7 +8,7 @@
 </div>
 } @if (notice()) {
 <div class="feedback feedback-success" role="status">
-  <console-icon name="check" />
+  <mat-icon aria-hidden="true">check</mat-icon>
   <div>{{ notice() }}</div>
 </div>
 } @if (busy()) {<mat-progress-bar

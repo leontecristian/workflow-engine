@@ -12,7 +12,6 @@ export type { AdministrationPage, DefinitionView, VersionSummary, VersionDetails
 export { rawDocument, prettyDocument } from './lib/administration/support/document-text';
 export { ConsolePageHeader } from './lib/administration/support/page-header';
 export { ConsoleFeedback } from './lib/administration/support/feedback';
-export { ConsoleIcon } from './lib/administration/support/icon';
 export { ConsoleStatus } from './lib/administration/support/status';
 export { ConsoleDetails } from './lib/administration/support/details';
 export * from './lib/runtime/contracts';

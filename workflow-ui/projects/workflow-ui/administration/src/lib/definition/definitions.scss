@@ -1,0 +1,9 @@
+.lookup-card { grid-column: 2; }
+.definitions-pagination { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-top:24px; }
+.definitions-pagination .page-size { width:168px; flex:0 0 168px; }
+mat-dialog-content { min-height: 0; }
+mat-dialog-actions { gap: 8px; }
+mat-dialog-actions .muted { flex: 1 1 15rem; }
+@media (max-width: 760px) {
+  .lookup-card { grid-column: 1; }
+}

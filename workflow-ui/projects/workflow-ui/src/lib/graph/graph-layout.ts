@@ -93,7 +93,8 @@ export function layoutGraph(graph: Pick<InstanceGraph, "nodes" | "edges">): Grap
   return {
     nodes: [...positions.values()].sort((a, b) => a.x - b.x || a.y - b.y),
     edges: routes,
-    width: Math.max(...[...positions.values()].map(p => p.x + WIDTH)) + 170,
+    width: Math.max(...[...positions.values()].map(p => p.x + WIDTH)) +
+      (edges.some(edge => ranks.get(edge.to)! === ranks.get(edge.from)!) ? 170 : MARGIN),
     height: Math.max(...[...positions.values()].map(p => p.y + HEIGHT)) + 40,
   };
 }

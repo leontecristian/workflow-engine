@@ -14,7 +14,7 @@
     ><console-details [value]="detail()" />
     <div class="actions spaced">
       <button mat-stroked-button (click)="redeliver()" [disabled]="busy()">
-        <console-icon name="replay" /> Redeliver locally</button
+        <mat-icon aria-hidden="true">replay</mat-icon> Redeliver locally</button
       ><a mat-button [routerLink]="['/inbox-event',id]">Inspect inbox event</a>
     </div>
     <h3>Immutable event payload</h3>

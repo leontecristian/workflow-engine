@@ -1,0 +1,19 @@
+Material Symbols Outlined font subset
+Copyright Google LLC.
+License: Apache License 2.0 (see material-symbols.LICENSE.txt).
+
+Downloaded 2026-11-14 from Google's official Google Fonts CSS API.
+Fixed axes: optical size 24, weight 400, fill 0, grade 0.
+icon_names=account_tree,add,apps,assignment_turned_in,bolt,check,chevron_right,code,description,expand_more,history,inbox,info,layers,logout,menu,play_arrow,refresh,replay,search,settings,upload,verified_user
+
+CSS source (returns the versioned fonts.gstatic.com font URL):
+https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=account_tree,add,apps,assignment_turned_in,bolt,check,chevron_right,code,description,expand_more,history,inbox,info,layers,logout,menu,play_arrow,refresh,replay,search,settings,upload,verified_user&display=block
+
+Bundled file: fonts/material-symbols-outlined.ttf
+Size: 6656 bytes
+SHA256: d31756652c3f583840a087a0a41e34200d2c5a0d6e8f9f81b88989762daca6e7
+
+The font bytes are unmodified. The local stylesheet replaces the remote URL
+with the bundled relative font path. No runtime Google request is made.
+When adding a new icon name, regenerate this subset through the official
+CSS API with the updated sorted icon_names list and update its hash here.

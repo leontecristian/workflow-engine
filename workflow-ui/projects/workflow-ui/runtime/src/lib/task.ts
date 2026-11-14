@@ -46,7 +46,7 @@ export class WorkflowTaskComponent extends RuntimeState {
     eyebrow: "ASSIGNED WORK",
     description:
       "Inspect the stored assignment, complete your task and read its accepted submission.",
-    icon: "tasks",
+    icon: "assignment_turned_in",
   };}
   detail = signal<TaskView | null>(null);
   contract = signal<TaskContract | null>(null);

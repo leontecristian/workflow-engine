@@ -14,6 +14,7 @@ const { WorkflowDefinitionsComponent: DefinitionsPage } = loadTs(
 );
 const { WorkflowDefinitionFamilyComponent: FamilyPage } = loadTs(new URL("../../../../../../workflow-ui/projects/workflow-ui/administration/src/lib/definition/family.ts", import.meta.url));
 const { WorkflowDefinitionVersionComponent: VersionPage } = loadTs(new URL("../../../../../../workflow-ui/projects/workflow-ui/administration/src/lib/definition/version.ts", import.meta.url));
+
 test("import passes duplicate properties and exact numbers as unchanged raw text", async (t) => {
   let received;
   const { page, router } = component(t, DefinitionsPage, {
@@ -26,6 +27,149 @@ test("import passes duplicate properties and exact numbers as unchanged raw text
   await page.importDraft();
   assert.equal(received, page.document);
   assert.equal(router.calls[0].parts[1], "9007199254740993");
+});
+
+function importDialogDouble() {
+  const closed = new rxjs.Subject();
+  const ref = { disableClose: false, closes: 0, afterClosed: () => closed,
+    close() { this.closes++; closed.next(); closed.complete(); } };
+  const service = { opens: 0, open() { this.opens++; return ref; } };
+  return { ref, service, provider: { provide: MatDialog, useValue: service } };
+}
+
+test("import dialog dismissal retains unfinished text and refuses duplicate opening", t => {
+  const dialog = importDialogDouble();
+  const { page } = component(t, DefinitionsPage, {}, undefined, undefined, [dialog.provider]);
+  page.document = '{"unfinished":9007199254740993}';
+  page.dirty = true;
+  page.error.set('Validation feedback');
+  page.openImport({}); page.openImport({});
+  assert.equal(dialog.service.opens, 1);
+  assert.equal(page.importDialogOpen(), true);
+  page.closeImport();
+  assert.equal(page.importDialogOpen(), false);
+  assert.equal(page.document, '{"unfinished":9007199254740993}');
+  assert.equal(page.dirty, true);
+  assert.equal(page.error(), 'Validation feedback');
+});
+
+test("import dialog protects pending upload, allows file reselection and retains file errors", async t => {
+  const dialog = importDialogDouble();
+  const { page } = component(t, DefinitionsPage, {}, undefined, undefined, [dialog.provider]);
+  page.openImport({});
+  let finish;
+  const input = { value: 'selected.json', files: [{ size: 2, text: () => new Promise(resolve => finish = resolve) }] };
+  const uploading = page.upload({ target: input });
+  assert.equal(input.value, '');
+  assert.equal(dialog.ref.disableClose, true);
+  page.closeImport();
+  assert.equal(dialog.ref.closes, 0);
+  finish('{"n":12500.00}'); await uploading;
+  assert.equal(page.document, '{"n":12500.00}');
+  assert.equal(dialog.ref.disableClose, false);
+  await page.upload({ target: { files: [{ size: 4 * 1024 * 1024 + 1 }] } });
+  assert.match(page.error(), /4 MiB/);
+  assert.equal(page.importDialogOpen(), true);
+  assert.equal(page.document, '{"n":12500.00}');
+});
+
+test("import failure remains in the dialog and accepted import closes before navigation", async t => {
+  const dialog = importDialogDouble();
+  let finish;
+  const { page, router } = component(t, DefinitionsPage, {
+    importDraft() { return new Promise((resolve, reject) => finish = { resolve, reject }); }
+  }, undefined, undefined, [dialog.provider]);
+  page.document = '{"x":1,"x":9007199254740993}'; page.dirty = true;
+  page.openImport({});
+  const failed = page.importDraft();
+  assert.equal(dialog.ref.disableClose, true);
+  page.closeImport(); assert.equal(dialog.ref.closes, 0);
+  finish.reject(new Error('Invalid definition')); await failed;
+  assert.equal(page.error(), 'Invalid definition');
+  assert.equal(page.importDialogOpen(), true);
+  assert.equal(dialog.ref.disableClose, false);
+  assert.equal(page.dirty, true);
+  const accepted = page.importDraft();
+  finish.resolve({ changed: true, after: { id: '9007199254740993' } }); await accepted;
+  assert.equal(page.importDialogOpen(), false);
+  assert.equal(dialog.ref.closes, 1);
+  assert.equal(router.calls[0].parts[1], '9007199254740993');
+});
+
+test("session invalidation and destruction close import dialogs and reject late results", async t => {
+  for (const destroy of [false, true]) {
+    const dialog = importDialogDouble();
+    let finish, signal;
+    const { page, injector, router } = component(t, DefinitionsPage, {
+      importDraft(_text, abortSignal) { signal = abortSignal; return new Promise(resolve => finish = resolve); }
+    }, undefined, undefined, [dialog.provider]);
+    page.document = '{"private":true}';
+    page.openImport({});
+    const pending = page.importDraft();
+    if (destroy) injector.destroy();
+    else { page.sessionScope = null; page.ngOnChanges({ sessionScope: true }); }
+    assert.equal(signal.aborted, true);
+    assert.equal(dialog.ref.closes, 1);
+    assert.equal(page.importDialogOpen(), false);
+    assert.equal(page.document, '');
+    finish({ changed: true, after: { id: '9' } }); await pending;
+    assert.equal(router.calls.length, 0);
+    assert.equal(page.notice(), '');
+  }
+});
+
+test("definition cursor navigation commits page state only after a successful read", async t => {
+  const calls = [];
+  let fail = false, finish;
+  const { page } = component(t, DefinitionsPage, {
+    async listDefinitions(cursor, size) {
+      calls.push({ cursor, size });
+      if (fail) throw new Error('Read failed');
+      if (cursor === 'second') return new Promise(resolve => finish = resolve);
+      return { items: [{ id: 'first' }], nextAfterId: 'second' };
+    }
+  });
+  await page.load();
+  assert.equal(page.pageIndex, 0);
+  const advancing = page.nextPage();
+  await page.nextPage(); await page.previousPage();
+  assert.equal(calls.length, 2);
+  assert.equal(page.pageIndex, 0);
+  finish({ items: [{ id: 'second' }], nextAfterId: 'third' }); await advancing;
+  assert.equal(page.pageIndex, 1);
+  fail = true;
+  await page.nextPage(); await page.previousPage(); await page.load(undefined, true);
+  assert.equal(page.pageIndex, 1);
+  assert.equal(page.rows()[0].id, 'second');
+  assert.equal(page.next, 'third');
+  fail = false;
+  await page.previousPage();
+  assert.equal(page.pageIndex, 0);
+  assert.equal(calls.at(-1).cursor, undefined);
+});
+
+test("definition refresh, page-size change and session replacement reset cursor history", async t => {
+  let fail = false;
+  const { page } = component(t, DefinitionsPage, {
+    async listDefinitions(cursor, size) {
+      if (fail) throw new Error('Read failed');
+      return { items: [{ id: cursor ?? 'first', size }], nextAfterId: cursor ? null : 'second' };
+    }
+  });
+  await page.load(); await page.nextPage();
+  assert.equal(page.pageIndex, 1);
+  fail = true; await page.changePageSize(10);
+  assert.equal(page.pageSize, 50);
+  assert.equal(page.pageIndex, 1);
+  fail = false; await page.changePageSize(10);
+  assert.equal(page.pageSize, 10);
+  assert.equal(page.pageIndex, 0);
+  await page.nextPage(); await page.load(undefined, true);
+  assert.equal(page.pageIndex, 0);
+  await page.nextPage();
+  page.sessionScope = {}; page.ngOnChanges({ sessionScope: true }); await tick();
+  assert.equal(page.pageIndex, 0);
+  assert.equal(page.rows()[0].id, 'first');
 });
 test("version conflict preserves unsaved raw text, dirty state and original token", async (t) => {
   const { page } = component(t, VersionPage, {

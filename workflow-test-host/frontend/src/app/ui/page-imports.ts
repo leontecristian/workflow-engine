@@ -12,7 +12,7 @@ import { MatTooltipModule } from "@angular/material/tooltip";
 import { ConsolePageHeader } from "@workflow-engine/ui";
 import { ConsoleFeedback } from "@workflow-engine/ui";
 import { ConsoleCollection } from "./collection";
-import { ConsoleIcon } from "@workflow-engine/ui";
+import { MatIconModule } from "@angular/material/icon";
 import { ConsoleStatus } from "@workflow-engine/ui";
 import { ConsoleDetails } from "@workflow-engine/ui";
 export const PAGE_IMPORTS = [
@@ -30,7 +30,7 @@ export const PAGE_IMPORTS = [
   ConsolePageHeader,
   ConsoleFeedback,
   ConsoleCollection,
-  ConsoleIcon,
+  MatIconModule,
   ConsoleStatus,
   ConsoleDetails,
 ] as const;

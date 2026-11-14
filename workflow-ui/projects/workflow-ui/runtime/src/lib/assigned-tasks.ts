@@ -10,7 +10,7 @@ export class WorkflowAssignedTasksComponent extends RuntimeState {
     eyebrow: "YOUR WORKSPACE",
     description:
       "Your eligible open tasks, read from the workflow engine.",
-    icon: "tasks",
+    icon: "assignment_turned_in",
     listTitle: "Assigned to you",
     listDescription:
       "Tasks available to your authenticated account appear here.",

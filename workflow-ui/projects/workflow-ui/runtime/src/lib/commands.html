@@ -5,7 +5,7 @@
 />
 
 <div class="hint-box recovery-hint">
-  <console-icon name="shield" />
+  <mat-icon aria-hidden="true">verified_user</mat-icon>
   <p>
     Retry keeps the original UUID, payload and token. Find result performs a
     replay-only lookup. Results below describe the original command, not current
@@ -40,7 +40,7 @@
       </p>
       }@else{
       <div class="empty-state small">
-        <console-icon name="replay" />
+        <mat-icon aria-hidden="true">replay</mat-icon>
         <h3>No command buffered</h3>
         <p>Start or complete a workflow, or restore a saved envelope below.</p>
       </div>
@@ -51,13 +51,13 @@
           (click)="retry(true)"
           [disabled]="!sessionScope || busy() || !commands.buffer.command"
         >
-          <console-icon name="search" /> Find result</button
+          <mat-icon aria-hidden="true">search</mat-icon> Find result</button
         ><button
           mat-stroked-button
           (click)="retry(false)"
           [disabled]="!sessionScope || busy() || !commands.buffer.command"
         >
-          <console-icon name="replay" /> Retry original
+          <mat-icon aria-hidden="true">replay</mat-icon> Retry original
         </button>
       </div>
       }
@@ -148,7 +148,7 @@
         <pre>{{result() | json}}</pre></mat-expansion-panel
       >}@else{
       <div class="empty-state small">
-        <console-icon name="history" />
+        <mat-icon aria-hidden="true">history</mat-icon>
         <h3>No result selected</h3>
         <p>
           Use Find result to look up a receipt without executing a new command.
@@ -161,7 +161,7 @@
 <mat-expansion-panel class="restore-panel"
   ><mat-expansion-panel-header
     ><mat-panel-title
-      ><console-icon name="upload" /> Restore a saved command
+      ><mat-icon aria-hidden="true">upload</mat-icon> Restore a saved command
       envelope</mat-panel-title
     ><mat-panel-description
       >Recover after a full page reload</mat-panel-description

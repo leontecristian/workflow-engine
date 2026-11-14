@@ -14,7 +14,7 @@
         </p>
       </div>
       <button mat-flat-button (click)="dispatch()" [disabled]="busy()">
-        <console-icon name="events" /> Dispatch up to {{pageSize}}
+        <mat-icon aria-hidden="true">bolt</mat-icon> Dispatch up to {{pageSize}}
       </button>
     </div></mat-card-header
   ><mat-card-content
@@ -35,7 +35,7 @@
       [rows]="rows()"
       kind="events"
       label="Event outbox"
-      icon="events"
+      icon="bolt"
       [busy]="busy()"
       [size]="pageSize"
       [next]="next"

@@ -1,8 +1,15 @@
-<console-page-header context="Workflow administration" [meta]="{title:messages.definitionsTitle,eyebrow:meta.eyebrow,description:meta.description,icon:meta.icon}"  /><console-feedback
+<console-page-header context="Workflow administration" [titleActions]="true" [meta]="{title:messages.definitionsTitle,eyebrow:meta.eyebrow,description:meta.description,icon:meta.icon}">
+<button pageTitleAction mat-flat-button (click)="openImport(importForm)" [disabled]="busy()">
+  <mat-icon aria-hidden="true">upload</mat-icon> Import definition
+</button>
+</console-page-header>
+@if (!importDialogOpen()) {
+<console-feedback
   [busy]="busy()"
   [error]="error()"
   [notice]="notice()"
 />
+}
 @if(refreshError()){<p class="feedback feedback-warning" role="alert">{{messages.refreshFailed}} {{refreshError()}}</p>}
 
 <mat-card appearance="outlined" class="library-card">
@@ -16,82 +23,37 @@
         </h2>
         <p>Browse workflow families and inspect their explicit versions.</p>
       </div>
-      <span class="section-symbol"><console-icon name="workflow" /></span></div
+      <button mat-icon-button (click)="load(undefined, true)" [disabled]="busy()"
+        matTooltip="Reload first page" aria-label="Reload first page">
+        <mat-icon aria-hidden="true">refresh</mat-icon>
+      </button></div
   ></mat-card-header>
   <mat-card-content
-    ><console-collection
+    >@if(rows().length) {<console-records
       [rows]="rows()"
       kind="definitions"
       label="Definitions"
-      icon="workflow"
-      [busy]="busy()"
-      [size]="pageSize"
-      [next]="next"
-      (sizeChange)="pageSize=$event;load()"
-      (reload)="load()"
-      (advance)="nextPage()"
+      [disabled]="busy()"
       (inspect)="open($event)"
-  /></mat-card-content>
+    />} @else {
+      <p role="status">{{busy() ? 'Loading the latest records…' : 'No records on this page. Refresh to check again.'}}</p>
+    }
+    <nav class="definitions-pagination" aria-label="Definitions pagination">
+      <mat-form-field appearance="outline" class="page-size" subscriptSizing="dynamic">
+        <mat-label>Rows per page</mat-label>
+        <mat-select #pageSizeSelect [ngModel]="pageSize" (ngModelChange)="changePageSize($event, pageSizeSelect)" [disabled]="busy()">
+          <mat-option [value]="1">1</mat-option><mat-option [value]="10">10</mat-option>
+          <mat-option [value]="50">50</mat-option><mat-option [value]="100">100</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <span aria-live="polite">Page {{pageIndex + 1}} · {{rows().length}} definitions on this page</span>
+      <span class="action-spacer"></span>
+      <button mat-button (click)="previousPage()" [disabled]="busy() || pageIndex === 0">Previous page</button>
+      <button mat-button (click)="nextPage()" [disabled]="busy() || !next">Next page <mat-icon aria-hidden="true" iconPositionEnd>chevron_right</mat-icon></button>
+    </nav>
+  </mat-card-content>
 </mat-card>
 <div class="authoring-grid">
-  <mat-card appearance="outlined" class="import-card">
-    <mat-card-header
-      ><div class="card-heading">
-        <div>
-          <div class="eyebrow">AUTHORING</div>
-          <h2>Import a definition</h2>
-          <p>
-            Upload a JSON file or paste its original text. Existing versions are
-            never overwritten.
-          </p>
-        </div>
-        <console-icon name="upload" /></div
-    ></mat-card-header>
-    <mat-card-content>
-      <div class="upload-bar">
-        <input
-          #workflowFile
-          type="file"
-          tabindex="-1"
-          accept=".json,application/json"
-          (change)="upload($event)"
-          class="visually-hidden"
-        /><button
-          mat-stroked-button
-          (click)="workflowFile.click()"
-          [disabled]="busy()"
-        >
-          <console-icon name="file" /> Choose JSON file</button
-        ><span>UTF-8 JSON · up to 4 MiB</span>
-      </div>
-      <mat-form-field
-        appearance="outline"
-        class="full-width code-field"
-        subscriptSizing="dynamic"
-        ><mat-label>Workflow JSON</mat-label
-        ><textarea
-          matInput
-          [(ngModel)]="document" (ngModelChange)="dirty=true"
-          aria-label="Raw workflow JSON"
-          rows="10"
-          spellcheck="false"
-          placeholder="Paste a definition with an explicit key and version…"
-        ></textarea>
-      </mat-form-field>
-      <div class="form-footer">
-        <span class="muted"
-          ><console-icon name="shield" /> Text is preserved exactly before
-          saving.</span
-        ><button
-          mat-flat-button
-          (click)="importDraft()"
-          [disabled]="busy() || !document"
-        >
-          <console-icon name="plus" /> Import draft
-        </button>
-      </div>
-    </mat-card-content>
-  </mat-card>
   <mat-card appearance="outlined" class="lookup-card">
     <mat-card-header
       ><div class="card-heading">
@@ -123,10 +85,10 @@
         (click)="lookup()"
         [disabled]="busy() || !lookupKey || !lookupVersion"
       >
-        <console-icon name="search" /> Find version
+        <mat-icon aria-hidden="true">search</mat-icon> Find version
       </button>
       <div class="hint-box">
-        <console-icon name="info" />
+        <mat-icon aria-hidden="true">info</mat-icon>
         <p>
           Each workflow family can have multiple versions. Publication freezes
           the version's content.
@@ -135,3 +97,53 @@
     </mat-card-content>
   </mat-card>
 </div>
+
+<ng-template #importForm>
+  <h2 mat-dialog-title>Import a definition</h2>
+  <mat-dialog-content>
+    <p>Upload a JSON file or paste its original text. Existing versions are never overwritten.</p>
+    <console-feedback [busy]="busy()" [error]="error()" [notice]="notice()" />
+      <div class="upload-bar">
+        <input
+          #workflowFile
+          type="file"
+          tabindex="-1"
+          accept=".json,application/json"
+          (change)="upload($event)"
+          class="visually-hidden"
+        /><button
+          mat-stroked-button
+          (click)="workflowFile.click()"
+          [disabled]="busy()"
+        >
+          <mat-icon aria-hidden="true">description</mat-icon> Choose JSON file</button
+        ><span>UTF-8 JSON · up to 4 MiB</span>
+      </div>
+      <mat-form-field
+        appearance="outline"
+        class="full-width code-field"
+        subscriptSizing="dynamic"
+        ><mat-label>Workflow JSON</mat-label
+        ><textarea
+          matInput
+          [(ngModel)]="document" (ngModelChange)="dirty=true"
+          aria-label="Raw workflow JSON"
+          rows="10"
+          spellcheck="false"
+          placeholder="Paste a definition with an explicit key and version…"
+        ></textarea>
+      </mat-form-field>
+  </mat-dialog-content>
+      <mat-dialog-actions align="end">
+        <span class="muted"
+          ><mat-icon aria-hidden="true">verified_user</mat-icon> Text is preserved exactly before
+          saving.</span
+        ><button mat-button (click)="closeImport()" [disabled]="busy()">Cancel</button><button
+          mat-flat-button
+          (click)="importDraft()"
+          [disabled]="busy() || !document"
+        >
+          <mat-icon aria-hidden="true">add</mat-icon> Import draft
+        </button>
+      </mat-dialog-actions>
+</ng-template>

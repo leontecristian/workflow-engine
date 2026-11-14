@@ -4,7 +4,7 @@ import { MatButtonModule } from "@angular/material/button";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatSelectModule } from "@angular/material/select";
 import { MatTooltipModule } from "@angular/material/tooltip";
-import { ConsoleIcon } from "@workflow-engine/ui";
+import { MatIconModule } from "@angular/material/icon";
 @Component({
   selector: "console-pagination",
   standalone: true,
@@ -14,7 +14,7 @@ import { ConsoleIcon } from "@workflow-engine/ui";
     MatFormFieldModule,
     MatSelectModule,
     MatTooltipModule,
-    ConsoleIcon,
+    MatIconModule,
   ],
   templateUrl: "./pagination.html",
 })

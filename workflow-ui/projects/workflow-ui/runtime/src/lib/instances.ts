@@ -10,7 +10,7 @@ export class WorkflowInstancesComponent extends RuntimeState {
     eyebrow: "WORKFLOW MONITORING",
     description:
       "Monitor running workflows, inspect their current step and open their execution evidence.",
-    icon: "workflow",
+    icon: "account_tree",
     listTitle: "Workflow instances",
   };}
   rows = signal<InstanceSummary[]>([]);

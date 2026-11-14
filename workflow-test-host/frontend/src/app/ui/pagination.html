@@ -19,12 +19,12 @@
     matTooltip="Reload first page"
     aria-label="Reload first page"
   >
-    <console-icon name="refresh" /></button
+    <mat-icon aria-hidden="true">refresh</mat-icon></button
   ><button
     mat-stroked-button
     (click)="advance.emit()"
     [disabled]="!next() || busy()"
   >
-    Next page <console-icon name="chevron" />
+    Next page <mat-icon aria-hidden="true" iconPositionEnd>chevron_right</mat-icon>
   </button>
 </div>

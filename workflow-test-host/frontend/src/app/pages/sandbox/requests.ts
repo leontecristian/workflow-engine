@@ -44,7 +44,7 @@ export class RequestsPage {
     eyebrow: "WORKFLOW EXECUTION",
     description:
       "Create a sandbox request and start an explicitly selected published workflow.",
-    icon: "start",
+    icon: "play_arrow",
   };
   rows = signal<SandboxRequestSummary[]>([]);
   next: string | null = null;

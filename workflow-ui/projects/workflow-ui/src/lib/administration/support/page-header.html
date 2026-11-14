@@ -1,12 +1,13 @@
-<header class="page-heading">
-  <div>
+<header class="page-heading" [class.with-title-actions]="titleActions()">
+  <div class="heading-copy">
     <div class="eyebrow">{{ meta().eyebrow }}</div>
     <h1>{{ meta().title }}</h1>
-    <p>{{ meta().description }}</p>
+    <p class="description">{{ meta().description }}</p>
   </div>
   <div class="page-context">
-    <console-icon [name]="meta().icon" /><span
+    <mat-icon aria-hidden="true">{{meta().icon}}</mat-icon><span
       >{{ context() || (admin() ? 'Administrator workspace' : 'Reviewer workspace') }}</span
     >
   </div>
+  <div class="page-actions"><ng-content select="[pageTitleAction]" /></div>
 </header>

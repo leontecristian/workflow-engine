@@ -1,5 +1,6 @@
 import 'zone.js';
-import { Component, Injectable, NgModule, inject } from '@angular/core';
+import { Component, ENVIRONMENT_INITIALIZER, Injectable, NgModule, inject } from '@angular/core';
+import { MatIconRegistry } from '@angular/material/icon';
 import { BrowserModule, platformBrowser } from '@angular/platform-browser';
 import { provideRouter, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { HttpBackend, HttpClient, HttpErrorResponse, HttpEvent, HttpRequest, HttpResponse, provideHttpClient, withInterceptors } from '@angular/common/http';
@@ -143,7 +144,9 @@ class ReadOnlyTask {scope={};}
   mode(value:string){this.state.mode=value;this.scope={};}
 }
 @NgModule({declarations:[App,Destination,ReadOnlyTask],imports:[BrowserModule,RouterLink,RouterOutlet,WorkflowInstanceViewerComponent,WorkflowHistoryComponent,WorkflowHistoryEventComponent,WorkflowDefinitionsComponent,WorkflowTaskComponent,WorkflowCommandsComponent],
-  providers:[FixtureState,Reads,RuntimeReads,RuntimeCommands,Navigation,provideRouter([{path:'alternate/:kind/:id',component:Destination}]),
+  providers:[FixtureState,Reads,RuntimeReads,RuntimeCommands,Navigation,
+    {provide:ENVIRONMENT_INITIALIZER,multi:true,useValue:()=>inject(MatIconRegistry).setDefaultFontSetClass('material-symbols-outlined','mat-ligature-font')},
+    provideRouter([{path:'alternate/:kind/:id',component:Destination}]),
     provideHttpClient(withInterceptors([(request,next)=>next(request.clone({setHeaders:{'X-Consumer':'NgModule'}}))])),
     {provide:WORKFLOW_ADMINISTRATION_API,useFactory:administrationFixture},
     {provide:WORKFLOW_RUNTIME_READS,useExisting:RuntimeReads},{provide:WORKFLOW_RUNTIME_COMMANDS,useExisting:RuntimeCommands},

@@ -28,7 +28,7 @@
       </mat-form-field>
       <p class="field-note">The saved data is read-only. Create another request to test different data.</p>
       <button mat-stroked-button (click)="createRequest()" [disabled]="busy()">
-        <console-icon name="plus" /> Create request
+        <mat-icon aria-hidden="true">add</mat-icon> Create request
       </button></mat-card-content
     ></mat-card
   >
@@ -95,7 +95,7 @@
         (click)="loadPublished(true)"
           [disabled]="busy() || versionsLoading()"
       >
-        Load more versions <console-icon name="chevron" /></button
+        Load more versions <mat-icon aria-hidden="true" iconPositionEnd>chevron_right</mat-icon></button
       >}
       <div class="form-grid">
         <mat-form-field appearance="outline"
@@ -119,7 +119,7 @@
         (click)="start()"
         [disabled]="busy() || versionsLoading() || !familyId || !versionId || !requestId"
       >
-        <console-icon name="start" /> Start new command
+        <mat-icon aria-hidden="true">play_arrow</mat-icon> Start new command
       </button>
       <p class="field-note">
         A deliberate new action gets a new UUID. Original requests stay in
@@ -135,7 +135,7 @@
       [rows]="rows()"
       kind="requests"
       label="Requests & start"
-      icon="start"
+      icon="play_arrow"
       [busy]="busy()"
       [size]="pageSize"
       [next]="next"

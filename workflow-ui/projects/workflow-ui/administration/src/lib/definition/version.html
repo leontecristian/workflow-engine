@@ -31,7 +31,7 @@
     </div>
     @if(dirty){
     <div class="feedback feedback-warning">
-      <console-icon name="info" /><span
+      <mat-icon aria-hidden="true">info</mat-icon><span
         >Unsaved changes. Save explicitly before validation or
         publication.</span
       >
@@ -68,7 +68,7 @@
         (click)="lifecycle('validate')"
         [disabled]="busy() || dirty || detail()?.summary?.status !== 'DRAFT'"
       >
-        <console-icon name="check" /> Validate</button
+        <mat-icon aria-hidden="true">check</mat-icon> Validate</button
       ><button
         mat-stroked-button
         (click)="lifecycle('publish')"
@@ -77,7 +77,7 @@
         Publish version</button
       ><span class="action-spacer"></span
       ><button mat-button (click)="reloadEditor()" [disabled]="busy()">
-        <console-icon name="refresh" /> {{messages.refresh}}</button
+        <mat-icon aria-hidden="true">refresh</mat-icon> {{messages.refresh}}</button
       ><button mat-button (click)="exportDocument()" [disabled]="busy() || !detail()"
         >{{messages.export}}</button
       ><button
@@ -115,7 +115,7 @@
       </p>
       }@else if(!validationReport()){
       <div class="empty-inline">
-        <console-icon name="shield" />
+        <mat-icon aria-hidden="true">verified_user</mat-icon>
         <p>No validation report for this content yet.</p>
       </div>
       }@else{ @if(validationReport()?.detailsOmitted){
@@ -128,7 +128,7 @@
       </div>
       } @if(validationReport()?.valid){
       <div class="empty-inline success-copy">
-        <console-icon name="check" />
+        <mat-icon aria-hidden="true">check</mat-icon>
         <p>Stored content passed its latest validation.</p>
       </div>
       } }

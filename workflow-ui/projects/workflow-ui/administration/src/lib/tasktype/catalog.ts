@@ -19,7 +19,7 @@ export class WorkflowCatalogComponent extends AdministrationState {
     eyebrow: "CONFIGURATION",
     description:
       "Manage the retained task catalog and its authoring selectability.",
-    icon: "catalog",
+    icon: "apps",
   };
   rows = signal<TaskTypeView[]>([]);
   next: string | null = null;

@@ -19,7 +19,7 @@
         </p>
       </div>
       <button mat-stroked-button (click)="load()" [disabled]="busy()">
-        <console-icon name="refresh" /> Refresh instances
+        <mat-icon aria-hidden="true">refresh</mat-icon> Refresh instances
       </button>
     </div></mat-card-header
   >
@@ -42,7 +42,7 @@
       [rows]="rows()"
       kind="instances"
       label="Workflow instances"
-      icon="workflow"
+      icon="account_tree"
       [busy]="busy()"
       [size]="pageSize"
       [next]="next"

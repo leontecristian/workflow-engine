@@ -4,7 +4,7 @@ import { RouterLink } from "@angular/router";
 import { MatButtonModule } from "@angular/material/button";
 import { MatTableModule } from "@angular/material/table";
 import { MatTooltipModule } from "@angular/material/tooltip";
-import { ConsoleIcon } from "@workflow-engine/ui";
+import { MatIconModule } from "@angular/material/icon";
 import { ConsoleStatus } from "@workflow-engine/ui";
 export interface RecordColumn {
   key: string;
@@ -33,7 +33,16 @@ const COLUMNS: Record<string, RecordColumn[]> = {
 @Component({
   selector: "console-records",
   standalone: true,
-  styles: [":host{display:block;overflow:auto}table{width:100%}.record-id,.date-cell small{display:block}.monospace{font-family:monospace}"],
+  host: { "[class.definition-records]": "kind() === 'definitions'" },
+  styles: [":host{display:block;overflow:auto}table{width:100%}.record-id,.date-cell small{display:block}.monospace{font-family:monospace}", `
+    :host(.definition-records) { overflow:visible; min-width:0; }
+    :host(.definition-records) .table-scroll { margin:0; overflow-x:auto; }
+    :host(.definition-records) table { table-layout:fixed; }
+    :host(.definition-records) th, :host(.definition-records) td { overflow-wrap:anywhere; }
+    :host(.definition-records) .mat-column-actions { width:80px; }
+    :host(.definition-records) .record-link { max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+    @media(max-width:600px) { :host(.definition-records) table { min-width:600px; } }
+  `],
   imports: [
     CommonModule,
     MatTableModule,
@@ -41,7 +50,7 @@ const COLUMNS: Record<string, RecordColumn[]> = {
     MatTooltipModule,
     RouterLink,
     ConsoleStatus,
-    ConsoleIcon,
+    MatIconModule,
   ],
   template: `<div
     class="table-scroll"
@@ -100,7 +109,7 @@ const COLUMNS: Record<string, RecordColumn[]> = {
             (click)="inspect.emit(row)"
             [disabled]="disabled()"
           >
-            <console-icon name="chevron" />
+            <mat-icon aria-hidden="true" iconPositionEnd>chevron_right</mat-icon>
           </button></td
       ></ng-container>
       <tr mat-header-row *matHeaderRowDef="columnKeys()"></tr>

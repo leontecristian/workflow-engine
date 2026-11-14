@@ -16,6 +16,7 @@
             "outputPath": "dist/fixture",
             "baseHref": "/",
             "styles": [
+              "node_modules/@workflow-engine/ui/styles/material-symbols.css",
               "src/styles.scss"
             ],
             "optimization": {

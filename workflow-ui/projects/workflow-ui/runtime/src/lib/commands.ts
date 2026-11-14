@@ -9,7 +9,7 @@ export class WorkflowCommandsComponent extends RuntimeState {
  readonly commands=inject(CommandRecovery);readonly commandProvider=inject(WORKFLOW_RUNTIME_COMMANDS,{optional:true});
  readonly viewer=inject(WORKFLOW_VIEWER_READS);
  readonly result=this.commands.result;
- get meta(){return {title:this.messages.commandsTitle,eyebrow:'RELIABLE EXECUTION',description:'Keep the original request intact. Retry explicitly or find its immutable result.',icon:'replay'};}
+ get meta(){return {title:this.messages.commandsTitle,eyebrow:'RELIABLE EXECUTION',description:'Keep the original request intact. Retry explicitly or find its immutable result.',icon: 'replay'};}
  envelope='';currentInstance=signal<InstanceView|null>(null);currentTasks=signal<TaskView[]>([]);private readGeneration=0;
  protected onScope(){this.commands.setScope(this.sessionScope);}
  protected clearContent(){this.envelope='';this.currentInstance.set(null);this.currentTasks.set([]);this.readGeneration++;}

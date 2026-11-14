@@ -23,7 +23,7 @@ export class OutboxPage {
     eyebrow: "OBSERVABILITY",
     description:
       "Inspect durable handoff events and operate the local dispatcher.",
-    icon: "events",
+    icon: "bolt",
   };
   rows = signal<OutboxEvent[]>([]);
   next: string | null = null;

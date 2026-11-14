@@ -22,7 +22,7 @@
         (click)="selectRequest(detail())"
         [disabled]="busy()"
       >
-        Use in start form <console-icon name="chevron" /></button
+        Use in start form <mat-icon aria-hidden="true" iconPositionEnd>chevron_right</mat-icon></button
       >@if(detail()?.instanceId){<a
         mat-stroked-button
         [routerLink]="['/instance',detail()?.instanceId]"

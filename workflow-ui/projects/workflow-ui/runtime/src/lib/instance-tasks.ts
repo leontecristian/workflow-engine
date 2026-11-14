@@ -9,7 +9,7 @@ export class WorkflowInstanceTasksComponent extends RuntimeState {
     title: this.messages.instanceTasksTitle,
     eyebrow: "RUNTIME INSPECTION",
     description: "Inspect open and completed assignments for this instance.",
-    icon: "tasks",
+    icon: "assignment_turned_in",
     listTitle: "Tasks",
     listDescription:
       "Select a task to inspect its contract and accepted submission.",

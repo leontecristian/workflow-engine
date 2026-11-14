@@ -22,7 +22,7 @@
       ><a mat-button [routerLink]="detail() ? link({kind:'activity',id:detail()!.activityId}) : null"
         >Activity #{{detail()?.activityId}}</a
       ><button mat-button (click)="load()" [disabled]="busy()">
-        <console-icon name="refresh" /> Refresh
+        <mat-icon aria-hidden="true">refresh</mat-icon> Refresh
       </button>
     </div>
     @if(diagnosticsEnabled){<console-details [value]="detail()" />}
@@ -175,7 +175,7 @@
         }
       }@else{
       <div class="empty-state small">
-        <console-icon name="file" />
+        <mat-icon aria-hidden="true">description</mat-icon>
         <h3>No accepted submission</h3>
         <p>A submission appears after successful completion.</p>
       </div>

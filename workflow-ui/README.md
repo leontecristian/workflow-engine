@@ -2,6 +2,16 @@
 
 `@workflow-engine/ui` is an Angular 19.2 partial-compiled library. It owns read-only instance metadata, pinned graphs, ordered history, exact events, definition/catalog administration, runtime inspection and optional task/recovery components. It has no application bootstrap, authentication, HTTP providers, routes, translation service or global theme. Angular (including Forms), Router, Material, CDK, RxJS and jsonc-parser are peers.
 
+Icons use direct native `<mat-icon>refresh</mat-icon>` markup and Google Material Symbols names, including page metadata/collection icon inputs. The former `ConsoleIcon` wrapper, semantic aliases and custom SVG registry are removed. The library packages an opt-in local Material Symbols Outlined font stylesheet, selected at weight 400, fill 0, grade 0 and optical size 24; no external runtime font request is needed. Graph visualizations remain separate.
+
+Each host must add `node_modules/@workflow-engine/ui/styles/material-symbols.css` to its Angular build `styles` list and configure the default icon font once before views render, for example in its own environment initializer:
+
+```typescript
+inject(MatIconRegistry).setDefaultFontSetClass('material-symbols-outlined', 'mat-ligature-font');
+```
+
+The library does not change a host's global icon defaults. Both sandbox and NgModule fixture show the host-owned initializer/build wiring; APOLO must integrate it into its own setup and account for its other icon consumers. The stylesheet resolves the packaged relative font automatically through Angular's CSS bundling. The local 6,656-byte fixed-axis font is an official Google Fonts subset for the 23 names listed in `material-symbols.NOTICE.txt`; adding names requires regenerating that subset through the documented official CSS API. License/provenance assets are included. No direct Platform Browser peer is needed by the library after SVG sanitization is removed.
+
 From the repository root, select Node 22.22.0/npm 10.9.4, then:
 
 ```powershell

@@ -15,7 +15,7 @@
             "tsConfig": "tsconfig.json",
             "outputPath": "dist/console",
             "baseHref": "/console/",
-            "styles": ["src/styles.scss"],
+            "styles": ["node_modules/@workflow-engine/ui/styles/material-symbols.css", "src/styles.scss"],
             "optimization": {
               "scripts": true,
               "styles": { "minify": true, "inlineCritical": false },

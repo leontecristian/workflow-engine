@@ -1,6 +1,13 @@
 :host {
   display: block;
 }
+.graph-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 20px;
+}
 .graph-legend {
   display: flex;
   flex-wrap: wrap;
@@ -106,15 +113,15 @@ svg {
   outline-offset: 3px;
 }
 .graph-node-details {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
   gap: 12px;
   list-style: none;
   padding: 0;
   margin: 0;
 }
 .graph-node-details li {
-  flex: 1 1 200px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -149,3 +156,11 @@ svg {
   color: #59667c;
 }
 .graph-controls span { min-width: 42px; text-align: center; }
+
+:host(workflow-instance-graph) {
+  .edge text { font-size: 16px; }
+  .node .node-type { font-size: 13px; }
+  .node .node-name { font-size: 17px; }
+  .node .node-state { font-size: 15px; }
+  .graph-controls { margin-top: 0; }
+}

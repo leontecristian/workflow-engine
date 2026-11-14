@@ -10,7 +10,7 @@ import { destroyedState } from '../../ui/page-state';
 @Component({selector:'console-instance',standalone:true,imports:[...PAGE_IMPORTS,WorkflowInstanceViewerComponent,WorkflowVariablesComponent],templateUrl:'./instance.html'})
 export class InstancePage {
  readonly api=inject(ConsoleApi);readonly session=inject(ConsoleSession);
- readonly meta={title:'Workflow instance',eyebrow:'CURRENT RUNTIME STATE',description:'Inspect the current position and execution evidence.',icon:'workflow'};
+ readonly meta={title:'Workflow instance',eyebrow:'CURRENT RUNTIME STATE',description:'Inspect the current position and execution evidence.',icon: 'account_tree'};
  id='';effects=signal<import('../../data/dtos').Page<import('../../data/dtos').ServiceEffect>|null>(null);effectError=signal('');
  private readonly route=inject(ActivatedRoute);private readonly destroyRef=inject(DestroyRef);private readonly isDestroyed=destroyedState(this.destroyRef);
  ngOnInit(){this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(p=>{this.id=p.get('id')!;this.effects.set(null);this.effectError.set('');});}

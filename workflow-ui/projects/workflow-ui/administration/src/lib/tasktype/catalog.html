@@ -42,14 +42,14 @@
   >
   <mat-card appearance="outlined" class="guidance-card"
     ><mat-card-content
-      ><span class="section-symbol"><console-icon name="catalog" /></span>
+      ><span class="section-symbol"><mat-icon aria-hidden="true">apps</mat-icon></span>
       <h2>A retained catalog</h2>
       <p>
         Disabling authoring selectability does not stop published workflows or
         their pinned instances.
       </p>
       <div class="hint-box">
-        <console-icon name="info" />
+        <mat-icon aria-hidden="true">info</mat-icon>
         <p>
           Catalog entries and executable host capabilities are separate
           prerequisites. The host supplies executable capabilities separately.
@@ -81,7 +81,7 @@
       [rows]="rows()"
       kind="catalog"
       label="Task types"
-      icon="catalog"
+      icon="apps"
       [busy]="busy()"
       [size]="pageSize"
       [next]="next"

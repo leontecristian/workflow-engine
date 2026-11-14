@@ -9,7 +9,7 @@ export class WorkflowActivityComponent extends RuntimeState {
     title: this.messages.activityTitle,
     eyebrow: "RUNTIME INSPECTION",
     description: "Inspect the human activity and its completion state.",
-    icon: "tasks",
+    icon: "assignment_turned_in",
   };}
   detail = signal<ActivityView | null>(null);
   async load() {

@@ -7,14 +7,14 @@ import { MatButtonModule } from "@angular/material/button";
 import { MatListModule } from "@angular/material/list";
 import { MatSidenavModule } from "@angular/material/sidenav";
 import { MatToolbarModule } from "@angular/material/toolbar";
-import { ConsoleIcon } from "@workflow-engine/ui";
+import { MatIconModule } from "@angular/material/icon";
 import { ConsoleApi } from "../data/console-api";
 @Component({
   selector: "app-root",
   standalone: true,
   imports: [
     CommonModule,
-    ConsoleIcon,
+    MatIconModule,
     MatButtonModule,
     MatListModule,
     MatSidenavModule,
