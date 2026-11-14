@@ -54,5 +54,5 @@ These instructions apply throughout this repository. Follow explicit user instru
 
 - Use `rg` for scoped searches. Keep credentials, private runtime data, logs, native DLLs and generated `target/` artifacts out of commits. Avoid machine-specific absolute paths in shared instructions/configuration where relative paths suffice.
 - On Windows, use PowerShell file operations with literal paths; verify resolved targets remain inside the intended workspace before directory moves or recursive deletion.
-- Review the final diff and run `git diff --check`; check newly added documentation too. When committing, stage only intended files and inspect `git diff --cached --check`. Commit or push when the user requests it.
+- Review the final diff and run `git diff --check`; check newly added documentation too. When committing, follow the [commit message structure](docs/coding-standards.md#commit-messages), stage only intended files and inspect `git diff --cached --check`. Commit or push when the user requests it.
 - Finish with what changed, how it was checked, unresolved issues and whether changes are committed. Keep the constitution and feature records current when behavior or decisions change; do not claim planned functionality is implemented.
