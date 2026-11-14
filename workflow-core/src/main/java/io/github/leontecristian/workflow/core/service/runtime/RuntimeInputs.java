@@ -38,7 +38,12 @@ final class RuntimeInputs {
     }
     static void start(StartWorkflow command, WorkflowCommandContext context) {
         context(context);
-        require(command != null && command.commandId() != null && command.definitionVersionId() > 0, Category.INVALID_INPUT);
+        require(command != null && command.commandId() != null, Category.INVALID_INPUT);
+        int selectors = (command.workflowKey() == null ? 0 : 1) + (command.definitionId() == null ? 0 : 1)
+                + (command.definitionVersionId() == null ? 0 : 1);
+        require(selectors == 1 && (command.workflowKey() == null || key(command.workflowKey()))
+                && (command.definitionId() == null || command.definitionId() > 0)
+                && (command.definitionVersionId() == null || command.definitionVersionId() > 0), Category.INVALID_INPUT);
         require((command.businessType() == null && command.businessId() == null)
                 || (key(command.businessType()) && text(command.businessId(), 200, 200, true)), Category.INVALID_INPUT);
         HostStartIntent intent = command.hostStartIntent();

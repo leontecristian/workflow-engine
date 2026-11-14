@@ -7,13 +7,19 @@ import io.github.leontecristian.workflow.testhost.service.sandbox.SandboxStartId
 import java.util.UUID;
 
 public record SandboxStart(
-        UUID commandId, long definitionVersionId, long requestId, long expectedRequestVersion, StartInputs inputs) {
+        UUID commandId, String workflowKey, Long definitionId, Long definitionVersionId,
+        long requestId, long expectedRequestVersion, StartInputs inputs) {
+    public SandboxStart(UUID commandId,long definitionVersionId,long requestId,long expectedRequestVersion,StartInputs inputs) {
+        this(commandId,null,null,definitionVersionId,requestId,expectedRequestVersion,inputs);
+    }
     public SandboxStart(UUID commandId,long definitionVersionId,long requestId,long expectedRequestVersion) {
         this(commandId,definitionVersionId,requestId,expectedRequestVersion,StartInputs.empty());
     }
     public StartWorkflow core() {
         return new StartWorkflow(
                 commandId,
+                workflowKey,
+                definitionId,
                 definitionVersionId,
                 "SANDBOX_REQUEST",
                 Long.toString(requestId),

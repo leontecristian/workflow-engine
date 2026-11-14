@@ -55,6 +55,10 @@ public interface WorkflowDefinitionVersionRepository extends Repository<Workflow
                                              @Param("status") DefinitionStatus status,
                                              @Param("afterId") long afterId, Pageable pageable);
 
+    @Query("select v.id from WorkflowDefinitionVersionEntity v where v.definitionId = :definitionId and v.status = :status order by v.version desc")
+    List<Long> findLatestPublished(@Param("definitionId") long definitionId,
+            @Param("status") DefinitionStatus status, Pageable pageable);
+
     Optional<WorkflowDefinitionVersionEntity> findById(Long id);
 
     Optional<WorkflowDefinitionVersionEntity> findByDefinitionIdAndVersion(Long definitionId, Integer version);

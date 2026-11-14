@@ -20,6 +20,8 @@ final class RuntimePersistenceErrors {
                 case UNSUPPORTED_CANONICALIZATION -> Category.UNSUPPORTED_VERSION;
                 case INVALID_INPUT -> failure.diagnostics().stream().anyMatch(d -> "WF_DEF_UNSUPPORTED_SCHEMA_VERSION".equals(d.code()))
                         ? Category.UNSUPPORTED_VERSION : Category.HOST_CONFIGURATION;
+                case NOT_FOUND -> Category.NOT_FOUND;
+                case NO_PUBLISHED_VERSION -> Category.NO_PUBLISHED_VERSION;
                 case INVALID_STATE -> Category.INVALID_STATE;
                 default -> Category.HOST_CONFIGURATION;
             };
@@ -28,6 +30,10 @@ final class RuntimePersistenceErrors {
     }
     static WorkflowExecutionException translate(RuntimeException failure) {
         for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof jakarta.persistence.PessimisticLockException
+                    || cause instanceof jakarta.persistence.LockTimeoutException
+                    || cause instanceof org.springframework.dao.PessimisticLockingFailureException)
+                return new WorkflowExecutionException(Category.CONCURRENT_COMMAND, failure);
             if (cause instanceof OptimisticLockException || cause instanceof StaleStateException
                     || cause instanceof OptimisticLockingFailureException) return new WorkflowExecutionException(Category.STALE_VERSION, failure);
             if (cause instanceof ConstraintViolationException constraint
@@ -35,6 +41,8 @@ final class RuntimePersistenceErrors {
                 return new WorkflowExecutionException(Category.CONCURRENT_COMMAND, failure);
             if (cause instanceof SQLException sql) {
                 for (SQLException detail = sql; detail != null; detail = detail.getNextException()) {
+                    if (detail.getErrorCode() == 1205 || detail.getErrorCode() == 1222)
+                        return new WorkflowExecutionException(Category.CONCURRENT_COMMAND, failure);
                     if (detail.getErrorCode() == 2627 && detail.getMessage() != null
                             && detail.getMessage().contains("'" + RECEIPT_KEY + "'"))
                         return new WorkflowExecutionException(Category.CONCURRENT_COMMAND, failure);

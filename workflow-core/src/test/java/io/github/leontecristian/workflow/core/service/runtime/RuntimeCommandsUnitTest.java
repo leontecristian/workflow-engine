@@ -113,7 +113,7 @@ class RuntimeCommandsUnitTest {
                     "BEFORE",new MinimalWorkflowDefinition.Service("BEFORE","sandbox.recordQuantity",Map.of("quantity",new Binding("variable","quantity",null)),Map.of("quantity",new Binding("actionOutput","recordedQuantity",null),"recordedQuantity",new Binding("actionOutput","recordedQuantity",null)),1),
                     "AFTER",new MinimalWorkflowDefinition.Service("AFTER","sandbox.recordQuantity",Map.of("quantity",new Binding("variable","recordedQuantity",null)),Map.of("quantity",new Binding("actionOutput","recordedQuantity",null),"recordedQuantity",new Binding("actionOutput","recordedQuantity",null)),3)));
         var definition=new ExecutableDefinition(42,40,"sandbox.serviceReview",1,"ab".repeat(32),DefinitionStatus.PUBLISHED,model);
-        when(definitions.loadForStart(42)).thenReturn(definition); when(definitions.loadPinned(42)).thenReturn(definition);
+        when(definitions.loadForStart(any(StartWorkflow.class))).thenReturn(definition); when(definitions.loadPinned(42)).thenReturn(definition);
         when(catalog.findByCode("SANDBOX_REVIEW")).thenReturn(Optional.of(new TaskTypeView(5,"SANDBOX_REVIEW","Review",null,false,0)));
         var resolver=mock(SingleTaskAssignmentResolver.class); when(host.resolver(anyString())).thenReturn(resolver);
         when(host.resolve(eq(resolver),any())).thenReturn(new SingleAssignmentResult(List.of(new ResolvedTask("review",new TaskAssignmentTarget(shared ? AssignmentTargetKind.GROUP : AssignmentTargetKind.USER, shared ? "finance" : "reviewer"))),null));

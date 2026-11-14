@@ -113,7 +113,7 @@ public class WorkflowExecutionService {
             var replay = startReplay(command, context, fingerprint);
             if (replay.isPresent()) return new WorkflowCommandResult(true, replay.get());
             var recorder = host.recorder();
-            var definition = definitions.loadForStart(command.definitionVersionId());
+            var definition = definitions.loadForStart(command);
             definitions.requireCapabilities(definition, true);
             var model = definition.model();
             var acceptedInputs=RuntimeValueBindings.inputs(model,inputs,json);
@@ -146,7 +146,7 @@ public class WorkflowExecutionService {
             RuntimeInputs.require("HUMAN_TASK".equals(paused.type()),Category.HOST_CONFIGURATION);
             var stage = enterStage(definition,instance,paused.key(),command.commandId(),context,batch,state,submissions);
             instance.waitAt(paused.key(),batch.last());
-            return finish(command.commandId(), WorkflowOperation.START_WORKFLOW, context, fingerprint, definition, instance, stage.activity(), stage.task(), 1, batch, recorder, json.fingerprintVersion(inputs));
+            return finish(command.commandId(), WorkflowOperation.START_WORKFLOW, context, fingerprint, definition, instance, stage.activity(), stage.task(), 1, batch, recorder, json.fingerprintVersion(command));
         });
     }
 
@@ -539,8 +539,9 @@ public class WorkflowExecutionService {
     }
 
     private Optional<WorkflowExecutionResult> startReplay(StartWorkflow command, WorkflowCommandContext context, byte[] fingerprint) {
-        return replay(command.commandId(), WorkflowOperation.START_WORKFLOW, context, fingerprint).map(result -> {
-            RuntimeInputs.require(result.instance().definitionVersionId() == command.definitionVersionId()
+        return json.replay(receipts.findById(command.commandId()).orElse(null), command.commandId(),
+                WorkflowOperation.START_WORKFLOW, context, fingerprint, json.fingerprintVersion(command)).map(result -> {
+            RuntimeInputs.require((command.definitionVersionId() == null || result.instance().definitionVersionId() == command.definitionVersionId())
                     && java.util.Objects.equals(result.instance().businessType(), command.businessType())
                     && java.util.Objects.equals(result.instance().businessId(), command.businessId()), Category.HOST_CONFIGURATION);
             return result;

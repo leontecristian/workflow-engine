@@ -51,7 +51,8 @@ class ConsoleRuntimeUnitTest {
     void losingCommandUsesOneReplayLookupWithOriginalInputAndDoesNotRetryMutation() {
         var tx = mock(ConsoleRuntimeTransaction.class);
         var coordinator = new ConsoleRuntimeCoordinator(tx, mock(ConsoleRuntimeAccess.class));
-        var command = new SandboxStart(UUID.randomUUID(), 1, 2, 0);
+        var command = new SandboxStart(UUID.randomUUID(), "Booking.review", null, null, 2, 0,
+                io.github.leontecristian.workflow.core.dto.runtime.StartInputs.empty());
         var context =
                 new WorkflowCommandContext(ActorKind.USER, "admin", Instant.EPOCH, "correlation");
         var conflict =

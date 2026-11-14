@@ -1,0 +1,7 @@
+# Tasks — F024 start workflow by family
+
+- [x] **T01 — Analysis/specification.** Inspect current contracts, host orchestration, lifecycle locks and receipt formats; create [spec revision 1](spec.md) and [plan](plan.md) with explicit concurrency, authorization and compatibility rules.
+- [x] **T02 — Core implementation (P01/P02; R01–04).** Reconcile final F023 shared-file baseline, add exclusive selectors and compatible fingerprints/replay, implement locked latest-publication selection and sanitized errors. Done when focused core unit checks pass and exact-version construction/receipts remain compatible. Depends on T01.
+- [x] **T03 — Sandbox API integration (P03; R01/R05).** Carry selectors unchanged through transport, start and recovery; preserve policy, saved inputs, links and error mapping. Document key-first integration. Done when focused host unit checks pass. Depends on T02's contract; parser tests can be prepared independently.
+- [x] **T04 — Persistence/concurrency verification (P04; AC02–06).** Add/run guarded focused integration coverage for committed selection, lifecycle races, stale contexts, replay, duplicates and rollback. Record commands/results/gaps; NOT RUN is not completion. Depends on T02/T03.
+- [x] **T05 — Handover (P04; AC01–07).** Reconcile behavior, code and docs; inspect intended diff, packaging evidence and whitespace; update feature index/status and implementation record with process state and any open gates. Depends on T02–T04. No automatic commit.

@@ -96,7 +96,7 @@ class ConsoleScalarServiceUnitTest {
         assertEquals("{\"amount\":9007199254740993.00,\"exponent\":1E+2,\"values\":[null,1.00]}",value.toJson());
         assertEquals("{\"value\":"+value.toJson()+"}",wire.json(Map.of("value",value)));
         String empty=prefix+"}}";
-        String maximum=empty+" ".repeat(2*1024*1024-empty.length());
+        String maximum=empty+" ".repeat(io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue.MAX_RAW_UTF8_BYTES-empty.length());
         assertDoesNotThrow(()->controller.start(request(maximum)));
         assertEquals(413,assertThrows(ConsoleException.class,()->controller.start(request(maximum+" "))).status());
     }

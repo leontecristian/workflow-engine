@@ -42,6 +42,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class RuntimeJson {
     static final String FINGERPRINT_VERSION = "wf-runtime-request-v3";
+    private static final String FAMILY_FINGERPRINT_VERSION = "wf-runtime-family-start-v1";
     private static final String RESULT_FINGERPRINT_VERSION = "wf-runtime-request-v4";
     static final int MAP_UTF16_BYTES = 10 * 1024 * 1024;
     static final int MAP_UTF8_BYTES = 15 * 1024 * 1024;
@@ -139,21 +140,24 @@ public class RuntimeJson {
         try { return mapper.readTree(source); }
         catch (IOException failure) { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION); }
     }
-    String fingerprintVersion(StartInputs inputs) {
-        return FINGERPRINT_VERSION;
+    String fingerprintVersion(StartWorkflow command) {
+        return command.definitionVersionId() == null ? FAMILY_FINGERPRINT_VERSION : FINGERPRINT_VERSION;
     }
     byte[] fingerprint(StartWorkflow command, WorkflowCommandContext context) {
         return fingerprint(command,StartInputs.empty(),context);
     }
     byte[] fingerprint(StartWorkflow command, StartInputs inputs, WorkflowCommandContext context) {
-        ObjectNode request = object(); request.put("definitionVersionId", Long.toString(command.definitionVersionId()));
+        ObjectNode request = object();
+        if (command.definitionVersionId() != null) request.put("definitionVersionId", Long.toString(command.definitionVersionId()));
+        else if (command.workflowKey() != null) request.put("workflowKey", command.workflowKey());
+        else request.put("definitionId", Long.toString(command.definitionId()));
         request.put("businessType", command.businessType()); request.put("businessId", command.businessId());
         if (command.hostStartIntent() == null) request.putNull("hostStartIntent");
         else request.set("hostStartIntent", mapper.valueToTree(command.hostStartIntent()));
         {
             var raw=object(); inputs.values().forEach((k,v) -> raw.set(k,RuntimeValueBindings.token(v))); request.set("inputs",raw);
         }
-        return fingerprint(WorkflowOperation.START_WORKFLOW, context, request,fingerprintVersion(inputs));
+        return fingerprint(WorkflowOperation.START_WORKFLOW, context, request,fingerprintVersion(command));
     }
     String fingerprintVersion(CompleteWorkflowTask command) {
         return command.result() == null ? FINGERPRINT_VERSION : RESULT_FINGERPRINT_VERSION;
@@ -197,7 +201,8 @@ public class RuntimeJson {
         boolean historical = Short.valueOf((short) 3).equals(version) || Short.valueOf((short) 4).equals(version);
         String storedFingerprintVersion = receipt.getFingerprintVersion();
         boolean hasResult = operation == WorkflowOperation.COMPLETE_TASK && RESULT_FINGERPRINT_VERSION.equals(storedFingerprintVersion);
-        RuntimeInputs.require(FINGERPRINT_VERSION.equals(storedFingerprintVersion) || hasResult, Category.UNSUPPORTED_VERSION);
+        RuntimeInputs.require(FINGERPRINT_VERSION.equals(storedFingerprintVersion) || hasResult
+                || operation == WorkflowOperation.START_WORKFLOW && FAMILY_FINGERPRINT_VERSION.equals(storedFingerprintVersion), Category.UNSUPPORTED_VERSION);
         RuntimeInputs.require(fingerprintVersion.equals(storedFingerprintVersion), Category.COMMAND_ID_CONFLICT);
         RuntimeInputs.require((Short.valueOf((short) 5).equals(version) || Short.valueOf((short) 6).equals(version)) || historical && !hasResult && !ownershipOperation(operation),
                 Category.UNSUPPORTED_VERSION);

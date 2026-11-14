@@ -55,12 +55,27 @@ public class ConsoleRuntimeController {
                 wire.body(
                         r, io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue.MAX_RAW_UTF8_BYTES,
                         "commandId",
+                        "workflowKey",
+                        "definitionId",
                         "definitionVersionId",
                         "requestId",
                         "expectedRequestVersion", "inputs");
+        int selectors = (b.has("workflowKey") ? 1 : 0)
+                + (b.has("definitionId") ? 1 : 0)
+                + (b.has("definitionVersionId") ? 1 : 0);
+        if (selectors != 1) throw ConsoleException.invalid();
+        String workflowKey = null;
+        if (b.has("workflowKey")) {
+            var key = b.get("workflowKey");
+            if (!key.isTextual() || !key.textValue().matches("[A-Za-z][A-Za-z0-9._-]{0,99}"))
+                throw ConsoleException.invalid();
+            workflowKey = key.textValue();
+        }
         return new SandboxStart(
                 uuid(b),
-                id(b, "definitionVersionId", false),
+                workflowKey,
+                b.has("definitionId") ? id(b, "definitionId", false) : null,
+                b.has("definitionVersionId") ? id(b, "definitionVersionId", false) : null,
                 id(b, "requestId", false),
                 id(b, "expectedRequestVersion", true), inputs(b));
     }

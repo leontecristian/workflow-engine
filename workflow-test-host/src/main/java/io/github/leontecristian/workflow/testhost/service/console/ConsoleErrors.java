@@ -61,6 +61,7 @@ public class ConsoleErrors {
                         case CONFLICT, STALE_VERSION,
                                         CONCURRENT_COMMAND,
                                         COMMAND_ID_CONFLICT,
+                                        NO_PUBLISHED_VERSION,
                                         INVALID_STATE ->
                                 409;
                         case LIMIT_EXCEEDED, UNINITIALIZED_VARIABLE, SUBMISSION_UNAVAILABLE, ROUTE_NOT_FOUND,
@@ -74,7 +75,7 @@ public class ConsoleErrors {
                     switch (e.category()) {
                         case INVALID_INPUT -> 400;
                         case NOT_FOUND -> 404;
-                        case CONFLICT, INVALID_STATE -> 409;
+                        case CONFLICT, INVALID_STATE, NO_PUBLISHED_VERSION -> 409;
                         default -> 500;
                     };
         } else if (failure instanceof TaskTypeCatalogException e) {

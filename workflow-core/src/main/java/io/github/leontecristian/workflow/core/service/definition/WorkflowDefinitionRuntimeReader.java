@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Narrow core-to-core boundary. No publication checks, authoring selectability or validation writes. */
+/** Narrow core-to-core runtime boundary; lifecycle selection participates in the host transaction. */
 @Service
 @Transactional(readOnly = true)
 public class WorkflowDefinitionRuntimeReader {
@@ -36,10 +36,29 @@ public class WorkflowDefinitionRuntimeReader {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public ExecutableDefinition loadForStart(long versionId) {
-        long familyId = versions.findFamilyId(versionId).orElseThrow(this::corrupt);
-        var family = families.lockById(familyId).orElseThrow(this::corrupt);
+        return loadForStart(new io.github.leontecristian.workflow.core.dto.runtime.StartWorkflow(null, versionId, null, null, null));
+    }
+
+    /** Select once under the lifecycle lock; callers validate selectors before entry. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ExecutableDefinition loadForStart(io.github.leontecristian.workflow.core.dto.runtime.StartWorkflow command) {
+        Long versionId = command.definitionVersionId();
+        boolean exactSelection = versionId != null;
+        long familyId;
+        if (versionId != null) familyId = versions.findFamilyId(versionId).orElseThrow(this::notFound);
+        else if (command.definitionId() != null) familyId = command.definitionId();
+        else familyId = families.findByWorkflowKey(command.workflowKey()).orElseThrow(this::notFound).getId();
+        var family = families.lockById(familyId).orElseThrow(this::notFound);
         entityManager.refresh(family, LockModeType.PESSIMISTIC_WRITE);
-        WorkflowDefinitionVersionEntity version = versions.findById(versionId).orElseThrow(this::corrupt);
+        if (versionId == null) {
+            var candidates = versions.findLatestPublished(familyId, DefinitionStatus.PUBLISHED,
+                    org.springframework.data.domain.PageRequest.of(0, 1));
+            if (candidates.isEmpty()) throw new WorkflowDefinitionException(
+                    WorkflowDefinitionException.Category.NO_PUBLISHED_VERSION, List.of());
+            versionId = candidates.get(0);
+        }
+        WorkflowDefinitionVersionEntity version = versions.findById(versionId)
+                .orElseThrow(() -> exactSelection ? notFound() : corrupt());
         entityManager.refresh(version, LockModeType.PESSIMISTIC_WRITE);
         if (version.getStatus() != DefinitionStatus.PUBLISHED)
             throw new WorkflowDefinitionException(WorkflowDefinitionException.Category.INVALID_STATE, List.of());
@@ -89,6 +108,10 @@ public class WorkflowDefinitionRuntimeReader {
         if (model == null || diagnostics.failed()) throw corrupt();
         return new ExecutableDefinition(version.getId(), version.getDefinitionId(), document.key(),
                 document.version(), DefinitionContentCanonicalizer.hex(document.hash()), version.getStatus(), model);
+    }
+
+    private WorkflowDefinitionException notFound() {
+        return new WorkflowDefinitionException(WorkflowDefinitionException.Category.NOT_FOUND, List.of());
     }
 
     private WorkflowDefinitionException corrupt() {

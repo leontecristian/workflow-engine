@@ -15,6 +15,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Error translation and logging only; no host, persistence or external service. */
 @ExtendWith(OutputCaptureExtension.class)
 class ConsoleErrorsUnitTest {
+    @Test void noPublishedVersionIsASanitizedConflict() {
+        var errors = new ConsoleErrors(new ConsoleWire());
+        var request = new MockHttpServletRequest();
+        request.setAttribute("console.correlation", "family-start");
+        var runtimeFailure = new WorkflowExecutionException(WorkflowExecutionException.Category.NO_PUBLISHED_VERSION,
+                new IllegalStateException("private-definition-detail"));
+        var definitionFailure = new io.github.leontecristian.workflow.core.exception.definition.WorkflowDefinitionException(
+                io.github.leontecristian.workflow.core.exception.definition.WorkflowDefinitionException.Category.NO_PUBLISHED_VERSION,
+                new IllegalStateException("private-definition-detail"));
+        for (RuntimeException failure : List.of(runtimeFailure, definitionFailure)) {
+            var response = errors.error(failure, request);
+            assertThat(response.getStatusCode().value()).isEqualTo(409);
+            assertThat(response.getBody()).isEqualTo("{\"code\":\"NO_PUBLISHED_VERSION\",\"message\":\"NO_PUBLISHED_VERSION\","
+                    + "\"diagnostics\":[],\"correlationId\":\"family-start\"}");
+        }
+    }
+
     @Test void serverFailuresLogOriginalExceptionsWhileResponsesStaySafe(CapturedOutput output) {
         var errors = new ConsoleErrors(new ConsoleWire());
         var request = new MockHttpServletRequest();
