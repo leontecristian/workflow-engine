@@ -26,6 +26,10 @@ import io.github.leontecristian.workflow.core.exception.definition.WorkflowDefin
 import io.github.leontecristian.workflow.core.exception.tasktype.TaskTypeCatalogException;
 import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+import io.github.leontecristian.workflow.core.dto.definition.CreateWorkflowDraftFromVersion;
+import io.github.leontecristian.workflow.core.dto.definition.DeleteWorkflowDraft;
+import io.github.leontecristian.workflow.core.dto.definition.DefinitionDeletion;
 import jakarta.persistence.PersistenceException;
 import jakarta.persistence.OptimisticLockException;
 import java.time.LocalDateTime;
@@ -77,23 +81,75 @@ public class WorkflowDefinitionService {
         return storage(() -> {
             WorkflowDefinitionEntity family = definitions.findByWorkflowKey(document.key()).orElse(null);
             if (family != null) {
+                family = lockFamily(family.getId());
                 WorkflowDefinitionVersionEntity existing = versions.findByDefinitionIdAndVersion(family.getId(), document.version()).orElse(null);
                 if (existing != null) {
+                    entityManager.refresh(existing, LockModeType.PESSIMISTIC_WRITE);
                     if (!equivalent(existing, document)) throw failure(WorkflowDefinitionException.Category.CONFLICT);
                     DefinitionVersionSummary summary = DefinitionViews.summary(document.key(), existing);
                     return new DefinitionChange(Optional.of(summary), summary, false, "IMPORT", context);
                 }
+                if (document.version() <= family.getHighestAllocatedVersion())
+                    throw failure(WorkflowDefinitionException.Category.CONFLICT);
             }
             authoringSelections(document);
             if (family == null) {
                 family = new WorkflowDefinitionEntity(document.key(), document.name(), document.description(), time, context.actorRef());
                 entityManager.persist(family);
             }
+            family.advanceAllocatedVersion(document.version());
             WorkflowDefinitionVersionEntity version = new WorkflowDefinitionVersionEntity(family.getId(), document.version(),
                     document.canonical(), document.hash(), DefinitionContentCanonicalizer.IDENTIFIER, time, context.actorRef());
             entityManager.persist(version);
             entityManager.flush();
             return new DefinitionChange(Optional.empty(), DefinitionViews.summary(document.key(), version), true, "IMPORT", context);
+        });
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public DefinitionChange createDraftFromVersion(CreateWorkflowDraftFromVersion command, DefinitionManagementContext context) {
+        DefinitionInputs.require(command != null);
+        LocalDateTime time = DefinitionInputs.context(context);
+        expected(command.sourceVersionId(), command.expectedLockVersion());
+        return storage(() -> {
+            WorkflowDefinitionVersionEntity source = lockedVersion(command.sourceVersionId());
+            checkVersion(source, command.expectedLockVersion());
+            supported(source);
+            var family = family(source.getDefinitionId());
+            int maximum = family.getHighestAllocatedVersion();
+            if (maximum == Integer.MAX_VALUE)
+                throw new WorkflowDefinitionException(WorkflowDefinitionException.Category.CONFLICT,
+                        List.of(new io.github.leontecristian.workflow.core.dto.definition.DefinitionDiagnostic(
+                                "WF_DEF_VERSION_EXHAUSTED", io.github.leontecristian.workflow.core.dto.definition.DiagnosticStage.PARSE,
+                                io.github.leontecristian.workflow.core.dto.definition.DiagnosticSeverity.ERROR,
+                                "No further version number is available.", null, null, null)));
+            var tree = codec.readObject(source.getDefinitionJson());
+            tree.put("version", maximum + 1);
+            var document = codec.ingest(DefinitionContentCanonicalizer.canonical(tree));
+            authoringSelections(document);
+            family.advanceAllocatedVersion(document.version());
+            var created = new WorkflowDefinitionVersionEntity(source.getDefinitionId(), document.version(), document.canonical(),
+                    document.hash(), DefinitionContentCanonicalizer.IDENTIFIER, time, context.actorRef());
+            entityManager.persist(created);
+            entityManager.flush();
+            return new DefinitionChange(Optional.empty(), DefinitionViews.summary(document.key(), created), true,
+                    "CREATE_DRAFT_FROM_VERSION", context);
+        });
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public DefinitionDeletion deleteDraft(DeleteWorkflowDraft command, DefinitionManagementContext context) {
+        DefinitionInputs.require(command != null);
+        DefinitionInputs.context(context);
+        expected(command.versionId(), command.expectedLockVersion());
+        return storage(() -> {
+            var version = lockedVersion(command.versionId());
+            checkVersion(version, command.expectedLockVersion());
+            draft(version);
+            var before = DefinitionViews.summary(family(version.getDefinitionId()).getWorkflowKey(), version);
+            entityManager.remove(version);
+            entityManager.flush();
+            return new DefinitionDeletion(before, "DELETE_DRAFT", context);
         });
     }
 
@@ -104,7 +160,7 @@ public class WorkflowDefinitionService {
         expected(command.versionId(), command.expectedLockVersion());
         DefinitionDocumentCodec.Document document = codec.ingest(command.documentJson());
         return storage(() -> {
-            WorkflowDefinitionVersionEntity version = version(command.versionId());
+            WorkflowDefinitionVersionEntity version = lockedVersion(command.versionId());
             checkVersion(version, command.expectedLockVersion()); draft(version);
             String key = family(version.getDefinitionId()).getWorkflowKey();
             DefinitionInputs.require(key.equals(document.key()) && version.getVersion() == document.version()
@@ -125,7 +181,7 @@ public class WorkflowDefinitionService {
         expected(command.definitionId(), command.expectedLockVersion());
         DefinitionInputs.metadata(command.name(), command.description());
         return storage(() -> {
-            WorkflowDefinitionEntity family = family(command.definitionId());
+            WorkflowDefinitionEntity family = lockFamily(command.definitionId());
             if (family.getLockVersion() != command.expectedLockVersion()) throw failure(WorkflowDefinitionException.Category.CONFLICT);
             DefinitionView before = DefinitionViews.family(family);
             if (!family.getCatalogName().equals(command.name()) || !Objects.equals(family.getCatalogDescription(), command.description())) {
@@ -152,7 +208,7 @@ public class WorkflowDefinitionService {
         LocalDateTime time = DefinitionInputs.context(context);
         expected(command.versionId(), command.expectedLockVersion());
         return storage(() -> {
-            WorkflowDefinitionVersionEntity version = version(command.versionId());
+            WorkflowDefinitionVersionEntity version = lockedVersion(command.versionId());
             checkVersion(version, command.expectedLockVersion()); draft(version); supported(version);
             String key = family(version.getDefinitionId()).getWorkflowKey();
             DefinitionVersionSummary before = DefinitionViews.summary(key, version);
@@ -175,7 +231,7 @@ public class WorkflowDefinitionService {
         LocalDateTime time = DefinitionInputs.context(context);
         expected(command.versionId(), command.expectedLockVersion());
         return storage(() -> {
-            WorkflowDefinitionVersionEntity version = version(command.versionId());
+            WorkflowDefinitionVersionEntity version = lockedVersion(command.versionId());
             checkVersion(version, command.expectedLockVersion());
             String key = family(version.getDefinitionId()).getWorkflowKey();
             DefinitionVersionSummary before = DefinitionViews.summary(key, version);
@@ -244,6 +300,21 @@ public class WorkflowDefinitionService {
         return definitions.findById(id).orElseThrow(() -> failure(WorkflowDefinitionException.Category.NOT_FOUND));
     }
 
+    /** Every administration mutation locks family before version; refresh defeats prior managed snapshots. */
+    private WorkflowDefinitionEntity lockFamily(long id) {
+        var family = definitions.lockById(id).orElseThrow(() -> failure(WorkflowDefinitionException.Category.NOT_FOUND));
+        entityManager.refresh(family, LockModeType.PESSIMISTIC_WRITE);
+        return family;
+    }
+
+    private WorkflowDefinitionVersionEntity lockedVersion(long id) {
+        long familyId = versions.findFamilyId(id).orElseThrow(() -> failure(WorkflowDefinitionException.Category.NOT_FOUND));
+        lockFamily(familyId);
+        var version = version(id);
+        entityManager.refresh(version, LockModeType.PESSIMISTIC_WRITE);
+        return version;
+    }
+
     private WorkflowDefinitionVersionEntity version(long id) {
         return versions.findById(id).orElseThrow(() -> failure(WorkflowDefinitionException.Category.NOT_FOUND));
     }
@@ -293,12 +364,18 @@ public class WorkflowDefinitionService {
 
     private <T> T storage(Supplier<T> action) {
         try { return action.get(); }
+        catch (jakarta.persistence.EntityNotFoundException failure) {
+            throw new WorkflowDefinitionException(WorkflowDefinitionException.Category.NOT_FOUND, failure);
+        }
         catch (PersistenceException | DataAccessException failure) {
             for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
-                if (cause instanceof OptimisticLockException || cause instanceof OptimisticLockingFailureException
+                if (cause instanceof jakarta.persistence.PessimisticLockException || cause instanceof jakarta.persistence.LockTimeoutException
+                        || cause instanceof org.springframework.dao.PessimisticLockingFailureException
+                        || cause instanceof OptimisticLockException || cause instanceof OptimisticLockingFailureException
                         || cause instanceof org.hibernate.StaleStateException
                         || (cause instanceof org.hibernate.exception.ConstraintViolationException constraint
                             && constraint.getConstraintName() != null && DEFINITION_KEYS.contains(constraint.getConstraintName()))
+                        || (cause instanceof java.sql.SQLException sql && sql.getErrorCode() == 547)
                         || (cause instanceof java.sql.SQLException sql && sql.getErrorCode() == 2627
                             && sql.getMessage() != null && DEFINITION_KEYS.stream().anyMatch(k -> sql.getMessage().contains("'" + k + "'"))))
                     throw new WorkflowDefinitionException(WorkflowDefinitionException.Category.CONFLICT, failure);

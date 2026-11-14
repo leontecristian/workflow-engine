@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+    <changeSet id="007-definition-version-counter" author="workflow">
+        <sql>
+            ALTER TABLE wf.workflow_definition ADD highest_allocated_version INT NOT NULL
+                CONSTRAINT df_workflow_definition_highest_allocated_version DEFAULT 0;
+        </sql>
+        <sql>
+            UPDATE d SET highest_allocated_version = COALESCE(
+                (SELECT MAX(v.version) FROM wf.workflow_definition_version v WHERE v.definition_id = d.id), 0)
+                FROM wf.workflow_definition d;
+            ALTER TABLE wf.workflow_definition ADD CONSTRAINT ck_workflow_definition_highest_allocated_version
+                CHECK (highest_allocated_version &gt;= 0);
+        </sql>
+    </changeSet>
+</databaseChangeLog>

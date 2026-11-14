@@ -90,7 +90,7 @@ function administrationFixture(): WorkflowAdministrationApi {
     listDefinitions:(_cursor,_limit,signal)=>firstValueFrom(http.get<AdministrationPage<DefinitionView>>('/host-administration/definitions').pipe(takeUntil(fromEvent(signal,'abort')))),
     listTaskTypes:unused,createTaskType:unused,updateTaskType:unused,definition:unused,
     saveMetadata:unused,listVersions:unused,version:unused,lookupVersion:unused,
-    importDraft:unused,saveDocument:unused,checkVersion:unused,retireVersion:unused,exportVersion:unused,
+    importDraft:unused,saveDocument:unused,checkVersion:unused,retireVersion:unused,createDraftFromVersion:unused,deleteDraft:unused,exportVersion:unused,
   };
 }
 

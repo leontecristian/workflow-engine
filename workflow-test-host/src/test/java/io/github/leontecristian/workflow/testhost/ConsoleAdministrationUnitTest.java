@@ -37,6 +37,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.matches;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -95,6 +96,25 @@ class ConsoleAdministrationUnitTest {
                     .contentType("application/json").content("{\"code\":\"TEST\",\"name\":\"Test\",\"selectable\":true}"))
                     .andExpect(status().isOk());
             verify(management).createTaskType(eq(new CreateTaskType("TEST", "Test", null, true)), matches("[a-f0-9-]{36}"));
+            for (var write : List.of(post("/console/api/versions/42/drafts").contentType("application/json").content("{}"),
+                    delete("/console/api/versions/42"))) {
+                mvc.perform(write.session(admin).header("X-Expected-Lock-Version", "7"))
+                        .andExpect(status().isForbidden());
+            }
+            for (var write : List.of(post("/console/api/versions/42/drafts").contentType("application/json").content("{}"),
+                    delete("/console/api/versions/42"))) {
+                var reviewerRequest = new MockHttpServletRequest(); reviewerRequest.setSession(reviewer);
+                var reviewerToken = csrfRepository.loadToken(reviewerRequest);
+                mvc.perform(write.session(reviewer).header("X-Expected-Lock-Version", "7")
+                        .header(reviewerToken.getHeaderName(), reviewerToken.getToken())).andExpect(status().isForbidden());
+            }
+            mvc.perform(post("/console/api/versions/42/drafts").session(admin).header(token.getHeaderName(), token.getToken())
+                    .header("X-Expected-Lock-Version", "7").contentType("application/json").content("{}"))
+                    .andExpect(status().isOk());
+            verify(management).createDraftFromVersion(eq(42L), eq(7L), matches("[a-f0-9-]{36}"));
+            mvc.perform(delete("/console/api/versions/42").session(admin).header(token.getHeaderName(), token.getToken())
+                    .header("X-Expected-Lock-Version", "7")).andExpect(status().isOk());
+            verify(management).deleteDraft(eq(42L), eq(7L), matches("[a-f0-9-]{36}"));
             verifyNoMoreInteractions(management);
         }
     }

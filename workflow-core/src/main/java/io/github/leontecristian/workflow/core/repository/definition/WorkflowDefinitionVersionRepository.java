@@ -19,6 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true, propagation = Propagation.REQUIRED)
 public interface WorkflowDefinitionVersionRepository extends Repository<WorkflowDefinitionVersionEntity, Long> {
 
+    @Query("select v.definitionId from WorkflowDefinitionVersionEntity v where v.id = :id")
+    Optional<Long> findFamilyId(@Param("id") long id);
+
     @Query("""
             select v.id as id,
                    v.definitionId as definitionId,

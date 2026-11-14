@@ -8,7 +8,7 @@ export { layoutGraph } from './lib/graph/graph-layout';
 export type { PositionedNode, RoutedEdge, GraphLayout } from './lib/graph/graph-layout';
 export * from './lib/administration/contracts';
 export type { AdministrationPage, DefinitionView, VersionSummary, VersionDetails, Change,
-  DefinitionChange, Diagnostic, ValidationReport, DefinitionCheck, TaskTypeView, TaskTypeInput } from './lib/administration/models';
+  DefinitionChange, DefinitionDeletion, Diagnostic, ValidationReport, DefinitionCheck, TaskTypeView, TaskTypeInput } from './lib/administration/models';
 export { rawDocument, prettyDocument } from './lib/administration/support/document-text';
 export { ConsolePageHeader } from './lib/administration/support/page-header';
 export { ConsoleFeedback } from './lib/administration/support/feedback';

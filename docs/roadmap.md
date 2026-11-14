@@ -1,5 +1,7 @@
 # Workflow engine roadmap
 
+**Authoring follow-up — 2026-11-14:** [F023 — Create next definition version](features/F023-create-next-definition-version/spec.md) is IMPLEMENTED at revision 3: draft creation/deletion, permanent family counter, strict new-import floor and preserving migration, with coordinated creation/import/deletion. Focused unit/UI/build, browser and all 15 selected SQL results are in its [handover](features/F023-create-next-definition-version/implementation.md). Test-database recovery and fixture cleanup are complete. This authoring convenience does not change graphical-designer sequencing.
+
 **Updated:** 2026-11-13 · **Delivery baseline:** F022 previous-decision comments, IMPLEMENTED revision 1
 
 The agreed direction is **working sandbox → first APOLO booking integration → graphical designer**, with reliability required before production. The sandbox, reusable libraries and ALL collective review are implemented. F022 previous-decision comments is implemented with focused core/shared web/UI and sandbox verification. APOLO integration waits until the owner has access to APOLO.

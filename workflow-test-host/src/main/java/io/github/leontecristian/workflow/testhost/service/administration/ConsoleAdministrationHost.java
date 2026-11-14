@@ -1,6 +1,7 @@
 package io.github.leontecristian.workflow.testhost.service.administration;
 
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionChange;
+import io.github.leontecristian.workflow.core.dto.definition.DefinitionDeletion;
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionCheckResult;
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionMetadataChange;
 import io.github.leontecristian.workflow.core.dto.tasktype.CreateTaskType;
@@ -27,6 +28,8 @@ public class ConsoleAdministrationHost implements WorkflowAdministrationHost {
     @Override public TaskTypeChange createTaskType(CreateTaskType command, String correlation) { return management.createTaskType(command, correlation); }
     @Override public TaskTypeChange updateTaskType(UpdateTaskType command, String correlation) { return management.updateTaskType(command, correlation); }
     @Override public DefinitionChange importDraft(String document, String correlation) { return management.importDraft(document, correlation); }
+    @Override public DefinitionChange createDraftFromVersion(long id, long token, String correlation) { return management.createDraftFromVersion(id, token, correlation); }
+    @Override public DefinitionDeletion deleteDraft(long id, long token, String correlation) { return management.deleteDraft(id, token, correlation); }
     @Override public DefinitionChange replace(long id, long token, String document, String correlation) { return management.replace(id, token, document, correlation); }
     @Override public DefinitionMetadataChange metadata(long id, long token, String name, String description, String correlation) { return management.metadata(id, token, name, description, correlation); }
     @Override public DefinitionCheckResult validate(long id, long token, String correlation) { return management.validate(id, token, correlation); }

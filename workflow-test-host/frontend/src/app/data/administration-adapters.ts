@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { ConsoleSession } from './console-session';
-import type { WorkflowAdministrationApi, AdministrationPage, DefinitionView, VersionSummary, VersionDetails, Change, DefinitionChange, Diagnostic, ValidationReport, DefinitionCheck, TaskTypeView, TaskTypeInput } from '@workflow-engine/ui';
+import type { WorkflowAdministrationApi, AdministrationPage, DefinitionView, VersionSummary, VersionDetails, Change, DefinitionChange, DefinitionDeletion, Diagnostic, ValidationReport, DefinitionCheck, TaskTypeView, TaskTypeInput } from '@workflow-engine/ui';
 const segment=encodeURIComponent;
 function pageQuery(cursor:string|undefined,limit:number,extra:Record<string,string>={}){const params=new URLSearchParams({limit:String(limit),...extra});if(cursor)params.set('afterId',cursor);return '?'+params;}
 @Injectable({providedIn:'root'})
@@ -19,5 +19,7 @@ export class ConsoleAdministrationApi implements WorkflowAdministrationApi {
  saveDocument(id:string,document:string,token:string,signal:AbortSignal){return this.session.administrationCall<DefinitionChange>('/versions/'+segment(id)+'/document',signal,'PUT',document,token,true);}
  checkVersion(id:string,action:'validate'|'publish',token:string,signal:AbortSignal){return this.session.administrationCall<DefinitionCheck>('/versions/'+segment(id)+'/'+action,signal,'POST',undefined,token);}
  retireVersion(id:string,token:string,signal:AbortSignal){return this.session.administrationCall<DefinitionChange>('/versions/'+segment(id)+'/retire',signal,'POST',undefined,token);}
+ createDraftFromVersion(id:string,token:string,signal:AbortSignal){return this.session.administrationCall<DefinitionChange>('/versions/'+segment(id)+'/drafts',signal,'POST',{},token);}
+ deleteDraft(id:string,token:string,signal:AbortSignal){return this.session.administrationCall<DefinitionDeletion>('/versions/'+segment(id),signal,'DELETE',undefined,token);}
  exportVersion(id:string,signal:AbortSignal){return this.session.administrationCall<string>('/versions/'+segment(id)+'/export',signal,'GET',undefined,undefined,false,true);}
 }

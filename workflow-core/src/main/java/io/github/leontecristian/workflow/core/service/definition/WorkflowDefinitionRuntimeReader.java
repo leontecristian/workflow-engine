@@ -36,6 +36,9 @@ public class WorkflowDefinitionRuntimeReader {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public ExecutableDefinition loadForStart(long versionId) {
+        long familyId = versions.findFamilyId(versionId).orElseThrow(this::corrupt);
+        var family = families.lockById(familyId).orElseThrow(this::corrupt);
+        entityManager.refresh(family, LockModeType.PESSIMISTIC_WRITE);
         WorkflowDefinitionVersionEntity version = versions.findById(versionId).orElseThrow(this::corrupt);
         entityManager.refresh(version, LockModeType.PESSIMISTIC_WRITE);
         if (version.getStatus() != DefinitionStatus.PUBLISHED)

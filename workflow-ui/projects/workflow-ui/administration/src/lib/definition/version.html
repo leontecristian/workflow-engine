@@ -4,6 +4,10 @@
   [notice]="notice()"
 />
 @if(refreshError()){<p class="feedback feedback-warning" role="alert">{{messages.refreshFailed}} {{refreshError()}}</p>}
+@if(completedLink(); as link) {
+  <p><a mat-button [routerLink]="link">{{completedDestination()?.kind === 'version' ? 'Open created draft' : 'Open workflow family'}}</a></p>
+}
+@if(outcomeUnknown()) { <p class="feedback feedback-warning" role="alert">Outcome unknown. Inspect the workflow family before repeating this operation.</p> }
 
 <mat-card appearance="outlined"
   ><mat-card-header
@@ -48,10 +52,16 @@
         (ngModelChange)="dirty = true"
         rows="22"
         spellcheck="false"
-        [readOnly]="detail()?.summary?.status !== 'DRAFT'"
+        [readOnly]="busy() || detail()?.summary?.status !== 'DRAFT'"
       ></textarea>
     </mat-form-field>
     <div class="actions document-actions">
+      <button mat-stroked-button (click)="confirmDraftAction('create')"
+        [disabled]="busy() || dirty || !detail() || outcomeUnknown() || refreshRequired() || !!completedDestination()">Create new draft</button>
+      @if(detail()?.summary?.status === 'DRAFT') {
+        <button mat-button (click)="confirmDraftAction('delete')"
+          [disabled]="busy() || outcomeUnknown() || refreshRequired() || !!completedDestination()">Delete draft</button>
+      }
       <button
         mat-stroked-button
         (click)="prettyPrint()"
@@ -84,7 +94,7 @@
         mat-button
         class="danger-action"
         (click)="lifecycle('retire')"
-        [disabled]="busy() || dirty || detail()?.summary?.status === 'DRAFT'"
+        [disabled]="busy() || dirty || !detail() || detail()?.summary?.status === 'DRAFT'"
       >
         Retire
       </button>

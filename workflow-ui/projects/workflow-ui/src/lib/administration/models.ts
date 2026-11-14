@@ -45,6 +45,11 @@ export interface DefinitionChange extends Change<VersionSummary> {
   operation: string;
   context: unknown;
 }
+export interface DefinitionDeletion {
+  before: VersionSummary;
+  operation: 'DELETE_DRAFT';
+  context: unknown;
+}
 export interface Diagnostic {
   severity: string;
   code: string;

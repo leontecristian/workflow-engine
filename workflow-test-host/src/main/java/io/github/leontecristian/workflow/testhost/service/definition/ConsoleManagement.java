@@ -2,6 +2,9 @@ package io.github.leontecristian.workflow.testhost.service.definition;
 
 import io.github.leontecristian.workflow.core.dto.definition.CheckWorkflowDefinition;
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionChange;
+import io.github.leontecristian.workflow.core.dto.definition.DefinitionDeletion;
+import io.github.leontecristian.workflow.core.dto.definition.CreateWorkflowDraftFromVersion;
+import io.github.leontecristian.workflow.core.dto.definition.DeleteWorkflowDraft;
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionMetadataChange;
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionCheckResult;
 import io.github.leontecristian.workflow.core.dto.definition.ImportWorkflowDraft;
@@ -55,6 +58,21 @@ public class ConsoleManagement {
         var result =
                 definitions.importDraft(new ImportWorkflowDraft(document), context.management());
         audit(result, correlation);
+        return result;
+    }
+
+    @Transactional
+    public DefinitionChange createDraftFromVersion(long sourceVersionId, long token, String correlation) {
+        var result = definitions.createDraftFromVersion(
+                new CreateWorkflowDraftFromVersion(sourceVersionId, token), context.management());
+        audit(result, correlation);
+        return result;
+    }
+
+    @Transactional
+    public DefinitionDeletion deleteDraft(long id, long token, String correlation) {
+        var result = definitions.deleteDraft(new DeleteWorkflowDraft(id, token), context.management());
+        audit(true, result.operation(), "DEFINITION_VERSION", result.before().id(), result.before(), null, correlation);
         return result;
     }
 

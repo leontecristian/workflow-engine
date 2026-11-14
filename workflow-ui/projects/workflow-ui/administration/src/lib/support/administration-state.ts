@@ -13,7 +13,7 @@ export abstract class AdministrationState implements OnChanges {
  readonly api=inject(WORKFLOW_ADMINISTRATION_API);
  readonly busy=signal(false); readonly error=signal(''); readonly notice=signal(''); readonly refreshError=signal('');
  protected readonly destroyRef=inject(DestroyRef);
- private readonly navigation=inject(WORKFLOW_VIEWER_NAVIGATION,{optional:true}); private readonly router=inject(Router,{optional:true});
+ protected readonly navigation=inject(WORKFLOW_VIEWER_NAVIGATION,{optional:true}); protected readonly router=inject(Router,{optional:true});
  private generation=0; private sequence=0; private controller=new AbortController(); private destroyed=false;
  constructor(){this.destroyRef.onDestroy(()=>{this.destroyed=true;this.invalidate();this.clearContent();});}
  ngOnChanges(changes:SimpleChanges){

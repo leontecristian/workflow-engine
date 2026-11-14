@@ -47,6 +47,15 @@ public class WorkflowDefinitionEntity {
     @Column(name = "lock_version", nullable = false)
     private Long lockVersion;
 
+    @Column(name = "highest_allocated_version", nullable = false)
+    private int highestAllocatedVersion;
+
+    /** Internal allocation under the family write lock; never decreases or fills lower gaps. */
+    public void advanceAllocatedVersion(int version) {
+        if (version <= highestAllocatedVersion) throw new IllegalArgumentException("Allocation must exceed the family counter");
+        highestAllocatedVersion = version;
+    }
+
     protected WorkflowDefinitionEntity() {
     }
 

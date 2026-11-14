@@ -1,5 +1,5 @@
 import { InjectionToken } from '@angular/core';
-import type { AdministrationPage, DefinitionView, VersionSummary, VersionDetails, DefinitionChange, DefinitionCheck, Change, TaskTypeView, TaskTypeInput } from './models';
+import type { AdministrationPage, DefinitionView, VersionSummary, VersionDetails, DefinitionChange, DefinitionDeletion, DefinitionCheck, Change, TaskTypeView, TaskTypeInput } from './models';
 /** Host-owned authentication, authorization, CSRF and HTTP transport. No write is retried. */
 export interface WorkflowAdministrationApi {
  listTaskTypes(filter:string,cursor:string|undefined,limit:number,signal:AbortSignal):Promise<AdministrationPage<TaskTypeView>>;
@@ -15,6 +15,8 @@ export interface WorkflowAdministrationApi {
  saveDocument(id:string,document:string,token:string,signal:AbortSignal):Promise<DefinitionChange>;
  checkVersion(id:string,action:'validate'|'publish',token:string,signal:AbortSignal):Promise<DefinitionCheck>;
  retireVersion(id:string,token:string,signal:AbortSignal):Promise<DefinitionChange>;
+ createDraftFromVersion(id:string,token:string,signal:AbortSignal):Promise<DefinitionChange>;
+ deleteDraft(id:string,token:string,signal:AbortSignal):Promise<DefinitionDeletion>;
  exportVersion(id:string,signal:AbortSignal):Promise<string>;
 }
 export const WORKFLOW_ADMINISTRATION_API = new InjectionToken<WorkflowAdministrationApi>('Workflow administration API');

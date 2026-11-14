@@ -40,6 +40,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -90,7 +91,8 @@ class WorkflowAdministrationUnitTest {
         context.register(classes); context.refresh(); return context;
     }
     private MockHttpServletRequestBuilder write(String method, String suffix, String body) {
-        return (method.equals("PUT") ? put("/custom/manage" + suffix) : post("/custom/manage" + suffix))
+        return (method.equals("PUT") ? put("/custom/manage" + suffix)
+                : method.equals("DELETE") ? delete("/custom/manage" + suffix) : post("/custom/manage" + suffix))
                 .header("X-Expected-Lock-Version", "9007199254740993")
                 .requestAttr("trusted.correlation", "trusted-id")
                 .header("X-Correlation-Id", "untrusted-id")
@@ -134,9 +136,10 @@ class WorkflowAdministrationUnitTest {
                 verify(host).requireAdministrationAccess(); verifyNoMoreInteractions(host);
             }
             for (String route : List.of("/task-types", "/definitions/1", "/versions/import", "/versions/1/document",
-                    "/versions/1/validate", "/versions/1/publish", "/versions/1/retire")) {
+                    "/versions/1/validate", "/versions/1/publish", "/versions/1/retire", "/versions/1/drafts", "/versions/1")) {
                 reset(host); doThrow(new WorkflowAdministrationException(403, "FORBIDDEN")).when(host).requireAdministrationAccess();
-                String method = route.equals("/definitions/1") || route.endsWith("document") ? "PUT" : "POST";
+                String method = route.equals("/versions/1") ? "DELETE"
+                        : route.equals("/definitions/1") || route.endsWith("document") ? "PUT" : "POST";
                 mvc.perform(write(method, route, "invalid input never read")).andExpect(status().isForbidden());
                 verify(host).requireAdministrationAccess(); verifyNoMoreInteractions(host);
             }
@@ -169,6 +172,33 @@ class WorkflowAdministrationUnitTest {
             verify(host, times(8)).requireAdministrationAccess(); verifyNoMoreInteractions(host);
         }
     }
+    @Test void createAndDeleteEnforceDistinctBodyContractsAndLoadedSourceTokens() throws Exception {
+        try (var context = context(Host.class, Enabled.class)) {
+            var mvc = MockMvcBuilders.webAppContextSetup(context).build();
+            var host = context.getBean(WorkflowAdministrationHost.class);
+            mvc.perform(write("POST", "/versions/42/drafts", "{} ")).andExpect(status().isOk());
+            verify(host).createDraftFromVersion(42, 9007199254740993L, "trusted-id");
+            mvc.perform(write("DELETE", "/versions/42", "")).andExpect(status().isOk());
+            verify(host).deleteDraft(42, 9007199254740993L, "trusted-id");
+            reset(host);
+            for (String body : List.of("", "[]", "null", "{\"version\":2}", "{\"id\":42}", "{\"unknown\":true}"))
+                mvc.perform(write("POST", "/versions/42/drafts", body)).andExpect(status().isBadRequest());
+            for (String body : List.of("{}", " ", "null"))
+                mvc.perform(write("DELETE", "/versions/42", body)).andExpect(status().isBadRequest());
+            for (String token : List.of("-1", "01", "9223372036854775808", "invalid")) {
+                mvc.perform(post("/custom/manage/versions/42/drafts").contentType("application/json")
+                        .content("{}").header("X-Expected-Lock-Version", token)).andExpect(status().isBadRequest());
+                mvc.perform(delete("/custom/manage/versions/42").header("X-Expected-Lock-Version", token))
+                        .andExpect(status().isBadRequest());
+            }
+            mvc.perform(post("/custom/manage/versions/42/drafts").contentType("application/json").content("{}"))
+                    .andExpect(status().isBadRequest());
+            mvc.perform(delete("/custom/manage/versions/42")).andExpect(status().isBadRequest());
+            verify(host, never()).createDraftFromVersion(anyLong(), anyLong(), anyString());
+            verify(host, never()).deleteDraft(anyLong(), anyLong(), anyString());
+        }
+    }
+
     @Test void coreReadsPagingExportAndExistingExactRouteQueryHandlingSurvive() throws Exception {
         try (var context = context(Host.class, Enabled.class)) {
             var mvc = MockMvcBuilders.webAppContextSetup(context).build();

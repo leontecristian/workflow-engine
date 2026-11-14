@@ -24,6 +24,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -136,6 +137,20 @@ public class WorkflowDefinitionController {
         management.requireAdministrationAccess();
         return wire.response(
                 management.importDraft(wire.raw(r, 4 * 1024 * 1024), errors.correlation(r)));
+    }
+
+    @PostMapping("/versions/{id}/drafts")
+    public ResponseEntity<String> createDraftFromVersion(@PathVariable String id, HttpServletRequest r) {
+        management.requireAdministrationAccess();
+        wire.body(r);
+        return wire.response(management.createDraftFromVersion(decimal(id, false), token(r), errors.correlation(r)));
+    }
+
+    @DeleteMapping("/versions/{id}")
+    public ResponseEntity<String> deleteDraft(@PathVariable String id, HttpServletRequest r) {
+        management.requireAdministrationAccess();
+        wire.empty(r);
+        return wire.response(management.deleteDraft(decimal(id, false), token(r), errors.correlation(r)));
     }
 
     @PutMapping("/versions/{id}/document")
