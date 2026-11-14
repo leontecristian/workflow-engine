@@ -1,6 +1,6 @@
 # Specification-driven development
 
-This workflow operationalizes [constitution v6.1.0](constitution.md). Its purpose is to make behavior clear before implementation and leave a useful handover afterward. Keep documentation proportional to the change; the four files below are responsibilities, not a requirement for four lengthy reports.
+This workflow operationalizes [constitution v6.6.1](constitution.md). Its purpose is to make behavior clear before implementation and leave a useful handover afterward. Keep documentation proportional to the change; the four files below are responsibilities, not a requirement for four lengthy reports.
 
 ## Four-document standard and authority
 
@@ -23,7 +23,7 @@ Small fixes, simple repository changes and maintenance may use a concise change 
 
 In spec.md, identify the feature, revision/date, status, owner and applicable constitution version. Describe the problem and intended outcome, scope, requirements, observable behavior and acceptance scenarios. Include business rules, inputs/results, errors, constraints and unresolved decisions where relevant.
 
-Use stable requirement/scenario IDs for substantial behavior. Reference applicable [CON constraints](constraints.md), [ASM assumptions](assumptions.md) and [design sources](design-sources.md). Keep AGREED, PROPOSED, PROVISIONAL, OPEN and DEFERRED distinct; examples are not automatically contracts. An acceptance scenario describes a required property and does not authorize an automated test.
+Use stable requirement/scenario IDs for substantial behavior. Reference applicable [CON constraints](constraints.md), [ASM assumptions](assumptions.md) and [design sources](design-sources.md). Keep AGREED, PROPOSED, PROVISIONAL, OPEN and DEFERRED distinct; examples are not automatically contracts. An acceptance scenario describes a required property; verification follows the standing authorization and focused-selection rules below.
 
 Resolve material ambiguity before dependent implementation while continuing independent work. Choose routine engineering details within the agreed contract. Readiness requires clear affected contracts and acceptance criteria, not resolution of unrelated APOLO policies or later designer decisions.
 
@@ -98,7 +98,7 @@ Do not create a separate evidence.md or verification.md for routine feature trac
 For authorized implementation builds, select JDK 21 and use the root wrapper:
 
 ```powershell
-./mvnw.cmd -Dmaven.test.skip=true package
+./mvnw.cmd '-Dmaven.test.skip=true' package
 ```
 
 Do not build for documentation-only changes; inspect content, links and whitespace. Run application/database checks only within the task's scope. Host startup runs Liquibase and can modify the development database. Record and stop temporary processes you start unless asked to leave them running, after checking their identities. Report final process state.
