@@ -38,4 +38,24 @@ test('a consumer without a navigation adapter renders definition IDs without a l
   const records = core.runInInjectionContext(injector, () => new ConsoleRecords());
   records.kind = () => 'definitions';
   assert.equal(records.definitionRoute({id:'52'}), null);
+  records.kind = () => 'definition';
+  assert.equal(records.versionRoute({id:'52'}), null);
+});
+
+test('version number links use the exact retained version destination and guarded fallback', t => {
+  let request;
+  const destination = {hostVersionUrl:true};
+  const injector = core.createEnvironmentInjector([
+    {provide:WORKFLOW_VIEWER_NAVIGATION,useValue:{destination(intent) {request=intent;return destination;}}},
+  ], null);
+  t.after(() => injector.destroy());
+  const records = core.runInInjectionContext(injector, () => new ConsoleRecords());
+  records.kind = () => 'definition'; records.disabled = () => false;
+  assert.equal(records.versionRoute({id:'9007199254740993'}), destination);
+  assert.equal(request.kind, 'version');
+  assert.equal(request.id, '9007199254740993');
+  records.disabled = () => true;
+  assert.equal(records.versionRoute({id:'52'}), null);
+  records.disabled = () => false; records.kind = () => 'catalog';
+  assert.equal(records.versionRoute({id:'52'}), null);
 });

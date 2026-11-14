@@ -19,7 +19,7 @@ export interface WorkflowAdministrationApi {
 }
 export const WORKFLOW_ADMINISTRATION_API = new InjectionToken<WorkflowAdministrationApi>('Workflow administration API');
 export const DEFAULT_ADMINISTRATION_MESSAGES = {
- catalogTitle:'Task types', definitionsTitle:'Definitions', familyTitle:'Workflow family', versionTitle:'Definition version', refresh:'Reload', export:'Export JSON',
+ catalogTitle:'Task types', definitionsTitle:'Definitions', familyTitle:'Workflow Definition', versionTitle:'Definition version', refresh:'Reload', export:'Export JSON',
  unauthenticated:'Sign in to administer workflows.', denied:'Administration access denied.', failed:'Request failed.',
  refreshFailed:'The write succeeded, but refreshing the view failed.',
 };

@@ -34,7 +34,10 @@ const COLUMNS: Record<string, RecordColumn[]> = {
 @Component({
   selector: "console-records",
   standalone: true,
-  host: { "[class.definition-records]": "kind() === 'definitions'" },
+  host: {
+    "[class.definition-records]": "kind() === 'definitions'",
+    "[class.version-records]": "kind() === 'definition'",
+  },
   styles: [":host{display:block;overflow:auto}table{width:100%}.record-id,.date-cell small{display:block}.monospace{font-family:monospace}", `
     :host(.definition-records) { overflow:visible; min-width:0; }
     :host(.definition-records) .table-scroll { margin:0; overflow-x:auto; }
@@ -43,6 +46,13 @@ const COLUMNS: Record<string, RecordColumn[]> = {
     :host(.definition-records) .mat-column-actions { width:80px; }
     :host(.definition-records) .mat-column-id { width:6rem; }
     :host(.definition-records) .definition-id { color:var(--mat-sys-primary); text-decoration:none; }
+    :host(.version-records) { overflow:visible; min-width:0; }
+    :host(.version-records) .table-scroll { margin:0; overflow-x:auto; }
+    :host(.version-records) table { table-layout:fixed; min-width:600px; }
+    :host(.version-records) th, :host(.version-records) td { overflow-wrap:anywhere; }
+    :host(.version-records) .mat-column-actions { width:80px; }
+    :host(.version-records) .mat-column-version { width:8rem; }
+    :host(.version-records) .version-link { color:var(--mat-sys-primary); text-decoration:none; }
   `],
   imports: [
     CommonModule,
@@ -68,6 +78,13 @@ const COLUMNS: Record<string, RecordColumn[]> = {
               } @else {
                 <span class="monospace">#{{row.id}}</span>
               }
+            } @else if (kind() === 'definition' && column.key === 'version') {
+              @if (versionRoute(row); as destination) {
+                <a class="version-link" [routerLink]="destination">{{row.version}}</a>
+              } @else {
+                <span>{{row.version}}</span>
+              }
+              <small class="record-id">#{{row.id}}</small>
             } @else if (isStatus(column.key)) {
               <console-status [value]="cell(row, column.key)" />
             } @else if (isDate(column.key, cell(row, column.key))) {
@@ -135,6 +152,10 @@ export class ConsoleRecords {
   definitionRoute(row: { id:string }) {
     return this.kind() === 'definitions' && !this.disabled()
       ? this.navigation?.destination({ kind:'definition', id:row.id }) ?? null : null;
+  }
+  versionRoute(row: { id:string }) {
+    return this.kind() === 'definition' && !this.disabled()
+      ? this.navigation?.destination({ kind:'version', id:row.id }) ?? null : null;
   }
   columns(): RecordColumn[] {
     return COLUMNS[this.kind()] || COLUMNS["definitions"];

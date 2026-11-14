@@ -38,30 +38,47 @@
         <h2>Versions</h2>
         <p>Every explicit version, including retained retired versions.</p>
       </div>
+      <div class="version-controls">
+      <button mat-icon-button (click)="load(undefined, true)" [disabled]="busy()"
+        matTooltip="Reload first page" aria-label="Reload first page">
+        <mat-icon aria-hidden="true">refresh</mat-icon>
+      </button>
       <mat-form-field
         appearance="outline"
         subscriptSizing="dynamic"
         class="compact-field"
         ><mat-label>Status</mat-label
-        ><mat-select [(ngModel)]="filter" (selectionChange)="load()"
+        ><mat-select #statusSelect [ngModel]="filter" (ngModelChange)="changeFilter($event, statusSelect)" [disabled]="busy()"
           ><mat-option value="">All statuses</mat-option
           ><mat-option value="DRAFT">Draft</mat-option
           ><mat-option value="PUBLISHED">Published</mat-option
           ><mat-option value="RETIRED">Retired</mat-option></mat-select
         ></mat-form-field
       >
+      </div>
     </div></mat-card-header
   ><mat-card-content
-    ><console-collection
+    >@if(rows().length) {<console-records
       [rows]="rows()"
       kind="definition"
-      label="Workflow family"
-      icon="account_tree"
-      [busy]="busy()"
-      [size]="pageSize"
-      [next]="next"
-      (sizeChange)="pageSize=$event;load()"
-      (reload)="load()"
-      (advance)="nextPage()"
-      (inspect)="open($event)" /></mat-card-content
+      label="Definition versions"
+      [disabled]="busy()"
+      (inspect)="open($event)" />
+    } @else {
+      <p role="status">{{busy() ? 'Loading the latest records…' : 'No records on this page. Refresh to check again.'}}</p>
+    }
+    <nav class="versions-pagination" aria-label="Versions pagination">
+      <mat-form-field appearance="outline" class="page-size" subscriptSizing="dynamic">
+        <mat-label>Rows per page</mat-label>
+        <mat-select #pageSizeSelect [ngModel]="pageSize" (ngModelChange)="changePageSize($event, pageSizeSelect)" [disabled]="busy()">
+          <mat-option [value]="1">1</mat-option><mat-option [value]="10">10</mat-option>
+          <mat-option [value]="50">50</mat-option><mat-option [value]="100">100</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <span aria-live="polite">Page {{pageIndex + 1}} · {{rows().length}} versions on this page</span>
+      <span class="action-spacer"></span>
+      <button mat-button (click)="previousPage()" [disabled]="busy() || pageIndex === 0">Previous page</button>
+      <button mat-button (click)="nextPage()" [disabled]="busy() || !next">Next page <mat-icon aria-hidden="true" iconPositionEnd>chevron_right</mat-icon></button>
+    </nav>
+  </mat-card-content
 ></mat-card>
