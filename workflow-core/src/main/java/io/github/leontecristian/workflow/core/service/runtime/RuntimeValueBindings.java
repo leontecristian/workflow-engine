@@ -58,8 +58,8 @@ final class RuntimeValueBindings {
         RuntimeInputs.require(inputs!=null && inputs.values().size()<=100,Category.INVALID_INPUT);
         var raw=new TokenEnvelope(json,RuntimeJson.MAP_UTF16_BYTES / 2);
         for (var e:inputs.values().entrySet()) {
-            RuntimeInputs.require(RuntimeInputs.key(e.getKey()),Category.INVALID_INPUT);
-            if (e.getValue() instanceof TextLiteral t) RuntimeInputs.require(RuntimeInputs.unicode(t.value()) && t.value().length()<=4000,Category.INVALID_INPUT);
+            RuntimeInputs.require(RuntimeInputs.isValidKey(e.getKey()),Category.INVALID_INPUT);
+            if (e.getValue() instanceof TextLiteral t) RuntimeInputs.require(RuntimeInputs.isWellFormedUnicode(t.value()) && t.value().length()<=4000,Category.INVALID_INPUT);
             raw.add(e.getKey(),e.getValue());
         }
     }

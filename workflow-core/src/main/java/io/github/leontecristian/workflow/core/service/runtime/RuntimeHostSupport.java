@@ -31,7 +31,7 @@ public class RuntimeHostSupport {
         try {
             for (var resolver : resolvers.stream().toList()) {
                 String id = resolver.identifier();
-                if (!RuntimeInputs.text(id, 100, 200, true) || registered.putIfAbsent(id, resolver) != null)
+                if (!RuntimeInputs.isValidText(id, 100, 200, true) || registered.putIfAbsent(id, resolver) != null)
                     throw new IllegalArgumentException("Invalid or duplicate resolver identifier");
             }
         } catch (RuntimeException failure) { error = failure; }
@@ -48,7 +48,7 @@ public class RuntimeHostSupport {
         try {
             for (var resolver : allResolvers.stream().toList()) {
                 String id = resolver.identifier();
-                RuntimeInputs.require(RuntimeInputs.text(id,100,200,true) && registered.putIfAbsent(id,resolver) == null,
+                RuntimeInputs.require(RuntimeInputs.isValidText(id,100,200,true) && registered.putIfAbsent(id,resolver) == null,
                         Category.HOST_CONFIGURATION);
             }
             this.allResolvers = Map.copyOf(registered);
@@ -80,12 +80,12 @@ public class RuntimeHostSupport {
             throw new WorkflowExecutionException(Category.HOST_CONFIGURATION,failure);
         } catch (RuntimeException failure) { throw RuntimePersistenceErrors.translate(failure); }
         RuntimeInputs.require(result != null && result.tasks() != null && result.tasks().size() >= 1 && result.tasks().size() <= 100
-                && (result.reviewRevisionRef() == null || RuntimeInputs.text(result.reviewRevisionRef(),200,200,true)), Category.INVALID_ASSIGNMENT);
+                && (result.reviewRevisionRef() == null || RuntimeInputs.isValidText(result.reviewRevisionRef(),200,200,true)), Category.INVALID_ASSIGNMENT);
         var keys = new java.util.HashSet<String>();
         for (var task : result.tasks()) {
-            RuntimeInputs.require(task != null && RuntimeInputs.key(task.taskKey()) && keys.add(task.taskKey())
+            RuntimeInputs.require(task != null && RuntimeInputs.isValidKey(task.taskKey()) && keys.add(task.taskKey())
                     && task.assignment() != null && task.assignment().kind() != null
-                    && RuntimeInputs.text(task.assignment().ref(),200,200,true)
+                    && RuntimeInputs.isValidText(task.assignment().ref(),200,200,true)
                     && resolver.targetKinds().contains(task.assignment().kind()), Category.INVALID_ASSIGNMENT);
             eligibility.requireTarget(context, task.assignment());
         }
@@ -123,9 +123,9 @@ public class RuntimeHostSupport {
         } catch (RuntimeException failure) { throw RuntimePersistenceErrors.translate(failure); }
         RuntimeInputs.require(result != null && result.tasks() != null && result.tasks().size() == 1, Category.INVALID_ASSIGNMENT);
         var task = result.tasks().get(0);
-        RuntimeInputs.require(task != null && RuntimeInputs.key(task.taskKey()) && task.assignment() != null && task.assignment().kind() != null
-                && RuntimeInputs.text(task.assignment().ref(), 200, 200, true) && resolver.targetKinds().contains(task.assignment().kind())
-                && (result.reviewRevisionRef() == null || RuntimeInputs.text(result.reviewRevisionRef(), 200, 200, true)), Category.INVALID_ASSIGNMENT);
+        RuntimeInputs.require(task != null && RuntimeInputs.isValidKey(task.taskKey()) && task.assignment() != null && task.assignment().kind() != null
+                && RuntimeInputs.isValidText(task.assignment().ref(), 200, 200, true) && resolver.targetKinds().contains(task.assignment().kind())
+                && (result.reviewRevisionRef() == null || RuntimeInputs.isValidText(result.reviewRevisionRef(), 200, 200, true)), Category.INVALID_ASSIGNMENT);
         eligibility.requireTarget(context, task.assignment());
         return result;
     }

@@ -53,7 +53,7 @@ class FamilyStartUnitTest {
     void acceptsOnlyOneValidSelectorWithoutNormalizingIt() {
         for (var command : List.of(command("Booking.review_1-v2", null, null),
                 command(null, Long.MAX_VALUE, null), command(null, null, Long.MAX_VALUE))) {
-            assertDoesNotThrow(() -> RuntimeInputs.start(command, context));
+            assertDoesNotThrow(() -> RuntimeInputs.validateStartCommand(command, context));
         }
         for (var command : List.of(command(null, null, null), command("key", 1L, null),
                 command("key", null, 1L), command(null, 1L, 1L), command("key", 1L, 1L),
@@ -64,7 +64,7 @@ class FamilyStartUnitTest {
         for (String key : List.of("", " ", " key", "key ", "1key", "a/b", "a".repeat(101), "ékey")) {
             invalid(command(key, null, null));
         }
-        assertDoesNotThrow(() -> RuntimeInputs.start(command("a".repeat(100), null, null), context));
+        assertDoesNotThrow(() -> RuntimeInputs.validateStartCommand(command("a".repeat(100), null, null), context));
     }
 
     @Test
@@ -170,7 +170,7 @@ class FamilyStartUnitTest {
 
     private void invalid(StartWorkflow command) {
         assertEquals(Category.INVALID_INPUT,
-                assertThrows(WorkflowExecutionException.class, () -> RuntimeInputs.start(command, context)).category());
+                assertThrows(WorkflowExecutionException.class, () -> RuntimeInputs.validateStartCommand(command, context)).category());
     }
 
     private void assertDifferent(StartWorkflow first, StartWorkflow second) {

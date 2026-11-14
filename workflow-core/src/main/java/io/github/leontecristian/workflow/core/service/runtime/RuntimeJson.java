@@ -136,7 +136,7 @@ public class RuntimeJson {
         }
     }
     JsonNode tree(String source) {
-        RuntimeInputs.require(source != null && source.length()*2L<=HISTORY_UTF16_BYTES && utf8Fits(source,HISTORY_UTF8_BYTES) && RuntimeInputs.unicode(source), Category.HOST_CONFIGURATION);
+        RuntimeInputs.require(source != null && source.length()*2L<=HISTORY_UTF16_BYTES && utf8Fits(source,HISTORY_UTF8_BYTES) && RuntimeInputs.isWellFormedUnicode(source), Category.HOST_CONFIGURATION);
         try { return mapper.readTree(source); }
         catch (IOException failure) { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION); }
     }
@@ -240,26 +240,26 @@ public class RuntimeJson {
                 && (operation==WorkflowOperation.START_WORKFLOW ? result.firstHistorySequence()==1 : result.firstHistorySequence()>1)
                 && result.firstHistorySequence()>0 && result.lastHistorySequence()>=result.firstHistorySequence() && result.lastHistorySequence()-result.firstHistorySequence()<6000
                 && instance.definitionHash() != null && instance.definitionHash().matches("[0-9a-f]{64}")
-                && RuntimeInputs.key(instance.definitionKey()) && instance.definitionVersion() > 0
+                && RuntimeInputs.isValidKey(instance.definitionKey()) && instance.definitionVersion() > 0
                 && task.id() > 0 && activity.id() > 0, Category.HOST_CONFIGURATION);
-        RuntimeInputs.require(RuntimeInputs.key(instance.currentNodeKey()) && validTime(instance.startedAt())
-                && RuntimeInputs.text(instance.startedBy(), 200, 200, true) && instance.terminationReason() == null
+        RuntimeInputs.require(RuntimeInputs.isValidKey(instance.currentNodeKey()) && validTime(instance.startedAt())
+                && RuntimeInputs.isValidText(instance.startedBy(), 200, 200, true) && instance.terminationReason() == null
                 && ((instance.businessType() == null && instance.businessId() == null)
-                    || (RuntimeInputs.key(instance.businessType()) && RuntimeInputs.text(instance.businessId(), 200, 200, true)))
-                && RuntimeInputs.key(activity.nodeKey()) && activity.activationSequence()>0 && activity.activationSequence()<=result.lastHistorySequence()
+                    || (RuntimeInputs.isValidKey(instance.businessType()) && RuntimeInputs.isValidText(instance.businessId(), 200, 200, true)))
+                && RuntimeInputs.isValidKey(activity.nodeKey()) && activity.activationSequence()>0 && activity.activationSequence()<=result.lastHistorySequence()
                 && (operation==WorkflowOperation.START_WORKFLOW ? activity.activationSequence()>=result.firstHistorySequence() : activity.activationSequence()<result.firstHistorySequence()) && activity.taskTypeId() > 0
                 && (activity.completionPolicy() == CompletionPolicy.SINGLE
                     ? activity.requiredTaskCount() == 1 && activity.contributionOutcomeKey() == null
                     : receipt.getResultSchemaVersion() == 6 && activity.completionPolicy() == CompletionPolicy.ALL
-                        && activity.requiredTaskCount() >= 1 && activity.requiredTaskCount() <= 100 && RuntimeInputs.key(activity.contributionOutcomeKey()))
-                && (activity.reviewRevisionRef() == null || RuntimeInputs.text(activity.reviewRevisionRef(), 200, 200, true))
+                        && activity.requiredTaskCount() >= 1 && activity.requiredTaskCount() <= 100 && RuntimeInputs.isValidKey(activity.contributionOutcomeKey()))
+                && (activity.reviewRevisionRef() == null || RuntimeInputs.isValidText(activity.reviewRevisionRef(), 200, 200, true))
                 && validTime(activity.enteredAt()) && !activity.enteredAt().isBefore(instance.startedAt()) && activity.enteredAt().equals(task.createdAt())
-                && RuntimeInputs.key(task.taskKey()) && task.assignment() != null && task.assignment().kind() != null
-                && RuntimeInputs.text(task.assignment().ref(), 200, 200, true) && task.dueAt() == null,
+                && RuntimeInputs.isValidKey(task.taskKey()) && task.assignment() != null && task.assignment().kind() != null
+                && RuntimeInputs.isValidText(task.assignment().ref(), 200, 200, true) && task.dueAt() == null,
                 Category.HOST_CONFIGURATION);
         boolean userTarget = task.assignment().kind() == io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER;
         if (!historical) {
-            RuntimeInputs.require((task.assigneeRef() == null || RuntimeInputs.text(task.assigneeRef(), 200, 200, true))
+            RuntimeInputs.require((task.assigneeRef() == null || RuntimeInputs.isValidText(task.assigneeRef(), 200, 200, true))
                     && (!userTarget || task.assigneeRef() == null || task.assignment().ref().equals(task.assigneeRef()))
                     && (!userTarget || task.status() != TaskStatus.OPEN || task.assignment().ref().equals(task.assigneeRef())),
                     Category.HOST_CONFIGURATION);
@@ -304,7 +304,7 @@ public class RuntimeJson {
             RuntimeInputs.require((terminal || instance.status() == InstanceStatus.ACTIVE)
                     && activity.status() == ActivityStatus.COMPLETED
                     && task.status() == TaskStatus.COMPLETED
-                    && (terminal ? RuntimeInputs.key(instance.resultKey()) && validTime(instance.endedAt())
+                    && (terminal ? RuntimeInputs.isValidKey(instance.resultKey()) && validTime(instance.endedAt())
                         && instance.endedAt().equals(activity.closedAt()) && receipt.getActorRef().equals(instance.endedBy())
                         : instance.resultKey() == null && instance.endedAt() == null && instance.endedBy() == null
                             && !instance.currentNodeKey().equals(activity.nodeKey()))
@@ -317,7 +317,7 @@ public class RuntimeJson {
                         || receipt.getActorRef().equals(task.assignment().ref()))
                     && "TASK_OUTCOME".equals(activity.closureReason())
                     && task.closureReason() == TaskClosureReason.TASK_OUTCOME
-                    && RuntimeInputs.key(task.outcomeKey()) && task.outcomeKey().equals(activity.outcomeKey())
+                    && RuntimeInputs.isValidKey(task.outcomeKey()) && task.outcomeKey().equals(activity.outcomeKey())
                     && activity.closedAt().equals(RuntimeViews.instant(receipt.getRecordedAt())), Category.HOST_CONFIGURATION);
         }
     }

@@ -50,7 +50,7 @@ public class WorkflowTaskEligibilityService {
     }
 
     public boolean isEligible(WorkflowTaskView task, String actorRef) {
-        RuntimeInputs.require(task != null && RuntimeInputs.text(actorRef, 200, 200, true), Category.INVALID_INPUT);
+        RuntimeInputs.require(task != null && RuntimeInputs.isValidText(actorRef, 200, 200, true), Category.INVALID_INPUT);
         if (task.assignment().kind() == AssignmentTargetKind.USER) return task.assignment().ref().equals(actorRef);
         var provider = provider();
         try { return provider.isCurrentMember(new TaskEligibilityContext(task, actorRef)); }

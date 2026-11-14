@@ -71,7 +71,7 @@ public class WorkflowRuntimeQueryService {
         this.instances = instances; this.activities = activities; this.tasks = tasks; this.history = history; this.pins = pins; this.json = json;
     }
     public WorkflowVariablePage listVariables(long instanceId,String afterKey,int limit,Long expectedLockVersion) {
-        RuntimeInputs.id(instanceId); RuntimeInputs.require(limit>=1 && limit<=100 && (afterKey==null || (RuntimeInputs.key(afterKey) && expectedLockVersion!=null))
+        RuntimeInputs.validatePositiveId(instanceId); RuntimeInputs.require(limit>=1 && limit<=100 && (afterKey==null || (RuntimeInputs.isValidKey(afterKey) && expectedLockVersion!=null))
                 && (expectedLockVersion==null || expectedLockVersion>=0),Category.INVALID_INPUT);
         long before=instances.readLockVersion(instanceId).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
         RuntimeInputs.require(expectedLockVersion==null || expectedLockVersion==before,Category.STALE_VERSION);
@@ -97,7 +97,7 @@ public class WorkflowRuntimeQueryService {
         return new WorkflowVariablePage(instanceId,before,items,next);
     }
     public Optional<WorkflowInstanceView> findInstance(long id) {
-        RuntimeInputs.id(id);
+        RuntimeInputs.validatePositiveId(id);
         return RuntimePersistenceErrors.call(() -> instances.findById(id).map(entity -> RuntimeViews.instance(entity, pins.identity(entity))));
     }
     /**
@@ -106,22 +106,22 @@ public class WorkflowRuntimeQueryService {
      */
     public WorkflowInstancePage listInstances(WorkflowInstanceQuery query) {
         RuntimeInputs.require(query != null, Category.INVALID_INPUT);
-        RuntimeInputs.page(query.afterId(), query.limit());
+        RuntimeInputs.validatePageRequest(query.afterId(), query.limit());
         return RuntimePersistenceErrors.call(() -> page(instances.findSummaryPage(query.status(), query.afterId(),
                 PageRequest.of(0, query.limit() + 1)), query.limit(), RuntimeViews::instanceSummary,
                 WorkflowInstanceSummary::id, WorkflowInstancePage::new));
     }
     public Optional<WorkflowActivityView> findActivity(long id) {
-        RuntimeInputs.id(id);
+        RuntimeInputs.validatePositiveId(id);
         return RuntimePersistenceErrors.call(() -> activities.findById(id).map(RuntimeViews::activity));
     }
     public Optional<WorkflowTaskView> findTask(long id) {
-        RuntimeInputs.id(id);
+        RuntimeInputs.validatePositiveId(id);
         return RuntimePersistenceErrors.call(() -> tasks.findById(id).map(entity -> RuntimeViews.task(entity, owner(entity))));
     }
     /** Creation-time values for an exact task already authorized by the host. */
     public Map<String, WorkflowValue> taskInputs(long instanceId, long taskId) {
-        RuntimeInputs.id(instanceId); RuntimeInputs.id(taskId);
+        RuntimeInputs.validatePositiveId(instanceId); RuntimeInputs.validatePositiveId(taskId);
         return RuntimePersistenceErrors.call(() -> {
             var task = tasks.findById(taskId).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
             var activity = owner(task);
@@ -135,8 +135,8 @@ public class WorkflowRuntimeQueryService {
     }
     /** Pinned policy for an exact task already authorized by the host. */
     public io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy taskClaimPolicy(long instanceId, long taskId) {
-        RuntimeInputs.id(instanceId);
-        RuntimeInputs.id(taskId);
+        RuntimeInputs.validatePositiveId(instanceId);
+        RuntimeInputs.validatePositiveId(taskId);
         return RuntimePersistenceErrors.call(() -> {
             var task = tasks.findById(taskId).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
             var activity = owner(task);
@@ -150,7 +150,7 @@ public class WorkflowRuntimeQueryService {
 
     /** Resolved metadata; the host must authorize the exact receiving task before calling. */
     public io.github.leontecristian.workflow.core.dto.definition.document.PreviousDecisionsPolicy previousDecisionsPolicy(long taskId) {
-        RuntimeInputs.id(taskId);
+        RuntimeInputs.validatePositiveId(taskId);
         return RuntimePersistenceErrors.call(() -> {
             var task = tasks.findById(taskId).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
             return pinnedHuman(owner(task)).previousDecisions();
@@ -163,7 +163,7 @@ public class WorkflowRuntimeQueryService {
      */
     public io.github.leontecristian.workflow.core.dto.runtime.PreviousDecisionPage listPreviousDecisions(
             long taskId, long afterSequence, int limit) {
-        RuntimeInputs.id(taskId);
+        RuntimeInputs.validatePositiveId(taskId);
         RuntimeInputs.require(afterSequence >= 0 && limit >= 1 && limit <= 50, Category.INVALID_INPUT);
         return RuntimePersistenceErrors.call(() -> {
             var task = tasks.findById(taskId).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
@@ -177,21 +177,21 @@ public class WorkflowRuntimeQueryService {
 
     public WorkflowTaskPage listTasks(long instanceId) { return listTasks(instanceId, 0, 50); }
     public WorkflowTaskPage listTasks(long instanceId, long afterId, int limit) {
-        RuntimeInputs.id(instanceId); RuntimeInputs.page(afterId, limit);
+        RuntimeInputs.validatePositiveId(instanceId); RuntimeInputs.validatePageRequest(afterId, limit);
         return RuntimePersistenceErrors.call(() -> page(tasks.findByInstancePage(instanceId, afterId, PageRequest.of(0, limit + 1)),
                 limit, RuntimeViews::task, WorkflowTaskView::id, WorkflowTaskPage::new));
     }
     public WorkflowTaskPage listAssignedTasks(String assignee) { return listAssignedTasks(assignee, 0, 50); }
     public WorkflowTaskPage listAssignedTasks(String assignee, long afterId, int limit) {
-        RuntimeInputs.require(RuntimeInputs.text(assignee, 200, 200, true), Category.INVALID_INPUT); RuntimeInputs.page(afterId, limit);
+        RuntimeInputs.require(RuntimeInputs.isValidText(assignee, 200, 200, true), Category.INVALID_INPUT); RuntimeInputs.validatePageRequest(afterId, limit);
         return RuntimePersistenceErrors.call(() -> page(tasks.findAssignedPage(assignee, assignee.length() * 2, afterId, PageRequest.of(0, limit + 1)),
                 limit, RuntimeViews::task, WorkflowTaskView::id, WorkflowTaskPage::new));
     }
     /** Bounded source scan. Continuation is the last examined candidate, including denied candidates. */
     public WorkflowTaskPage listEligibleTasks(String actorRef, long afterId, int limit,
             java.util.function.Predicate<WorkflowTaskView> hostAccess) {
-        RuntimeInputs.require(RuntimeInputs.text(actorRef,200,200,true) && hostAccess != null, Category.INVALID_INPUT);
-        RuntimeInputs.page(afterId,limit);
+        RuntimeInputs.require(RuntimeInputs.isValidText(actorRef,200,200,true) && hostAccess != null, Category.INVALID_INPUT);
+        RuntimeInputs.validatePageRequest(afterId,limit);
         return RuntimePersistenceErrors.call(() -> {
             var items = new ArrayList<WorkflowTaskView>();
             long cursor = afterId;
@@ -223,7 +223,7 @@ public class WorkflowRuntimeQueryService {
     }
     public WorkflowHistoryPage listHistory(long instanceId) { return listHistory(instanceId, 0, 50); }
     public WorkflowHistoryPage listHistory(long instanceId, long afterSequence, int limit) {
-        RuntimeInputs.id(instanceId); RuntimeInputs.page(afterSequence, limit);
+        RuntimeInputs.validatePositiveId(instanceId); RuntimeInputs.validatePageRequest(afterSequence, limit);
         return RuntimePersistenceErrors.call(() -> page(history.findSummaryPage(instanceId, afterSequence, PageRequest.of(0, limit + 1)),
                 limit, RuntimeViews::history, WorkflowHistorySummary::historySequence, WorkflowHistoryPage::new));
     }
@@ -236,7 +236,7 @@ public class WorkflowRuntimeQueryService {
      */
     public Optional<WorkflowHistoryEvent> findHistoryEvent(long instanceId, long sequence,
             Predicate<WorkflowHistorySummary> canReadTaskInputs) {
-        RuntimeInputs.id(instanceId); RuntimeInputs.id(sequence);
+        RuntimeInputs.validatePositiveId(instanceId); RuntimeInputs.validatePositiveId(sequence);
         Objects.requireNonNull(canReadTaskInputs);
         var fact = RuntimePersistenceErrors.call(() -> history.findById(new WorkflowHistoryId(instanceId, sequence)));
         if (fact.isEmpty()) return Optional.empty();
@@ -264,7 +264,7 @@ public class WorkflowRuntimeQueryService {
         });
     }
     public Optional<TaskSubmission> findTaskSubmission(long taskId) {
-        RuntimeInputs.id(taskId);
+        RuntimeInputs.validatePositiveId(taskId);
         return RuntimePersistenceErrors.call(() -> tasks.findById(taskId).filter(t -> t.getStatus() == TaskStatus.COMPLETED).map(task -> {
             var activity = owner(task);
             return submission(task, activity, submissionMode(activity));
@@ -272,7 +272,7 @@ public class WorkflowRuntimeQueryService {
     }
     public TaskSubmissionPage listActivitySubmissions(long activityId) { return listActivitySubmissions(activityId, 0, 50); }
     public TaskSubmissionPage listActivitySubmissions(long activityId, long afterTaskId, int limit) {
-        RuntimeInputs.id(activityId); RuntimeInputs.page(afterTaskId, limit);
+        RuntimeInputs.validatePositiveId(activityId); RuntimeInputs.validatePageRequest(afterTaskId, limit);
         return RuntimePersistenceErrors.call(() -> {
             var rows = tasks.findCompletedPage(activityId, afterTaskId, PageRequest.of(0, limit + 1));
             if (rows.isEmpty()) return new TaskSubmissionPage(List.of(), null);
@@ -316,7 +316,7 @@ public class WorkflowRuntimeQueryService {
         int completed = 0;
         var keys = new java.util.HashSet<String>();
         for (var task : roster.stream().sorted(java.util.Comparator.comparing(WorkflowTaskEntity::getTaskKey)).toList()) {
-            RuntimeInputs.require(RuntimeInputs.key(task.getTaskKey()) && keys.add(task.getTaskKey()) && task.getActivityId().equals(activity.getId()),Category.HOST_CONFIGURATION);
+            RuntimeInputs.require(RuntimeInputs.isValidKey(task.getTaskKey()) && keys.add(task.getTaskKey()) && task.getActivityId().equals(activity.getId()),Category.HOST_CONFIGURATION);
             if (task.getStatus() != TaskStatus.COMPLETED) {
                 RuntimeInputs.require(task.getStatus() == TaskStatus.CANCELLED && task.getClosureReason() == TaskClosureReason.ACTIVITY_RESOLVED
                         && !byTask.containsKey(task.getId()) && task.getOutcomeKey() == null
@@ -373,7 +373,7 @@ public class WorkflowRuntimeQueryService {
                 && (version == 2 || details.path("result").isObject()) && details.has("outcomeKey") && details.has("comment") && details.has("inputs")
                 && details.get("outcomeKey").isTextual() && details.get("inputs").isObject() && details.get("inputs").isEmpty()
                 && (details.get("comment").isNull() || (details.get("comment").isTextual()
-                    && RuntimeInputs.text(details.get("comment").textValue(), 2000, 2000, false))), Category.HOST_CONFIGURATION);
+                    && RuntimeInputs.isValidText(details.get("comment").textValue(), 2000, 2000, false))), Category.HOST_CONFIGURATION);
         RuntimeInputs.require(task.getStatus() == TaskStatus.COMPLETED && task.getClosureReason() == TaskClosureReason.TASK_OUTCOME
                 && fact.getActorKind() == ActorKind.USER && (task.getAssignmentKind() != io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER
                     || Objects.equals(task.getAssignmentRef(), fact.getActorRef()))
@@ -381,7 +381,7 @@ public class WorkflowRuntimeQueryService {
                 && !task.getClosedAt().isBefore(task.getCreatedAt()) && !task.getClosedAt().isBefore(activity.getEnteredAt())
                 && task.getId().equals(fact.getTaskId()) && activity.getId().equals(fact.getActivityId())
                 && activity.getInstanceId().equals(fact.getId().getInstanceId()) && "TASK_COMPLETED".equals(fact.getEventType())
-                && RuntimeInputs.key(task.getOutcomeKey()) && Objects.equals(task.getOutcomeKey(), details.get("outcomeKey").textValue()), Category.HOST_CONFIGURATION);
+                && RuntimeInputs.isValidKey(task.getOutcomeKey()) && Objects.equals(task.getOutcomeKey(), details.get("outcomeKey").textValue()), Category.HOST_CONFIGURATION);
         RuntimeInputs.require(version == 3 ? mode != Mode.FORBIDDEN : mode != Mode.REQUIRED, Category.HOST_CONFIGURATION);
         WorkflowJsonValue result = null;
         if (version == 3) {

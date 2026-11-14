@@ -127,12 +127,12 @@ final class RuntimePreviousDecisions {
                 && (version == 2 || details.path("result").isObject())
                 && details.path("outcomeKey").isTextual() && details.path("inputs").isObject() && details.path("inputs").isEmpty()
                 && details.has("comment") && (details.get("comment").isNull()
-                    || details.get("comment").isTextual() && RuntimeInputs.text(details.get("comment").textValue(), 2000, 2000, false))
+                    || details.get("comment").isTextual() && RuntimeInputs.isValidText(details.get("comment").textValue(), 2000, 2000, false))
                 && (version == 3 ? human.resultContract().mode() != TaskResultContract.Mode.FORBIDDEN
                     : human.resultContract().mode() != TaskResultContract.Mode.REQUIRED)
                 && task.getStatus() == io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.COMPLETED
                 && task.getClosureReason() == TaskClosureReason.TASK_OUTCOME && fact.getActorKind() == ActorKind.USER
-                && RuntimeInputs.text(fact.getActorRef(), 200, 200, true)
+                && RuntimeInputs.isValidText(fact.getActorRef(), 200, 200, true)
                 && Objects.equals(task.getClosedBy(), fact.getActorRef())
                 && (task.getAssignmentKind() != io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER
                     || Objects.equals(task.getAssignmentRef(), fact.getActorRef()))
