@@ -2,6 +2,7 @@ package io.github.leontecristian.workflow.testhost.service.runtime;
 
 import io.github.leontecristian.workflow.core.dto.runtime.AdministrativelyReleaseWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.ClaimWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.ReassignWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
@@ -24,6 +25,13 @@ public class ConsoleRuntimeCommandHost implements WorkflowRuntimeCommandHost {
             ConsoleRuntimeAccess access, ConsoleContext context) {
         this.commands = commands; this.transactions = transactions; this.access = access; this.context = context;
     }
+    @Override public WorkflowCommandResult reassign(ReassignWorkflowTask command, String correlation) {
+        return policy(() -> commands.reassign(command, context.runtime(correlation)));
+    }
+    @Override public Optional<WorkflowCommandResult> replayReassignment(ReassignWorkflowTask command, String correlation) {
+        return policy(() -> transactions.replayReassignment(command, context.runtime(correlation)));
+    }
+
     @Override public WorkflowCommandResult complete(CompleteWorkflowTask command, String correlation) {
         return policy(() -> {
             access.task(command.taskId());

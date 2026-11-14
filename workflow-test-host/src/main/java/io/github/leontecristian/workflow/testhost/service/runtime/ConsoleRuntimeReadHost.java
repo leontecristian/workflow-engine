@@ -34,6 +34,22 @@ public class ConsoleRuntimeReadHost implements WorkflowRuntimeReadHost {
                     unavailable);
         }
     }
+    @Override public void requireTaskAdministrationAccess() {
+        if (!context.admin()) throw new WorkflowRuntimeException(403, "ADMINISTRATION_FORBIDDEN");
+    }
+    @Override public io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationPage listAdministrationTasks(
+            io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationQuery query) {
+        requireTaskAdministrationAccess();
+        return reads.listAdministrationTasks(query, item -> access.canReadTask(item.task()));
+    }
+    @Override public boolean canReassignTask(WorkflowTaskView task) {
+        return access.canReassignTask(task);
+    }
+    @Override public io.github.leontecristian.workflow.web.dto.runtime.WorkflowReassignmentTargetPage reassignmentTargets(
+            WorkflowTaskView task, io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind kind,
+            String query, String cursor, int limit) {
+        return policy(() -> access.reassignmentTargets(task, kind, query, cursor, limit));
+    }
     @Override public void requireMonitorAccess() {
         if (!context.admin()) throw new WorkflowRuntimeException(403, "FORBIDDEN");
     }

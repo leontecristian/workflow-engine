@@ -32,6 +32,10 @@ export function commandRequest(envelope:Envelope,replay:boolean):{path:string;bo
  const {instanceId,taskId,...body}=envelope.body;
  const path=replay?`/commands/${envelope.kind}/replay`:`/instances/${instanceId}/tasks/${taskId}/${envelope.kind}`;
  const requestBody=replay?envelope.body:body;
+ if(envelope.kind==='reassign') {
+  const {assignmentKind,assignmentRef,...fields}=requestBody;
+  return {path,body:{...fields,assignment:{kind:assignmentKind,ref:assignmentRef}},token:envelope.expectedToken};
+ }
  if(envelope.kind==='complete'&&Object.hasOwn(requestBody,'resultJson')) {
   const {resultJson,...fields}=requestBody;
   return {path,body:JSON.stringify(fields).slice(0,-1)+',"result":'+freezeResultJson(resultJson)+'}',token:envelope.expectedToken};

@@ -1,11 +1,13 @@
 import { InjectionToken } from '@angular/core';
 import type { InstanceSummary } from '../models';
-import type { Page, PreviousDecisionPage, VariablePage, TaskView, TaskContract, TaskSubmission, ActivityView, SubmissionPage, CommandResult, ReplayResult } from './models';
+import type { Page, PreviousDecisionPage, VariablePage, TaskAdministrationFilters, TaskAdministrationRow, TaskView, TaskContract, TaskSubmission, ActivityView, SubmissionPage, CommandResult, ReplayResult } from './models';
 import type { Envelope, StartEnvelopeAdapter } from './command/command-buffer';
+import type { WorkflowReassignmentTargetPage } from './models';
 /** Host-authorized reads; transport and cancellation belong to the host. */
 export interface WorkflowRuntimeReads {
  listInstances(status:string,cursor:string|undefined,limit:number,signal:AbortSignal):Promise<Page<InstanceSummary>>;
  variables(id:string,afterKey:string|undefined,expectedLockVersion:string|undefined,signal:AbortSignal):Promise<VariablePage>;
+ administrationTasks?(filters:TaskAdministrationFilters,cursor:string|undefined,limit:number,signal:AbortSignal):Promise<Page<TaskAdministrationRow>>;
  assignedTasks(cursor:string|undefined,limit:number,signal:AbortSignal):Promise<Page<TaskView>>;
  instanceTasks(id:string,cursor:string|undefined,limit:number,signal:AbortSignal):Promise<Page<TaskView>>;
  task(id:string,signal:AbortSignal):Promise<TaskView>;
@@ -37,3 +39,11 @@ export const DEFAULT_RUNTIME_MESSAGES = {
  refresh:'Refresh', loading:'Loading…', empty:'No records on this page.', next:'Next page', failed:'Read failed. Refresh to try again.',
 };
 export type WorkflowRuntimeMessages = typeof DEFAULT_RUNTIME_MESSAGES;
+
+/** Optional host-owned task administration permissions, directory and command transport. */
+export interface WorkflowTaskReassignment {
+ availability(taskId:string,signal:AbortSignal):Promise<{allowed:boolean;instanceLockVersion:string}>;
+ targets(taskId:string,kind:'USER'|'GROUP'|'ROLE',query:string,cursor:string|undefined,limit:number,signal:AbortSignal):Promise<WorkflowReassignmentTargetPage>;
+ reassign(envelope:Envelope,replay:boolean,signal:AbortSignal):Promise<CommandResult|ReplayResult>;
+}
+export const WORKFLOW_TASK_REASSIGNMENT = new InjectionToken<WorkflowTaskReassignment>('Workflow task reassignment');

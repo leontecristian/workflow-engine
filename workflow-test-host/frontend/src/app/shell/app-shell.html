@@ -34,6 +34,7 @@
           ></a
         >
         @if(api.admin){
+        <a mat-list-item routerLink="/task-administration" routerLinkActive="nav-active" (click)="compact() && navigation.close()"><mat-icon aria-hidden="true" matListItemIcon>assignment_turned_in</mat-icon><span matListItemTitle>Task administration</span></a>
         <a
           mat-list-item
           routerLink="/instances"

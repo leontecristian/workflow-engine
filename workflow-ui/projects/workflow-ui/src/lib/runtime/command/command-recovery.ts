@@ -1,5 +1,5 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { WORKFLOW_RUNTIME_COMMANDS, WORKFLOW_CANCELLATION } from '../contracts';
+import { WORKFLOW_RUNTIME_COMMANDS, WORKFLOW_CANCELLATION, WORKFLOW_TASK_REASSIGNMENT } from '../contracts';
 import { CommandBuffer } from './command-buffer';
 import type { Observation, Execution, CancellationExecution } from '../models';
 /** In-memory session state. Route destruction does not discard immutable requests. */
@@ -7,6 +7,7 @@ import type { Observation, Execution, CancellationExecution } from '../models';
 export class CommandRecovery {
  private readonly transport=inject(WORKFLOW_RUNTIME_COMMANDS,{optional:true});
  private readonly cancellation=inject(WORKFLOW_CANCELLATION,{optional:true});
+ private readonly reassignment=inject(WORKFLOW_TASK_REASSIGNMENT,{optional:true});
  readonly buffer=new CommandBuffer(this.transport?.start);
  readonly result=signal<Observation|null>(null);
  readonly observations=new Map<string,Observation>();
@@ -22,22 +23,24 @@ export class CommandRecovery {
  async execute(replay:boolean,signal=new AbortController().signal){
   const envelope=this.buffer.command;
   if(!envelope||!this.scope)throw new Error('No command selected in a current session');
-  if(envelope.kind==='cancel'?!this.cancellation:!this.transport)throw new Error('Host command adapter is required');
+  if(envelope.kind==='reassign'?!this.reassignment:envelope.kind==='cancel'?!this.cancellation:!this.transport)throw new Error('Host command adapter is required');
   const generation=this.generation,id=envelope.body['commandId']!;
   const wasUncertain=this.pendingIds.has(id);
   if(this.runningIds.has(id))throw new Error('Command is already pending');
   this.runningIds.add(id);
-  if(envelope.kind==='cancel'&&!replay)this.pendingIds.add(id);
+  if((envelope.kind==='cancel'||envelope.kind==='reassign')&&!replay)this.pendingIds.add(id);
   this.result.set(this.observations.get(id)||null);
   try {
-   const result=envelope.kind==='cancel'
+   const result=envelope.kind==='reassign'
+    ? await this.reassignment!.reassign(envelope,replay,signal)
+    : envelope.kind==='cancel'
     ? await (replay?this.cancellation!.replay(envelope,signal):this.cancellation!.cancel(envelope,signal))
     : envelope.kind==='start'
     ? await (replay?this.transport!.start!.replay(envelope,signal):this.transport!.start!.execute(envelope,signal))
     : envelope.kind==='complete'
      ? await (replay?this.transport!.replayComplete(envelope,signal):this.transport!.complete(envelope,signal))
      : await (this.transport!.ownership?.(envelope,replay,signal) ?? Promise.reject(new Error('Host ownership transport is required')));
-   if(generation===this.generation&&envelope.kind==='cancel'){
+   if(generation===this.generation&&(envelope.kind==='cancel'||envelope.kind==='reassign')){
     if(!replay||'found' in result&&result.found)this.pendingIds.delete(id);
    }
    this.record(generation,id,{outcome:replay?'REPLAY_ONLY_LOOKUP':'replayed' in result&&result.replayed?'REPLAYED_ORIGINAL_RESULT':'NEW_COMMITTED_RESULT',result});return result;
@@ -45,8 +48,8 @@ export class CommandRecovery {
    const failure=error as {httpStatus?:number;code?:string};
    const status=failure?.httpStatus;
    const rejected=status&&status<500||status===503&&failure?.code==='RESULT_VALIDATION_FAILED';
-   if(generation===this.generation&&envelope.kind==='cancel'&&!rejected)this.pendingIds.add(id);
-   if(generation===this.generation&&envelope.kind==='cancel'&&rejected&&!replay&&!wasUncertain)this.pendingIds.delete(id);
+   if(generation===this.generation&&(envelope.kind==='cancel'||envelope.kind==='reassign')&&!rejected)this.pendingIds.add(id);
+   if(generation===this.generation&&(envelope.kind==='cancel'||envelope.kind==='reassign')&&rejected&&!replay&&!wasUncertain)this.pendingIds.delete(id);
    this.record(generation,id,{outcome:rejected?'REJECTED':'UNKNOWN_OUTCOME',message:String(error)});throw error;
   } finally {
    if(generation===this.generation)this.runningIds.delete(id);

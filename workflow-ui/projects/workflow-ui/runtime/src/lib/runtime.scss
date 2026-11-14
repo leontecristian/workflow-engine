@@ -82,3 +82,5 @@
   .decision-entry { padding: 12px; gap: 10px; }
   .decision-meta { flex-direction: column; gap: 2px; }
 }
+
+.administration-filters{display:flex;flex-wrap:wrap;gap:1rem;align-items:center}.administration-filters mat-form-field{flex:1 1 12rem}.table-scroll{overflow-x:auto}.administration-table{width:100%;border-collapse:collapse}.administration-table th,.administration-table td{text-align:left;padding:1rem .75rem;vertical-align:top;overflow-wrap:anywhere;border-bottom:1px solid var(--mat-sys-outline-variant)}

@@ -1,17 +1,50 @@
-import { Component, Input, computed, inject, signal } from '@angular/core';
-import { CommandRecovery, WORKFLOW_RUNTIME_COMMANDS } from '@workflow-engine/ui';
-import type { TaskView, TaskContract, TaskSubmission, PreviousDecision } from '@workflow-engine/ui';
+import { Component, Injector, Input, computed, inject, signal } from '@angular/core';
+import { CommandRecovery, WORKFLOW_RUNTIME_COMMANDS, WORKFLOW_TASK_REASSIGNMENT } from '@workflow-engine/ui';
+import type { Envelope, TaskView, TaskContract, TaskSubmission, PreviousDecision } from '@workflow-engine/ui';
 import { RuntimeState } from './runtime-state';
 import { PAGE_IMPORTS } from './page-imports';
 import { download } from './variables';
 import { currentWork } from './current-work';
 @Component({selector:"workflow-task",standalone:true,imports:[...PAGE_IMPORTS],styleUrl:"./runtime.scss",templateUrl:"./task.html"})
 export class WorkflowTaskComponent extends RuntimeState {
+  readonly reassignment=inject(WORKFLOW_TASK_REASSIGNMENT,{optional:true});
+  private readonly injector=inject(Injector);
+  readonly reassignmentAvailability=signal<{allowed:boolean;instanceLockVersion:string}|null>(null);
+  readonly reassignBusy=signal(false);readonly reassignNotice=signal('');readonly lookupMiss=signal(false);
+  private dialogOpen=false;private confirmation?:{close():void};private closed=false;
+  constructor(){super();this.destroyRef.onDestroy(()=>{this.closed=true;this.confirmation?.close();});}
+  protected override onInvalidate(){this.confirmation?.close();this.dialogOpen=false;}
+  pendingReassignment():Envelope|null{return this.commands.buffer.entries.find(e=>e.kind==='reassign'&&e.body['taskId']===this.id&&this.commands.pendingIds.has(e.body['commandId']!))??null;}
+  canReassign(){const a=this.reassignmentAvailability();return !!(this.reassignment&&this.detail()?.status==='OPEN'&&a?.allowed&&a.instanceLockVersion===this.contract()?.instanceLockVersion&&!this.uncertain);}
+  async confirmReassignment(){
+   if(!this.canReassign()||this.busy()||this.reassignBusy()||this.dialogOpen)return;
+   const id=this.id,scope=this.sessionScope,version=this.contract()!.instanceLockVersion;this.dialogOpen=true;
+   try{const [{MatDialog},{WorkflowReassignmentDialog}]=await Promise.all([import('@angular/material/dialog'),import('./reassignment-dialog')]);
+    if(this.closed||scope!==this.sessionScope||id!==this.id||version!==this.contract()?.instanceLockVersion||!this.canReassign()){this.dialogOpen=false;return;}
+    const dialog=this.confirmation=this.injector.get(MatDialog).open(WorkflowReassignmentDialog,{data:{task:this.detail(),version},width:'36rem',maxWidth:'95vw'});
+    dialog.afterClosed().subscribe((envelope:Envelope|undefined)=>{this.dialogOpen=false;
+     if(!envelope||this.closed||scope!==this.sessionScope||id!==this.id||version!==this.contract()?.instanceLockVersion||!this.canReassign())return;
+     const frozen=this.commands.buffer.remember(envelope);void this.sendReassignment(frozen,false);
+    });
+   }catch{this.dialogOpen=false;if(!this.closed&&scope===this.sessionScope&&id===this.id)this.reassignNotice.set('Confirmation could not be opened. Try again.');}
+  }
+  async sendReassignment(envelope:Envelope,replay:boolean){
+   if(this.reassignBusy()||this.closed)return;const id=this.id,scope=this.sessionScope;
+   const current=()=>!this.closed&&scope===this.sessionScope&&id===this.id;
+   this.reassignBusy.set(true);this.reassignNotice.set('');this.commands.buffer.select(envelope.body['commandId']!);
+   try{const result=await this.commands.execute(replay);if(!current())return;
+    if('found' in result&&!result.found){this.lookupMiss.set(true);this.reassignNotice.set('No committed reassignment result was found.');}
+    else{this.lookupMiss.set(false);await this.load();if(current())this.reassignNotice.set('Task reassigned.');}
+   }catch{if(!current())return;this.lookupMiss.set(false);
+    if(this.commands.pendingIds.has(envelope.body['commandId']!))this.reassignNotice.set('Reassignment outcome unknown. Check the result before retrying.');
+    else{await this.load();if(current())this.reassignNotice.set('Reassignment was rejected. Current details have been refreshed; confirm a new request if available.');}
+   }finally{if(current())this.reassignBusy.set(false);}
+  }
   @Input() diagnosticsEnabled = false;
   get uncertain(): boolean {
-    return this.commands.buffer.entries.some(e => e.kind !== "start" && e.body["taskId"] === this.id && this.commands.observations.get(e.body["commandId"]!)?.outcome === "UNKNOWN_OUTCOME");
+    return !!this.pendingReassignment() || this.commands.buffer.entries.some(e => e.kind !== "start" && e.body["taskId"] === this.id && this.commands.observations.get(e.body["commandId"]!)?.outcome === "UNKNOWN_OUTCOME");
   }
- protected clearContent(){this.cancelPreviousRead();this.previousDecisions.set([]);this.previousCursor.set(null);this.previousError.set('');this.detail.set(null);this.contract.set(null);this.submission.set(null);this.currentTasks.set([]);this.comment="";this.outcome="";this.reason="";this.resultDraft="";}
+ protected clearContent(){this.reassignmentAvailability.set(null);this.reassignNotice.set('');this.lookupMiss.set(false);this.cancelPreviousRead();this.previousDecisions.set([]);this.previousCursor.set(null);this.previousError.set('');this.detail.set(null);this.contract.set(null);this.submission.set(null);this.currentTasks.set([]);this.comment="";this.outcome="";this.reason="";this.resultDraft="";}
   previousDecisions = signal<PreviousDecision[]>([]);
   previousCursor = signal<string | null>(null);
   previousBusy = signal(false);
@@ -69,7 +102,7 @@ export class WorkflowTaskComponent extends RuntimeState {
   }
   commands = inject(CommandRecovery);
   readonly commandProvider=inject(WORKFLOW_RUNTIME_COMMANDS,{optional:true});
-  protected onScope(){this.commands.setScope(this.sessionScope);}
+  protected onScope(){this.commands.setScope(this.sessionScope);this.reassignBusy.set(false);}
   private completing=false;
   protected clearFailedRead(){if(!this.completing)this.clearContent();}
   async load() {
@@ -94,6 +127,10 @@ export class WorkflowTaskComponent extends RuntimeState {
       this.detail.set(task.detail);
       this.contract.set(task.contract);
       this.submission.set(s);
+      if(this.reassignment&&task.detail.status==='OPEN'){
+       const availability=await this.reassignment.availability(id,signal);
+       if(current())this.reassignmentAvailability.set(availability);
+      }
     });
     // The read-only context has its own request state and never gates completion.
     if(loaded)await this.loadPreviousDecisions();
@@ -106,7 +143,7 @@ export class WorkflowTaskComponent extends RuntimeState {
   async ownership(kind: 'claim'|'release'|'admin-release'): Promise<void> {
     const contract=this.contract(), detail=this.detail();
     const allowed=kind==='claim'?contract?.canClaim:kind==='release'?contract?.canRelease:contract?.canAdminRelease;
-    if(this.busy() || !this.commandProvider?.ownership || !detail || detail.status!=='OPEN' || detail.assignment.kind==='USER' || !allowed || this.uncertain)return;
+    if(this.busy() || this.reassignBusy() || !this.commandProvider?.ownership || !detail || detail.status!=='OPEN' || detail.assignment.kind==='USER' || !allowed || this.uncertain)return;
     this.completing=true;
     let conflict=false;
     const succeeded=await this.run(async(signal) => {

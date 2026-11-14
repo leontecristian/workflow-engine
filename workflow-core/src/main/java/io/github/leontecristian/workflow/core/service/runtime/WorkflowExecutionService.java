@@ -85,6 +85,13 @@ public class WorkflowExecutionService {
     private final RuntimeServiceProgression services;
     private final ObjectProvider<WorkflowTaskSubmissionValidator> submissionValidator;
     private final ObjectProvider<WorkflowCancellationAuthorization> cancellationAuthorization;
+    private ObjectProvider<WorkflowTaskReassignmentAuthorization> reassignmentAuthorization;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setReassignmentAuthorization(ObjectProvider<WorkflowTaskReassignmentAuthorization> authorization) {
+        this.reassignmentAuthorization = authorization;
+    }
+
     private final ThreadLocal<Boolean> executing = new ThreadLocal<>();
 
     public WorkflowExecutionService(WorkflowInstanceRepository instances, WorkflowActivityRepository activities,
@@ -528,6 +535,115 @@ public class WorkflowExecutionService {
         return findOwnershipReplay(ownershipRequest(command), context);
     }
 
+    private WorkflowTaskReassignmentAuthorization reassignmentAdapter() {
+        try {
+            var adapter = reassignmentAuthorization == null ? null : reassignmentAuthorization.getIfAvailable();
+            RuntimeInputs.require(adapter != null, Category.HOST_CONFIGURATION);
+            return adapter;
+        } catch (WorkflowExecutionException failure) { throw failure; }
+        catch (RuntimeException failure) { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION, failure); }
+    }
+
+    private void validateReassignment(io.github.leontecristian.workflow.core.dto.runtime.ReassignWorkflowTask command,
+            WorkflowCommandContext context) {
+        RuntimeInputs.validateContextAndGetOccurredAtUtc(context);
+        RuntimeInputs.require(command != null && command.commandId() != null && command.instanceId() > 0
+                && command.taskId() > 0 && command.expectedLockVersion() >= 0 && command.assignment() != null
+                && command.assignment().kind() != null && RuntimeInputs.isValidText(command.assignment().ref(), 200, 200, true)
+                && RuntimeInputs.isValidText(command.reason(), 1000, 1000, true)
+                && context.actorKind() == ActorKind.USER, Category.INVALID_INPUT);
+    }
+
+    private boolean reassignmentDecision(java.util.function.BooleanSupplier decision) {
+        try { return decision.getAsBoolean(); }
+        catch (RuntimeException failure) { throw new WorkflowExecutionException(Category.AUTHORIZATION_LOOKUP_FAILED, failure); }
+    }
+
+    private EnteredStage reassignmentAccess(io.github.leontecristian.workflow.core.dto.runtime.ReassignWorkflowTask command,
+            WorkflowCommandContext context, WorkflowTaskReassignmentAuthorization adapter) {
+        var task = tasks.findById(command.taskId()).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
+        var activity = activities.findById(task.getActivityId()).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
+        RuntimeInputs.require(activity.getInstanceId().equals(command.instanceId()), Category.NOT_FOUND);
+        RuntimeInputs.require(reassignmentDecision(() -> adapter.canAccess(new TaskEligibilityContext(RuntimeViews.task(task, activity), context.actorRef()))), Category.NOT_FOUND);
+        return new EnteredStage(activity, task);
+    }
+
+    private Optional<WorkflowExecutionResult> reassignmentReplay(io.github.leontecristian.workflow.core.dto.runtime.ReassignWorkflowTask command,
+            WorkflowCommandContext context) {
+        return replay(command.commandId(), WorkflowOperation.REASSIGN_TASK, context, json.reassignmentFingerprint(command, context)).map(result -> {
+            RuntimeInputs.require(result.instance().id() == command.instanceId() && result.task().id() == command.taskId()
+                    && result.task().assignment().equals(command.assignment()) && result.instance().lockVersion() > command.expectedLockVersion(), Category.HOST_CONFIGURATION);
+            return result;
+        });
+    }
+
+    /** Lookup only: current business access and original receipt actor remain mandatory. */
+    public Optional<WorkflowExecutionResult> findReplay(io.github.leontecristian.workflow.core.dto.runtime.ReassignWorkflowTask command,
+            WorkflowCommandContext context) {
+        validateReassignment(command, context);
+        return RuntimePersistenceErrors.call(() -> {
+            reassignmentAccess(command, context, reassignmentAdapter());
+            return reassignmentReplay(command, context);
+        });
+    }
+
+    /** Replace only the current target and owner, preserving identity, obligations and frozen inputs. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public WorkflowCommandResult reassignTask(io.github.leontecristian.workflow.core.dto.runtime.ReassignWorkflowTask command,
+            WorkflowCommandContext context) {
+        return guarded(() -> {
+            validateReassignment(command, context);
+            var adapter = reassignmentAdapter();
+            var stage = reassignmentAccess(command, context, adapter);
+            var replay = reassignmentReplay(command, context);
+            if (replay.isPresent()) return new WorkflowCommandResult(true, replay.get());
+            RuntimeInputs.require(reassignmentDecision(() -> adapter.canReassign(new TaskEligibilityContext(
+                    RuntimeViews.task(stage.task(), stage.activity()), context.actorRef()))), Category.REASSIGNMENT_FORBIDDEN);
+            var instance = instances.findById(command.instanceId()).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
+            entityManager.refresh(instance);
+            RuntimeInputs.require(instance.getLockVersion() == command.expectedLockVersion(), Category.STALE_VERSION);
+            RuntimeInputs.require(instance.getStatus() == InstanceStatus.ACTIVE && instance.getLastHistorySequence() >= 4, Category.INVALID_STATE);
+            long sequence = instance.reserveHistorySequence();
+            entityManager.flush(); // Version-checked aggregate claim serializes all competing commands.
+            var task = stage.task(); var activity = stage.activity();
+            entityManager.refresh(activity); entityManager.refresh(task);
+            // Host grants may depend on the assignment/owner cached before the aggregate claim.
+            // Recheck the serialized current task only on a fresh mutation; receipt replay stays privilege-independent.
+            var currentAccess = new TaskEligibilityContext(RuntimeViews.task(task, activity), context.actorRef());
+            RuntimeInputs.require(reassignmentDecision(() -> adapter.canAccess(currentAccess)), Category.NOT_FOUND);
+            RuntimeInputs.require(reassignmentDecision(() -> adapter.canReassign(currentAccess)), Category.REASSIGNMENT_FORBIDDEN);
+            RuntimeInputs.require(activity.getStatus() == ActivityStatus.ACTIVE && task.getStatus() == TaskStatus.OPEN
+                    && instance.getCurrentNodeKey().equals(activity.getNodeKey()), Category.INVALID_STATE);
+            RuntimeInputs.require(!command.assignment().equals(task.getAssignment()), Category.CONFLICT);
+            var time = RuntimeInputs.validateContextAndGetOccurredAtUtc(context);
+            RuntimeInputs.require(!time.isBefore(task.getCreatedAt()), Category.INVALID_INPUT);
+            var definition = pins.load(instance);
+            var human = definition.model().humans().get(activity.getNodeKey());
+            RuntimeInputs.require(human != null, Category.HOST_CONFIGURATION);
+            if (!human.inputs().isEmpty()) RuntimeTaskCreationEvidence.read(history.findCreationByTaskId(task.getId())
+                    .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION)), task, activity, human.inputs(), json, history);
+            RuntimeInputs.require(reassignmentDecision(() -> adapter.isValidTarget(new TaskEligibilityContext(
+                    RuntimeViews.task(task, activity), context.actorRef()), command.assignment())), Category.INVALID_ASSIGNMENT);
+            eligibility.requireTarget(new AssignmentContext(command.commandId(), instance.getId(), definition.versionId(),
+                    definition.key(), definition.version(), definition.contentHash(), activity.getNodeKey(),
+                    instance.getBusinessType(), instance.getBusinessId(), context), command.assignment());
+            var previous = task.getAssignment(); String previousAssignee = task.getAssigneeRef();
+            task.reassign(command.assignment());
+            var details = json.object();
+            var before = json.object(); before.put("kind", previous.kind().name()); before.put("ref", previous.ref());
+            var after = json.object(); after.put("kind", task.getAssignmentKind().name()); after.put("ref", task.getAssignmentRef());
+            details.set("previousAssignment", before); details.set("assignment", after);
+            details.put("previousAssigneeRef", previousAssignee); details.put("assigneeRef", task.getAssigneeRef()); details.put("reason", command.reason());
+            var batch = new RuntimeHistoryBatch(entityManager, json, instance.getId(), definition.versionId(), command.commandId(), context);
+            batch.beginAt(sequence - 1);
+            batch.next("TASK_REASSIGNED", activity.getId(), task.getId(), details, Map.of(
+                    "previousAssignmentKind", previous.kind().name(), "previousAssignmentRef", previous.ref(),
+                    "assignmentKind", task.getAssignmentKind().name(), "assignmentRef", task.getAssignmentRef()), (short) 1);
+            return finish(command.commandId(), WorkflowOperation.REASSIGN_TASK, context, json.reassignmentFingerprint(command, context),
+                    definition, instance, activity, task, sequence, batch, host.recorder(), RuntimeJson.FINGERPRINT_VERSION);
+        });
+    }
+
     private record OwnershipRequest(UUID commandId, WorkflowOperation operation, long instanceId, long taskId,
                                     long expectedLockVersion, String reason) {
         void validate(WorkflowCommandContext context) {
@@ -751,7 +867,7 @@ public class WorkflowExecutionService {
         entityManager.flush(); // Capture actual final managed token after every instance update, not a predicted increment.
         WorkflowExecutionResult result = snapshot(commandId, operation, definition, instance, activity, task, first);
         entityManager.persist(new WorkflowCommandReceiptEntity(commandId, instance.getId(), operation.name(), context.actorKind(), context.actorRef(),
-                fingerprint, fingerprintVersion, RuntimeInputs.validateContextAndGetOccurredAtUtc(context), json.evidence(result), (short)(activity.getCompletionPolicy() == CompletionPolicy.ALL ? 6 : 5)));
+                fingerprint, fingerprintVersion, RuntimeInputs.validateContextAndGetOccurredAtUtc(context), json.evidence(result), (short)(operation == WorkflowOperation.REASSIGN_TASK ? 8 : activity.getCompletionPolicy() == CompletionPolicy.ALL ? 6 : 5)));
         entityManager.flush(); // Detect a receipt-PK loser before invoking the durable recorder; never recover in this transaction.
         host.record(recorder, batch.events());
         entityManager.flush();

@@ -1,6 +1,6 @@
 import { DestroyRef, Injectable, inject } from '@angular/core';
 import { CommandRecovery } from '@workflow-engine/ui';
-import type { WorkflowRuntimeCommands, WorkflowCancellation, CancellationResult, CancellationReplay, StartEnvelopeAdapter, Envelope, CommandResult, ReplayResult } from '@workflow-engine/ui';
+import type { WorkflowRuntimeCommands, WorkflowCancellation, CancellationResult, CancellationReplay, StartEnvelopeAdapter, Envelope, CommandResult, ReplayResult, WorkflowReassignmentTargetPage } from '@workflow-engine/ui';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ConsoleSession } from './console-session';
 import { commandRequest, freezeStartBody } from '../command-buffer';
@@ -12,6 +12,12 @@ export class ConsoleRuntimeCommands implements WorkflowRuntimeCommands, Workflow
   replay:(envelope,signal)=>this.dispatch<ReplayResult>(envelope,true,signal)};
  complete(envelope:Envelope,signal:AbortSignal){return this.dispatch<CommandResult>(envelope,false,signal);}
  replayComplete(envelope:Envelope,signal:AbortSignal){return this.dispatch<ReplayResult>(envelope,true,signal);}
+ reassignmentAvailability(taskId:string,signal:AbortSignal){return this.session.viewerRead<{allowed:boolean;instanceLockVersion:string}>('/tasks/'+encodeURIComponent(taskId)+'/reassignment-availability',signal);}
+ targets(taskId:string,kind:'USER'|'GROUP'|'ROLE',query:string,cursor:string|undefined,limit:number,signal:AbortSignal){
+  const params=new URLSearchParams({kind,query,limit:String(limit)});if(cursor!==undefined)params.set('cursor',cursor);
+  return this.session.viewerRead<WorkflowReassignmentTargetPage>('/tasks/'+encodeURIComponent(taskId)+'/reassignment-targets?'+params,signal);
+ }
+ reassign(envelope:Envelope,replay:boolean,signal:AbortSignal){return this.dispatch<CommandResult|ReplayResult>(envelope,replay,signal);}
  ownership(envelope:Envelope,replay:boolean,signal:AbortSignal){return this.dispatch<CommandResult | ReplayResult>(envelope,replay,signal);}
  availability(id:string,signal:AbortSignal){return this.session.viewerRead<{allowed:boolean;lockVersion:string}>(`/instances/${encodeURIComponent(id)}/cancellation-availability`,signal);}
  cancel(envelope:Envelope,signal:AbortSignal){return this.dispatch<CancellationResult>(envelope,false,signal);}

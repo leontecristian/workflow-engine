@@ -2,6 +2,7 @@ package io.github.leontecristian.workflow.testhost.service.runtime;
 
 import io.github.leontecristian.workflow.core.dto.runtime.AdministrativelyReleaseWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.ClaimWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.ReassignWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
@@ -69,6 +70,11 @@ public class ConsoleRuntimeCoordinator {
         } finally {
             LOG.info("Console complete end command={}", command.commandId());
         }
+    }
+
+    public WorkflowCommandResult reassign(ReassignWorkflowTask command, WorkflowCommandContext context) {
+        return executeOwnership(() -> transactions.reassign(command, context),
+                () -> transactions.replayReassignment(command, context));
     }
 
     public WorkflowCommandResult claim(ClaimWorkflowTask command, WorkflowCommandContext context) {

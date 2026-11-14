@@ -171,7 +171,7 @@ final class RuntimeTaskCreationEvidence {
                         : !assignee.isNull()) return false;
             }
         } else return false;
-        return RuntimeInputs.isValidText(target.ref(), 200, 200, true) && target.equals(task.getAssignment())
+        return RuntimeInputs.isValidText(target.ref(), 200, 200, true)
                 && history.getOccurredAt().equals(task.getCreatedAt());
     }
 }

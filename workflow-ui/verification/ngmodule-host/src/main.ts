@@ -8,10 +8,10 @@ import { Observable, firstValueFrom, fromEvent, takeUntil } from 'rxjs';
 import { WorkflowInstanceViewerComponent, WorkflowHistoryComponent, WorkflowHistoryEventComponent, WORKFLOW_VIEWER_READS, WORKFLOW_VIEWER_NAVIGATION, DEFAULT_VIEWER_MESSAGES, normalizeViewerReadError } from '@workflow-engine/ui';
 import type {WorkflowViewerReads, WorkflowViewerNavigation, ViewerDestination, InstanceView, HistoryPage, HistoryEvent, InstanceGraph} from '@workflow-engine/ui';
 import { WORKFLOW_ADMINISTRATION_API } from '@workflow-engine/ui';
-import { WORKFLOW_RUNTIME_READS, WORKFLOW_RUNTIME_COMMANDS, WORKFLOW_CANCELLATION, CommandRecovery } from '@workflow-engine/ui';
-import type { WorkflowCancellation, CancellationResult } from '@workflow-engine/ui';
+import { WORKFLOW_RUNTIME_READS, WORKFLOW_RUNTIME_COMMANDS, WORKFLOW_CANCELLATION, WORKFLOW_TASK_REASSIGNMENT, CommandRecovery } from '@workflow-engine/ui';
+import type { WorkflowCancellation, CancellationResult, WorkflowReassignmentTargetPage } from '@workflow-engine/ui';
 import type { WorkflowRuntimeReads, WorkflowRuntimeCommands, TaskView, TaskContract, Envelope, CommandResult, ReplayResult, PreviousDecisionPage } from '@workflow-engine/ui';
-import { WorkflowTaskComponent, WorkflowCommandsComponent } from '@workflow-engine/ui/runtime';
+import { WorkflowTaskAdministrationComponent, WorkflowTaskComponent, WorkflowCommandsComponent } from '@workflow-engine/ui/runtime';
 import { WorkflowDefinitionsComponent } from '@workflow-engine/ui/administration';
 import type { WorkflowAdministrationApi, AdministrationPage, DefinitionView } from '@workflow-engine/ui';
 const id='9007199254740993';
@@ -21,6 +21,8 @@ const summary={instanceId:id,historySequence:'4',eventType:'UNKNOWN_FUTURE',comm
 const namedOutputEvidence = new URLSearchParams(location.search).has('namedOutputEvidence');
 const taskInputEvidence = new URLSearchParams(location.search).get('taskInputEvidence');
 const previousDecisionEvidence = new URLSearchParams(location.search).get('previousDecisionEvidence');
+const taskLayoutEvidence = new URLSearchParams(location.search).has('taskLayoutEvidence');
+const reassignmentEvidence = new URLSearchParams(location.search).has('reassignmentEvidence') || taskLayoutEvidence;
 const cancellationEvidence = new URLSearchParams(location.search).has('cancellationEvidence');
 function cancellationFixture():WorkflowCancellation|null {
  if(!cancellationEvidence)return null;
@@ -115,6 +117,22 @@ function administrationFixture(): WorkflowAdministrationApi {
   };
 }
 
+function reassignmentFixture(){
+ if(!reassignmentEvidence)return null;
+ let committed:CommandResult|null=null;
+ return {
+  availability:async()=>({allowed:fixtureTask.status==='OPEN',instanceLockVersion:fixtureContract.instanceLockVersion}),
+  targets:async(_id:string,kind:string,query:string):Promise<WorkflowReassignmentTargetPage>=>{if(taskLayoutEvidence && new URLSearchParams(location.search).has('delayedDestinationSearch'))await new Promise(resolve=>setTimeout(resolve,1800));return {items:[{ref:kind==='USER'?'new-reviewer':kind==='GROUP'?'Finance':'Approver',label:kind==='USER'?'New reviewer':kind==='GROUP'?'Finance reviewers':'Approver role'}].filter(row=>(row.ref+' '+row.label).toLowerCase().includes(query.toLowerCase())),nextCursor:null};},
+  reassign:async(envelope:Envelope,replay:boolean)=>{
+   if(replay)return {found:!!committed,result:committed&&{...committed,replayed:true}};
+   const assignment={kind:envelope.body['assignmentKind'] as 'USER'|'GROUP'|'ROLE',ref:envelope.body['assignmentRef']!};
+   fixtureTask.assignment=assignment;fixtureTask.assigneeRef=assignment.kind==='USER'?assignment.ref:null;
+   fixtureContract.assignmentLabel=assignment.ref;fixtureContract.instanceLockVersion=String(BigInt(fixtureContract.instanceLockVersion)+1n);
+   committed={replayed:false,execution:{...fixtureResult(envelope).execution,operation:'REASSIGN_TASK',task:{...fixtureTask},instance:{...instance,lockVersion:fixtureContract.instanceLockVersion}}};
+   return committed;
+  }
+ };
+}
 const completedInputFixture = taskInputEvidence === 'completed' || previousDecisionEvidence === 'completed';
 const fixtureTask:TaskView={id:'30',instanceId:id,activityId:'20',taskTypeId:'1',taskKey:'REVIEW',assignment:{kind:'USER',ref:'fixture'},assigneeRef:'fixture',status:completedInputFixture?'COMPLETED':'OPEN',outcomeKey:completedInputFixture?'APPROVE':null,createdAt:instance.startedAt,dueAt:null,closedAt:completedInputFixture?instance.startedAt:null,closedBy:completedInputFixture?'fixture':null,closureReason:null};
 const fixtureContract:TaskContract={taskId:'30',instanceId:id,instanceLockVersion:instance.lockVersion,taskType:'REVIEW',claimPolicy:'OPTIONAL',canClaim:false,canRelease:false,canAdminRelease:false,canComplete:!completedInputFixture,assignmentLabel:'Fixture reviewer',outcomes:[{key:'APPROVE',label:'Host approve',requiresComment:true}],
@@ -129,8 +147,29 @@ const fixtureContract:TaskContract={taskId:'30',instanceId:id,instanceLockVersio
     resultContract:{mode:'REQUIRED',schema:{type:'object'}},
   }),
 };
+if(taskLayoutEvidence){fixtureTask.assignment={kind:'USER',ref:'reviewer.'+'longreference'.repeat(14)};fixtureTask.assigneeRef=fixtureTask.assignment.ref;}
 function fixtureResult(envelope:Envelope):CommandResult{return {replayed:false,execution:{commandId:envelope.body['commandId']!,operation:'COMPLETE',instance,activity:{id:'20',instanceId:id,nodeKey:'REVIEW',activationSequence:'1',taskTypeId:'1',completionPolicy:'SINGLE',contributionOutcomeKey:null,requiredTaskCount:1,reviewRevisionRef:null,status:'COMPLETED',outcomeKey:'APPROVE',enteredAt:instance.startedAt,closedAt:instance.startedAt,closedBy:'fixture',closureReason:null},task:{...fixtureTask,status:'COMPLETED'},firstHistorySequence:'5',lastHistorySequence:'6'}};}
 @Injectable() class RuntimeReads implements WorkflowRuntimeReads {
+ private state=inject(FixtureState);
+ administrationTasks(filters:{status:string;taskType?:string;taskName?:string;assignmentKind?:string;assignmentRef?:string;assigneeRef?:string;instanceId?:string},cursor?:string,limit=50,signal?:AbortSignal){
+  if(!taskLayoutEvidence)return Promise.resolve({items:filters.status==='OPEN'||filters.status==='ALL'?[{...fixtureTask,nodeName:'Finance review',taskType:'REVIEW',taskTypeName:'Review task'}, {...fixtureTask,id:'31',instanceId:'9007199254740994',assignment:{kind:'GROUP' as const,ref:'Finance'},assigneeRef:null,nodeName:'Another instance review',taskType:'REVIEW',taskTypeName:'Review task'}]:[{...fixtureTask,id:'32',status:filters.status,nodeName:'Closed review',taskType:'REVIEW',taskTypeName:'Review task'}],nextAfterId:null});
+  const kinds=['USER','GROUP','ROLE'] as const;
+  const rows=Array.from({length:55},(_,index)=>{
+   const kind=kinds[index%3];const ref=index===0?'reviewer.'+'longreference'.repeat(14):kind==='USER'?'fixture':kind==='GROUP'?'Finance':'Approver';
+   return {...fixtureTask,id:String(BigInt(id)+BigInt(index+1)),instanceId:String(BigInt(id)+BigInt(Math.floor(index/20))),
+    assignment:{kind,ref},assigneeRef:kind==='USER'?ref:null,status:filters.status==='ALL'?'OPEN':filters.status,
+    nodeName:index===0?'Review the retained international request with a deliberately long descriptive task name that must wrap without changing table spacing':'Independent review '+(index+1),taskType:'REVIEW',taskTypeName:'Review task'};
+  }).filter(row=>(!filters.taskType||filters.taskType===row.taskType)&&(!filters.assignmentKind||filters.assignmentKind===row.assignment.kind)
+    &&(!filters.assignmentRef||filters.assignmentRef===row.assignment.ref)&&(!filters.assigneeRef||filters.assigneeRef===row.assigneeRef)&&(!filters.instanceId||filters.instanceId===row.instanceId));
+  const candidates=rows.filter(row=>!cursor||BigInt(row.id)>BigInt(cursor));const selected=candidates.slice(0,limit);
+  const nextAfterId=candidates.length>limit?selected[selected.length-1].id:null;
+  const items=this.state.mode==='layout-empty'&&!cursor?[]:selected.filter(row=>!filters.taskName||row.nodeName.toLowerCase().includes(filters.taskName.toLowerCase()));
+  return new Promise<{items:typeof rows;nextAfterId:string|null}>((resolve,reject)=>{
+   const abort=()=>{clearTimeout(timer);reject(new DOMException('Aborted','AbortError'));};
+   const timer=setTimeout(()=>{signal?.removeEventListener('abort',abort);resolve({items,nextAfterId});},this.state.mode==='delayed'?1500:50);
+   if(signal?.aborted)abort();else signal?.addEventListener('abort',abort,{once:true});
+  });
+ }
  private http=inject(HttpClient);
  private read<T>(path:string,signal:AbortSignal){return firstValueFrom(this.http.get<T>(path).pipe(takeUntil(fromEvent(signal,'abort'))));}
  task(_id:string,signal:AbortSignal){return this.read<TaskView>('/host-task/30',signal);}
@@ -145,10 +184,18 @@ function fixtureResult(envelope:Envelope):CommandResult{return {replayed:false,e
  complete(envelope:Envelope,signal:AbortSignal){return firstValueFrom(this.http.post<CommandResult>('/host-command/complete',envelope).pipe(takeUntil(fromEvent(signal,'abort'))));}
  replayComplete(envelope:Envelope,signal:AbortSignal){return firstValueFrom(this.http.post<ReplayResult>('/host-command/replay',envelope).pipe(takeUntil(fromEvent(signal,'abort'))));}
 }
-@Component({selector:'fixture-read-only-task',standalone:false,providers:[{provide:WORKFLOW_RUNTIME_COMMANDS,useValue:null},CommandRecovery],template:'<h2>Read-only consumer without commands</h2><workflow-task id="30" [sessionScope]="scope"/>'})
+@Component({selector:'fixture-read-only-task',standalone:false,providers:[{provide:WORKFLOW_TASK_REASSIGNMENT,useValue:null},{provide:WORKFLOW_RUNTIME_COMMANDS,useValue:null},CommandRecovery],template:'<h2>Read-only consumer without commands</h2><workflow-task id="30" [sessionScope]="scope"/>'})
 class ReadOnlyTask {scope={};}
 
 @Component({selector:'fixture-root',standalone:false,template:`
+  @if(taskLayoutEvidence){<div class="layout-evidence">
+   <h1>F026 revision 2 layout verification</h1>
+   <nav class="fixture-controls" aria-label="Fixture views"><button (click)="layoutView='tasks'">Task administration view</button><button (click)="layoutView='definitions'">Definitions reference view</button><button (click)="layoutView='task'">Reassignment dialog view</button></nav>
+   <nav class="fixture-controls" aria-label="Fixture response modes"><button (click)="mode('success')">Normal responses</button><button (click)="mode('delayed')">Delayed responses</button><button (click)="mode('layout-empty')">Empty page with continuation</button></nav>
+   @if(layoutView==='tasks'){<workflow-task-administration [sessionScope]="scope"/>}
+   @if(layoutView==='definitions'){<workflow-definitions [sessionScope]="scope" [messages]="administrationMessages"/>}
+   @if(layoutView==='task'){<workflow-task id="30" [sessionScope]="scope"/>}
+  </div>}@else if(reassignmentEvidence){<h1>Task administration fixture</h1><workflow-task-administration [sessionScope]="scope"/><workflow-task id="30" [sessionScope]="scope"/><fixture-read-only-task/>}@else{
   <h1>NgModule viewer consumer</h1><p>Host interceptor reads: {{state.intercepted}}</p>
   <button (click)="locale()">Change messages</button><button (click)="scope={}">Replace same-user session</button><button (click)="scope=null">Invalidate session</button>
   <button (click)="mode('success')">Successful reads</button><button (click)="mode('delayed')">Delayed reads</button><button (click)="mode('denied')">Denied reads</button><button (click)="mode('failed')">Failed reads</button>
@@ -156,17 +203,18 @@ class ReadOnlyTask {scope={};}
   <workflow-history [instanceId]="id" [sessionScope]="scope" [messages]="messages"/><workflow-history-event [instanceId]="id" sequence="4" [sessionScope]="scope" [messages]="messages"/>
   @if(namedOutputEvidence){<workflow-history-event [instanceId]="id" sequence="3" [sessionScope]="scope" [messages]="messages"/>}
   <workflow-definitions [sessionScope]="scope" [messages]="administrationMessages"/>
-  <p>Custom host command calls: {{state.commands}}</p><workflow-task id="30" [sessionScope]="scope" [messages]="runtimeMessages"/><workflow-commands [sessionScope]="scope" [messages]="runtimeMessages"/><fixture-read-only-task/><router-outlet/>
+  <p>Custom host command calls: {{state.commands}}</p><workflow-task id="30" [sessionScope]="scope" [messages]="runtimeMessages"/><workflow-commands [sessionScope]="scope" [messages]="runtimeMessages"/><fixture-read-only-task/>}<router-outlet/>
 `}) class App {
   state=inject(FixtureState); id=id; scope:object|null={};messages=DEFAULT_VIEWER_MESSAGES;
-  namedOutputEvidence=namedOutputEvidence;
+  namedOutputEvidence=namedOutputEvidence;reassignmentEvidence=reassignmentEvidence;taskLayoutEvidence=taskLayoutEvidence;layoutView='tasks';
   administrationMessages={definitionsTitle:'Host workflow library'};runtimeMessages={taskTitle:'Host assigned review',commandsTitle:'Host command evidence'};
   locale(){this.messages={...DEFAULT_VIEWER_MESSAGES,refresh:'Actualiser',current:'Étape actuelle',graph:'Graphe du workflow'};}
   mode(value:string){this.state.mode=value;this.scope={};}
 }
-@NgModule({declarations:[App,Destination,ReadOnlyTask],imports:[BrowserModule,RouterLink,RouterOutlet,WorkflowInstanceViewerComponent,WorkflowHistoryComponent,WorkflowHistoryEventComponent,WorkflowDefinitionsComponent,WorkflowTaskComponent,WorkflowCommandsComponent],
+@NgModule({declarations:[App,Destination,ReadOnlyTask],imports:[BrowserModule,RouterLink,RouterOutlet,WorkflowInstanceViewerComponent,WorkflowHistoryComponent,WorkflowHistoryEventComponent,WorkflowDefinitionsComponent,WorkflowTaskAdministrationComponent,WorkflowTaskComponent,WorkflowCommandsComponent],
   providers:[FixtureState,Reads,RuntimeReads,RuntimeCommands,Navigation,
     {provide:WORKFLOW_CANCELLATION,useFactory:cancellationFixture},
+    {provide:WORKFLOW_TASK_REASSIGNMENT,useFactory:reassignmentFixture},
     {provide:ENVIRONMENT_INITIALIZER,multi:true,useValue:()=>inject(MatIconRegistry).setDefaultFontSetClass('material-symbols-outlined','mat-ligature-font')},
     provideRouter([{path:'alternate/:kind/:id',component:Destination}]),
     provideHttpClient(withInterceptors([(request,next)=>next(request.clone({setHeaders:{'X-Consumer':'NgModule'}}))])),

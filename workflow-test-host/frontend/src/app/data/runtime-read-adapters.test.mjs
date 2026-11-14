@@ -65,3 +65,11 @@ test('previous-decision adapter keeps receiving-task IDs and exclusive cursors e
  assert.equal(calls.length,1);assert.equal(calls[0][0],'/tasks/9007199254740997/previous-decisions?afterSequence=9007199254740991&limit=20');assert.equal(calls[0][1],signal);
  assert.equal(page.items[0].taskId,'9007199254740993');assert.equal(page.items[0].comment,' <b>Exact</b> ');assert.equal(page.nextAfterSequence,'9007199254740995');
 });
+
+test('administration sends exact filters and stable bounded cursor without loading instance pages',async t=>{
+ const calls=[];const {page:reads}=component(t,ConsoleRuntimeReads,{},undefined,undefined,[{provide:ConsoleSession,useValue:{administrationCall:async(...args)=>{calls.push(args);return '{"items":[],"nextAfterId":"9007199254740993"}';}}}]);
+ const filters={status:'OPEN',taskName:' Review & 100%_ ',taskType:'SANDBOX_REVIEW',assignmentKind:'GROUP',assignmentRef:'Finance & Legal',assigneeRef:'reviewer',instanceId:'9007199254740993'};
+ const page=await reads.administrationTasks(filters,'9007199254740994',100,new AbortController().signal);
+ assert.equal(calls.length,1);assert.ok(calls[0][0].startsWith('/tasks/administration?'));const query=new URLSearchParams(calls[0][0].split('?')[1]);
+ for(const [key,value] of Object.entries(filters))assert.equal(query.get(key),value);assert.equal(query.get('afterId'),'9007199254740994');assert.equal(query.get('limit'),'100');assert.equal(page.nextAfterId,'9007199254740993');
+});

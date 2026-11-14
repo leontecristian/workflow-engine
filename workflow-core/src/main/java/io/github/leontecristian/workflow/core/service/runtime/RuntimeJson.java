@@ -239,6 +239,20 @@ public class RuntimeJson {
                 && instance.lastHistorySequence() == result.lastHistorySequence(), Category.HOST_CONFIGURATION);
     }
 
+    byte[] reassignmentFingerprint(io.github.leontecristian.workflow.core.dto.runtime.ReassignWorkflowTask command,
+            WorkflowCommandContext context) {
+        var request = object();
+        request.put("instanceId", Long.toString(command.instanceId()));
+        request.put("taskId", Long.toString(command.taskId()));
+        request.put("expectedLockVersion", Long.toString(command.expectedLockVersion()));
+        var assignment = object();
+        assignment.put("kind", command.assignment().kind().name());
+        assignment.put("ref", command.assignment().ref());
+        request.set("assignment", assignment);
+        request.put("reason", command.reason());
+        return fingerprint(WorkflowOperation.REASSIGN_TASK, context, request);
+    }
+
     byte[] ownershipFingerprint(WorkflowOperation operation, WorkflowCommandContext context, long instanceId,
             long taskId, long expectedLockVersion, String reason) {
         ObjectNode request = object();
@@ -274,7 +288,8 @@ public class RuntimeJson {
         RuntimeInputs.require(FINGERPRINT_VERSION.equals(storedFingerprintVersion) || hasResult
                 || operation == WorkflowOperation.START_WORKFLOW && FAMILY_FINGERPRINT_VERSION.equals(storedFingerprintVersion), Category.UNSUPPORTED_VERSION);
         RuntimeInputs.require(fingerprintVersion.equals(storedFingerprintVersion), Category.COMMAND_ID_CONFLICT);
-        RuntimeInputs.require((Short.valueOf((short) 5).equals(version) || Short.valueOf((short) 6).equals(version)) || historical && !hasResult && !ownershipOperation(operation),
+        RuntimeInputs.require(operation == WorkflowOperation.REASSIGN_TASK ? Short.valueOf((short) 8).equals(version)
+                : (Short.valueOf((short) 5).equals(version) || Short.valueOf((short) 6).equals(version)) || historical && !hasResult && !ownershipOperation(operation),
                 Category.UNSUPPORTED_VERSION);
         RuntimeInputs.require(Arrays.equals(receipt.getRequestFingerprint(), fingerprint), Category.COMMAND_ID_CONFLICT);
         JsonNode stored = tree(receipt.getResultJson());
@@ -320,7 +335,7 @@ public class RuntimeJson {
                 && (operation==WorkflowOperation.START_WORKFLOW ? activity.activationSequence()>=result.firstHistorySequence() : activity.activationSequence()<result.firstHistorySequence()) && activity.taskTypeId() > 0
                 && (activity.completionPolicy() == CompletionPolicy.SINGLE
                     ? activity.requiredTaskCount() == 1 && activity.contributionOutcomeKey() == null
-                    : receipt.getResultSchemaVersion() == 6 && activity.completionPolicy() == CompletionPolicy.ALL
+                    : (receipt.getResultSchemaVersion() == 6 || receipt.getResultSchemaVersion() == 8) && activity.completionPolicy() == CompletionPolicy.ALL
                         && activity.requiredTaskCount() >= 1 && activity.requiredTaskCount() <= 100 && RuntimeInputs.isValidKey(activity.contributionOutcomeKey()))
                 && (activity.reviewRevisionRef() == null || RuntimeInputs.isValidText(activity.reviewRevisionRef(), 200, 200, true))
                 && validTime(activity.enteredAt()) && !activity.enteredAt().isBefore(instance.startedAt()) && activity.enteredAt().equals(task.createdAt())
@@ -334,7 +349,17 @@ public class RuntimeJson {
                     && (!userTarget || task.status() != TaskStatus.OPEN || task.assignment().ref().equals(task.assigneeRef())),
                     Category.HOST_CONFIGURATION);
         }
-        if (ownershipOperation(operation)) {
+        if (operation == WorkflowOperation.REASSIGN_TASK) {
+            RuntimeInputs.require(receipt.getActorKind() == ActorKind.USER
+                    && result.firstHistorySequence() == result.lastHistorySequence()
+                    && instance.status() == InstanceStatus.ACTIVE && activity.status() == ActivityStatus.ACTIVE
+                    && task.status() == TaskStatus.OPEN && instance.currentNodeKey().equals(activity.nodeKey())
+                    && instance.resultKey() == null && instance.endedAt() == null && instance.endedBy() == null
+                    && activity.outcomeKey() == null && activity.closedAt() == null && activity.closedBy() == null && activity.closureReason() == null
+                    && task.outcomeKey() == null && task.closedAt() == null && task.closedBy() == null && task.closureReason() == null
+                    && (userTarget ? task.assignment().ref().equals(task.assigneeRef()) : task.assigneeRef() == null)
+                    && !RuntimeViews.instant(receipt.getRecordedAt()).isBefore(task.createdAt()), Category.HOST_CONFIGURATION);
+        } else if (ownershipOperation(operation)) {
             RuntimeInputs.require(!userTarget && receipt.getActorKind() == ActorKind.USER
                     && result.firstHistorySequence() == result.lastHistorySequence()
                     && instance.status() == InstanceStatus.ACTIVE && activity.status() == ActivityStatus.ACTIVE

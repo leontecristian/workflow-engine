@@ -2,6 +2,7 @@ package io.github.leontecristian.workflow.testhost.service.runtime;
 
 import io.github.leontecristian.workflow.core.dto.runtime.AdministrativelyReleaseWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.ClaimWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.ReassignWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
@@ -123,6 +124,16 @@ public class ConsoleRuntimeTransaction {
     @Transactional(readOnly = true)
     public Optional<WorkflowCommandResult> replayAdministrativeRelease(
             AdministrativelyReleaseWorkflowTask command, WorkflowCommandContext context) {
+        return execution.findReplay(command, context).map(result -> new WorkflowCommandResult(true, result));
+    }
+
+    @Transactional
+    public WorkflowCommandResult reassign(ReassignWorkflowTask command, WorkflowCommandContext context) {
+        return after(execution.reassignTask(command, context));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<WorkflowCommandResult> replayReassignment(ReassignWorkflowTask command, WorkflowCommandContext context) {
         return execution.findReplay(command, context).map(result -> new WorkflowCommandResult(true, result));
     }
 

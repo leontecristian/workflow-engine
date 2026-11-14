@@ -1,8 +1,10 @@
 # Workflow engine roadmap
 
+**Reassignment delivery — 2026-11-14:** [F026 task administration and administrative reassignment](features/F026-task-administration-reassignment/spec.md) is IMPLEMENTED revision 2, with owner-agreed scope and frontend refinements and [handover](features/F026-task-administration-reassignment/implementation.md). This supersedes the unselected reassignment portion of older rows below. F025 cancellation remains preserved; APOLO access and the designer dependency remain unchanged.
+
 **Cancellation delivery — 2026-11-14:** the owner authorized and F025 implements [workflow cancellation](features/F025-workflow-cancellation/spec.md). Its [handover](features/F025-workflow-cancellation/implementation.md) records scoped checks and remaining integration limits. This supersedes the unselected cancellation portion of older priority rows below. F024 status/evidence remains independent, reassignment is deferred and APOLO access is still unavailable.
 
-**Updated:** 2026-11-14 · **Delivery baseline:** F025 workflow cancellation, IMPLEMENTED revision 1
+**Updated:** 2026-11-14 · **Delivery baseline:** F026 task administration and reassignment, IMPLEMENTED revision 2
 
 The agreed direction is **working sandbox → first APOLO booking integration → graphical designer**, with reliability required before production. The sandbox, reusable libraries, ALL collective review, previous-decision comments and draft creation/deletion are implemented. F024 runtime starts by workflow family key or ID are implemented and committed. F025 workflow cancellation is implemented under subsequent owner authorization. APOLO integration waits until the owner has access to APOLO.
 

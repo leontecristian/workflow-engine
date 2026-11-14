@@ -32,7 +32,7 @@ public class WorkflowInstanceViewerService {
     }
     private static boolean isTaskRestrictedEvent(WorkflowHistorySummary event) {
         return "TASK_CLAIMED".equals(event.eventType()) || "TASK_RELEASED".equals(event.eventType())
-                || "TASK_CANCELLED".equals(event.eventType());
+                || "TASK_CANCELLED".equals(event.eventType()) || "TASK_REASSIGNED".equals(event.eventType());
     }
 
     /** Bound the final escaped envelope, independently of ordinary summary pages. */

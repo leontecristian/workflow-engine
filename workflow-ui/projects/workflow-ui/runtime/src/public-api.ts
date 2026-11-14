@@ -6,3 +6,5 @@ export { WorkflowActivityComponent } from './lib/activity';
 export { WorkflowTaskComponent } from './lib/task';
 export { WorkflowVariablesComponent } from './lib/variables';
 export { WorkflowCommandsComponent } from './lib/commands';
+
+export { WorkflowTaskAdministrationComponent } from './lib/task-administration';

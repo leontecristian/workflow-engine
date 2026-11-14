@@ -20,6 +20,7 @@ export const APP_ROUTES: Routes = [
   { path: "requests", component: RequestsPage },
   { path: "request/:id", component: RequestPage },
   { path: "instances", loadComponent: () => import("./pages/runtime/instances").then(m => m.InstancesPage) },
+  { path: "task-administration", loadComponent: () => import("./pages/tasks/task-administration").then(m => m.TaskAdministrationPage) },
   { path: "my-tasks", loadComponent: () => import("./pages/tasks/assigned-tasks").then(m => m.AssignedTasksPage) },
   { path: "instance-tasks/:id", loadComponent: () => import("./pages/tasks/instance-tasks").then(m => m.InstanceTasksPage) },
   { path: "task/:id", loadComponent: () => import("./pages/tasks/task").then(m => m.TaskPage) },

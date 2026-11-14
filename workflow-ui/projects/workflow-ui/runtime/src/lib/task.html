@@ -24,7 +24,11 @@
       ><button mat-button (click)="load()" [disabled]="busy()">
         <mat-icon aria-hidden="true">refresh</mat-icon> Refresh
       </button>
+      @if(canReassign()){<button mat-stroked-button (click)="confirmReassignment()" [disabled]="busy() || reassignBusy() || uncertain">Reassign task</button>}
     </div>
+    @if(pendingReassignment();as command){<p role="status">The reassignment outcome needs checking. Keep the original request until its result is known.</p><button mat-button (click)="sendReassignment(command,true)" [disabled]="reassignBusy()">Check reassignment result</button>
+      @if(lookupMiss()){<p>A missing result does not prove the first attempt cannot commit.</p><button mat-stroked-button (click)="sendReassignment(command,false)" [disabled]="reassignBusy()">Retry original reassignment</button>}}
+    @if(reassignNotice()){<p role="status">{{reassignNotice()}}</p>}
     @if(diagnosticsEnabled){<console-details [value]="detail()" />}
     @if(detail()?.status === 'CANCELLED'){<p>{{detail()?.closureReason === 'INSTANCE_CANCELLED' ? 'This task stopped because the workflow was cancelled.' : 'This task was cancelled because the review resolved.'}} No submission was recorded for this task.</p>}
     @for(task of currentTasks(); track task.id){<a mat-stroked-button [routerLink]="link({kind:'task',id:task.id})">Open current task #{{task.id}}</a>}
@@ -93,7 +97,7 @@
   <button mat-stroked-button (click)="ownership('admin-release')" [disabled]="busy() || uncertain || reasonBlank()">Administrative release</button>}
 </mat-card-content></mat-card>}
 <div class="two-column">
-@if(commandProvider && detail()?.status !== 'CANCELLED'){
+@if(commandProvider && detail()?.status === 'OPEN'){
   <mat-card appearance="outlined"
     ><mat-card-header
       ><div>

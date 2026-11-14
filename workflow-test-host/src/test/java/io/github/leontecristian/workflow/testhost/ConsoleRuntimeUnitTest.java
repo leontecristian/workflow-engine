@@ -91,7 +91,7 @@ class ConsoleRuntimeUnitTest {
         var reads = mock(WorkflowRuntimeQueryService.class);
         var context = mock(ConsoleContext.class);
         when(context.actor()).thenReturn("reviewer");
-        var access = new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskOwnershipAuthorization.class));
+        var access = new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskOwnershipAuthorization.class), org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskReassignmentAuthorization.class), org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings.class));
         var task = mock(WorkflowTaskView.class);
         when(task.assignment()).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER, "reviewer"));
         when(task.status()).thenReturn(TaskStatus.COMPLETED);

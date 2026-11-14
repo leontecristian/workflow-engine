@@ -73,3 +73,15 @@ test('runtime transport carries CSRF and old-session 401 cannot clear a replacem
  const replacement={};session.viewerScope.set(replacement);resolve(new Response('{"code":"UNAUTHENTICATED"}',{status:401}));await assert.rejects(pending,/401/);assert.equal(session.viewerScope(),replacement);assert.equal(options.headers['X-HOST-CSRF'],'token');assert.equal(options.headers['X-Expected-Lock-Version'],completion.expectedToken);assert.equal(options.signal,signal);
  globalThis.fetch=async()=>{throw new Error('network');};await assert.rejects(session.runtimeCommand('/complete',{},null,false,signal),/outcome unknown/);
 });
+
+test('reassignment maps flat frozen buffer fields to exact nested wire assignment and task-scoped directory',async t=>{
+ const calls=[],reads=[];const adapter=service(t,ConsoleRuntimeCommands,[{provide:ConsoleSession,useValue:{runtimeCommand:async(...args)=>{calls.push(args);return {};},viewerRead:async(...args)=>{reads.push(args);return {};}}}]);
+ const signal=new AbortController().signal,envelope=freezeEnvelope({kind:'reassign',body:{commandId:completion.body.commandId,instanceId:completion.body.instanceId,taskId:completion.body.taskId,assignmentKind:'ROLE',assignmentRef:'finance/reviewer',reason:'  exact\n😀  '},expectedToken:completion.expectedToken});
+ await adapter.reassignmentAvailability(envelope.body.taskId,signal);await adapter.targets(envelope.body.taskId,'ROLE','a & b','opaque+cursor',20,signal);
+ await adapter.reassign(envelope,false,signal);await adapter.reassign(envelope,true,signal);
+ assert.equal(reads[0][0],'/tasks/9223372036854775807/reassignment-availability');
+ const query=new URLSearchParams(reads[1][0].split('?')[1]);assert.equal(query.get('query'),'a & b');assert.equal(query.get('cursor'),'opaque+cursor');assert.equal(query.get('kind'),'ROLE');
+ assert.equal(calls[0][0],'/instances/9007199254740993/tasks/9223372036854775807/reassign');assert.equal(calls[1][0],'/commands/reassign/replay');
+ for(const call of calls){assert.deepEqual({...call[1].assignment},{kind:'ROLE',ref:'finance/reviewer'});assert.equal(call[1].assignmentKind,undefined);assert.equal(call[1].reason,envelope.body.reason);assert.equal(call[2],envelope.expectedToken);assert.equal(call[4],signal);}
+ assert.equal(calls[0][1].taskId,undefined);assert.equal(calls[1][1].taskId,envelope.body.taskId);
+});

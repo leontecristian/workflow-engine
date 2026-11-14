@@ -1,5 +1,7 @@
 # Assumptions and verification register
 
+**F026 selection — 2026-11-14:** [Task administration and reassignment](features/F026-task-administration-reassignment/spec.md) is IMPLEMENTED revision 1; the handover records scoped checks. Generic target-change and administration scope is selected; hosts still own task access, destination validity, distinct-person policy and suitability of unchanged frozen inputs. ASM-02/03/04/06/10 integration obligations remain. No directory/membership management, delegation or APOLO policy is inferred.
+
 **F025 selection — 2026-11-14:** [Workflow cancellation](features/F025-workflow-cancellation/spec.md) is IMPLEMENTED revision 1, with scoped evidence in its handover. Generic whole-instance stop, host authorization and shared UI no longer await a scope decision. APOLO withdrawal policy and production transaction/access/delivery verification under ASM-02/03/04/06 remain deferred; partial ALL evidence retention follows ASM-10. This does not select reassignment, compensation or resubmission.
 
 **F022 verification — 2026-11-13:** [Previous-decision comments revision 1](features/F022-previous-decision-comments/implementation.md) records scoped unit, guarded SQL, API and browser evidence for receiving-task authorization, retained entry/completion cutoffs, bounded pagination and corrupt/missing evidence failures. These extend ASM-10 without granting full source-task/history access. APOLO consumption and operational retention remain integration work.

@@ -74,7 +74,7 @@ class ConsoleInstanceGraphUnitTest {
     private final ViewerWire wire = new ViewerWire();
     private final WorkflowInstanceGraphService graphs =
             new WorkflowInstanceGraphService(
-                    new ConsoleViewerAccess(new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskOwnershipAuthorization.class)), reads), definitions, reads, wire);
+                    new ConsoleViewerAccess(new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskOwnershipAuthorization.class), org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskReassignmentAuthorization.class), org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings.class)), reads), definitions, reads, wire);
 
     private WorkflowInstanceView instance(InstanceStatus status, long sequence) {
         return new WorkflowInstanceView(
@@ -332,6 +332,6 @@ class ConsoleInstanceGraphUnitTest {
         assertFalse(graph.edges().stream().filter(e -> e.key().equals("finish")).findFirst().orElseThrow().traversed());
         assertEquals(
                 InstanceStatus.CANCELLED,
-                new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskOwnershipAuthorization.class)).instance(ID).status());
+                new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskOwnershipAuthorization.class), org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskReassignmentAuthorization.class), org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings.class)).instance(ID).status());
     }
 }

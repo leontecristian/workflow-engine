@@ -71,6 +71,28 @@ public class WorkflowDefinitionRuntimeReader {
         return inspect(version);
     }
 
+    /** Retained display metadata only; does not establish that a definition can execute today. */
+    public java.util.Map<String, String> readNodeNames(long versionId) {
+        var version = versions.findById(versionId).orElseThrow(this::corrupt);
+        if (version.getStatus() != DefinitionStatus.PUBLISHED && version.getStatus() != DefinitionStatus.RETIRED)
+            throw corrupt();
+        String source = version.getDefinitionJson();
+        if (source == null || source.length() > 4 * 1024 * 1024) throw corrupt();
+        var nodes = codec.readObject(source).path("nodes");
+        if (!nodes.isArray() || nodes.size() > 200) throw corrupt();
+        var names = new java.util.HashMap<String, String>();
+        for (var node : nodes) {
+            var key = node.path("key");
+            var name = node.get("name");
+            if (!node.isObject() || !key.isTextual() || !DefinitionInputs.key(key.textValue())
+                    || name != null && (!name.isTextual() || !DefinitionInputs.text(name.textValue(), 200, 400, true)))
+                throw corrupt();
+            if (names.putIfAbsent(key.textValue(), name == null ? key.textValue() : name.textValue()) != null)
+                throw corrupt();
+        }
+        return java.util.Map.copyOf(names);
+    }
+
     /** Read-only identity projection also permits stored nonminimal/cancelled aggregate views. */
     public io.github.leontecristian.workflow.core.dto.definition.document.PinnedDefinitionIdentity readIdentity(long versionId) {
         var version = versions.findById(versionId).orElseThrow(this::corrupt);

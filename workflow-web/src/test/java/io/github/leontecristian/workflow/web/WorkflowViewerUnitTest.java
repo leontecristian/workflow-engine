@@ -137,7 +137,7 @@ class WorkflowViewerUnitTest {
         }
     }
     @Test void ownershipHistoryUsesExactTaskGrantEvenWhenHostDetailHookAllowsRead() throws Exception {
-        for (String eventType : List.of("TASK_RELEASED", "TASK_CANCELLED")) {
+        for (String eventType : List.of("TASK_RELEASED", "TASK_CANCELLED", "TASK_REASSIGNED")) {
         try (var context = context(Host.class, Enabled.class)) {
             var mvc = MockMvcBuilders.webAppContextSetup(context).build();
             var access = context.getBean(WorkflowViewerAccess.class);

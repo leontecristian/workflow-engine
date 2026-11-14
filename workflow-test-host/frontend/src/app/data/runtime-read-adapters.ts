@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { findNodeAtLocation, parseTree, visit, type JSONPath } from 'jsonc-parser';
 import { ConsoleSession } from './console-session';
-import type { WorkflowRuntimeReads, InstanceSummary, Page, VariablePage, TaskView, TaskContract, TaskInput, TaskSubmission, ActivityView, SubmissionPage, PreviousDecisionPage } from '@workflow-engine/ui';
+import type { TaskAdministrationFilters, TaskAdministrationRow, WorkflowRuntimeReads, InstanceSummary, Page, VariablePage, TaskView, TaskContract, TaskInput, TaskSubmission, ActivityView, SubmissionPage, PreviousDecisionPage } from '@workflow-engine/ui';
 @Injectable({providedIn:'root'})
 export class ConsoleRuntimeReads implements WorkflowRuntimeReads {
  private readonly session=inject(ConsoleSession);
@@ -33,6 +33,7 @@ export class ConsoleRuntimeReads implements WorkflowRuntimeReads {
  private query(values:Record<string,string|undefined>){return '?'+new URLSearchParams(Object.entries(values).filter((p):p is [string,string]=>p[1]!==undefined));}
  listInstances(status:string,cursor:string|undefined,limit:number,signal:AbortSignal){return this.read<Page<InstanceSummary>>('/instances'+this.query({status,afterId:cursor,limit:String(limit)}),signal);}
  variables(id:string,afterKey:string|undefined,expectedLockVersion:string|undefined,signal:AbortSignal){return this.read<VariablePage>('/instances/'+encodeURIComponent(id)+'/variables'+this.query({afterKey,expectedLockVersion,limit:'50'}),signal);}
+ administrationTasks(filters:TaskAdministrationFilters,cursor:string|undefined,limit:number,signal:AbortSignal){return this.read<Page<TaskAdministrationRow>>('/tasks/administration'+this.query({...filters,afterId:cursor,limit:String(limit)}),signal);}
  assignedTasks(cursor:string|undefined,limit:number,signal:AbortSignal){return this.read<Page<TaskView>>('/tasks/mine'+this.query({afterId:cursor,limit:String(limit)}),signal);}
  instanceTasks(id:string,cursor:string|undefined,limit:number,signal:AbortSignal){return this.read<Page<TaskView>>('/instances/'+encodeURIComponent(id)+'/tasks'+this.query({afterId:cursor,limit:String(limit)}),signal);}
  task(id:string,signal:AbortSignal){return this.read<TaskView>('/tasks/'+encodeURIComponent(id),signal);}

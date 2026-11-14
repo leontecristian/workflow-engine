@@ -18,6 +18,7 @@ public class RuntimeDefinitionPins {
     public RuntimeDefinitionPins(WorkflowDefinitionRuntimeReader definitions, WorkflowHistoryRepository history, RuntimeJson json) {
         this.definitions = definitions; this.history = history; this.json = json;
     }
+    java.util.Map<String, String> nodeNames(long versionId) { return definitions.readNodeNames(versionId); }
     ExecutableDefinition load(WorkflowInstanceEntity instance) {
         var definition = definitions.loadPinned(instance.getDefinitionVersionId());
         verify(instance, definition.versionId(), definition.key(), definition.version(), definition.contentHash());

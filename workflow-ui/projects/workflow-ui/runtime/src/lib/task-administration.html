@@ -1,0 +1,56 @@
+<console-page-header [meta]="meta" />
+<console-feedback [busy]="busy()" [error]="error()" [notice]="notice()" />
+<mat-card appearance="outlined"><mat-card-content class="administration-content">
+ <form (ngSubmit)="load()">
+ <div class="task-filter-toolbar">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Status</mat-label><mat-select [(ngModel)]="filters.status" (ngModelChange)="filtersChanged()" name="status">@for(s of ['OPEN','COMPLETED','CANCELLED','ALL'];track s){<mat-option [value]="s">{{s}}</mat-option>}</mat-select></mat-form-field>
+  <button mat-button type="button" (click)="filtersExpanded=!filtersExpanded" [attr.aria-expanded]="filtersExpanded" [attr.aria-controls]="filterPanelId">Filters@if(appliedChips().length){ ({{appliedChips().length}})}</button>
+  <button mat-button type="submit" [disabled]="busy()">Apply filters</button>
+  <button mat-button type="button" (click)="load()" [disabled]="busy()"><mat-icon>refresh</mat-icon>Refresh</button>
+ </div>
+ <div [id]="filterPanelId" [hidden]="!filtersExpanded" class="task-filter-panel" role="group" aria-label="Additional task filters">
+ <div class="task-filter-grid">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Task name</mat-label><input matInput [(ngModel)]="filters.taskName" (ngModelChange)="filtersChanged()" name="taskName" maxlength="200"></mat-form-field>
+  <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Task type code</mat-label><input matInput [(ngModel)]="filters.taskType" (ngModelChange)="filtersChanged()" name="taskType"></mat-form-field>
+  <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Assignment kind</mat-label><mat-select [(ngModel)]="filters.assignmentKind" (ngModelChange)="filtersChanged()" name="assignmentKind"><mat-option [value]="undefined">All kinds</mat-option>@for(k of ['USER','GROUP','ROLE'];track k){<mat-option [value]="k">{{k}}</mat-option>}</mat-select></mat-form-field>
+  <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Assignment reference</mat-label><input matInput [(ngModel)]="filters.assignmentRef" (ngModelChange)="filtersChanged()" name="assignmentRef"></mat-form-field>
+  <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Assignee reference</mat-label><input matInput [(ngModel)]="filters.assigneeRef" (ngModelChange)="filtersChanged()" name="assigneeRef"></mat-form-field>
+  <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Instance ID</mat-label><input matInput [(ngModel)]="filters.instanceId" (ngModelChange)="filtersChanged()" name="instanceId"></mat-form-field>
+ </div>
+ </div>
+ </form>
+ @if(appliedChips().length){
+  <mat-chip-set class="task-filter-chips" aria-label="Applied task filters">
+   @for(chip of appliedChips();track chip.key){
+    <mat-chip [disabled]="busy()" (removed)="removeFilter(chip.key)">
+     {{chip.label}}: {{chip.value}}
+     <button matChipRemove [attr.aria-label]="'Remove '+chip.label+' filter'" [disabled]="busy()">×</button>
+    </mat-chip>
+   }
+  </mat-chip-set>
+ }
+ <div class="task-table-scroll"><table mat-table [dataSource]="rows()" class="task-table" aria-label="Task administration">
+ <ng-container matColumnDef="id"><th mat-header-cell *matHeaderCellDef>ID</th><td mat-cell *matCellDef="let row"><a class="task-id" [routerLink]="link({kind:'task',id:row.id})">#{{row.id}}</a></td></ng-container>
+ <ng-container matColumnDef="task"><th mat-header-cell *matHeaderCellDef>Task</th><td mat-cell *matCellDef="let row">{{row.nodeName || row.taskKey}}</td></ng-container>
+ <ng-container matColumnDef="type"><th mat-header-cell *matHeaderCellDef>Type</th><td mat-cell *matCellDef="let row">{{row.taskTypeName || row.taskType}}</td></ng-container>
+ <ng-container matColumnDef="instance"><th mat-header-cell *matHeaderCellDef>Instance</th><td mat-cell *matCellDef="let row">{{row.instanceId}}</td></ng-container>
+ <ng-container matColumnDef="status"><th mat-header-cell *matHeaderCellDef>Status</th><td mat-cell *matCellDef="let row"><console-status [value]="row.status" /></td></ng-container>
+ <ng-container matColumnDef="assignment"><th mat-header-cell *matHeaderCellDef>Assignment</th><td mat-cell *matCellDef="let row">{{row.assignment.kind}}: {{row.assignmentLabel || row.assignment.ref}}</td></ng-container>
+ <ng-container matColumnDef="assignee"><th mat-header-cell *matHeaderCellDef>Assignee</th><td mat-cell *matCellDef="let row">{{row.assigneeRef || 'Unassigned'}}</td></ng-container>
+ <ng-container matColumnDef="created"><th mat-header-cell *matHeaderCellDef>Created</th><td mat-cell *matCellDef="let row">{{row.createdAt | date:'medium'}}</td></ng-container>
+ <tr mat-header-row *matHeaderRowDef="['id','task','type','instance','status','assignment','assignee','created']"></tr><tr mat-row *matRowDef="let row;columns:['id','task','type','instance','status','assignment','assignee','created']"></tr>
+ </table></div>
+ @if(!busy()&&!rows().length){<p class="task-empty">No tasks on this page.</p>}
+ <nav class="task-pagination" aria-label="Task administration pagination">
+  <mat-form-field appearance="outline" class="page-size" subscriptSizing="dynamic">
+   <mat-label>Rows per page</mat-label>
+   <mat-select #pageSizeSelect [ngModel]="pageSize" (ngModelChange)="changePageSize($event,pageSizeSelect)" [disabled]="busy()">
+    @for(size of [20,50,100];track size){<mat-option [value]="size">{{size}}</mat-option>}
+   </mat-select>
+  </mat-form-field>
+  <span class="task-page-info" aria-live="polite">Page {{pageIndex + 1}} · {{rows().length}} tasks on this page</span>
+  <span class="action-spacer"></span>
+  <button mat-button (click)="previousPage()" [disabled]="busy() || pageIndex === 0">Previous page</button>
+  <button mat-button (click)="nextPage()" [disabled]="busy() || !next">Next page <mat-icon aria-hidden="true" iconPositionEnd>chevron_right</mat-icon></button>
+ </nav>
+</mat-card-content></mat-card>

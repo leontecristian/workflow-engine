@@ -18,6 +18,7 @@ import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceQuery;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceSummary;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationQuery;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
@@ -128,6 +129,88 @@ public class WorkflowRuntimeReadController {
                         limit(r.getParameter("limit")));
         return wire.response(
                 taskPage(page));
+    }
+    @GetMapping("/tasks/administration")
+    public ResponseEntity<String> administrationTasks(HttpServletRequest request) {
+        access.requireTaskAdministrationAccess();
+        query(request, "status", "taskType", "assignmentKind", "assignmentRef", "assigneeRef", "instanceId", "afterId", "limit", "taskName");
+        TaskStatus status = TaskStatus.OPEN;
+        String requested = request.getParameter("status");
+        if ("ALL".equals(requested)) status = null;
+        else if (requested != null) {
+            try { status = TaskStatus.valueOf(requested); }
+            catch (IllegalArgumentException invalid) { throw WorkflowRuntimeException.invalid(); }
+        }
+        String kindValue = request.getParameter("assignmentKind");
+        AssignmentTargetKind kind = kindValue == null ? null : assignmentKind(kindValue);
+        String ref = filter(request, "assignmentRef", 200);
+        if (ref != null && kind == null) throw WorkflowRuntimeException.invalid();
+        var page = access.listAdministrationTasks(new WorkflowTaskAdministrationQuery(status,
+                filter(request, "taskType", 100), kind, ref, filter(request, "assigneeRef", 200),
+                request.getParameter("instanceId") == null ? null : decimal(request.getParameter("instanceId"), false),
+                after(request.getParameter("afterId")), limit(request.getParameter("limit")), filter(request, "taskName", 200)));
+        var items = page.items().stream().map(item -> {
+            var row = (com.fasterxml.jackson.databind.node.ObjectNode) wire.tree(wire.json(item.task()));
+            row.remove(java.util.List.of("outcomeKey", "closedBy", "closureReason"));
+            row.put("nodeName", item.nodeName());
+            row.put("taskType", item.taskTypeCode());
+            row.put("taskTypeName", item.taskTypeName());
+            row.put("assignmentLabel", assignmentLabel(item.task()));
+            return row;
+        }).toList();
+        return wire.response(wire.page(items, page.nextAfterId(), "nextAfterId", row -> Long.parseLong(row.path("id").asText())));
+    }
+
+    @GetMapping("/tasks/{id}/reassignment-availability")
+    public ResponseEntity<String> reassignmentAvailability(@PathVariable String id, HttpServletRequest request) {
+        query(request);
+        long taskId = decimal(id, false);
+        var first = access.task(taskId);
+        // Read the aggregate token before the final authorized task snapshot.
+        var instance = reads.findInstance(first.instanceId()).orElseThrow();
+        var task = access.task(taskId);
+        var activity = reads.findActivity(task.activityId()).orElseThrow();
+        boolean allowed = task.status() == TaskStatus.OPEN && instance.status() == InstanceStatus.ACTIVE
+                && activity.nodeKey().equals(instance.currentNodeKey()) && access.canReassignTask(task);
+        return wire.response(Map.of("allowed", allowed, "instanceLockVersion", instance.lockVersion()));
+    }
+
+    @GetMapping("/tasks/{id}/reassignment-targets")
+    public ResponseEntity<String> reassignmentTargets(@PathVariable String id, HttpServletRequest request) {
+        query(request, "kind", "query", "cursor", "limit");
+        var task = access.task(decimal(id, false));
+        if (!access.canReassignTask(task)) throw new WorkflowRuntimeException(403, "REASSIGNMENT_FORBIDDEN");
+        var kind = assignmentKind(request.getParameter("kind"));
+        String search = request.getParameter("query");
+        if (search == null) search = "";
+        if (search.length() > 200 || !RuntimeWire.unicode(search)) throw WorkflowRuntimeException.invalid();
+        String cursor = request.getParameter("cursor");
+        if (cursor != null && (cursor.length() > 1000 || !RuntimeWire.unicode(cursor))) throw WorkflowRuntimeException.invalid();
+        long count = request.getParameter("limit") == null ? 20 : decimal(request.getParameter("limit"), false);
+        if (count > 50) throw WorkflowRuntimeException.invalid();
+        var page = access.reassignmentTargets(task, kind, search, cursor, (int) count);
+        if (page == null || page.items().size() > count || page.nextCursor() != null
+                && (page.nextCursor().length() > 1000 || !RuntimeWire.unicode(page.nextCursor())))
+            throw new WorkflowRuntimeException(500, "HOST_CONFIGURATION");
+        for (var target : page.items()) {
+            if (target.ref() == null || target.ref().isBlank() || target.ref().length() > 200 || !RuntimeWire.unicode(target.ref())
+                    || target.label() == null || target.label().isBlank() || target.label().length() > 200 || !RuntimeWire.unicode(target.label()))
+                throw new WorkflowRuntimeException(500, "HOST_CONFIGURATION");
+        }
+        return wire.response(page);
+    }
+
+    private static AssignmentTargetKind assignmentKind(String value) {
+        if (value == null) throw WorkflowRuntimeException.invalid();
+        try { return AssignmentTargetKind.valueOf(value); }
+        catch (IllegalArgumentException invalid) { throw WorkflowRuntimeException.invalid(); }
+    }
+
+    private static String filter(HttpServletRequest request, String key, int bound) {
+        String value = request.getParameter(key);
+        if (value != null && (value.isBlank() || value.length() > bound || !RuntimeWire.unicode(value)))
+            throw WorkflowRuntimeException.invalid();
+        return value;
     }
     @GetMapping("/tasks/{id}")
     public ResponseEntity<String> task(@PathVariable String id) {

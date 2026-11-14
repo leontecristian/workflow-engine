@@ -9,6 +9,9 @@ import static io.github.leontecristian.workflow.web.service.runtime.RuntimeWire.
 import io.github.leontecristian.workflow.core.dto.runtime.AdministrativelyReleaseWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.ClaimWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.ReassignWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget;
+import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
 import io.github.leontecristian.workflow.core.dto.runtime.CancelWorkflow;
@@ -43,6 +46,38 @@ public class WorkflowRuntimeCommandController {
                 text(b, "outcomeKey", false),
                 text(b, "comment", true),
                 body.result());
+    }
+    @PostMapping("/instances/{instanceId}/tasks/{taskId}/reassign")
+    public ResponseEntity<String> reassign(@PathVariable String instanceId, @PathVariable String taskId,
+            HttpServletRequest request) {
+        var body = wire.body(request, "commandId", "assignment", "reason");
+        var command = new ReassignWorkflowTask(uuid(body), decimal(instanceId, false), decimal(taskId, false),
+                token(request), assignment(body), reason(body));
+        return wire.response(commands.reassign(command, errors.correlation(request)));
+    }
+
+    @PostMapping("/commands/reassign/replay")
+    public ResponseEntity<String> replayReassignment(HttpServletRequest request) {
+        var body = wire.body(request, "commandId", "instanceId", "taskId", "assignment", "reason");
+        var command = new ReassignWorkflowTask(uuid(body), id(body, "instanceId", false), id(body, "taskId", false),
+                token(request), assignment(body), reason(body));
+        return wire.response(replay(commands.replayReassignment(command, errors.correlation(request)).orElse(null)));
+    }
+
+    private static TaskAssignmentTarget assignment(com.fasterxml.jackson.databind.JsonNode body) {
+        var target = body.get("assignment");
+        if (target == null || !target.isObject() || target.size() != 2
+                || !target.has("kind") || !target.has("ref"))
+            throw io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException.invalid();
+        AssignmentTargetKind kind;
+        try { kind = AssignmentTargetKind.valueOf(text(target, "kind", false)); }
+        catch (IllegalArgumentException invalid) {
+            throw io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException.invalid();
+        }
+        String ref = text(target, "ref", false);
+        if (ref.isBlank() || ref.length() > 200)
+            throw io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException.invalid();
+        return new TaskAssignmentTarget(kind, ref);
     }
     @PostMapping("/instances/{instanceId}/cancel")
     public ResponseEntity<String> cancel(@PathVariable String instanceId, HttpServletRequest request) {

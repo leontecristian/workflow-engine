@@ -1,6 +1,6 @@
 import type { CommandResult, ReplayResult } from '../models';
 export type CommandBody = Readonly<Record<string,string|null>>;
-export type Envelope = Readonly<{kind:'start'|'complete'|'claim'|'release'|'admin-release'|'cancel';body:CommandBody;expectedToken:string|null}>;
+export type Envelope = Readonly<{kind:'start'|'complete'|'claim'|'release'|'admin-release'|'cancel'|'reassign';body:CommandBody;expectedToken:string|null}>;
 /** The only host-specific envelope: start fields and dispatch remain host-owned. */
 export interface StartEnvelopeAdapter {
  freezeBody(value:unknown):CommandBody;
@@ -14,7 +14,7 @@ export function exactDecimal(value:string,zero=false):string {
 export function freezeEnvelope(input:unknown,start?:StartEnvelopeAdapter):Envelope {
  if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('Invalid command envelope');
  const obj=input as Record<string,unknown>;
- if(Object.keys(obj).sort().join()!=='body,expectedToken,kind'||!['start','complete','claim','release','admin-release','cancel'].includes(obj['kind'] as string))throw new Error('Invalid command envelope');
+ if(Object.keys(obj).sort().join()!=='body,expectedToken,kind'||!['start','complete','claim','release','admin-release','cancel','reassign'].includes(obj['kind'] as string))throw new Error('Invalid command envelope');
  if(!obj['body']||typeof obj['body']!=='object'||Array.isArray(obj['body']))throw new Error('Invalid body');
  const source=obj['body'] as Record<string,unknown>;
  if(typeof source['commandId']!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(source['commandId']))throw new Error('Invalid command UUID');
@@ -28,11 +28,12 @@ export function freezeEnvelope(input:unknown,start?:StartEnvelopeAdapter):Envelo
   const hasResult=obj['kind']==='complete'&&Object.hasOwn(source,'resultJson');
   const fields=obj['kind']==='complete'
    ? hasResult?'commandId,comment,instanceId,outcomeKey,resultJson,taskId':'commandId,comment,instanceId,outcomeKey,taskId'
-   : obj['kind']==='cancel'?'commandId,instanceId,reason':obj['kind']==='admin-release'?'commandId,instanceId,reason,taskId':'commandId,instanceId,taskId';
+   : obj['kind']==='reassign'?'assignmentKind,assignmentRef,commandId,instanceId,reason,taskId':obj['kind']==='cancel'?'commandId,instanceId,reason':obj['kind']==='admin-release'?'commandId,instanceId,reason,taskId':'commandId,instanceId,taskId';
   if(Object.keys(source).sort().join()!==fields)throw new Error('Invalid command fields');
   for(const [key,value] of Object.entries(source))if(typeof value!=='string'&&!(key==='comment'&&value===null))throw new Error('Invalid command value');
   if(hasResult)freezeResultJson(source['resultJson']);
-  if(obj['kind']==='admin-release' && (typeof source['reason']!=='string' || source['reason'].length>1000 || /^[\u0009-\u000d\u001c-\u0020\u1680\u2000-\u2006\u2008-\u200a\u2028\u2029\u205f\u3000]*$/u.test(source['reason']) || /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(source['reason'])))throw new Error('Invalid administrative reason');
+  if((obj['kind']==='admin-release'||obj['kind']==='reassign') && (typeof source['reason']!=='string' || source['reason'].length>1000 || /^[\u0009-\u000d\u001c-\u0020\u1680\u2000-\u2006\u2008-\u200a\u2028\u2029\u205f\u3000]*$/u.test(source['reason']) || /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(source['reason'])))throw new Error('Invalid administrative reason');
+  if(obj['kind']==='reassign'&&(!['USER','GROUP','ROLE'].includes(source['assignmentKind'] as string)||typeof source['assignmentRef']!=='string'||!source['assignmentRef']||source['assignmentRef'].length>200))throw new Error('Invalid assignment');
   if(obj['kind']==='cancel')validateCancellationReason(source['reason']);
   exactDecimal(source['instanceId'] as string);if(obj['kind']!=='cancel')exactDecimal(source['taskId'] as string);
   exactDecimal(obj['expectedToken'] as string,true);

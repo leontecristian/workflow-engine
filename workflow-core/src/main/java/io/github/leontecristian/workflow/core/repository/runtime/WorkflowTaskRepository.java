@@ -63,6 +63,31 @@ public interface WorkflowTaskRepository extends Repository<WorkflowTaskEntity, L
     List<WorkflowTaskEntity> findCompletedPage(@Param("activityId") Long activityId,
                                               @Param("afterId") long afterId, Pageable pageable);
 
+    @Query("""
+            select t.id as id, t.activityId as activityId, a.instanceId as instanceId,
+                a.taskTypeId as taskTypeId, t.taskKey as taskKey, t.assignmentKind as assignmentKind, t.assignmentRef as assignmentRef, t.assigneeRef as assigneeRef,
+                t.status as status, t.outcomeKey as outcomeKey, t.createdAt as createdAt,
+                t.dueAt as dueAt, t.closedAt as closedAt, t.closedBy as closedBy,
+                t.closureReason as closureReason, a.nodeKey as nodeKey, tt.code as taskTypeCode, tt.name as taskTypeName, i.definitionVersionId as definitionVersionId
+            from WorkflowTaskEntity t join WorkflowActivityEntity a on a.id = t.activityId
+            join TaskTypeEntity tt on tt.id = a.taskTypeId join WorkflowInstanceEntity i on i.id = a.instanceId
+            where t.id > :afterId
+              and (:status is null or t.status = :status)
+              and (:taskType is null or (tt.code = :taskType and function('datalength', tt.code) = :taskTypeBytes))
+              and (:kind is null or t.assignmentKind = :kind)
+              and (:ref is null or (t.assignmentRef = :ref and function('datalength', t.assignmentRef) = :refBytes))
+              and (:assignee is null or (t.assigneeRef = :assignee and function('datalength', t.assigneeRef) = :assigneeBytes))
+              and (:instanceId is null or a.instanceId = :instanceId)
+            order by t.id asc
+            """)
+    List<RuntimeTaskAdministrationRow> findAdministrationPage(
+            @Param("status") io.github.leontecristian.workflow.core.dto.runtime.TaskStatus status,
+            @Param("taskType") String taskType, @Param("taskTypeBytes") int taskTypeBytes,
+            @Param("kind") io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind kind,
+            @Param("ref") String ref, @Param("refBytes") int refBytes,
+            @Param("assignee") String assignee, @Param("assigneeBytes") int assigneeBytes,
+            @Param("instanceId") Long instanceId, @Param("afterId") long afterId, Pageable pageable);
+
     Optional<WorkflowTaskEntity> findById(Long id);
 
     @Query("""

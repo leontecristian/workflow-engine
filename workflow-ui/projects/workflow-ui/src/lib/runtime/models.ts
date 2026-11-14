@@ -1,6 +1,10 @@
 import type { Decimal, InstanceView } from "../models";
 
 export interface Page<T> { items:T[]; nextAfterId:string|null; }
+/** Host-approved destination reference and display label; no host directory types escape this boundary. */
+export interface WorkflowReassignmentTarget { ref:string; label:string; }
+/** Bounded destination lookup result. The host owns the opaque cursor; null means no further page. */
+export interface WorkflowReassignmentTargetPage { items:WorkflowReassignmentTarget[]; nextCursor:string|null; }
 export interface SubmissionPage {
   items: TaskSubmission[];
   nextAfterTaskId: Decimal | null;
@@ -127,3 +131,10 @@ export interface VariablePage { exactJson?: string;
   items: { key:string; type:string; initialized:boolean; value:unknown }[];
   nextAfterKey: string|null;
 }
+
+export interface TaskAdministrationFilters {
+ status:'OPEN'|'COMPLETED'|'CANCELLED'|'ALL'; taskType?:string; taskName?:string;
+ assignmentKind?:'USER'|'GROUP'|'ROLE'; assignmentRef?:string; assigneeRef?:string; instanceId?:string;
+}
+
+export type TaskAdministrationRow=Omit<TaskView,'outcomeKey'|'closedBy'|'closureReason'> & {assignmentLabel?:string};

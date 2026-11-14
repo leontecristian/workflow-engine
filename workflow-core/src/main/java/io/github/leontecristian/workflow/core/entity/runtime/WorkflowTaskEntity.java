@@ -92,6 +92,13 @@ public class WorkflowTaskEntity {
         return new TaskAssignmentTarget(assignmentKind, assignmentRef);
     }
 
+    public void reassign(TaskAssignmentTarget target) {
+        if (status != TaskStatus.OPEN) throw new IllegalStateException("OPEN task required");
+        assignmentKind = java.util.Objects.requireNonNull(target.kind());
+        assignmentRef = java.util.Objects.requireNonNull(target.ref());
+        assigneeRef = assignmentKind == AssignmentTargetKind.USER ? assignmentRef : null;
+    }
+
     public void claim(String actor) {
         if (status != TaskStatus.OPEN || assignmentKind == AssignmentTargetKind.USER || assigneeRef != null)
             throw new IllegalStateException("Unassigned OPEN shared task required");

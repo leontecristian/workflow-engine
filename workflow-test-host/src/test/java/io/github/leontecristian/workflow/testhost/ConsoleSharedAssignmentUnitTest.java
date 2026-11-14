@@ -53,7 +53,7 @@ class ConsoleSharedAssignmentUnitTest {
         when(context.actor()).thenReturn("first");
         var ownership = mock(ConsoleTaskOwnershipAuthorization.class);
         when(ownership.canAccess(org.mockito.ArgumentMatchers.any())).thenReturn(true);
-        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), ownership);
+        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), ownership, org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskReassignmentAuthorization.class), org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings.class));
         var open = task(TaskStatus.OPEN, null);
         assertThat(access.canReadTask(open)).isTrue();
         assertThat(access.canCompleteTask(open)).isTrue();
@@ -77,7 +77,7 @@ class ConsoleSharedAssignmentUnitTest {
         var context = mock(ConsoleContext.class);
         when(context.actor()).thenReturn("first");
         var ownership = mock(ConsoleTaskOwnershipAuthorization.class);
-        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), ownership);
+        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), ownership, org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskReassignmentAuthorization.class), org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings.class));
         var task = new WorkflowTaskView(5, 2, 1, 3, "REVIEW", SandboxSharedAssignmentProvider.FINANCE,
                 TaskStatus.OPEN, null, Instant.EPOCH, null, null, null, null, "first");
         when(ownership.canAccess(org.mockito.ArgumentMatchers.any())).thenReturn(true);
@@ -140,7 +140,7 @@ class ConsoleSharedAssignmentUnitTest {
         when(context.actor()).thenReturn("first");
         var ownership = mock(ConsoleTaskOwnershipAuthorization.class);
         when(ownership.canAccess(org.mockito.ArgumentMatchers.any())).thenReturn(true);
-        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), ownership);
+        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), ownership, org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskReassignmentAuthorization.class), org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings.class));
         assertThatThrownBy(() -> access.canReadTask(task(TaskStatus.OPEN, null)))
                 .isInstanceOfSatisfying(WorkflowExecutionException.class,
                         failure -> assertThat(failure.category()).isEqualTo(WorkflowExecutionException.Category.ASSIGNMENT_LOOKUP_FAILED));

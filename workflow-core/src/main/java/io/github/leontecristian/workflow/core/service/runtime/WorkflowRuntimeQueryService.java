@@ -175,6 +175,39 @@ public class WorkflowRuntimeQueryService {
         });
     }
 
+    /** One bounded candidate page; denied candidates still advance the continuation. */
+    public io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationPage listAdministrationTasks(
+            io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationQuery query,
+            Predicate<io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationItem> hostAccess) {
+        RuntimeInputs.require(query != null && hostAccess != null, Category.INVALID_INPUT);
+        RuntimeInputs.validatePageRequest(query.afterId(), query.limit());
+        RuntimeInputs.require((query.taskTypeCode() == null || RuntimeInputs.isValidKey(query.taskTypeCode()))
+                && (query.taskName() == null || RuntimeInputs.isValidText(query.taskName(),200,200,true))
+                && (query.assignmentRef() == null || query.assignmentKind() != null && RuntimeInputs.isValidText(query.assignmentRef(),200,200,true))
+                && (query.assigneeRef() == null || RuntimeInputs.isValidText(query.assigneeRef(),200,200,true))
+                && (query.instanceId() == null || query.instanceId() > 0), Category.INVALID_INPUT);
+        return RuntimePersistenceErrors.call(() -> {
+            var rows = tasks.findAdministrationPage(query.status(), query.taskTypeCode(), query.taskTypeCode() == null ? 0 : query.taskTypeCode().length(),
+                    query.assignmentKind(), query.assignmentRef(), query.assignmentRef() == null ? 0 : query.assignmentRef().length()*2,
+                    query.assigneeRef(), query.assigneeRef() == null ? 0 : query.assigneeRef().length()*2,
+                    query.instanceId(), query.afterId(), PageRequest.of(0,query.limit()+1));
+            var items = new ArrayList<io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationItem>();
+            var definitions = new java.util.HashMap<Long,Map<String, String>>();
+            int count = Math.min(rows.size(),query.limit());
+            String taskName = query.taskName() == null ? null : query.taskName().toLowerCase(java.util.Locale.ROOT);
+            for (var row : rows.subList(0,count)) {
+                var names = definitions.computeIfAbsent(row.getDefinitionVersionId(), pins::nodeNames);
+                String name = names.get(row.getNodeKey());
+                RuntimeInputs.require(name != null, Category.HOST_CONFIGURATION);
+                var item = new io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationItem(RuntimeViews.task(row),row.getNodeKey(),
+                        name,row.getTaskTypeCode(),row.getTaskTypeName());
+                if (hostAccess.test(item) && (taskName == null || name.toLowerCase(java.util.Locale.ROOT).contains(taskName))) items.add(item);
+            }
+            return new io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationPage(items,
+                    rows.size() > count ? rows.get(count-1).getId() : null);
+        });
+    }
+
     public WorkflowTaskPage listTasks(long instanceId) { return listTasks(instanceId, 0, 50); }
     public WorkflowTaskPage listTasks(long instanceId, long afterId, int limit) {
         RuntimeInputs.validatePositiveId(instanceId); RuntimeInputs.validatePageRequest(afterId, limit);
