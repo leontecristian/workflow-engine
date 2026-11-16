@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus;
+import io.github.leontecristian.workflow.core.exception.runtime.WorkflowRuntimeReadAccessException;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstancePage;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceQuery;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceSummary;
@@ -33,7 +34,12 @@ class ConsoleInstancesUnitTest {
     private final WorkflowRuntimeQueryService reads = mock(WorkflowRuntimeQueryService.class);
     private final ConsoleContext context = new ConsoleContext(java.time.Clock.systemUTC());
     private final WorkflowRuntimeReadController controller = new WorkflowRuntimeReadController(
-            reads, null, null, new ConsoleRuntimeReadHost(reads, null, context, null), new RuntimeWire(), null, false);
+            reads, null, null, RuntimeReadFixtures.authorized(reads,
+                    new io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeAccess(reads, context,
+                            mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class),
+                            mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess.class)),
+                    mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class)),
+            new ConsoleRuntimeReadHost(context, null, null), null, null, new RuntimeWire(), null, false);
 
     @BeforeEach
     void administrator() {
@@ -113,11 +119,12 @@ class ConsoleInstancesUnitTest {
                         new TestingAuthenticationToken(
                                 "reviewer", "unit-only", "ROLE_CONSOLE_REVIEWER"));
         assertThrows(
-                WorkflowRuntimeException.class,
+                WorkflowRuntimeReadAccessException.class,
                 () -> secured.instances(new MockHttpServletRequest()));
         var malformed = new MockHttpServletRequest();
         malformed.addParameter("unknown", "1");
-        assertEquals(403, assertThrows(WorkflowRuntimeException.class, () -> secured.instances(malformed)).status());
+        assertEquals(WorkflowRuntimeReadAccessException.Access.MONITOR,
+                assertThrows(WorkflowRuntimeReadAccessException.class, () -> secured.instances(malformed)).access());
         verifyNoInteractions(reads);
         SecurityContextHolder.getContext()
                 .setAuthentication(

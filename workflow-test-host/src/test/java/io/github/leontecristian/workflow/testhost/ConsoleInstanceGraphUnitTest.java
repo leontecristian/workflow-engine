@@ -66,6 +66,7 @@ class ConsoleInstanceGraphUnitTest {
     private final WorkflowDefinitionService definitions = mock(WorkflowDefinitionService.class);
     private final ConsoleContext context = mock(ConsoleContext.class);
     @org.junit.jupiter.api.BeforeEach void authenticated() {
+        when(context.actor()).thenReturn("unit");
         org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
             org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated("unit", "unused", List.of()));
         when(reads.listTasks(anyLong(), anyLong(), anyInt())).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage(List.of(), null));
@@ -74,7 +75,7 @@ class ConsoleInstanceGraphUnitTest {
     private final ViewerWire wire = new ViewerWire();
     private final WorkflowInstanceGraphService graphs =
             new WorkflowInstanceGraphService(
-                    new ConsoleViewerAccess(new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskOwnershipAuthorization.class), org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskReassignmentAuthorization.class), org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings.class)), reads), definitions, reads, wire);
+                    new ConsoleViewerAccess(new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess.class)), reads), definitions, reads, wire);
 
     private WorkflowInstanceView instance(InstanceStatus status, long sequence) {
         return new WorkflowInstanceView(
@@ -332,6 +333,6 @@ class ConsoleInstanceGraphUnitTest {
         assertFalse(graph.edges().stream().filter(e -> e.key().equals("finish")).findFirst().orElseThrow().traversed());
         assertEquals(
                 InstanceStatus.CANCELLED,
-                new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskOwnershipAuthorization.class), org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskReassignmentAuthorization.class), org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings.class)).instance(ID).status());
+                new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess.class)).instance(ID).status());
     }
 }

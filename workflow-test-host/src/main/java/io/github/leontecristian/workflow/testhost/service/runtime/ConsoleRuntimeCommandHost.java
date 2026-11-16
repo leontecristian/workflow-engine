@@ -34,7 +34,7 @@ public class ConsoleRuntimeCommandHost implements WorkflowRuntimeCommandHost {
 
     @Override public WorkflowCommandResult complete(CompleteWorkflowTask command, String correlation) {
         return policy(() -> {
-            access.task(command.taskId());
+            access.completionTask(command.taskId());
             return commands.complete(command, context.runtime(correlation));
         });
     }
@@ -46,7 +46,7 @@ public class ConsoleRuntimeCommandHost implements WorkflowRuntimeCommandHost {
     }
     @Override public Optional<WorkflowCommandResult> replayComplete(CompleteWorkflowTask command, String correlation) {
         return policy(() -> {
-            access.task(command.taskId());
+            access.completionTask(command.taskId());
             return transactions.replayComplete(command, context.runtime(correlation));
         });
     }

@@ -48,7 +48,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Host-authorized detached reads. IDs are not access grants; the host authorizes instance,
+ * Raw detached reads requiring caller authorization. For authorized runtime retrieval use
+ * {@link WorkflowAuthorizedRuntimeReadService}. IDs are not access grants; the host authorizes instance,
  * assignee and exact evidence access before every call. Reads join the host transaction,
  * including uncommitted accepted submissions, or open a read-only REQUIRED transaction.
  * No snapshot stability across commits or implicit latest submission is promised.

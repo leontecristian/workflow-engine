@@ -10,18 +10,18 @@ import org.springframework.stereotype.Component;
 /** Sandbox-only policy: known console fixtures share the same frozen review basis. */
 @Component
 public class ConsoleTaskReassignmentAuthorization implements WorkflowTaskReassignmentAuthorization {
-    private final ConsoleTaskOwnershipAuthorization ownership;
+    private final ConsoleTaskBusinessAccess businessAccess;
     private final io.github.leontecristian.workflow.testhost.service.console.ConsoleContext context;
     private final ConsoleSettings settings;
 
-    public ConsoleTaskReassignmentAuthorization(ConsoleTaskOwnershipAuthorization ownership,
+    public ConsoleTaskReassignmentAuthorization(ConsoleTaskBusinessAccess businessAccess,
             io.github.leontecristian.workflow.testhost.service.console.ConsoleContext context, ConsoleSettings settings) {
-        this.ownership = ownership;
+        this.businessAccess = businessAccess;
         this.context = context;
         this.settings = settings;
     }
 
-    @Override public boolean canAccess(TaskEligibilityContext task) { return ownership.canAccess(task); }
+    @Override public boolean canAccess(TaskEligibilityContext task) { return businessAccess.canAccess(task); }
     @Override public boolean canReassign(TaskEligibilityContext task) {
         return context.isConsoleActor(task.actorRef()) && context.admin();
     }

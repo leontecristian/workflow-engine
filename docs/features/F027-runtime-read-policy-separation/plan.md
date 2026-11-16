@@ -1,12 +1,12 @@
 # F027 implementation plan
 
-Targets [specification revision 6](spec.md). **PROPOSED; no implementation authorized.** Execution is tracked in [tasks.md](tasks.md); actual outcomes belong in [implementation.md](implementation.md).
+Targets [specification revision 6](spec.md). **ADOPTED — owner authorized revision 6 implementation and focused verification on 2026-11-16.** Execution is tracked in [tasks.md](tasks.md); actual outcomes belong in [implementation.md](implementation.md).
 
 ## P01 — Public contracts and core facade
 
 Use `io.github.leontecristian.workflow.core.service.runtime` for the concrete `WorkflowAuthorizedRuntimeReadService`, read-policy integration and the existing authorization adapters. Use `core.dto.runtime` only for a genuinely necessary detached context; reuse `TaskEligibilityContext`, existing views/pages and query records for reads; retain `WorkflowCommandContext` only at the separate cancellation-authorization boundary. No new module, repository abstraction or service interface/implementation pair.
 
-Proposed core policy shape (method names are design, not existing API):
+Adopted core policy contract:
 
 ```java
 public interface WorkflowRuntimeReadAuthorization {
@@ -50,7 +50,7 @@ Use existing packages:
 - `io.github.leontecristian.workflow.web.service.runtime`: preserve `RuntimeErrors`, wire projection and availability activation composition.
 - `io.github.leontecristian.workflow.testhost.service.runtime`: migrate `ConsoleRuntimeReadHost`/`ConsoleRuntimeAccess` into policy/identity/directory wiring; reuse `ConsoleTaskOwnershipAuthorization`, `ConsoleTaskReassignmentAuthorization`, `ConsoleWorkflowCancellationAuthorization` and shared assignment provider.
 
-Proposed web integration:
+Adopted web integration:
 
 ```java
 public interface WorkflowRuntimeReadIdentity {
@@ -88,7 +88,7 @@ For revision 3, place the administrator read grant before the existing OPEN-task
 
 For revision 4, remove the sandbox read policy's indirect dependency on `ConsoleTaskOwnershipAuthorization`: the current `ConsoleRuntimeAccess.canAccessBusiness` delegates there. Reuse a host-private business-access helper or the same existing host business check in both adapters, preserving ordinary-user decisions and error categories. This is internal host composition, not a new public authorization interface. Ownership command/availability/recovery callers continue using the ownership adapter; read-only construction must not need that adapter. Inspect callers before moving the helper so replay and operation checks retain their present behavior.
 
-For revision 5, use that same host-private helper to remove `ConsoleTaskReassignmentAuthorization`'s constructor dependency on `ConsoleTaskOwnershipAuthorization` and its `ownership.canAccess(...)` delegation. Place the concrete helper in `io.github.leontecristian.workflow.testhost.service.runtime` (proposed name `ConsoleTaskBusinessAccess`); it is not a new core/public integration contract. Preserve the existing check of authenticated console actor plus `SandboxRequestStore.linkedToInstance(task.instanceId())`. Inject the helper directly into ownership authorization, reassignment authorization and the read-policy consumer that needs ordinary-user business access. Keep administrator read bypass in read policy, outside the helper. Preserve each adapter's operation-specific decisions and the existing caller's exception mapping. No changes to core reassignment execution/replay ordering or authorization signatures are required. The earlier references to unchanged command adapters mean unchanged contracts/decisions; this explicitly selected host dependency refactoring is included.
+For revision 5, use that same host-private helper to remove `ConsoleTaskReassignmentAuthorization`'s constructor dependency on `ConsoleTaskOwnershipAuthorization` and its `ownership.canAccess(...)` delegation. Place the concrete helper in `io.github.leontecristian.workflow.testhost.service.runtime` (`ConsoleTaskBusinessAccess`); it is not a new core/public integration contract. Preserve the existing check of authenticated console actor plus `SandboxRequestStore.linkedToInstance(task.instanceId())`. Inject the helper directly into ownership authorization, reassignment authorization and the read-policy consumer that needs ordinary-user business access. Keep administrator read bypass in read policy, outside the helper. Preserve each adapter's operation-specific decisions and the existing caller's exception mapping. No changes to core reassignment execution/replay ordering or authorization signatures are required. The earlier references to unchanged command adapters mean unchanged contracts/decisions; this explicitly selected host dependency refactoring is included.
 
 ### Instance-task list flow
 
@@ -104,7 +104,7 @@ For My Tasks, omit the general instance grant: call `listEligibleTasks` with the
 
 Update `workflow-core`/`workflow-web` integration documentation and sandbox registration examples to describe required policy/identity and optional operation/directory adapters. Explicitly document Java source migration from all `WorkflowRuntimeReadHost` methods and extra custom permission restrictions. Do not retain an automatic legacy fallback that bypasses authorized reads. Preserve HTTP/UI contracts and the root `WorkflowConfiguration` marker. No database migration, dependency upgrade, frontend redesign or schema work is planned.
 
-On implementation, reconcile F015 R02's paging wording narrowly and add source-precedence/feature-index entries without rewriting historical verification. Constitution principles need no amendment. Keep F027 DRAFT until the proposed integration contract is accepted for implementation; readiness and authorization are separate from completed code.
+On implementation, reconcile F015 R02's paging wording narrowly and add source-precedence/feature-index entries without rewriting historical verification. Constitution principles need no amendment. F027 is READY under the owner approval of 2026-11-16; implementation completion remains evidence-based.
 
 ## P05 — Focused verification
 
@@ -130,4 +130,13 @@ During implementation, select installed JDK 21 and root Maven wrapper; explicitl
 
 Fresh focused HTTP/configuration tests are required for changed bean wiring and response parity. Browser checks are conditional on changed rendering/client interaction or wiring not demonstrated by those tests; no whole workflow replay just to reach a screen. No host startup against the development database is authorized by this plan. Stop when AC01–AC07 relevant checks and packaging pass; do not rerun unrelated command/replay/concurrency suites.
 
-For this planning delivery only: content/source review, local-link existence, exactly four process documents, diff/whitespace checks; no builds, tests, services or database access.
+Planning-only checks remain historical. This implementation uses the focused suites above and packaging; no normal host startup or development database access.
+
+
+## Adopted engineering details — 2026-11-16
+
+Construct the facade explicitly in `WorkflowRuntimeReadConfiguration`; do not register it through core scanning. Optional cancellation/reassignment authorization resolves through `ObjectProvider`; missing operation support suppresses its hints. Use neutral `core.exception.runtime.WorkflowRuntimeReadAccessException` with MONITOR/ADMINISTRATION access categories; web maps those to existing 403 codes. Keep exact denial in `WorkflowExecutionException.NOT_FOUND`.
+
+Caller inspection found that completion dispatch/recovery also used `ConsoleRuntimeAccess.task`. Preserve their previous authorization through a dedicated `completionTask` wrapper, including the OPEN-task business check before the administrator shortcut. The three consumers are `ConsoleRuntimeCommandHost.complete`, `ConsoleRuntimeCommandHost.replayComplete` and the coordinator's post-failure completion lookup. This prevents read expansion from bypassing the existing operation guard, without introducing F028 behavior. Select focused host adapter/recovery checks for these changed call sites.
+
+A concrete coverage gap in the existing facade/query tests selects one composed My Tasks regression using actual core candidate selection with repository doubles: unreadable eligible rows, readable ineligible rows, former-member assignee and administrator personal eligibility. No database or new command execution suite is needed.

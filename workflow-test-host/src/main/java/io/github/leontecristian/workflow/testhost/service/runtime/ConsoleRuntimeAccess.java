@@ -5,33 +5,45 @@ import io.github.leontecristian.workflow.core.dto.runtime.TaskEligibilityContext
 import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowActivityView;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceSummary;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeReadAuthorization;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService;
 import io.github.leontecristian.workflow.testhost.exception.console.ConsoleException;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
 import org.springframework.stereotype.Service;
 
 @Service
-public class ConsoleRuntimeAccess {
+public class ConsoleRuntimeAccess implements WorkflowRuntimeReadAuthorization {
     private final WorkflowRuntimeQueryService reads;
     private final ConsoleContext context;
     private final WorkflowTaskEligibilityService eligibility;
-    private final ConsoleTaskOwnershipAuthorization ownership;
-    private final ConsoleTaskReassignmentAuthorization reassignment;
-    private final io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings settings;
+    private final ConsoleTaskBusinessAccess businessAccess;
 
     public ConsoleRuntimeAccess(WorkflowRuntimeQueryService reads, ConsoleContext context,
-            WorkflowTaskEligibilityService eligibility, ConsoleTaskOwnershipAuthorization ownership,
-            ConsoleTaskReassignmentAuthorization reassignment,
-            io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings settings) {
+            WorkflowTaskEligibilityService eligibility, ConsoleTaskBusinessAccess businessAccess) {
         this.reads = reads;
         this.context = context;
         this.eligibility = eligibility;
-        this.ownership = ownership;
-        this.reassignment = reassignment;
-        this.settings = settings;
+        this.businessAccess = businessAccess;
+    }
+
+    private boolean administrator(String actorRef) {
+        return actorRef.equals(context.actor()) && context.admin();
+    }
+
+    @Override public boolean canMonitor(String actorRef) { return administrator(actorRef); }
+    @Override public boolean canAdministerTasks(String actorRef) { return administrator(actorRef); }
+    @Override public boolean canListInstance(String actorRef, WorkflowInstanceSummary instance) {
+        return administrator(actorRef);
+    }
+    @Override public boolean canReadInstance(String actorRef, WorkflowInstanceView instance) {
+        return administrator(actorRef) || assigned(instance.id(), null, actorRef);
+    }
+    @Override public boolean canReadActivity(String actorRef, WorkflowActivityView activity) {
+        return administrator(actorRef) || assigned(activity.instanceId(), activity.id(), actorRef);
     }
 
     public WorkflowTaskView task(long id) {
@@ -41,87 +53,52 @@ public class ConsoleRuntimeAccess {
         return task;
     }
 
-    public boolean canReadTask(WorkflowTaskView task) {
-        if (task.status() == TaskStatus.OPEN) {
-            if (!canAccessBusiness(task)) return false;
-            if (context.actor().equals(task.assigneeRef())) return true;
-        }
-        return canReadByAssignment(task);
+    /** Completion/recovery preserves its pre-existing business gate independently of read grants. */
+    public WorkflowTaskView completionTask(long id) {
+        var task = reads.findTask(id).orElseThrow(ConsoleException::missing);
+        if (task.status() == TaskStatus.OPEN && !canAccessBusiness(new TaskEligibilityContext(task, context.actor())))
+            throw ConsoleException.missing();
+        if (task.status() == TaskStatus.OPEN && context.actor().equals(task.assigneeRef())) return task;
+        if (!canReadByAssignment(task, context.actor())) throw ConsoleException.missing();
+        return task;
     }
 
-    public boolean canAccessBusiness(WorkflowTaskView task) {
+    private boolean canAccessBusiness(TaskEligibilityContext taskContext) {
         try {
-            return ownership.canAccess(new TaskEligibilityContext(task, context.actor()));
+            return businessAccess.canAccess(taskContext);
         } catch (RuntimeException unavailable) {
             throw new WorkflowExecutionException(
                     WorkflowExecutionException.Category.AUTHORIZATION_LOOKUP_FAILED, unavailable);
         }
     }
 
-    private boolean canReadByAssignment(WorkflowTaskView task) {
-        if (context.admin()) return true;
-        if (task.assignment().kind() == AssignmentTargetKind.USER)
-            return context.actor().equals(task.assignment().ref());
-        if (task.status() == TaskStatus.OPEN)
-            return eligibility.isEligible(task, context.actor());
-        return task.status() == TaskStatus.COMPLETED
-                && context.actor().equals(task.closedBy());
+    public boolean canReadTask(WorkflowTaskView task) {
+        return canReadTask(new TaskEligibilityContext(task, context.actor()));
     }
 
-    public boolean canReassignTask(WorkflowTaskView task) {
-        var taskContext = new TaskEligibilityContext(task, context.actor());
-        try { return reassignment.canAccess(taskContext) && reassignment.canReassign(taskContext); }
-        catch (RuntimeException failure) {
-            throw new WorkflowExecutionException(WorkflowExecutionException.Category.AUTHORIZATION_LOOKUP_FAILED, failure);
+    @Override public boolean canReadTask(TaskEligibilityContext taskContext) {
+        var task = taskContext.task();
+        String actor = taskContext.actorRef();
+        if (administrator(actor)) return true;
+        if (task.status() == TaskStatus.OPEN) {
+            if (!canAccessBusiness(taskContext)) return false;
+            if (actor.equals(task.assigneeRef())) return true;
         }
+        return canReadByAssignment(task, actor);
     }
 
-    public io.github.leontecristian.workflow.web.dto.runtime.WorkflowReassignmentTargetPage reassignmentTargets(
-            WorkflowTaskView task, AssignmentTargetKind kind, String query, String cursor, int limit) {
-        task(task.id());
-        if (!canReassignTask(task)) throw new ConsoleException(403, "REASSIGNMENT_FORBIDDEN");
-        if (kind == null || limit < 1 || limit > 50 || query != null && query.length() > 200)
-            throw new ConsoleException(400, "INVALID_INPUT");
-        // Opaque continuation is an exact fixture reference, never a directory-wide browser cache.
-        var candidates = new java.util.TreeMap<String, String>();
-        if (kind == AssignmentTargetKind.USER) {
-            for (String ref : java.util.List.of(settings.admin, settings.reviewer, settings.reviewer2)) candidates.put(ref, ref);
-        } else if (kind == AssignmentTargetKind.GROUP) candidates.put(SandboxSharedAssignmentProvider.FINANCE.ref(), "Finance");
-        else candidates.put(SandboxSharedAssignmentProvider.APPROVER.ref(), "Approver");
-        if (cursor != null && !candidates.containsKey(cursor)) throw new ConsoleException(400, "INVALID_INPUT");
-        String search = query == null ? "" : query.toLowerCase(java.util.Locale.ROOT);
-        var selected = candidates.entrySet().stream()
-                .filter(entry -> cursor == null || entry.getKey().compareTo(cursor) > 0)
-                .filter(entry -> entry.getKey().toLowerCase(java.util.Locale.ROOT).contains(search)
-                        || entry.getValue().toLowerCase(java.util.Locale.ROOT).contains(search))
-                .limit(limit + 1L).toList();
-        boolean more = selected.size() > limit;
-        var items = selected.stream().limit(limit)
-                .map(entry -> new io.github.leontecristian.workflow.web.dto.runtime.WorkflowReassignmentTarget(entry.getKey(), entry.getValue())).toList();
-        return new io.github.leontecristian.workflow.web.dto.runtime.WorkflowReassignmentTargetPage(items,
-                more ? items.get(items.size() - 1).ref() : null);
+    private boolean canReadByAssignment(WorkflowTaskView task, String actor) {
+        if (administrator(actor)) return true;
+        if (task.assignment().kind() == AssignmentTargetKind.USER)
+            return actor.equals(task.assignment().ref());
+        if (task.status() == TaskStatus.OPEN)
+            return eligibility.isEligible(task, actor);
+        return task.status() == TaskStatus.COMPLETED && actor.equals(task.closedBy());
     }
 
-    public boolean canCompleteTask(WorkflowTaskView task) {
-        String actor = context.actor();
-        return task.status() == TaskStatus.OPEN
-                && (task.assigneeRef() == null || actor.equals(task.assigneeRef()))
-                && eligibility.isEligible(task, actor);
-    }
-
-    public boolean canClaimTask(WorkflowTaskView task) {
-        var taskContext = new TaskEligibilityContext(task, context.actor());
-        return eligibility.canAccessOwnership(taskContext) && eligibility.isEligible(task, taskContext.actorRef());
-    }
-
-    public boolean canReleaseTask(WorkflowTaskView task) {
-        var taskContext = new TaskEligibilityContext(task, context.actor());
-        return taskContext.actorRef().equals(task.assigneeRef()) && eligibility.canAccessOwnership(taskContext);
-    }
-
-    public boolean canAdministrativelyReleaseTask(WorkflowTaskView task) {
-        var taskContext = new TaskEligibilityContext(task, context.actor());
-        return eligibility.canAccessOwnership(taskContext) && eligibility.canAdministrativelyRelease(taskContext);
+    @Override public boolean canCompleteTask(TaskEligibilityContext taskContext) {
+        // Sandbox supplies no extra completion veto beyond the core state/assignment policy.
+        return true;
     }
 
     /** Bounded bulk authorization for graph links; avoids an exact-task query per displayed node. */
@@ -132,7 +109,7 @@ public class ConsoleRuntimeAccess {
         for (int page = 0; page < 100; page++) {
             var tasks = reads.listTasks(instanceId, cursor, 100);
             for (var task : tasks.items())
-                if (candidates.contains(task.activityId()) && canReadByAssignment(task)) visible.add(task.activityId());
+                if (candidates.contains(task.activityId()) && canReadByAssignment(task, context.actor())) visible.add(task.activityId());
             if (tasks.nextAfterId() == null) return java.util.Set.copyOf(visible);
             cursor = tasks.nextAfterId();
         }
@@ -141,17 +118,29 @@ public class ConsoleRuntimeAccess {
 
     public WorkflowInstanceView instance(long id) {
         var instance = reads.findInstance(id).orElseThrow(ConsoleException::missing);
-        if (!context.admin()) assigned(id, null);
+        try {
+            if (!canReadInstance(context.actor(), instance)) throw ConsoleException.missing();
+        } catch (WorkflowExecutionException failure) {
+            if (failure.category() == WorkflowExecutionException.Category.LIMIT_EXCEEDED)
+                throw new ConsoleException(422, "LIMIT_EXCEEDED");
+            throw failure;
+        }
         return instance;
     }
 
     public WorkflowActivityView activity(long id) {
         var activity = reads.findActivity(id).orElseThrow(ConsoleException::missing);
-        if (!context.admin()) assigned(activity.instanceId(), id);
+        try {
+            if (!canReadActivity(context.actor(), activity)) throw ConsoleException.missing();
+        } catch (WorkflowExecutionException failure) {
+            if (failure.category() == WorkflowExecutionException.Category.LIMIT_EXCEEDED)
+                throw new ConsoleException(422, "LIMIT_EXCEEDED");
+            throw failure;
+        }
         return activity;
     }
 
-    private void assigned(long instanceId, Long activityId) {
+    private boolean assigned(long instanceId, Long activityId, String actor) {
         long cursor = 0;
         // Includes completed tasks; reviewer access does not vanish on completion/retirement.
         for (int page = 0; page < 100; page++) {
@@ -160,10 +149,10 @@ public class ConsoleRuntimeAccess {
                     .anyMatch(
                             t ->
                                     (activityId == null || t.activityId() == activityId)
-                                            && canReadByAssignment(t))) return;
-            if (tasks.nextAfterId() == null) throw ConsoleException.missing();
+                                            && canReadByAssignment(t, actor))) return true;
+            if (tasks.nextAfterId() == null) return false;
             cursor = tasks.nextAfterId();
         }
-        throw new ConsoleException(422, "LIMIT_EXCEEDED");
+        throw new WorkflowExecutionException(WorkflowExecutionException.Category.LIMIT_EXCEEDED);
     }
 }

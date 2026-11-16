@@ -2,7 +2,6 @@ package io.github.leontecristian.workflow.testhost.service.runtime;
 
 import io.github.leontecristian.workflow.core.dto.runtime.TaskEligibilityContext;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskOwnershipAuthorization;
-import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
 import org.springframework.stereotype.Component;
 
@@ -10,17 +9,16 @@ import org.springframework.stereotype.Component;
 @Component
 public class ConsoleTaskOwnershipAuthorization implements WorkflowTaskOwnershipAuthorization {
     private final ConsoleContext context;
-    private final SandboxRequestStore requests;
+    private final ConsoleTaskBusinessAccess businessAccess;
 
-    public ConsoleTaskOwnershipAuthorization(ConsoleContext context, SandboxRequestStore requests) {
+    public ConsoleTaskOwnershipAuthorization(ConsoleContext context, ConsoleTaskBusinessAccess businessAccess) {
         this.context = context;
-        this.requests = requests;
+        this.businessAccess = businessAccess;
     }
 
     @Override
     public boolean canAccess(TaskEligibilityContext taskContext) {
-        return context.isConsoleActor(taskContext.actorRef())
-                && requests.linkedToInstance(taskContext.task().instanceId());
+        return businessAccess.canAccess(taskContext);
     }
 
     @Override

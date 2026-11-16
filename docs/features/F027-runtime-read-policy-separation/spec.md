@@ -1,6 +1,6 @@
 # F027 — Runtime read policy separation
 
-**Status:** DRAFT, revision 6 — 2026-11-14. **Owner:** Workflow project owner. **Constitution:** 6.6.1. **Authorization:** specification and implementation planning only; no implementation authorized.
+**Status:** IMPLEMENTED, revision 6 — 2026-11-16. **Owner:** Workflow project owner. **Constitution:** 6.6.1. **Authorization:** owner approved revision 6 implementation and focused verification on 2026-11-16.
 
 ## Outcome and authority
 
@@ -14,7 +14,7 @@ Revision 5 explicitly removes reassignment authorization's dependency on ownersh
 
 Revision 6 makes reassignment directory search default to unsupported/denied, allowing a host to implement only assignment labels.
 
-The owner selected this analysis/planning scope after reviewing `WorkflowRuntimeReadHost`. Interface sketches from that discussion were illustrative. This revision refines them against implementation at `d62bfda0eccab656e14e2d16253f355c0043ffce`; the proposed API shape in [plan.md](plan.md) is not an implemented contract. DRAFT distinguishes the proposed public integration change from existing delivered contracts; implementation requires a subsequent owner request.
+The owner selected this analysis/planning scope after reviewing `WorkflowRuntimeReadHost`. Interface sketches from that discussion were illustrative. This revision refines them against implementation at `d62bfda0eccab656e14e2d16253f355c0043ffce`; the API shape in [plan.md](plan.md) was proposed during preparation and adopted for this implementation. The subsequent owner request on 2026-11-16 approves this public integration change and its implementation.
 
 Apply [CON-01/02/03/10/12](../../constraints.md), [ASM-01 and ASM-06](../../assumptions.md), [constitution C03/C09/C10](../../constitution.md), [source precedence](../../design-sources.md) and [package boundaries](../../package-structure.md). Existing policy and wire contracts are owned by [F015](../F015-runtime-task-instance-extraction/spec.md), [F017](../F017-task-claim-release/spec.md), [F022](../F022-previous-decision-comments/spec.md), [F025](../F025-workflow-cancellation/spec.md) and [F026 revision 2](../F026-task-administration-reassignment/spec.md). APOLO policy/compatibility remains unverified under ASM-01/06.
 
@@ -85,7 +85,7 @@ Directory search and assignment labels remain separate host integration. Exact-t
 
 ### R06 — Compatibility and adoption
 
-Preserve endpoint paths, request/response shapes, action flags, error categories and frontend contracts. This is a proposed Java host-integration source change: replace data-returning host methods, migrate test host and shared web together, and document the mapping. Do not claim unchanged source compatibility or silently reinterpret a custom host's additional restrictions as granted access. Custom consumers must explicitly map their policies before adopting this version; legacy custom page-query compatibility is outside this slice.
+Preserve endpoint paths, request/response shapes, action flags, error categories and frontend contracts. This is an approved Java host-integration source change: replace data-returning host methods, migrate test host and shared web together, and document the mapping. Do not claim unchanged source compatibility or silently reinterpret a custom host's additional restrictions as granted access. Custom consumers must explicitly map their policies before adopting this version; legacy custom page-query compatibility is outside this slice.
 
 Existing required command adapters, transaction boundaries, pinned evidence, schema, receipts and migration ownership are unchanged. No constitutional principle amendment is needed; feature/source-precedence documentation should identify the narrowly superseded F015 integration requirement when implemented.
 
@@ -99,6 +99,6 @@ Existing required command adapters, transaction boundaries, pinned evidence, sch
 - **AC07 — Label-only directory:** a host implements only `assignmentLabel` and obtains friendly task assignment labels with the existing fallback behavior. If an otherwise authorized search reaches the inherited `reassignmentTargets`, it receives 403 `REASSIGNMENT_FORBIDDEN`; the label-only adapter neither enables search nor changes reassignment command permissions. Explicit search overrides still return their normal bounded pages.
 - **AC05 — Integration:** core-only consumers pass trusted actor references without a web adapter or command context; shared web obtains the same identity from its required identity adapter. Ordinary reads work with no cancellation-context factory and never call it. Cancellation availability alone uses the separate trusted operation context, rejects actor mismatch, and preserves missing-support/failure behavior. Explicit read configuration works without command endpoints and has no competing transaction manager. Sandbox HTTP DTOs and relevant UI interactions remain compatible. Directory/label behavior is preserved.
 
-## Proposal boundaries
+## Adoption boundaries
 
-The separation, ordinary-user/pagination preservation and simple administrator visibility policy are selected for planning. The concrete interface names/signatures, replacement release and wiring approach in the plan are PROPOSED; DRAFT does not authorize implementation. No additional business policy is assumed. Domain-scoped administrator visibility, per-task administration grants, query-level custom host scoping and batching are outside this stage. Any further discovery that cannot preserve the baseline must be resolved in this specification before dependent implementation, rather than treated as an incidental cleanup.
+The owner approved revision 6 on 2026-11-16. The integration shape in the plan is adopted for implementation; routine provider wiring and neutral error mapping are delegated engineering choices. No additional business policy is assumed. Domain-scoped administrator visibility, per-task administration grants, query-level custom host scoping and batching are outside this stage. Any further discovery that cannot preserve the baseline must be resolved in this specification before dependent implementation, rather than treated as an incidental cleanup.

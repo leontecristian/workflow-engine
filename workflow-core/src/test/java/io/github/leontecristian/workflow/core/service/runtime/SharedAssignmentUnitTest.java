@@ -108,6 +108,43 @@ class SharedAssignmentUnitTest {
         assertThat(page.nextAfterId()).isEqualTo(2L);
         verify(eligibility,times(1)).isEligible(argThat(t->t.id()==2),eq("alice"));
     }
+    @Test void authorizedMyTasksCombinesVisibilityWithPersonalEligibilityWithoutOwnershipSupport() {
+        var tasks=mock(WorkflowTaskRepository.class);
+        var membership=mock(WorkflowSharedAssignmentProvider.class);
+        var eligibility=eligibility(membership); // No ownership authorization adapter is registered.
+        var policy=mock(WorkflowRuntimeReadAuthorization.class);
+        var unreadableMember=row(1);
+        var readableNonmember=row(2);
+        var formerMemberOwner=row(3);
+        when(formerMemberOwner.getAssigneeRef()).thenReturn("alice");
+        var readableMember=row(4);
+        when(tasks.findEligibleCandidatesPage(anyString(),anyInt(),eq(0L),any()))
+                .thenReturn(List.of(unreadableMember,readableNonmember,formerMemberOwner,readableMember));
+        when(policy.canReadTask(any())).thenAnswer(invocation->{
+            TaskEligibilityContext context=invocation.getArgument(0);
+            return context.actorRef().equals("admin") || context.task().id()!=1;
+        });
+        when(membership.isCurrentMember(any())).thenAnswer(invocation->{
+            TaskEligibilityContext context=invocation.getArgument(0);
+            return context.task().id()==4 || context.actorRef().equals("alice") && context.task().id()==1;
+        });
+        var queries=new WorkflowRuntimeQueryService(null,null,tasks,null,null,new RuntimeJson(),null,eligibility);
+        var authorized=new WorkflowAuthorizedRuntimeReadService(queries,policy,eligibility,
+                source(List.of()),source(List.of()));
+
+        var personal=authorized.listMyTasks("alice",0,50);
+        assertThat(personal.items()).extracting(WorkflowTaskView::id).containsExactly(3L,4L);
+        assertThat(personal.nextAfterId()).isNull();
+        // An unreadable member is excluded before membership lookup; the current owner survives membership loss.
+        verify(membership,never()).isCurrentMember(argThat(context->context.actorRef().equals("alice")
+                && (context.task().id()==1 || context.task().id()==3)));
+
+        var administrator=authorized.listMyTasks("admin",0,50);
+        assertThat(administrator.items()).extracting(WorkflowTaskView::id).containsExactly(4L);
+        assertThat(administrator.nextAfterId()).isNull();
+        // Broad administrator read visibility still excludes readable work without personal eligibility.
+        verify(membership).isCurrentMember(argThat(context->context.actorRef().equals("admin") && context.task().id()==2));
+    }
     private RuntimeTaskRow row(long id) {
         var row=mock(RuntimeTaskRow.class);
         when(row.getId()).thenReturn(id); when(row.getActivityId()).thenReturn(2L);

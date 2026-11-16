@@ -5,7 +5,14 @@ import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQue
 import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
 import io.github.leontecristian.workflow.web.controller.runtime.WorkflowRuntimeCommandController;
 import io.github.leontecristian.workflow.web.controller.runtime.WorkflowRuntimeReadController;
-import io.github.leontecristian.workflow.web.integration.runtime.WorkflowRuntimeReadHost;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowAuthorizedRuntimeReadService;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeReadAuthorization;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskReassignmentAuthorization;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowCancellationAuthorization;
+import io.github.leontecristian.workflow.web.integration.runtime.WorkflowRuntimeReadIdentity;
+import io.github.leontecristian.workflow.web.integration.runtime.WorkflowAssignmentDirectory;
+import io.github.leontecristian.workflow.web.integration.runtime.WorkflowCancellationAvailabilityContextHost;
 import io.github.leontecristian.workflow.web.service.runtime.RuntimeErrors;
 import io.github.leontecristian.workflow.web.service.runtime.RuntimeWire;
 import java.util.Map;
@@ -14,12 +21,23 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 /** Plain explicit import: dependency/scanning alone activates no routes. */
 public class WorkflowRuntimeReadConfiguration {
-    @Bean public WorkflowRuntimeReadController workflowRuntimeReadController(WorkflowRuntimeReadHost host,
+    @Bean public WorkflowAuthorizedRuntimeReadService workflowAuthorizedRuntimeReadService(
+            WorkflowRuntimeQueryService reads, WorkflowRuntimeReadAuthorization policy,
+            WorkflowTaskEligibilityService eligibility,
+            ObjectProvider<WorkflowTaskReassignmentAuthorization> reassignment,
+            ObjectProvider<WorkflowCancellationAuthorization> cancellation) {
+        return new WorkflowAuthorizedRuntimeReadService(reads, policy, eligibility, reassignment, cancellation);
+    }
+    @Bean public WorkflowRuntimeReadController workflowRuntimeReadController(WorkflowAuthorizedRuntimeReadService readsAccess,
+            WorkflowRuntimeReadIdentity identity, ObjectProvider<WorkflowAssignmentDirectory> directory,
+            ObjectProvider<WorkflowCancellationAvailabilityContextHost> cancellationContext,
             WorkflowRuntimeOptions options, WorkflowRuntimeQueryService reads, WorkflowDefinitionService definitions,
             TaskTypeCatalogService catalog,
             ObjectProvider<WorkflowRuntimeCommandController> commands) {
         var wire = new RuntimeWire();
-        return new WorkflowRuntimeReadController(reads, definitions, catalog, host, wire, new RuntimeErrors(wire, options),
+        return new WorkflowRuntimeReadController(reads, definitions, catalog, readsAccess, identity,
+                directory.getIfAvailable(() -> new WorkflowAssignmentDirectory() {}), cancellationContext.getIfAvailable(),
+                wire, new RuntimeErrors(wire, options),
                 commands.getIfAvailable() != null);
     }
     @Bean public RequestMappingHandlerMapping workflowRuntimeReadHandlerMapping(WorkflowRuntimeOptions options) {

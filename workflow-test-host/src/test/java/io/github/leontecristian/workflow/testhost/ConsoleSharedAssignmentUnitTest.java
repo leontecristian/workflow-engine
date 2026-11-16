@@ -17,7 +17,7 @@ import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQue
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowSharedAssignmentProvider;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskOwnershipAuthorization;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskOwnershipAuthorization;
+import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeAccess;
@@ -51,51 +51,53 @@ class ConsoleSharedAssignmentUnitTest {
         var reads = mock(WorkflowRuntimeQueryService.class);
         var context = mock(ConsoleContext.class);
         when(context.actor()).thenReturn("first");
-        var ownership = mock(ConsoleTaskOwnershipAuthorization.class);
-        when(ownership.canAccess(org.mockito.ArgumentMatchers.any())).thenReturn(true);
-        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), ownership, org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskReassignmentAuthorization.class), org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings.class));
+        var businessAccess = mock(ConsoleTaskBusinessAccess.class);
+        when(businessAccess.canAccess(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), businessAccess);
         var open = task(TaskStatus.OPEN, null);
+        when(reads.taskClaimPolicy(1, 5)).thenReturn(io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy.OPTIONAL);
         assertThat(access.canReadTask(open)).isTrue();
-        assertThat(access.canCompleteTask(open)).isTrue();
+        assertThat(RuntimeReadFixtures.authorized(reads, access, eligibility(provider)).canCompleteTask(context.actor(), open)).isTrue();
         provider.replaceMembers(SandboxSharedAssignmentProvider.FINANCE, Set.of("second"));
         assertThat(access.canReadTask(open)).isFalse();
-        assertThat(access.canCompleteTask(open)).isFalse();
+        assertThat(RuntimeReadFixtures.authorized(reads, access, eligibility(provider)).canCompleteTask(context.actor(), open)).isFalse();
         var completed = task(TaskStatus.COMPLETED, "first");
         assertThat(access.canReadTask(completed)).isTrue();
-        assertThat(access.canCompleteTask(completed)).isFalse();
+        assertThat(RuntimeReadFixtures.authorized(reads, access, eligibility(provider)).canCompleteTask(context.actor(), completed)).isFalse();
         when(context.actor()).thenReturn("second");
         assertThat(access.canReadTask(completed)).isFalse();
         provider.removeTarget(SandboxSharedAssignmentProvider.FINANCE);
         assertThat(access.canReadTask(open)).isFalse();
         when(context.admin()).thenReturn(true);
         assertThat(access.canReadTask(open)).isTrue();
-        assertThat(access.canCompleteTask(open)).isFalse();
+        assertThat(RuntimeReadFixtures.authorized(reads, access, eligibility(provider)).canCompleteTask(context.actor(), open)).isFalse();
     }
     @Test void formerMemberRetainsExactTaskAccessWithoutAHistoryOrCompletionGrant() {
         var provider = new SandboxSharedAssignmentProvider(Set.of("second"));
         var reads = mock(WorkflowRuntimeQueryService.class);
         var context = mock(ConsoleContext.class);
         when(context.actor()).thenReturn("first");
-        var ownership = mock(ConsoleTaskOwnershipAuthorization.class);
-        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), ownership, org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskReassignmentAuthorization.class), org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings.class));
+        var businessAccess = mock(ConsoleTaskBusinessAccess.class);
+        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), businessAccess);
         var task = new WorkflowTaskView(5, 2, 1, 3, "REVIEW", SandboxSharedAssignmentProvider.FINANCE,
                 TaskStatus.OPEN, null, Instant.EPOCH, null, null, null, null, "first");
-        when(ownership.canAccess(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        when(businessAccess.canAccess(org.mockito.ArgumentMatchers.any())).thenReturn(true);
         when(reads.findTask(5)).thenReturn(Optional.of(task));
-        when(reads.findInstance(1)).thenReturn(Optional.of(mock(
-                io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView.class)));
+        var instance = mock(io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView.class);
+        when(instance.id()).thenReturn(1L);
+        when(reads.findInstance(1)).thenReturn(Optional.of(instance));
         when(reads.listTasks(1, 0, 100)).thenReturn(
                 new io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage(java.util.List.of(task), null));
 
         assertThat(access.task(5)).isSameAs(task);
-        assertThat(access.canCompleteTask(task)).isFalse();
+        assertThat(RuntimeReadFixtures.authorized(reads, access, eligibility(provider)).canCompleteTask(context.actor(), task)).isFalse();
         assertThatThrownBy(() -> access.instance(1))
                 .isInstanceOf(io.github.leontecristian.workflow.testhost.exception.console.ConsoleException.class);
         when(context.actor()).thenReturn("second");
         assertThat(access.task(5)).isSameAs(task);
-        assertThat(access.canCompleteTask(task)).isFalse();
+        assertThat(RuntimeReadFixtures.authorized(reads, access, eligibility(provider)).canCompleteTask(context.actor(), task)).isFalse();
         when(context.actor()).thenReturn("first");
-        when(ownership.canAccess(org.mockito.ArgumentMatchers.any())).thenReturn(false);
+        when(businessAccess.canAccess(org.mockito.ArgumentMatchers.any())).thenReturn(false);
         assertThatThrownBy(() -> access.task(5))
                 .isInstanceOf(io.github.leontecristian.workflow.testhost.exception.console.ConsoleException.class);
     }
@@ -126,7 +128,7 @@ class ConsoleSharedAssignmentUnitTest {
         var coordinator = new ConsoleRuntimeCoordinator(tx, access);
         var command = new CompleteWorkflowTask(UUID.randomUUID(), 1, 5, 0, "APPROVE", null);
         when(tx.complete(command, null)).thenThrow(new WorkflowExecutionException(WorkflowExecutionException.Category.CONCURRENT_COMMAND));
-        when(access.task(5)).thenThrow(io.github.leontecristian.workflow.testhost.exception.console.ConsoleException.missing());
+        when(access.completionTask(5)).thenThrow(io.github.leontecristian.workflow.testhost.exception.console.ConsoleException.missing());
         assertThatThrownBy(() -> coordinator.complete(command, null))
                 .isInstanceOf(io.github.leontecristian.workflow.testhost.exception.console.ConsoleException.class);
         org.mockito.Mockito.verify(tx).complete(command, null);
@@ -138,9 +140,9 @@ class ConsoleSharedAssignmentUnitTest {
         var reads = mock(WorkflowRuntimeQueryService.class);
         var context = mock(ConsoleContext.class);
         when(context.actor()).thenReturn("first");
-        var ownership = mock(ConsoleTaskOwnershipAuthorization.class);
-        when(ownership.canAccess(org.mockito.ArgumentMatchers.any())).thenReturn(true);
-        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), ownership, org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskReassignmentAuthorization.class), org.mockito.Mockito.mock(io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings.class));
+        var businessAccess = mock(ConsoleTaskBusinessAccess.class);
+        when(businessAccess.canAccess(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), businessAccess);
         assertThatThrownBy(() -> access.canReadTask(task(TaskStatus.OPEN, null)))
                 .isInstanceOfSatisfying(WorkflowExecutionException.class,
                         failure -> assertThat(failure.category()).isEqualTo(WorkflowExecutionException.Category.ASSIGNMENT_LOOKUP_FAILED));

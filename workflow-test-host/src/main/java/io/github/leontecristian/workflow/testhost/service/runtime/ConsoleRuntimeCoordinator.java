@@ -62,7 +62,7 @@ public class ConsoleRuntimeCoordinator {
             return transactions.complete(command, context);
         } catch (RuntimeException original) {
             if (eligible(original)) {
-                access.task(command.taskId());
+                access.completionTask(command.taskId());
                 var replay = transactions.replayComplete(command, context);
                 if (replay.isPresent()) return replay.get();
             }

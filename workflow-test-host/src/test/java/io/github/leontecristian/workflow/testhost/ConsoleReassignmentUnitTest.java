@@ -15,10 +15,9 @@ import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutio
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService;
 import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
-import io.github.leontecristian.workflow.testhost.exception.console.ConsoleException;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeAccess;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskOwnershipAuthorization;
+import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskReassignmentAuthorization;
 import io.github.leontecristian.workflow.testhost.service.runtime.SandboxSharedAssignmentProvider;
 import java.time.Instant;
@@ -28,11 +27,11 @@ import org.springframework.mock.env.MockEnvironment;
 
 class ConsoleReassignmentUnitTest {
     private final ConsoleContext context = mock(ConsoleContext.class);
-    private final ConsoleTaskOwnershipAuthorization ownership = mock(ConsoleTaskOwnershipAuthorization.class);
+    private final ConsoleTaskBusinessAccess businessAccess = mock(ConsoleTaskBusinessAccess.class);
     private final ConsoleSettings settings = new ConsoleSettings(new MockEnvironment()
             .withProperty("workflow.console.admin.username", "admin")
             .withProperty("workflow.console.reviewer.username", "reviewer"));
-    private final ConsoleTaskReassignmentAuthorization authorization = new ConsoleTaskReassignmentAuthorization(ownership, context, settings);
+    private final ConsoleTaskReassignmentAuthorization authorization = new ConsoleTaskReassignmentAuthorization(businessAccess, context, settings);
     private final WorkflowRuntimeQueryService reads = mock(WorkflowRuntimeQueryService.class);
     private final WorkflowTaskView task = new WorkflowTaskView(5, 2, 1, 3, "REVIEW", SandboxSharedAssignmentProvider.FINANCE,
             TaskStatus.OPEN, null, Instant.EPOCH, null, null, null, null, null);
@@ -40,13 +39,13 @@ class ConsoleReassignmentUnitTest {
         when(context.actor()).thenReturn("admin");
         when(context.admin()).thenReturn(true);
         when(context.isConsoleActor("admin")).thenReturn(true);
-        when(ownership.canAccess(any())).thenReturn(true);
+        when(businessAccess.canAccess(any())).thenReturn(true);
         when(reads.findTask(5)).thenReturn(Optional.of(task));
-        return new ConsoleRuntimeAccess(reads, context, mock(WorkflowTaskEligibilityService.class), ownership, authorization, settings);
+        return new ConsoleRuntimeAccess(reads, context, mock(WorkflowTaskEligibilityService.class), businessAccess);
     }
     @Test void knownDestinationsAndAdminPermissionAreSeparateFromBusinessAccess() {
-        var access = access(); var request = new TaskEligibilityContext(task, "admin");
-        assertThat(access.canReassignTask(task)).isTrue();
+        access(); var request = new TaskEligibilityContext(task, "admin");
+        assertThat(authorization.canAccess(request) && authorization.canReassign(request)).isTrue();
         assertThat(authorization.isValidTarget(request, new TaskAssignmentTarget(AssignmentTargetKind.USER, "reviewer2"))).isTrue();
         assertThat(authorization.isValidTarget(request, new TaskAssignmentTarget(AssignmentTargetKind.USER, "Reviewer2"))).isFalse();
         assertThat(authorization.isValidTarget(request, SandboxSharedAssignmentProvider.APPROVER)).isTrue();
@@ -55,20 +54,23 @@ class ConsoleReassignmentUnitTest {
         assertThat(authorization.canReassign(request)).isFalse();
     }
     @Test void targetLookupPagesFixturesAndRechecksAccessAndPermission() {
-        var access = access();
-        var first = access.reassignmentTargets(task, AssignmentTargetKind.USER, "review", null, 1);
+        access();
+        var directory = new io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeReadHost(context, authorization, settings);
+        var request = new TaskEligibilityContext(task, "admin");
+        var first = directory.reassignmentTargets(request, AssignmentTargetKind.USER, "review", null, 1);
         assertThat(first.items()).extracting(item -> item.ref()).containsExactly("reviewer");
         assertThat(first.nextCursor()).isEqualTo("reviewer");
-        var next = access.reassignmentTargets(task, AssignmentTargetKind.USER, "review", first.nextCursor(), 1);
+        var next = directory.reassignmentTargets(request, AssignmentTargetKind.USER, "review", first.nextCursor(), 1);
         assertThat(next.items()).extracting(item -> item.ref()).containsExactly("reviewer2");
         assertThat(next.nextCursor()).isNull();
-        assertThat(access.reassignmentTargets(task, AssignmentTargetKind.GROUP, "Finance", null, 20).items())
+        assertThat(directory.reassignmentTargets(request, AssignmentTargetKind.GROUP, "Finance", null, 20).items())
                 .extracting(item -> item.ref()).containsExactly("sandbox.finance");
         when(context.admin()).thenReturn(false);
         when(context.actor()).thenReturn("reviewer");
-        when(reads.findTask(5)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> access.reassignmentTargets(task, AssignmentTargetKind.USER, null, null, 20))
-                .isInstanceOfSatisfying(ConsoleException.class, failure -> assertThat(failure.status()).isEqualTo(404));
+        when(context.isConsoleActor("admin")).thenReturn(false);
+        when(businessAccess.canAccess(any())).thenReturn(false);
+        assertThatThrownBy(() -> directory.reassignmentTargets(request, AssignmentTargetKind.USER, null, null, 20))
+                .isInstanceOfSatisfying(io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException.class, failure -> assertThat(failure.status()).isEqualTo(403));
     }
     @Test void effectiveTargetReplacesAssignmentDerivedVisibilityWithoutCompletionOverride() {
         var access = access();
@@ -82,12 +84,13 @@ class ConsoleReassignmentUnitTest {
         when(context.actor()).thenReturn("admin");
         when(context.admin()).thenReturn(true);
         assertThat(access.canReadTask(moved)).isTrue();
-        assertThat(access.canCompleteTask(moved)).isFalse();
+        assertThat(RuntimeReadFixtures.authorized(reads, access, mock(WorkflowTaskEligibilityService.class)).canCompleteTask("admin", moved)).isFalse();
     }
     @Test void lookupInfrastructureFailureIsSanitizedAndNeverGrantsPermission() {
-        var access = access();
-        when(ownership.canAccess(any())).thenThrow(new IllegalStateException("private directory detail"));
-        assertThatThrownBy(() -> access.canReassignTask(task)).isInstanceOfSatisfying(WorkflowExecutionException.class,
+        access();
+        when(businessAccess.canAccess(any())).thenThrow(new IllegalStateException("private directory detail"));
+        var directory = new io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeReadHost(context, authorization, settings);
+        assertThatThrownBy(() -> directory.reassignmentTargets(new TaskEligibilityContext(task, "admin"), AssignmentTargetKind.USER, null, null, 20)).isInstanceOfSatisfying(WorkflowExecutionException.class,
                 failure -> assertThat(failure.category()).isEqualTo(WorkflowExecutionException.Category.AUTHORIZATION_LOOKUP_FAILED));
     }
 }

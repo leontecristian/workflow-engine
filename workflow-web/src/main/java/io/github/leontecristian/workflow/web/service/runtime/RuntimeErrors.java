@@ -27,6 +27,11 @@ public class RuntimeErrors {
         List<Map<String, Object>> diagnostics = List.of();
         if (failure instanceof WorkflowRuntimeException e) { status = e.status(); code = e.code(); }
         else if (failure instanceof WorkflowViewerException e) { status = e.status(); code = e.code(); }
+        else if (failure instanceof io.github.leontecristian.workflow.core.exception.runtime.WorkflowRuntimeReadAccessException e) {
+            status = 403;
+            code = e.access() == io.github.leontecristian.workflow.core.exception.runtime.WorkflowRuntimeReadAccessException.Access.MONITOR
+                    ? "FORBIDDEN" : "ADMINISTRATION_FORBIDDEN";
+        }
         else if (failure instanceof WorkflowExecutionException e) {
             code = e.category().name();
             message = e.safeMessage();
