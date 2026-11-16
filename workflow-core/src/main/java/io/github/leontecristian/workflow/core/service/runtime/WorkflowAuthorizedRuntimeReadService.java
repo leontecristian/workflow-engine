@@ -48,13 +48,13 @@ public class WorkflowAuthorizedRuntimeReadService {
 
     /** Usable before parsing protected collection filters. */
     public void requireMonitorAccess(String actorRef) {
-        actor(actorRef);
+        validateActorRef(actorRef);
         if (!authorization.canMonitor(actorRef)) throw new WorkflowRuntimeReadAccessException(Access.MONITOR);
     }
 
     /** Independent from monitor and exact-task visibility. */
     public void requireTaskAdministrationAccess(String actorRef) {
-        actor(actorRef);
+        validateActorRef(actorRef);
         if (!authorization.canAdministerTasks(actorRef)) throw new WorkflowRuntimeReadAccessException(Access.ADMINISTRATION);
     }
 
@@ -67,7 +67,7 @@ public class WorkflowAuthorizedRuntimeReadService {
 
     /** Personal eligible work, independent of ownership-operation permission. */
     public WorkflowTaskPage listMyTasks(String actorRef, long afterId, int limit) {
-        actor(actorRef);
+        validateActorRef(actorRef);
         return reads.listEligibleTasks(actorRef, afterId, limit, task -> canReadTask(actorRef, task));
     }
 
@@ -101,21 +101,21 @@ public class WorkflowAuthorizedRuntimeReadService {
     }
 
     public WorkflowInstanceView instance(String actorRef, long id) {
-        actor(actorRef);
+        validateActorRef(actorRef);
         var instance = reads.findInstance(id).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
         RuntimeInputs.require(authorization.canReadInstance(actorRef, instance), Category.NOT_FOUND);
         return instance;
     }
 
     public WorkflowTaskView task(String actorRef, long id) {
-        actor(actorRef);
+        validateActorRef(actorRef);
         var task = reads.findTask(id).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
         RuntimeInputs.require(canReadTask(actorRef, task), Category.NOT_FOUND);
         return task;
     }
 
     public WorkflowActivityView activity(String actorRef, long id) {
-        actor(actorRef);
+        validateActorRef(actorRef);
         var activity = reads.findActivity(id).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
         RuntimeInputs.require(authorization.canReadActivity(actorRef, activity), Category.NOT_FOUND);
         return activity;
@@ -172,7 +172,7 @@ public class WorkflowAuthorizedRuntimeReadService {
 
     /** The caller first authorizes the instance; only this operation takes command context. */
     public boolean canCancelWorkflow(String actorRef, WorkflowInstanceView instance, WorkflowCommandContext context) {
-        actor(actorRef);
+        validateActorRef(actorRef);
         RuntimeInputs.require(instance != null, Category.INVALID_INPUT);
         if (instance.status() != InstanceStatus.ACTIVE) return false;
         var adapters = cancellationProviders.stream().toList();
@@ -185,14 +185,14 @@ public class WorkflowAuthorizedRuntimeReadService {
     }
 
     private static TaskEligibilityContext taskContext(String actorRef, WorkflowTaskView task) {
-        actor(actorRef);
+        validateActorRef(actorRef);
         RuntimeInputs.require(task != null, Category.INVALID_INPUT);
         return new TaskEligibilityContext(task, actorRef);
     }
 
     private static boolean shared(WorkflowTaskView task) { return task.assignment().kind() != AssignmentTargetKind.USER; }
 
-    private static void actor(String actorRef) {
+    private static void validateActorRef(String actorRef) {
         RuntimeInputs.require(RuntimeInputs.isValidText(actorRef, 200, 200, true), Category.INVALID_INPUT);
     }
 }
