@@ -1,6 +1,7 @@
 package io.github.leontecristian.workflow.core.service.runtime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -8,6 +9,7 @@ import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
 import io.github.leontecristian.workflow.core.dto.runtime.BooleanLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.NullLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
 import io.github.leontecristian.workflow.core.dto.runtime.StartInputs;
 import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
@@ -89,7 +91,7 @@ class ScalarBindingsUnitTest {
                 Map.of("needed",scalar(VariableValueType.STRING,"2"))))
             assertEquals(Category.INVALID_ACTION_OUTPUT,assertThrows(WorkflowExecutionException.class,() -> RuntimeValueBindings.output(fields,output,json)).category());
     }
-    @Test void completeInvocationAndStartDefaultBudgetsRejectWithoutTruncation() {
+    @Test void completeScalarInvocationAndDefaultsFitTheExpandedMapBudgetWithoutTruncation() {
         var fields=new java.util.ArrayList<ActionField>();
         var outputs=new java.util.HashMap<String,WorkflowValue>();
         var inputs=new java.util.HashMap<String,MinimalWorkflowDefinition.Input>();
@@ -98,9 +100,27 @@ class ScalarBindingsUnitTest {
             fields.add(field); outputs.put(key,scalar(VariableValueType.STRING,"\u0000".repeat(4000)));
             inputs.put(key,new MinimalWorkflowDefinition.Input(field,new TextLiteral("\u0000".repeat(4000))));
         }
+        assertDoesNotThrow(() -> RuntimeValueBindings.output(fields,outputs,new RuntimeJson()));
+        var model=new MinimalWorkflowDefinition(null,null,null,List.of(),inputs,Map.of(),Map.of(),Map.of());
+        assertEquals(outputs,RuntimeValueBindings.inputs(model,StartInputs.empty(),new RuntimeJson()));
+        assertEquals(4000,((TextLiteral)outputs.get("value0").value()).value().length());
+    }
+
+    @Test void completeInvocationAndStartDefaultBudgetsRejectWithoutTruncation() {
+        // Four individually valid JSON values exceed F021's complete 10 MiB UTF-16 map budget.
+        var value=WorkflowJsonValue.parse("["+String.join(",",java.util.Collections.nCopies(100,"\""+"x".repeat(13200)+"\""))+"]");
+        var fields=new java.util.ArrayList<ActionField>();
+        var outputs=new java.util.HashMap<String,WorkflowValue>();
+        var inputs=new java.util.HashMap<String,MinimalWorkflowDefinition.Input>();
+        for(int i=0;i<4;i++) {
+            String key="value"+i; var field=new ActionField(key,VariableValueType.JSON,false,false);
+            fields.add(field); outputs.put(key,new WorkflowValue(VariableValueType.JSON,value));
+            inputs.put(key,new MinimalWorkflowDefinition.Input(field,value));
+        }
         assertEquals(Category.LIMIT_EXCEEDED,assertThrows(WorkflowExecutionException.class,() -> RuntimeValueBindings.output(fields,outputs,new RuntimeJson())).category());
         var model=new MinimalWorkflowDefinition(null,null,null,List.of(),inputs,Map.of(),Map.of(),Map.of());
         assertEquals(Category.LIMIT_EXCEEDED,assertThrows(WorkflowExecutionException.class,() -> RuntimeValueBindings.inputs(model,StartInputs.empty(),new RuntimeJson())).category());
-        assertEquals(4000,((TextLiteral)outputs.get("value0").value()).value().length());
+        assertEquals(value,outputs.get("value0").value());
+        assertEquals(4,outputs.size());
     }
 }

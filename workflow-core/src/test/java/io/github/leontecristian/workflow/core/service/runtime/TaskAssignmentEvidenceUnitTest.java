@@ -38,19 +38,26 @@ class TaskAssignmentEvidenceUnitTest {
                 ActorKind.USER, "starter", time.toInstant(ZoneOffset.UTC), 2L, 3L, null, null, null, version), details);
     }
 
-    @Test void legacyUserAndCurrentTypedEvidenceMatchOnlyTheExactTarget() {
+    @Test void creationEvidenceRetainsItsOriginalAssignmentAfterTheEffectiveTargetChanges() {
         for (var kind : AssignmentTargetKind.values()) {
             var task = new WorkflowTaskEntity(2, "review", new TaskAssignmentTarget(kind, "finance "), time);
             String details = json.evidence(java.util.Map.of("taskKey", "review", "assignment", task.getAssignment()));
             assertTrue(RuntimeTaskCreationEvidence.matches(history((short)3, details), task, json));
             String legacy = "{\"taskKey\":\"review\",\"assignedUserRef\":\"finance \"}";
-            assertEquals(kind == AssignmentTargetKind.USER,
-                    RuntimeTaskCreationEvidence.matches(history((short)2, legacy), task, json));
-            for (String invalid : new String[]{details.replace("finance ", "finance"),
+            assertTrue(RuntimeTaskCreationEvidence.matches(history((short)2, legacy), task, json));
+            // F026 permits a valid historical target to differ from the current task row.
+            assertTrue(RuntimeTaskCreationEvidence.matches(history((short)3, details.replace("finance ", "finance")), task, json));
+            for (String invalid : new String[]{details.replace("finance ", ""),
                     details.replace("\"taskKey\"", "\"unexpected\""), details.replace("\"kind\"", "\"unknown\""),
+                    details.replace("\""+kind.name()+"\"", "\"UNKNOWN\""),
                     details.substring(0, details.length()-1) + ",\"extra\":true}"})
                 assertFalse(RuntimeTaskCreationEvidence.matches(history((short)3, invalid), task, json));
             assertFalse(RuntimeTaskCreationEvidence.matches(history((short)4, details), task, json));
+            var original=(com.fasterxml.jackson.databind.node.ObjectNode)json.tree(details);
+            original.put("assigneeRef",kind == AssignmentTargetKind.USER ? "finance " : null);
+            assertTrue(RuntimeTaskCreationEvidence.matches(history((short)4, json.encode(original)), task, json));
+            original.put("assigneeRef","other");
+            assertFalse(RuntimeTaskCreationEvidence.matches(history((short)4, json.encode(original)), task, json));
         }
     }
 
