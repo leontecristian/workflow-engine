@@ -50,7 +50,7 @@ class ConsoleRuntimeUnitTest {
     @Test
     void losingCommandUsesOneReplayLookupWithOriginalInputAndDoesNotRetryMutation() {
         var tx = mock(ConsoleRuntimeTransaction.class);
-        var coordinator = new ConsoleRuntimeCoordinator(tx, mock(ConsoleRuntimeAccess.class));
+        var coordinator = new ConsoleRuntimeCoordinator(tx);
         var command = new SandboxStart(UUID.randomUUID(), "Booking.review", null, null, 2, 0,
                 io.github.leontecristian.workflow.core.dto.runtime.StartInputs.empty());
         var context =
@@ -72,7 +72,7 @@ class ConsoleRuntimeUnitTest {
     @Test
     void replayMissRetainsOriginalFailureAndOrdinaryCallbackFailureDoesNotRecover() {
         var tx = mock(ConsoleRuntimeTransaction.class);
-        var coordinator = new ConsoleRuntimeCoordinator(tx, mock(ConsoleRuntimeAccess.class));
+        var coordinator = new ConsoleRuntimeCoordinator(tx);
         var command = new SandboxStart(UUID.randomUUID(), 1, 2, 0);
         var conflict =
                 new WorkflowExecutionException(WorkflowExecutionException.Category.STALE_VERSION);

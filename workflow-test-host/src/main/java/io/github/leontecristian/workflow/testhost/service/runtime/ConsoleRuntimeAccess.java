@@ -53,16 +53,6 @@ public class ConsoleRuntimeAccess implements WorkflowRuntimeReadAuthorization {
         return task;
     }
 
-    /** Completion/recovery preserves its pre-existing business gate independently of read grants. */
-    public WorkflowTaskView completionTask(long id) {
-        var task = reads.findTask(id).orElseThrow(ConsoleException::missing);
-        if (task.status() == TaskStatus.OPEN && !canAccessBusiness(new TaskEligibilityContext(task, context.actor())))
-            throw ConsoleException.missing();
-        if (task.status() == TaskStatus.OPEN && context.actor().equals(task.assigneeRef())) return task;
-        if (!canReadByAssignment(task, context.actor())) throw ConsoleException.missing();
-        return task;
-    }
-
     private boolean canAccessBusiness(TaskEligibilityContext taskContext) {
         try {
             return businessAccess.canAccess(taskContext);

@@ -39,7 +39,7 @@ import io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionS
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowServiceAction;
 import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
-import io.github.leontecristian.workflow.testhost.configuration.integration.DatabaseIntegrationTest;
+import io.github.leontecristian.workflow.testhost.configuration.integration.CompletionAdapterIntegrationTest;
 import io.github.leontecristian.workflow.testhost.repository.event.ConsoleEventStore;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleWire;
 import java.nio.file.Files;
@@ -71,7 +71,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Committed cross-stage boundaries and rollback on the guarded SQL Server only. */
 @Import(SequentialHumanStagesIT.Adapters.class)
-class SequentialHumanStagesIT extends DatabaseIntegrationTest {
+class SequentialHumanStagesIT extends CompletionAdapterIntegrationTest {
     @Autowired WorkflowDefinitionService definitions;
     @Autowired TaskTypeCatalogService catalog;
     @Autowired WorkflowExecutionService engine;

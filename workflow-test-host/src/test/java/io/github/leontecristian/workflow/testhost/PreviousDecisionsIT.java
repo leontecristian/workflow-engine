@@ -23,7 +23,7 @@ import io.github.leontecristian.workflow.core.service.runtime.AllTaskAssignmentR
 import io.github.leontecristian.workflow.core.service.runtime.SingleTaskAssignmentResolver;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
-import io.github.leontecristian.workflow.testhost.configuration.integration.DatabaseIntegrationTest;
+import io.github.leontecristian.workflow.testhost.configuration.integration.CompletionAdapterIntegrationTest;
 import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
 import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
@@ -70,7 +70,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         properties = {"workflow.console.enabled=true", "workflow.console.capabilities=sample",
                 "workflow.console.admin.username=f022-admin", "workflow.console.admin.password=f022-local-test-password",
                 "workflow.console.reviewer.username=f022-reviewer", "workflow.console.reviewer.password=f022-local-test-password"})
-class PreviousDecisionsIT extends DatabaseIntegrationTest {
+class PreviousDecisionsIT extends CompletionAdapterIntegrationTest {
     @Autowired WorkflowDefinitionService definitions;
     @Autowired TaskTypeCatalogService catalog;
     @Autowired WorkflowRuntimeQueryService reads;

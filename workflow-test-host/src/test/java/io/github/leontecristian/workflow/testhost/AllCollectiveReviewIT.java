@@ -38,7 +38,7 @@ import io.github.leontecristian.workflow.core.service.runtime.WorkflowEventRecor
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowServiceAction;
 import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
-import io.github.leontecristian.workflow.testhost.configuration.integration.DatabaseIntegrationTest;
+import io.github.leontecristian.workflow.testhost.configuration.integration.CompletionAdapterIntegrationTest;
 import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxServiceEffectStore;
@@ -92,7 +92,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
                 "workflow.console.admin.username=f021-admin", "workflow.console.admin.password=f021-local-test-password",
                 "workflow.console.reviewer.username=f021-reviewer", "workflow.console.reviewer.password=f021-local-test-password"})
 @Import(AllCollectiveReviewIT.CapacityAdapters.class)
-class AllCollectiveReviewIT extends DatabaseIntegrationTest {
+class AllCollectiveReviewIT extends CompletionAdapterIntegrationTest {
     @Autowired WorkflowDefinitionService definitions;
     @Autowired TaskTypeCatalogService catalog;
     @Autowired WorkflowRuntimeQueryService reads;

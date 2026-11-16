@@ -532,6 +532,19 @@ class WorkflowRuntimeWebUnitTest {
                     .andExpect(content().json("""
                             {"code":"RESULT_VALIDATION_FAILED","message":"RESULT_VALIDATION_FAILED","diagnostics":[],"correlationId":"safe"}
                             """, org.springframework.test.json.JsonCompareMode.STRICT));
+            for (var entry : java.util.Map.of(
+                    WorkflowExecutionException.Category.COMPLETION_FORBIDDEN, 403,
+                    WorkflowExecutionException.Category.BUSINESS_VALIDATION_REJECTED, 422,
+                    WorkflowExecutionException.Category.BUSINESS_VALIDATION_FAILED, 503,
+                    WorkflowExecutionException.Category.HOST_CONFIGURATION, 500).entrySet()) {
+                doThrow(new WorkflowExecutionException(entry.getKey(), new IllegalStateException("private business material")))
+                        .when(host).complete(any(), any());
+                mvc.perform(request).andExpect(status().is(entry.getValue()))
+                        .andExpect(content().json("{\"code\":\"" + entry.getKey().name()
+                                + "\",\"message\":\"" + entry.getKey().name()
+                                + "\",\"diagnostics\":[],\"correlationId\":\"safe\"}",
+                                org.springframework.test.json.JsonCompareMode.STRICT));
+            }
         }
     }
 

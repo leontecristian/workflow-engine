@@ -19,11 +19,10 @@ import io.github.leontecristian.workflow.testhost.exception.console.SandboxReque
 public class ConsoleRuntimeCommandHost implements WorkflowRuntimeCommandHost {
     private final ConsoleRuntimeCoordinator commands;
     private final ConsoleRuntimeTransaction transactions;
-    private final ConsoleRuntimeAccess access;
     private final ConsoleContext context;
     public ConsoleRuntimeCommandHost(ConsoleRuntimeCoordinator commands, ConsoleRuntimeTransaction transactions,
-            ConsoleRuntimeAccess access, ConsoleContext context) {
-        this.commands = commands; this.transactions = transactions; this.access = access; this.context = context;
+            ConsoleContext context) {
+        this.commands = commands; this.transactions = transactions; this.context = context;
     }
     @Override public WorkflowCommandResult reassign(ReassignWorkflowTask command, String correlation) {
         return policy(() -> commands.reassign(command, context.runtime(correlation)));
@@ -33,10 +32,7 @@ public class ConsoleRuntimeCommandHost implements WorkflowRuntimeCommandHost {
     }
 
     @Override public WorkflowCommandResult complete(CompleteWorkflowTask command, String correlation) {
-        return policy(() -> {
-            access.completionTask(command.taskId());
-            return commands.complete(command, context.runtime(correlation));
-        });
+        return policy(() -> commands.complete(command, context.runtime(correlation)));
     }
     @Override public WorkflowCancellationCommandResult cancel(CancelWorkflow command, String correlation) {
         return policy(() -> commands.cancel(command, context.runtime(correlation)));
@@ -45,10 +41,7 @@ public class ConsoleRuntimeCommandHost implements WorkflowRuntimeCommandHost {
         return policy(() -> transactions.replayCancellation(command, context.runtime(correlation)));
     }
     @Override public Optional<WorkflowCommandResult> replayComplete(CompleteWorkflowTask command, String correlation) {
-        return policy(() -> {
-            access.completionTask(command.taskId());
-            return transactions.replayComplete(command, context.runtime(correlation));
-        });
+        return policy(() -> transactions.replayComplete(command, context.runtime(correlation)));
     }
     @Override
     public WorkflowCommandResult claim(ClaimWorkflowTask command, String correlation) {

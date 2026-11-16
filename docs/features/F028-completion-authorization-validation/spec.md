@@ -1,6 +1,6 @@
 # F028 — Completion authorization and business validation
 
-**Status:** DRAFT, revision 2 — 2026-11-16. **Owner:** Workflow project owner. **Constitution:** 6.6.1. **Authorization:** specification and planning only; no implementation authorized.
+**Status:** IMPLEMENTED, revision 3 — 2026-11-16. **Owner:** Workflow project owner. **Constitution:** 6.6.1. **Authorization:** owner request 2026-11-16 approves revision 3 implementation and focused verification.
 
 ## Purpose and scope
 
@@ -8,15 +8,15 @@ Provide an authoritative host authorization boundary and a business-validation h
 
 In plain language: authorization asks **may this person approve?** Business validation asks **is the business record still valid to approve?** A booking changed after the reviewer opened it must be checked again when the decision is processed. If a check rejects, nothing from that attempted completion commits. A retry of an already successful decision returns its authorized stored result rather than validating the business record as a new approval.
 
-This feature is separate from [F027](../F027-runtime-read-policy-separation/spec.md). It does not depend on F027 delivery or change its read contracts, My Tasks, directory or administrator visibility policy. Read/availability permission is not completion permission. The future semantic-actor/default-resolver proposal is also excluded.
+This feature is separate from [F027](../F027-runtime-read-policy-separation/spec.md). F027 is now implemented; this feature preserves its read contracts, My Tasks, directory and administrator visibility policy. Read/availability permission is not completion permission. The future semantic-actor/default-resolver proposal is also excluded.
 
 Include core completion and lookup-only replay entry points, neutral host contracts, scoped web error mapping, sandbox policy/fixture wiring and focused transaction/recovery verification. Exclude new booking/budget rules, APOLO production implementation, new outcome guards/DSL fields, schema migrations, automatic retries, compensation, per-outcome UI permissions and broad assignment/ownership changes.
 
-Apply [CON-01/02/03/06/07/10/12/13](../../constraints.md), [ASM-01/02/03/06/10](../../assumptions.md), [constitution C03/C06/C09/C10](../../constitution.md), [design sources](../../design-sources.md), [F017](../F017-task-claim-release/spec.md), [F018](../F018-structured-task-submissions/spec.md) and [F021](../F021-all-collective-review/spec.md). The [booking baseline requirement](../../integrations/apolo/booking-business-analysis.md#approval-baseline-and-protected-material) remains host-owned. Budget rules and exact APOLO access mappings are not inferred.
+Apply [CON-01/02/03/06/07/10/12/13](../../constraints.md), [ASM-01/02/03/06/10](../../assumptions.md), [constitution C03/C06/C09/C10](../../constitution.md), [design sources](../../design-sources.md), [F017](../F017-task-claim-release/spec.md), [F018](../F018-structured-task-submissions/spec.md) and [F021](../F021-all-collective-review/spec.md). Host-specific permission mappings and business rules are outside this feature.
 
-## Current evidence
+## Planning baseline
 
-At baseline `50e356395fae2822ea38493ee255c6e8ef9da7c3`, `WorkflowExecutionService.completeTask` resolves receipt replay before fresh state/version/eligibility checks. Its completion receipt helper verifies actor/fingerprint and target/result consistency but has no core completion business-access adapter. The sandbox web command adapter supplies its own recovery access policy; direct-core consumers retain host authorization obligations.
+Historical source inspection at baseline `50e356395fae2822ea38493ee255c6e8ef9da7c3`: `WorkflowExecutionService.completeTask` resolves receipt replay before fresh state/version/eligibility checks. Its completion receipt helper verifies actor/fingerprint and target/result consistency but has no core completion business-access adapter. The sandbox web command adapter supplies its own recovery access policy; direct-core consumers retain host authorization obligations.
 
 `WorkflowTaskSubmissionValidator` is optional, runs for OPTIONAL/REQUIRED result contracts (including omitted OPTIONAL results), and is skipped for FORBIDDEN. It is not a universal approval permission or business-validation hook. This feature preserves that contract rather than silently broadening it.
 
@@ -27,6 +27,22 @@ At baseline `50e356395fae2822ea38493ee255c6e8ef9da7c3`, `WorkflowExecutionServic
 Introduce a host completion-authorization contract with separate `canAccess` and `canComplete` decisions. `canAccess` checks current business access to the exact target task/instance for both mutation requests and receipt lookup; missing/denied exact targets are concealed as NOT_FOUND. It must not require OPEN/ACTIVE state, current assignment/membership, current approval privilege, an unchanged approval baseline or general instance-read permission. Those would prevent recovery of a valid previous completion.
 
 `canComplete` checks authority for the selected outcome on a fresh completion only. Core still owns workflow state, assignment/current membership, claimant exclusivity, version, outcome/comment and result validation. No administrator bypass follows from being able to read everything. Host policies may share internal business-access helpers but do not depend on ownership, reassignment or cancellation authorization adapters.
+
+Authorization is provider-neutral. Hosts may use resource/scope permissions, applicable contextual roles or another authorization mechanism. These contracts do not require per-object ACLs, permission records for each booking/project, Keycloak types or a provider-specific SDK. Exact target verification identifies the resource being acted upon; it does not prescribe how permission is stored. Hosts may derive the relevant authorization context from authoritative business associations and evaluate permissions granted through roles applicable in that context. Workflow assignment membership and permission-bearing contextual roles are distinct.
+
+#### Non-normative Keycloak resource/scope example
+
+A host backed by Keycloak could map `canAccess` to `Resource.BOOKING` plus `Scope.VIEW`, and fresh `canComplete` to `Resource.BOOKING` plus `Scope.DECIDE`. These names are illustrative host-owned constants, not Keycloak Java API types or required workflow permission names.
+
+```java
+// Illustrative host authorization facade, not a Keycloak SDK call.
+permissions.isAllowed(actorRef, Resource.BOOKING, Scope.VIEW, businessContext);
+permissions.isAllowed(actorRef, Resource.BOOKING, Scope.DECIDE, businessContext);
+```
+
+The host evaluates the actor's applicable contextual roles and the permissions granted through them. `businessContext` selects the relevant role context; it does not imply a per-booking ACL or a separate Keycloak resource for each booking. Global grants can also be used. No APOLO-specific role, permission mapping or approval rule is selected by this example.
+
+Under this mapping, a fresh decision requires current VIEW access and DECIDE permission as well as core eligibility and business validation. A successful replay still requires current VIEW access and the original receipt actor, but does not recheck DECIDE or fresh business validity. Evaluating current VIEW may require contextual-role evaluation; the replay prohibition on membership checks means workflow assignment eligibility checks, not suppression of current access policy. A provider failure remains an error and never grants access. Business validation remains a separate provider-neutral callback.
 
 ### R02 — Authorized replay before fresh checks
 
@@ -50,15 +66,15 @@ Invoke host checks in the same host-owned transaction as completion; no separate
 
 Being inside a transaction alone does not protect business data from concurrent edits. The host must use its supported locking/version checks/protected-write guard to keep the validated approval basis valid through acceptance and commit. Core aggregate locking does not lock APOLO booking/budget records. Define consistent host/engine lock ordering during integration; contention fails through established conflict behavior without automatic retries.
 
-The hook supports, but does not by itself implement, APOLO's preserved booking basis, protected-material/membership checks, no-self-approval and finalization requirements. Sequential steps must not recapture the baseline. Business finalization checks remain in the host's finalization path; this feature adds no generic finalization callback. Budget scope/amount rules and protected fields remain separate business specifications. Generic sandbox evidence must not be reported as APOLO acceptance.
+The hook supports host-defined approval-basis checks without selecting domain-specific rules. Where a host preserves a baseline across sequential steps, validation must use that baseline rather than silently replace it with current material. Business finalization checks remain in the host's finalization path; this feature adds no generic finalization callback. Protected fields, materiality and any domain-specific decision constraints belong to separate host business specifications. Generic sandbox evidence must not be reported as production-provider or host-business acceptance.
 
 ### R05 — Neutral inputs and safe failure behavior
 
 Callbacks receive workflow-owned detached context: trusted actor/command context, verified task/instance linkage, and, for fresh evaluation, pinned node/type/version and requested outcome/comment. The business validator additionally receives the existing immutable result value, nullable under the existing result contract. Do not pass entities, arbitrary application objects, every variable, or client-supplied identity. Hosts resolve authoritative business associations by instance ID; correlation fields are not proof of access.
 
-Proposed errors for this feature: access denial/missing target retains NOT_FOUND (404); fresh permission denial uses COMPLETION_FORBIDDEN (403); explicit business rejection uses BUSINESS_VALIDATION_REJECTED (422); unexpected authorization failures retain AUTHORIZATION_LOOKUP_FAILED (503); unexpected general validation failures use BUSINESS_VALIDATION_FAILED (503); missing/ambiguous required adapters use HOST_CONFIGURATION (500). Existing structural, submission-validation, receipt and concurrency errors remain. Public responses use stable generic messages without arbitrary host exception text, business material or baseline contents. No new free-text diagnostic contract is proposed.
+Finalized errors for this feature: access denial/missing target retains NOT_FOUND (404); fresh permission denial uses COMPLETION_FORBIDDEN (403); explicit business rejection uses BUSINESS_VALIDATION_REJECTED (422); unexpected authorization failures retain AUTHORIZATION_LOOKUP_FAILED (503); unexpected general validation failures use BUSINESS_VALIDATION_FAILED (503); missing/ambiguous required adapters use HOST_CONFIGURATION (500). Existing structural, submission-validation, receipt and concurrency errors remain. Public responses use stable generic messages without arbitrary host exception text, business material or baseline contents. No new free-text diagnostic contract is proposed.
 
-### R06 — Explicit activation and migration proposal
+### R06 — Explicit activation and migration
 
 **AGREED deployment rule — owner decision, 2026-11-16:** hosts using completion must provide exactly one `WorkflowTaskCompletionAuthorization` and exactly one `WorkflowTaskCompletionValidator`. There is no optional activation mode or implicit allow/no-op fallback. A host with no additional business validation still registers an explicit validator that returns normally, owning that decision. Enforce authorization adapter presence for completion mutation and lookup entry points; enforce validator presence before fresh completion can be accepted. The requirement to provide both adapters does not make fresh validation part of replay: authorized receipt hits and lookup-only misses do not resolve or invoke the fresh validator. Core import, read-only consumers and other commands must not acquire mandatory bean dependencies just by including the library.
 
@@ -77,8 +93,8 @@ Web completion payloads/success responses and command recovery routes remain unc
 
 ## Decisions and exclusions
 
-**AGREED scope:** specify authoritative fresh authorization and transaction-time business validation separately from F027; preserve authorized replay and current core/host ownership. No implementation authorized.
+**AGREED scope:** specify authoritative fresh authorization and transaction-time business validation separately from F027; preserve authorized replay and current core/host ownership. Implementation authorized by the owner on 2026-11-16.
 
-**D01 — CLOSED / AGREED, 2026-11-16:** the owner requires both completion authorization and general business-validation adapters for hosts using completion, including existing published workflows when adopting this boundary. No opt-in compatibility alternative or permissive fallback is selected. Preserve R06's distinction between required host registration and fresh-only validator invocation; successful authorized replay remains independent of fresh validation. This closes the deployment-policy decision and does not authorize implementation.
+**D01 — CLOSED / AGREED, 2026-11-16:** the owner requires both completion authorization and general business-validation adapters for hosts using completion, including existing published workflows when adopting this boundary. No opt-in compatibility alternative or permissive fallback is selected. Preserve R06's distinction between required host registration and fresh-only validator invocation; successful authorized replay remains independent of fresh validation. This closes the deployment-policy decision; the subsequent owner request authorizes implementation.
 
-**PROPOSED engineering contracts:** names/signatures and new error categories in this revision. **DEFERRED:** exact APOLO permissions, baseline storage/guards and budget rules, semantic actor/default resolver design, new outcome guard syntax and UI permission redesign. No APOLO business rule is invented to close those gaps.
+**AGREED engineering contracts:** P01 signatures and R05 error categories are finalized. TaskCompletionContext is the detached record described in P01. Hosts signal explicit rejection with no-argument TaskCompletionRejectedException; it carries no public diagnostic or business material. **DEFERRED:** exact APOLO permissions, baseline storage/guards and budget rules, semantic actor/default resolver design, new outcome guard syntax and UI permission redesign. No APOLO business rule is invented to close those gaps.

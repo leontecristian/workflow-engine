@@ -84,6 +84,18 @@ public class SandboxRequestStore {
                 instanceId));
     }
 
+    public java.util.Optional<SandboxRequestView> findByInstance(long instanceId) {
+        return jdbc.query("SELECT * FROM wf_test.sandbox_request WHERE instance_id=?", this::map, instanceId)
+                .stream().findFirst();
+    }
+
+    /** Engine aggregate write precedes this business lock; the lock remains held through commit. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public SandboxRequestView lockApprovalBasis(long instanceId) {
+        return jdbc.query("SELECT * FROM wf_test.sandbox_request WITH (UPDLOCK,HOLDLOCK) WHERE instance_id=?",
+                        this::map, instanceId).stream().findFirst().orElseThrow(ConsoleException::missing);
+    }
+
     public boolean linked(long id, long instanceId) {
         return jdbc.queryForObject(
                         "SELECT COUNT(*) FROM wf_test.sandbox_request WHERE id=? AND instance_id=?",

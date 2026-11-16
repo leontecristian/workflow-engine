@@ -34,7 +34,7 @@ class ConsoleRuntimeAdaptersUnitTest {
         var context = mock(ConsoleContext.class);
         var actor = mock(WorkflowCommandContext.class);
         when(context.runtime("trusted")).thenReturn(actor);
-        var host = new ConsoleRuntimeCommandHost(new ConsoleRuntimeCoordinator(tx, access), tx, access, context);
+        var host = new ConsoleRuntimeCommandHost(new ConsoleRuntimeCoordinator(tx), tx, context);
         var command = new io.github.leontecristian.workflow.core.dto.runtime.CancelWorkflow(UUID.randomUUID(), 1, 9, "exact");
         var result = new io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationCommandResult(true, null);
         when(tx.cancel(command, actor)).thenThrow(new io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException(
@@ -65,22 +65,22 @@ class ConsoleRuntimeAdaptersUnitTest {
         when(requests.linkedToInstance(1)).thenReturn(false);
         assertThat(policy.canAccess(authorization)).isFalse();
     }
-    @Test void completionAndReplayCheckAccessBeforeDispatchWithoutRecoveryMutation() {
-        var commands=mock(ConsoleRuntimeCoordinator.class); var tx=mock(ConsoleRuntimeTransaction.class);
-        var access=mock(ConsoleRuntimeAccess.class); var context=mock(ConsoleContext.class);
-        var actor=mock(WorkflowCommandContext.class); when(context.runtime("trusted")).thenReturn(actor);
-        var host=new ConsoleRuntimeCommandHost(commands,tx,access,context);
-        var command=new CompleteWorkflowTask(UUID.randomUUID(),1,5,9,"APPROVE",null);
-        var result=new WorkflowCommandResult(true,null); when(commands.complete(command,actor)).thenReturn(result);
-        assertThat(host.complete(command,"trusted")).isSameAs(result);
-        verify(access).completionTask(5); verifyNoInteractions(tx); org.mockito.Mockito.clearInvocations(access);
-        when(tx.replayComplete(command,actor)).thenReturn(Optional.empty());
-        assertThat(host.replayComplete(command,"trusted")).isEmpty();
-        var order=inOrder(access,tx);order.verify(access).completionTask(5);order.verify(tx).replayComplete(command,actor);
-        verify(commands,times(1)).complete(command,actor);
-        when(access.completionTask(5)).thenThrow(ConsoleException.missing());
-        assertThatThrownBy(()->host.replayComplete(command,"trusted")).isInstanceOfSatisfying(WorkflowRuntimeException.class,e->assertThat(e.status()).isEqualTo(404));
-        verifyNoMoreInteractions(tx);
+    @Test void completionAndReplayDispatchTrustedContextWithoutReadPrechecks() {
+        var commands = mock(ConsoleRuntimeCoordinator.class);
+        var tx = mock(ConsoleRuntimeTransaction.class);
+        var context = mock(ConsoleContext.class);
+        var actor = mock(WorkflowCommandContext.class);
+        when(context.runtime("trusted")).thenReturn(actor);
+        var host = new ConsoleRuntimeCommandHost(commands, tx, context);
+        var command = new CompleteWorkflowTask(UUID.randomUUID(), 1, 5, 9, "APPROVE", null);
+        var result = new WorkflowCommandResult(true, null);
+        when(commands.complete(command, actor)).thenReturn(result);
+        assertThat(host.complete(command, "trusted")).isSameAs(result);
+        when(tx.replayComplete(command, actor)).thenReturn(Optional.empty());
+        assertThat(host.replayComplete(command, "trusted")).isEmpty();
+        verify(commands).complete(command, actor);
+        verify(tx).replayComplete(command, actor);
+        verifyNoMoreInteractions(commands, tx);
     }
     @Test void ownershipRecoveryUsesOnlyTheNewTransactionReplayAndNeverTheMembershipGate() {
         var tx = mock(ConsoleRuntimeTransaction.class);
@@ -88,7 +88,7 @@ class ConsoleRuntimeAdaptersUnitTest {
         var context = mock(ConsoleContext.class);
         var actor = mock(WorkflowCommandContext.class);
         when(context.runtime("trusted")).thenReturn(actor);
-        var host = new ConsoleRuntimeCommandHost(new ConsoleRuntimeCoordinator(tx, access), tx, access, context);
+        var host = new ConsoleRuntimeCommandHost(new ConsoleRuntimeCoordinator(tx), tx, context);
         var command = new io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask(
                 UUID.randomUUID(), 1, 5, 9);
         var result = new WorkflowCommandResult(true, null);
@@ -107,7 +107,7 @@ class ConsoleRuntimeAdaptersUnitTest {
     @Test void hostFailuresKeepExistingConsoleStatusAndWrappedBusinessConflictMapping() {
         var commands=mock(ConsoleRuntimeCoordinator.class); var tx=mock(ConsoleRuntimeTransaction.class);
         var access=mock(ConsoleRuntimeAccess.class); var context=mock(ConsoleContext.class);
-        var host=new ConsoleRuntimeCommandHost(commands,tx,access,context);
+        var host=new ConsoleRuntimeCommandHost(commands,tx,context);
         var command=new CompleteWorkflowTask(UUID.randomUUID(),1,5,9,"APPROVE",null);
         org.mockito.Mockito.doThrow(new ConsoleException(422,"HOST_VALIDATION")).when(commands).complete(command,null);
         assertThatThrownBy(()->host.complete(command,"correlation")).isInstanceOfSatisfying(WorkflowRuntimeException.class,

@@ -1,7 +1,6 @@
 package io.github.leontecristian.workflow.testhost.configuration.console;
 
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeAccess;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeCommandHost;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeCoordinator;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeReadHost;
@@ -25,7 +24,7 @@ public class ConsoleRuntimeConfiguration {
         return new ConsoleRuntimeReadHost(context, reassignment, settings);
     }
     @Bean WorkflowRuntimeCommandHost consoleRuntimeCommandHost(ConsoleRuntimeCoordinator commands,
-            ConsoleRuntimeTransaction transactions, ConsoleRuntimeAccess access, ConsoleContext context) {
-        return new ConsoleRuntimeCommandHost(commands, transactions, access, context);
+            ConsoleRuntimeTransaction transactions, ConsoleContext context) {
+        return new ConsoleRuntimeCommandHost(commands, transactions, context);
     }
 }

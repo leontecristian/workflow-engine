@@ -41,7 +41,7 @@ import io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionS
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowServiceAction;
 import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
-import io.github.leontecristian.workflow.testhost.configuration.integration.DatabaseIntegrationTest;
+import io.github.leontecristian.workflow.testhost.configuration.integration.CompletionAdapterIntegrationTest;
 import io.github.leontecristian.workflow.testhost.repository.event.ConsoleEventStore;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleWire;
 import java.time.Instant;
@@ -81,7 +81,7 @@ import static org.mockito.Mockito.verify;
 
 /** Real commands/publication/commits on the guarded test DB. No HTTP port or development DB. */
 @Import(RestrictedRoutingIT.Adapters.class)
-class RestrictedRoutingIT extends DatabaseIntegrationTest {
+class RestrictedRoutingIT extends CompletionAdapterIntegrationTest {
     @Autowired WorkflowDefinitionService definitions;
     @Autowired TaskTypeCatalogService catalog;
     @Autowired WorkflowExecutionService engine;

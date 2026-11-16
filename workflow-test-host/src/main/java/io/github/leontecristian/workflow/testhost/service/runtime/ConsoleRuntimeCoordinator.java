@@ -27,11 +27,9 @@ public class ConsoleRuntimeCoordinator {
     private static final org.slf4j.Logger LOG =
             org.slf4j.LoggerFactory.getLogger(ConsoleRuntimeCoordinator.class);
     private final ConsoleRuntimeTransaction transactions;
-    private final ConsoleRuntimeAccess access;
 
-    public ConsoleRuntimeCoordinator(ConsoleRuntimeTransaction transactions, ConsoleRuntimeAccess access) {
+    public ConsoleRuntimeCoordinator(ConsoleRuntimeTransaction transactions) {
         this.transactions = transactions;
-        this.access = access;
     }
 
     public WorkflowCommandResult start(SandboxStart command, WorkflowCommandContext context) {
@@ -62,7 +60,6 @@ public class ConsoleRuntimeCoordinator {
             return transactions.complete(command, context);
         } catch (RuntimeException original) {
             if (eligible(original)) {
-                access.completionTask(command.taskId());
                 var replay = transactions.replayComplete(command, context);
                 if (replay.isPresent()) return replay.get();
             }

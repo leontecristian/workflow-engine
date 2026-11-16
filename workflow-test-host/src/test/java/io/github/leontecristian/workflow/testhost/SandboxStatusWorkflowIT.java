@@ -23,7 +23,7 @@ import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutio
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
-import io.github.leontecristian.workflow.testhost.configuration.integration.DatabaseIntegrationTest;
+import io.github.leontecristian.workflow.testhost.configuration.integration.CompletionAdapterIntegrationTest;
 import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeTransaction;
@@ -52,7 +52,7 @@ import org.springframework.transaction.support.TransactionTemplate;
         "workflow.console.admin.username=status.admin", "workflow.console.admin.password=integration-only-admin",
         "workflow.console.reviewer.username=status.reviewer", "workflow.console.reviewer.password=integration-only-reviewer"
 })
-class SandboxStatusWorkflowIT extends DatabaseIntegrationTest {
+class SandboxStatusWorkflowIT extends CompletionAdapterIntegrationTest {
     @Autowired private WorkflowDefinitionService definitions;
     @Autowired private WorkflowRuntimeQueryService reads;
     @Autowired private TaskTypeCatalogService catalog;

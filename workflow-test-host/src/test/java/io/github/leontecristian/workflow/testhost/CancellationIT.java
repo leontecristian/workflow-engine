@@ -44,7 +44,7 @@ import io.github.leontecristian.workflow.core.service.runtime.WorkflowEventRecor
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
-import io.github.leontecristian.workflow.testhost.configuration.integration.DatabaseIntegrationTest;
+import io.github.leontecristian.workflow.testhost.configuration.integration.CompletionAdapterIntegrationTest;
 import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleAdapters;
 import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
 import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
@@ -84,7 +84,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @TestPropertySource(properties = {"workflow.console.enabled=true", "workflow.console.capabilities=sample",
         "workflow.console.admin.username=cancel.admin", "workflow.console.admin.password=integration-only-admin",
         "workflow.console.reviewer.username=cancel.reviewer", "workflow.console.reviewer.password=integration-only-reviewer"})
-class CancellationIT extends DatabaseIntegrationTest {
+class CancellationIT extends CompletionAdapterIntegrationTest {
     @Autowired WorkflowDefinitionService definitions;
     @Autowired TaskTypeCatalogService catalog;
     @Autowired WorkflowRuntimeQueryService reads;

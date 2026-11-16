@@ -32,7 +32,7 @@ import io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionS
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowServiceAction;
 import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
-import io.github.leontecristian.workflow.testhost.configuration.integration.DatabaseIntegrationTest;
+import io.github.leontecristian.workflow.testhost.configuration.integration.CompletionAdapterIntegrationTest;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -69,7 +69,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
                 "spring.main.allow-bean-definition-overriding=true",
                 "workflow.console.admin.username=f013-admin", "workflow.console.admin.password=f013-local-test-password",
                 "workflow.console.reviewer.username=f013-reviewer", "workflow.console.reviewer.password=f013-local-test-password"})
-class SharedInstanceViewerIT extends DatabaseIntegrationTest {
+class SharedInstanceViewerIT extends CompletionAdapterIntegrationTest {
     @Autowired WorkflowDefinitionService definitions;
     @Autowired TaskTypeCatalogService catalog;
     @Autowired WorkflowExecutionService engine;

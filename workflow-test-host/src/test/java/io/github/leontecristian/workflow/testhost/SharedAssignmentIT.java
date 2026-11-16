@@ -34,7 +34,7 @@ import io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionS
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
 import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
-import io.github.leontecristian.workflow.testhost.configuration.integration.DatabaseIntegrationTest;
+import io.github.leontecristian.workflow.testhost.configuration.integration.CompletionAdapterIntegrationTest;
 import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeTransaction;
@@ -76,7 +76,7 @@ import org.springframework.web.context.WebApplicationContext;
         "workflow.console.admin.username=f016-admin","workflow.console.admin.password=f016-local-test-password",
         "workflow.console.reviewer.username=f016-reviewer","workflow.console.reviewer.password=f016-local-test-password"})
 @Import(SharedAssignmentIT.FailureFixture.class)
-class SharedAssignmentIT extends DatabaseIntegrationTest {
+class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
     @Autowired WorkflowDefinitionService definitions;
     @Autowired WorkflowRuntimeQueryService reads;
     @Autowired TaskTypeCatalogService catalog;

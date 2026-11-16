@@ -99,37 +99,6 @@ class ConsoleRuntimePolicyUnitTest {
                 failure -> assertThat(failure.category()).isEqualTo(WorkflowExecutionException.Category.AUTHORIZATION_LOOKUP_FAILED));
     }
 
-    @Test void administratorReadGrantDoesNotWidenCompletionRecoveryAccess() {
-        when(context.actor()).thenReturn("admin");
-        when(context.admin()).thenReturn(true);
-        when(context.isConsoleActor("admin")).thenReturn(true);
-        when(reads.findTask(5)).thenReturn(Optional.of(task));
-        assertThat(access.task(5)).isSameAs(task);
-        assertThatThrownBy(() -> access.completionTask(5)).isInstanceOf(ConsoleException.class);
-        var tx = mock(ConsoleRuntimeTransaction.class);
-        var command = new CompleteWorkflowTask(UUID.randomUUID(), 1, 5, 9, "APPROVE", null);
-        when(tx.complete(command, null)).thenThrow(new WorkflowExecutionException(
-                WorkflowExecutionException.Category.CONCURRENT_COMMAND));
-        assertThatThrownBy(() -> new ConsoleRuntimeCoordinator(tx, access).complete(command, null))
-                .isInstanceOf(ConsoleException.class);
-        verify(tx).complete(command, null);
-        verifyNoMoreInteractions(tx);
-        when(requests.linkedToInstance(1)).thenReturn(true);
-        assertThat(access.completionTask(5)).isSameAs(task);
-    }
-
-    @Test void currentOwnerCompletionGuardAvoidsMembershipLookupAfterBusinessAccess() {
-        when(context.actor()).thenReturn("reviewer");
-        when(context.isConsoleActor("reviewer")).thenReturn(true);
-        when(requests.linkedToInstance(1)).thenReturn(true);
-        var shared = new WorkflowTaskView(5, 2, 1, 3, "REVIEW",
-                io.github.leontecristian.workflow.testhost.service.runtime.SandboxSharedAssignmentProvider.FINANCE,
-                TaskStatus.OPEN, null, Instant.EPOCH, null, null, null, null, "reviewer");
-        when(reads.findTask(5)).thenReturn(Optional.of(shared));
-        assertThat(access.completionTask(5)).isSameAs(shared);
-        verifyNoInteractions(eligibility);
-    }
-
     @Test void identityDoesNotConstructCommandContextUntilCancellationFactoryIsUsed() {
         when(context.actor()).thenReturn("reviewer");
         var adapter = new ConsoleRuntimeReadHost(context, null, null);
