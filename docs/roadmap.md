@@ -75,6 +75,7 @@ Production readiness applies before any deployment, regardless of designer timin
 | --- | --- | --- |
 | **Audited administrative reassignment** — exact slice open | Specify a separate lifecycle, authorization, API and evidence contract when selected. | Preserve task identity where required, aggregate concurrency, replay, history and atomicity. |
 | **External variable-update command** — conditional scope | F009 supports start/service replacements, not a standalone external update command. Specify one only when a selected scenario requires it. | Authorized updates follow the agreed whole-value and aggregate concurrency contracts, with focused verification. |
+| **Notifications** — capability to be specified | Exact scope, triggers, recipients, channels and delivery sequencing remain open. Preserve the [host-owned delivery boundary](architecture/workflow-engine-design.md#131-reliable-side-effects): core supplies neutral workflow/task events with durable handoff in the command transaction; the host owns notification policy and delivery after commit. | Specify the selected behavior and focused acceptance criteria before implementation, preserving durable delivery and idempotent consumption under CON-07. |
 
 A shared GROUP/ROLE SINGLE task is one shared obligation; it cannot substitute for ALL contributions. Claim/release already exists in F017 and ALL is delivered in F021. The first integration may use SINGLE if that matches the selected business scenario.
 
