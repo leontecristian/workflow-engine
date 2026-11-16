@@ -12,7 +12,13 @@ import io.github.leontecristian.workflow.core.exception.tasktype.TaskTypeCatalog
 import io.github.leontecristian.workflow.web.configuration.WorkflowAdministrationConfiguration;
 import io.github.leontecristian.workflow.web.configuration.WorkflowAdministrationOptions;
 import io.github.leontecristian.workflow.web.controller.definition.WorkflowDefinitionController;
-import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationHost;
+import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationIdentity;
+import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationAuthorization;
+import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationAuditRecorder;
+import io.github.leontecristian.workflow.web.service.administration.WorkflowAdministrationService;
+import java.time.Clock;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.context.annotation.Primary;
 import io.github.leontecristian.workflow.web.exception.administration.WorkflowAdministrationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Bean;
@@ -37,6 +43,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -55,7 +62,16 @@ class WorkflowAdministrationUnitTest {
     static class Host {
         @Bean WorkflowDefinitionService definitions() { return mock(WorkflowDefinitionService.class); }
         @Bean TaskTypeCatalogService catalog() { return mock(TaskTypeCatalogService.class); }
-        @Bean WorkflowAdministrationHost administration() { return mock(WorkflowAdministrationHost.class); }
+        @Bean @Primary WorkflowAdministrationService administration() { return mock(WorkflowAdministrationService.class); }
+        @Bean WorkflowAdministrationIdentity identity() {
+            var identity = mock(WorkflowAdministrationIdentity.class);
+            when(identity.requireActorRef()).thenReturn("actor");
+            return identity;
+        }
+        @Bean WorkflowAdministrationAuthorization authorization() { return mock(WorkflowAdministrationAuthorization.class); }
+        @Bean WorkflowAdministrationAuditRecorder recorder() { return mock(WorkflowAdministrationAuditRecorder.class); }
+        @Bean Clock clock() { return Clock.systemUTC(); }
+        @Bean PlatformTransactionManager transactionManager() { return mock(PlatformTransactionManager.class); }
     }
     @Configuration(proxyBeanMethods = false)
     @Import(WorkflowAdministrationConfiguration.class)
@@ -110,76 +126,125 @@ class WorkflowAdministrationUnitTest {
             mvc.perform(post("/custom/manage/versions/import")).andExpect(status().isNotFound());
         }
     }
-    @Test void explicitActivationRequiresAdapterAndTrustedOptions() {
-        try (var context = new AnnotationConfigApplicationContext()) {
-            context.registerBean(WorkflowAdministrationOptions.class,
-                    () -> new WorkflowAdministrationOptions("/manage", "trusted"));
-            context.registerBean(WorkflowDefinitionService.class, () -> mock(WorkflowDefinitionService.class));
-            context.registerBean(TaskTypeCatalogService.class, () -> mock(TaskTypeCatalogService.class));
-            context.register(WorkflowAdministrationConfiguration.class);
-            assertThatThrownBy(context::refresh).hasMessageContaining("WorkflowAdministrationHost");
+    @Test void explicitActivationRequiresEachHostDependencyAndTrustedOptions() {
+        for (Class<?> missing : List.of(WorkflowAdministrationIdentity.class,
+                WorkflowAdministrationAuthorization.class, WorkflowAdministrationAuditRecorder.class,
+                Clock.class, PlatformTransactionManager.class)) {
+            try (var context = new AnnotationConfigApplicationContext()) {
+                context.registerBean(WorkflowAdministrationOptions.class,
+                        () -> new WorkflowAdministrationOptions("/manage", "trusted"));
+                context.registerBean(WorkflowDefinitionService.class, () -> mock(WorkflowDefinitionService.class));
+                context.registerBean(TaskTypeCatalogService.class, () -> mock(TaskTypeCatalogService.class));
+                if (missing != WorkflowAdministrationIdentity.class)
+                    context.registerBean(WorkflowAdministrationIdentity.class, () -> () -> "actor");
+                if (missing != WorkflowAdministrationAuthorization.class)
+                    context.registerBean(WorkflowAdministrationAuthorization.class, () -> mock(WorkflowAdministrationAuthorization.class));
+                if (missing != WorkflowAdministrationAuditRecorder.class)
+                    context.registerBean(WorkflowAdministrationAuditRecorder.class, () -> mock(WorkflowAdministrationAuditRecorder.class));
+                if (missing != Clock.class) context.registerBean(Clock.class, Clock::systemUTC);
+                if (missing != PlatformTransactionManager.class)
+                    context.registerBean(PlatformTransactionManager.class, () -> mock(PlatformTransactionManager.class));
+                context.register(WorkflowAdministrationConfiguration.class);
+                assertThatThrownBy(context::refresh).hasStackTraceContaining(missing.getSimpleName());
+            }
         }
         assertThatThrownBy(() -> new WorkflowAdministrationOptions("/manage", null)).isInstanceOf(IllegalArgumentException.class);
         for (String path : List.of("", "/", "/manage/", "/{tenant}", "/manage/**"))
             assertThatThrownBy(() -> new WorkflowAdministrationOptions(path, "trusted")).isInstanceOf(IllegalArgumentException.class);
     }
+    @Test void invalidIdentityFailsBeforeAuthorizationParsingOrCoreAndUnauthenticatedStays401() throws Exception {
+        try (var context = context(Host.class, Enabled.class)) {
+            var mvc = MockMvcBuilders.webAppContextSetup(context).build();
+            var identity = context.getBean(WorkflowAdministrationIdentity.class);
+            for (String actor : new String[] {null, "", "  "}) {
+                when(identity.requireActorRef()).thenReturn(actor);
+                mvc.perform(write("POST", "/versions/import", "invalid"))
+                        .andExpect(status().isInternalServerError()).andExpect(jsonPath("$.code").value("HOST_FAILURE"));
+                mvc.perform(get("/custom/manage/definitions"))
+                        .andExpect(status().isInternalServerError()).andExpect(jsonPath("$.code").value("HOST_FAILURE"));
+            }
+            when(identity.requireActorRef()).thenThrow(new WorkflowAdministrationException(401, "UNAUTHENTICATED"));
+            mvc.perform(get("/custom/manage/definitions")).andExpect(status().isUnauthorized());
+            verifyNoInteractions(context.getBean(WorkflowAdministrationAuthorization.class),
+                    context.getBean(WorkflowAdministrationService.class), context.getBean(WorkflowDefinitionService.class),
+                    context.getBean(TaskTypeCatalogService.class), context.getBean(WorkflowAdministrationAuditRecorder.class));
+        }
+    }
+    @Test void mutationsRequireTrustedNonblankStringCorrelationWithoutHeaderFallback() throws Exception {
+        try (var context = context(Host.class, Enabled.class)) {
+            var mvc = MockMvcBuilders.webAppContextSetup(context).build();
+            for (Object correlation : new Object[] {null, 42, "", "  "}) {
+                var request = post("/custom/manage/versions/import").contentType("application/json").content("{}")
+                        .header("X-Correlation-Id", "client-value");
+                if (correlation != null) request.requestAttr("trusted.correlation", correlation);
+                mvc.perform(request).andExpect(status().isInternalServerError())
+                        .andExpect(jsonPath("$.code").value("HOST_FAILURE"));
+            }
+            verifyNoInteractions(context.getBean(WorkflowAdministrationService.class), context.getBean(WorkflowDefinitionService.class),
+                    context.getBean(TaskTypeCatalogService.class), context.getBean(WorkflowAdministrationAuditRecorder.class));
+        }
+    }
     @Test void everyOperationChecksAccessOnceBeforeAnyCoreOrMutationDelegate() throws Exception {
         try (var context = context(Host.class, Enabled.class)) {
             var mvc = MockMvcBuilders.webAppContextSetup(context).build();
-            var host = context.getBean(WorkflowAdministrationHost.class);
+            var host = context.getBean(WorkflowAdministrationService.class);
             var definitions = context.getBean(WorkflowDefinitionService.class);
             var catalog = context.getBean(TaskTypeCatalogService.class);
+            var access = context.getBean(WorkflowAdministrationAuthorization.class);
             for (String route : List.of("/task-types", "/definitions", "/definitions/1", "/definitions/1/versions",
                     "/versions/lookup?key=test&version=1", "/versions/1", "/versions/1/export")) {
-                reset(host); doThrow(new WorkflowAdministrationException(403, "FORBIDDEN")).when(host).requireAdministrationAccess();
+                reset(access); doThrow(new WorkflowAdministrationException(403, "FORBIDDEN")).when(access).requireAdministrationAccess("actor");
                 mvc.perform(get("/custom/manage" + route)).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
-                verify(host).requireAdministrationAccess(); verifyNoMoreInteractions(host);
+                verify(access).requireAdministrationAccess("actor"); verifyNoMoreInteractions(access);
             }
             for (String route : List.of("/task-types", "/definitions/1", "/versions/import", "/versions/1/document",
                     "/versions/1/validate", "/versions/1/publish", "/versions/1/retire", "/versions/1/drafts", "/versions/1")) {
-                reset(host); doThrow(new WorkflowAdministrationException(403, "FORBIDDEN")).when(host).requireAdministrationAccess();
+                reset(access); doThrow(new WorkflowAdministrationException(403, "FORBIDDEN")).when(access).requireAdministrationAccess("actor");
                 String method = route.equals("/versions/1") ? "DELETE"
                         : route.equals("/definitions/1") || route.endsWith("document") ? "PUT" : "POST";
                 mvc.perform(write(method, route, "invalid input never read")).andExpect(status().isForbidden());
-                verify(host).requireAdministrationAccess(); verifyNoMoreInteractions(host);
+                verify(access).requireAdministrationAccess("actor"); verifyNoMoreInteractions(access);
             }
-            reset(host); doThrow(new WorkflowAdministrationException(403, "FORBIDDEN")).when(host).requireAdministrationAccess();
+            reset(access); doThrow(new WorkflowAdministrationException(403, "FORBIDDEN")).when(access).requireAdministrationAccess("actor");
             mvc.perform(put("/custom/manage/task-types/1")).andExpect(status().isForbidden());
-            verify(host).requireAdministrationAccess(); verifyNoMoreInteractions(host);
-            verifyNoInteractions(definitions, catalog);
+            verify(access).requireAdministrationAccess("actor"); verifyNoMoreInteractions(access);
+            verify(context.getBean(WorkflowAdministrationIdentity.class), times(17)).requireActorRef();
+            verifyNoInteractions(definitions, catalog, host, context.getBean(WorkflowAdministrationAuditRecorder.class));
         }
     }
     @Test void writesPreserveExactTokensRawTextTrustedCorrelationAndTypedDelegates() throws Exception {
         try (var context = context(Host.class, Enabled.class)) {
             var mvc = MockMvcBuilders.webAppContextSetup(context).build();
-            var host = context.getBean(WorkflowAdministrationHost.class);
+            var host = context.getBean(WorkflowAdministrationService.class);
             String raw = " {\"number\":900719925474099312345,\"decimal\":1.00}\n";
             mvc.perform(write("POST", "/versions/import", raw)).andExpect(status().isOk());
-            verify(host).importDraft(raw, "trusted-id");
+            verify(host).importDraft("actor", raw, "trusted-id");
             mvc.perform(write("PUT", "/versions/42/document", raw)).andExpect(status().isOk());
-            verify(host).replace(42, 9007199254740993L, raw, "trusted-id");
+            verify(host).replace("actor", 42, 9007199254740993L, raw, "trusted-id");
             mvc.perform(write("PUT", "/definitions/42", "{\"name\":\"Name\",\"description\":null}")).andExpect(status().isOk());
-            verify(host).metadata(42, 9007199254740993L, "Name", null, "trusted-id");
+            verify(host).metadata("actor", 42, 9007199254740993L, "Name", null, "trusted-id");
             mvc.perform(write("POST", "/task-types", "{\"code\":\"TEST\",\"name\":\"Name\",\"selectable\":true}")).andExpect(status().isOk());
-            verify(host).createTaskType(new CreateTaskType("TEST", "Name", null, true), "trusted-id");
+            verify(host).createTaskType("actor", new CreateTaskType("TEST", "Name", null, true), "trusted-id");
             mvc.perform(write("PUT", "/task-types/42", "{\"name\":\"Name\",\"selectable\":false}")).andExpect(status().isOk());
-            verify(host).updateTaskType(new UpdateTaskType(42, 9007199254740993L, "Name", null, false), "trusted-id");
+            verify(host).updateTaskType("actor", new UpdateTaskType(42, 9007199254740993L, "Name", null, false), "trusted-id");
             for (String action : List.of("validate", "publish", "retire"))
                 mvc.perform(write("POST", "/versions/42/" + action, "")).andExpect(status().isOk());
-            verify(host).validate(42, 9007199254740993L, "trusted-id");
-            verify(host).publish(42, 9007199254740993L, "trusted-id");
-            verify(host).retire(42, 9007199254740993L, "trusted-id");
-            verify(host, times(8)).requireAdministrationAccess(); verifyNoMoreInteractions(host);
+            verify(host).validate("actor", 42, 9007199254740993L, "trusted-id");
+            verify(host).publish("actor", 42, 9007199254740993L, "trusted-id");
+            verify(host).retire("actor", 42, 9007199254740993L, "trusted-id");
+            verify(context.getBean(WorkflowAdministrationIdentity.class), times(8)).requireActorRef();
+            verify(context.getBean(WorkflowAdministrationAuthorization.class), times(8)).requireAdministrationAccess("actor");
+            verifyNoMoreInteractions(host);
         }
     }
     @Test void createAndDeleteEnforceDistinctBodyContractsAndLoadedSourceTokens() throws Exception {
         try (var context = context(Host.class, Enabled.class)) {
             var mvc = MockMvcBuilders.webAppContextSetup(context).build();
-            var host = context.getBean(WorkflowAdministrationHost.class);
+            var host = context.getBean(WorkflowAdministrationService.class);
             mvc.perform(write("POST", "/versions/42/drafts", "{} ")).andExpect(status().isOk());
-            verify(host).createDraftFromVersion(42, 9007199254740993L, "trusted-id");
+            verify(host).createDraftFromVersion("actor", 42, 9007199254740993L, "trusted-id");
             mvc.perform(write("DELETE", "/versions/42", "")).andExpect(status().isOk());
-            verify(host).deleteDraft(42, 9007199254740993L, "trusted-id");
+            verify(host).deleteDraft("actor", 42, 9007199254740993L, "trusted-id");
             reset(host);
             for (String body : List.of("", "[]", "null", "{\"version\":2}", "{\"id\":42}", "{\"unknown\":true}"))
                 mvc.perform(write("POST", "/versions/42/drafts", body)).andExpect(status().isBadRequest());
@@ -194,8 +259,8 @@ class WorkflowAdministrationUnitTest {
             mvc.perform(post("/custom/manage/versions/42/drafts").contentType("application/json").content("{}"))
                     .andExpect(status().isBadRequest());
             mvc.perform(delete("/custom/manage/versions/42")).andExpect(status().isBadRequest());
-            verify(host, never()).createDraftFromVersion(anyLong(), anyLong(), anyString());
-            verify(host, never()).deleteDraft(anyLong(), anyLong(), anyString());
+            verify(host, never()).createDraftFromVersion(eq("actor"), anyLong(), anyLong(), anyString());
+            verify(host, never()).deleteDraft(eq("actor"), anyLong(), anyLong(), anyString());
         }
     }
 
@@ -231,18 +296,18 @@ class WorkflowAdministrationUnitTest {
     @Test void failedHostMutationNeverReportsSuccessAndErrorsKeepManagementMapping() throws Exception {
         try (var context = context(Host.class, Enabled.class)) {
             var mvc = MockMvcBuilders.webAppContextSetup(context).build();
-            var host = context.getBean(WorkflowAdministrationHost.class);
-            doThrow(new IllegalStateException("private document and SQL")).when(host).importDraft(anyString(), anyString());
+            var host = context.getBean(WorkflowAdministrationService.class);
+            doThrow(new IllegalStateException("private document and SQL")).when(host).importDraft(eq("actor"), anyString(), anyString());
             mvc.perform(write("POST", "/versions/import", "{}"))
                     .andExpect(status().isInternalServerError()).andExpect(jsonPath("$.message").value("HOST_FAILURE"))
                     .andExpect(jsonPath("$.correlationId").value("trusted-id"));
-            doThrow(new TaskTypeCatalogException(TaskTypeCatalogException.Category.STALE_VERSION, null)).when(host).updateTaskType(any(), anyString());
+            doThrow(new TaskTypeCatalogException(TaskTypeCatalogException.Category.STALE_VERSION, null)).when(host).updateTaskType(eq("actor"), any(), anyString());
             mvc.perform(write("PUT", "/task-types/42", "{\"name\":\"n\",\"selectable\":true}"))
                     .andExpect(status().isConflict()).andExpect(jsonPath("$.diagnostics").isEmpty());
-            doThrow(new WorkflowDefinitionException(WorkflowDefinitionException.Category.INVALID_INPUT, List.of())).when(host).validate(anyLong(), anyLong(), anyString());
+            doThrow(new WorkflowDefinitionException(WorkflowDefinitionException.Category.INVALID_INPUT, List.of())).when(host).validate(eq("actor"), anyLong(), anyLong(), anyString());
             mvc.perform(write("POST", "/versions/42/validate", "")).andExpect(status().isBadRequest());
             mvc.perform(write("POST", "/versions/42/publish", "{}")).andExpect(status().isBadRequest());
-            verify(host, never()).publish(anyLong(), anyLong(), anyString());
+            verify(host, never()).publish(eq("actor"), anyLong(), anyLong(), anyString());
         }
     }
 }

@@ -58,11 +58,12 @@ class SharedAdministrationIT extends DatabaseIntegrationTest {
         var sessionResponse = mvc.perform(get("/console/api/session").session(session)).andReturn().getResponse();
         assertThat(sessionResponse.getStatus()).isEqualTo(200);
         var csrf = json.readTree(sessionResponse.getContentAsString());
-        var response = mvc.perform(post("/console/api/task-types").session(session)
+        var write = mvc.perform(post("/console/api/task-types").session(session)
                 .header(csrf.path("csrfHeaderName").asText(), csrf.path("csrfToken").asText())
                 .contentType("application/json").content(json.writeValueAsString(
                         Map.of("code", code, "name", "F014 administration fixture", "selectable", true))))
-                .andReturn().getResponse();
+                .andReturn();
+        var response = write.getResponse();
         assertThat(response.getStatus()).withFailMessage(response.getContentAsString()).isEqualTo(200);
         var change = json.readTree(response.getContentAsString());
         assertThat(change.path("changed").asBoolean()).isTrue();
@@ -74,6 +75,12 @@ class SharedAdministrationIT extends DatabaseIntegrationTest {
                         + " WHERE entity_kind='TASK_TYPE' AND entity_id=? AND operation='CREATE_TASK_TYPE' AND actor_ref='f014-admin'",
                 String.class, taskType);
         assertThat(json.readTree(evidence).path("after").path("code").asText()).isEqualTo(code);
+        var trustedCorrelation = (String) write.getRequest().getAttribute("console.correlation");
+        assertThat(trustedCorrelation).isNotBlank();
+        var storedCorrelation = jdbc.queryForObject("SELECT correlation_id FROM wf_test.management_audit"
+                        + " WHERE entity_kind='TASK_TYPE' AND entity_id=? AND operation='CREATE_TASK_TYPE'",
+                String.class, taskType);
+        assertThat(UUID.fromString(storedCorrelation)).isEqualTo(UUID.fromString(trustedCorrelation));
 
         if (Boolean.getBoolean("f014.browserHold")) {
             var document = (ObjectNode) json.readTree(Files.readString(repository().resolve(

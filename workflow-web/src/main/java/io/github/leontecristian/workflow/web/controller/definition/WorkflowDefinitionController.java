@@ -17,7 +17,9 @@ import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinit
 import io.github.leontecristian.workflow.web.exception.administration.WorkflowAdministrationException;
 import io.github.leontecristian.workflow.web.service.administration.AdministrationErrors;
 import io.github.leontecristian.workflow.web.service.administration.AdministrationWire;
-import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationHost;
+import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationIdentity;
+import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationAuthorization;
+import io.github.leontecristian.workflow.web.service.administration.WorkflowAdministrationService;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -35,22 +37,27 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 
 public class WorkflowDefinitionController {
     private final WorkflowDefinitionService definitions;
-    private final WorkflowAdministrationHost management;
+    private final WorkflowAdministrationService management;
+    private final WorkflowAdministrationIdentity identity;
+    private final WorkflowAdministrationAuthorization authorization;
     private final AdministrationWire wire;
     private final AdministrationErrors errors;
 
     public WorkflowDefinitionController(
-            WorkflowDefinitionService definitions, WorkflowAdministrationHost management,
+            WorkflowDefinitionService definitions, WorkflowAdministrationService management,
+            WorkflowAdministrationIdentity identity, WorkflowAdministrationAuthorization authorization,
             AdministrationWire wire, AdministrationErrors errors) {
         this.definitions = definitions;
         this.management = management;
+        this.identity = identity;
+        this.authorization = authorization;
         this.wire = wire;
         this.errors = errors;
     }
 
     @GetMapping("/definitions")
     public ResponseEntity<String> definitions(HttpServletRequest r) {
-        management.requireAdministrationAccess();
+        var actorRef = requireAdministrationAccess();
         query(r, "afterId", "limit", "order");
         DefinitionOrder order = DefinitionOrder.ASC;
         if (r.getParameter("order") != null) {
@@ -67,7 +74,7 @@ public class WorkflowDefinitionController {
 
     @GetMapping("/definitions/{id}")
     public ResponseEntity<String> definition(@PathVariable String id) {
-        management.requireAdministrationAccess();
+        var actorRef = requireAdministrationAccess();
         return wire.response(
                 definitions
                         .findDefinition(decimal(id, false))
@@ -76,20 +83,20 @@ public class WorkflowDefinitionController {
 
     @PutMapping("/definitions/{id}")
     public ResponseEntity<String> metadata(@PathVariable String id, HttpServletRequest r) {
-        management.requireAdministrationAccess();
+        var actorRef = requireAdministrationAccess();
         var b = wire.body(r, "name", "description");
         return wire.response(
-                management.metadata(
+                management.metadata(actorRef,
                         decimal(id, false),
                         token(r),
                         text(b, "name", false),
                         text(b, "description", true),
-                        errors.correlation(r)));
+                        errors.mutationCorrelation(r)));
     }
 
     @GetMapping("/definitions/{id}/versions")
     public ResponseEntity<String> versions(@PathVariable String id, HttpServletRequest r) {
-        management.requireAdministrationAccess();
+        var actorRef = requireAdministrationAccess();
         query(r, "status", "afterId", "limit");
         DefinitionStatus status = null;
         if (r.getParameter("status") != null)
@@ -115,7 +122,7 @@ public class WorkflowDefinitionController {
 
     @GetMapping("/versions/lookup")
     public ResponseEntity<String> lookup(HttpServletRequest r) {
-        management.requireAdministrationAccess();
+        var actorRef = requireAdministrationAccess();
         query(r, "key", "version");
         long version = decimal(r.getParameter("version"), false);
         if (version > Integer.MAX_VALUE) throw WorkflowAdministrationException.invalid();
@@ -127,67 +134,67 @@ public class WorkflowDefinitionController {
 
     @GetMapping("/versions/{id}")
     public ResponseEntity<String> version(@PathVariable String id) {
-        management.requireAdministrationAccess();
+        var actorRef = requireAdministrationAccess();
         return wire.response(
                 definitions.findVersion(decimal(id, false)).orElseThrow(WorkflowAdministrationException::missing));
     }
 
     @PostMapping("/versions/import")
     public ResponseEntity<String> importDraft(HttpServletRequest r) {
-        management.requireAdministrationAccess();
+        var actorRef = requireAdministrationAccess();
         return wire.response(
-                management.importDraft(wire.raw(r, 4 * 1024 * 1024), errors.correlation(r)));
+                management.importDraft(actorRef, wire.raw(r, 4 * 1024 * 1024), errors.mutationCorrelation(r)));
     }
 
     @PostMapping("/versions/{id}/drafts")
     public ResponseEntity<String> createDraftFromVersion(@PathVariable String id, HttpServletRequest r) {
-        management.requireAdministrationAccess();
+        var actorRef = requireAdministrationAccess();
         wire.body(r);
-        return wire.response(management.createDraftFromVersion(decimal(id, false), token(r), errors.correlation(r)));
+        return wire.response(management.createDraftFromVersion(actorRef, decimal(id, false), token(r), errors.mutationCorrelation(r)));
     }
 
     @DeleteMapping("/versions/{id}")
     public ResponseEntity<String> deleteDraft(@PathVariable String id, HttpServletRequest r) {
-        management.requireAdministrationAccess();
+        var actorRef = requireAdministrationAccess();
         wire.empty(r);
-        return wire.response(management.deleteDraft(decimal(id, false), token(r), errors.correlation(r)));
+        return wire.response(management.deleteDraft(actorRef, decimal(id, false), token(r), errors.mutationCorrelation(r)));
     }
 
     @PutMapping("/versions/{id}/document")
     public ResponseEntity<String> replace(@PathVariable String id, HttpServletRequest r) {
-        management.requireAdministrationAccess();
+        var actorRef = requireAdministrationAccess();
         return wire.response(
-                management.replace(
+                management.replace(actorRef,
                         decimal(id, false),
                         token(r),
                         wire.raw(r, 4 * 1024 * 1024),
-                        errors.correlation(r)));
+                        errors.mutationCorrelation(r)));
     }
 
     @PostMapping("/versions/{id}/validate")
     public ResponseEntity<String> validate(@PathVariable String id, HttpServletRequest r) {
-        management.requireAdministrationAccess();
+        var actorRef = requireAdministrationAccess();
         wire.empty(r);
-        return wire.response(management.validate(decimal(id, false), token(r), errors.correlation(r)));
+        return wire.response(management.validate(actorRef, decimal(id, false), token(r), errors.mutationCorrelation(r)));
     }
 
     @PostMapping("/versions/{id}/publish")
     public ResponseEntity<String> publish(@PathVariable String id, HttpServletRequest r) {
-        management.requireAdministrationAccess();
+        var actorRef = requireAdministrationAccess();
         wire.empty(r);
-        return wire.response(management.publish(decimal(id, false), token(r), errors.correlation(r)));
+        return wire.response(management.publish(actorRef, decimal(id, false), token(r), errors.mutationCorrelation(r)));
     }
 
     @PostMapping("/versions/{id}/retire")
     public ResponseEntity<String> retire(@PathVariable String id, HttpServletRequest r) {
-        management.requireAdministrationAccess();
+        var actorRef = requireAdministrationAccess();
         wire.empty(r);
-        return wire.response(management.retire(decimal(id, false), token(r), errors.correlation(r)));
+        return wire.response(management.retire(actorRef, decimal(id, false), token(r), errors.mutationCorrelation(r)));
     }
 
     @GetMapping("/versions/{id}/export")
     public ResponseEntity<String> export(@PathVariable String id) {
-        management.requireAdministrationAccess();
+        var actorRef = requireAdministrationAccess();
         long key = decimal(id, false);
         return ResponseEntity.ok()
                 .header("Content-Type", "application/json; charset=UTF-8")
@@ -196,6 +203,14 @@ public class WorkflowDefinitionController {
                         "attachment; filename=\"workflow-version-" + key + ".json\"")
                 .body(definitions.exportVersion(key));
     }
+    private String requireAdministrationAccess() {
+        String actorRef = identity.requireActorRef();
+        if (actorRef == null || actorRef.isBlank())
+            throw new WorkflowAdministrationException(500, "HOST_FAILURE");
+        authorization.requireAdministrationAccess(actorRef);
+        return actorRef;
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<String> error(Exception failure, HttpServletRequest request) {
         return errors.error(failure, request);

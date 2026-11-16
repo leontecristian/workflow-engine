@@ -19,6 +19,12 @@ public class AdministrationErrors {
         Object value = request.getAttribute(options.correlationAttribute());
         return value instanceof String text ? text : null;
     }
+    public String mutationCorrelation(HttpServletRequest request) {
+        String value = correlation(request);
+        if (value == null || value.isBlank())
+            throw new WorkflowAdministrationException(500, "HOST_FAILURE");
+        return value;
+    }
     public record Failure(String code, String message, Object diagnostics, String correlationId) {}
     public ResponseEntity<String> error(Exception failure, HttpServletRequest request) {
         int status = 500;

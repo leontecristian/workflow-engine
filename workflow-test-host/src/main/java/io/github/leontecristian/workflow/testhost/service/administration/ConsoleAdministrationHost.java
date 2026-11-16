@@ -1,38 +1,60 @@
 package io.github.leontecristian.workflow.testhost.service.administration;
 
-import io.github.leontecristian.workflow.core.dto.definition.DefinitionChange;
-import io.github.leontecristian.workflow.core.dto.definition.DefinitionDeletion;
-import io.github.leontecristian.workflow.core.dto.definition.DefinitionCheckResult;
-import io.github.leontecristian.workflow.core.dto.definition.DefinitionMetadataChange;
-import io.github.leontecristian.workflow.core.dto.tasktype.CreateTaskType;
-import io.github.leontecristian.workflow.core.dto.tasktype.TaskTypeChange;
-import io.github.leontecristian.workflow.core.dto.tasktype.UpdateTaskType;
-import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationHost;
+import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationIdentity;
+import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationAuthorization;
+import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationAuditRecorder;
+import io.github.leontecristian.workflow.web.dto.administration.WorkflowAdministrationAudit;
 import io.github.leontecristian.workflow.web.exception.administration.WorkflowAdministrationException;
-import io.github.leontecristian.workflow.testhost.service.definition.ConsoleManagement;
+import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
+import io.github.leontecristian.workflow.testhost.repository.audit.ManagementAuditStore;
+import io.github.leontecristian.workflow.testhost.service.console.ConsoleWire;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
 
-/** Sandbox policy and existing transactional management proxy. */
-public class ConsoleAdministrationHost implements WorkflowAdministrationHost {
-    private final ConsoleManagement management;
-    public ConsoleAdministrationHost(ConsoleManagement management) { this.management = management; }
-    @Override public void requireAdministrationAccess() {
+/** Sandbox identity, administration policy and transactional audit storage. */
+public class ConsoleAdministrationHost implements WorkflowAdministrationIdentity,
+        WorkflowAdministrationAuthorization, WorkflowAdministrationAuditRecorder {
+    private final ManagementAuditStore audits;
+    private final ConsoleWire wire;
+    private final ConsoleSettings settings;
+
+    public ConsoleAdministrationHost(ManagementAuditStore audits, ConsoleWire wire, ConsoleSettings settings) {
+        this.audits = audits;
+        this.wire = wire;
+        this.settings = settings;
+    }
+
+    @Override public String requireActorRef() {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()
                 || authentication instanceof AnonymousAuthenticationToken)
             throw new WorkflowAdministrationException(401, "UNAUTHENTICATED");
-        if (authentication.getAuthorities().stream().noneMatch(a -> a.getAuthority().equals("ROLE_CONSOLE_ADMIN")))
+        return authentication.getName();
+    }
+
+    @Override public void requireAdministrationAccess(String actorRef) {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken
+                || !authentication.getName().equals(actorRef)
+                || authentication.getAuthorities().stream().noneMatch(a -> a.getAuthority().equals("ROLE_CONSOLE_ADMIN")))
             throw new WorkflowAdministrationException(403, "FORBIDDEN");
     }
-    @Override public TaskTypeChange createTaskType(CreateTaskType command, String correlation) { return management.createTaskType(command, correlation); }
-    @Override public TaskTypeChange updateTaskType(UpdateTaskType command, String correlation) { return management.updateTaskType(command, correlation); }
-    @Override public DefinitionChange importDraft(String document, String correlation) { return management.importDraft(document, correlation); }
-    @Override public DefinitionChange createDraftFromVersion(long id, long token, String correlation) { return management.createDraftFromVersion(id, token, correlation); }
-    @Override public DefinitionDeletion deleteDraft(long id, long token, String correlation) { return management.deleteDraft(id, token, correlation); }
-    @Override public DefinitionChange replace(long id, long token, String document, String correlation) { return management.replace(id, token, document, correlation); }
-    @Override public DefinitionMetadataChange metadata(long id, long token, String name, String description, String correlation) { return management.metadata(id, token, name, description, correlation); }
-    @Override public DefinitionCheckResult validate(long id, long token, String correlation) { return management.validate(id, token, correlation); }
-    @Override public DefinitionCheckResult publish(long id, long token, String correlation) { return management.publish(id, token, correlation); }
-    @Override public DefinitionChange retire(long id, long token, String correlation) { return management.retire(id, token, correlation); }
+
+    @Override public void record(WorkflowAdministrationAudit audit) {
+        if (settings.failAudit) throw new IllegalStateException("Configured audit failure");
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("schemaVersion", 1);
+        evidence.put("operation", audit.operation());
+        evidence.put("before", audit.before());
+        evidence.put("after", audit.after());
+        String json = wire.json(evidence);
+        if (json.length() * 2L > 512 * 1024)
+            throw new IllegalStateException("Audit evidence exceeds bound");
+        audits.insert(audit.context().occurredAt(), audit.context().actorRef(), audit.operation(),
+                audit.entityKind(), audit.entityId(), UUID.fromString(audit.correlationId()), json);
+    }
 }

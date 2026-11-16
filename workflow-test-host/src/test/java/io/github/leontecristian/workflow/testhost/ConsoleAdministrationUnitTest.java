@@ -8,7 +8,11 @@ import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleS
 import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleWire;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleErrors;
-import io.github.leontecristian.workflow.testhost.service.definition.ConsoleManagement;
+import io.github.leontecristian.workflow.web.service.administration.WorkflowAdministrationService;
+import io.github.leontecristian.workflow.testhost.repository.audit.ManagementAuditStore;
+import org.springframework.context.annotation.Primary;
+import org.springframework.transaction.PlatformTransactionManager;
+import java.time.Clock;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -41,7 +45,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Real sandbox security filters + explicit shared administration activation, with core/transaction doubles only. */
+/** Real sandbox security filters and adapter; coordinator/core/transaction doubles keep this database-free. */
 class ConsoleAdministrationUnitTest {
     @Configuration(proxyBeanMethods = false)
     @EnableWebMvc
@@ -51,7 +55,10 @@ class ConsoleAdministrationUnitTest {
         @Bean ConsoleSettings settings(Environment environment) { return new ConsoleSettings(environment); }
         @Bean ConsoleWire wire() { return new ConsoleWire(); }
         @Bean ConsoleErrors errors(ConsoleWire wire) { return new ConsoleErrors(wire); }
-        @Bean ConsoleManagement management() { return mock(ConsoleManagement.class); }
+        @Bean @Primary WorkflowAdministrationService management() { return mock(WorkflowAdministrationService.class); }
+        @Bean ManagementAuditStore audits() { return mock(ManagementAuditStore.class); }
+        @Bean Clock clock() { return Clock.systemUTC(); }
+        @Bean PlatformTransactionManager transactions() { return mock(PlatformTransactionManager.class); }
         @Bean WorkflowDefinitionService definitions() { return mock(WorkflowDefinitionService.class); }
         @Bean TaskTypeCatalogService catalog() { return mock(TaskTypeCatalogService.class); }
     }
@@ -72,7 +79,7 @@ class ConsoleAdministrationUnitTest {
             context.register(Host.class); context.refresh();
             var security = context.getBean("springSecurityFilterChain", jakarta.servlet.Filter.class);
             var mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(security).build();
-            var management = context.getBean(ConsoleManagement.class);
+            var management = context.getBean(WorkflowAdministrationService.class);
             mvc.perform(get("/console/api/definitions")).andExpect(status().isUnauthorized());
             mvc.perform(get("/console/api/definitions").session(session("CONSOLE_REVIEWER")))
                     .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
@@ -95,7 +102,7 @@ class ConsoleAdministrationUnitTest {
             mvc.perform(post("/console/api/task-types").session(admin).header(token.getHeaderName(), token.getToken())
                     .contentType("application/json").content("{\"code\":\"TEST\",\"name\":\"Test\",\"selectable\":true}"))
                     .andExpect(status().isOk());
-            verify(management).createTaskType(eq(new CreateTaskType("TEST", "Test", null, true)), matches("[a-f0-9-]{36}"));
+            verify(management).createTaskType(eq("unit-user"), eq(new CreateTaskType("TEST", "Test", null, true)), matches("[a-f0-9-]{36}"));
             for (var write : List.of(post("/console/api/versions/42/drafts").contentType("application/json").content("{}"),
                     delete("/console/api/versions/42"))) {
                 mvc.perform(write.session(admin).header("X-Expected-Lock-Version", "7"))
@@ -111,10 +118,10 @@ class ConsoleAdministrationUnitTest {
             mvc.perform(post("/console/api/versions/42/drafts").session(admin).header(token.getHeaderName(), token.getToken())
                     .header("X-Expected-Lock-Version", "7").contentType("application/json").content("{}"))
                     .andExpect(status().isOk());
-            verify(management).createDraftFromVersion(eq(42L), eq(7L), matches("[a-f0-9-]{36}"));
+            verify(management).createDraftFromVersion(eq("unit-user"), eq(42L), eq(7L), matches("[a-f0-9-]{36}"));
             mvc.perform(delete("/console/api/versions/42").session(admin).header(token.getHeaderName(), token.getToken())
                     .header("X-Expected-Lock-Version", "7")).andExpect(status().isOk());
-            verify(management).deleteDraft(eq(42L), eq(7L), matches("[a-f0-9-]{36}"));
+            verify(management).deleteDraft(eq("unit-user"), eq(42L), eq(7L), matches("[a-f0-9-]{36}"));
             verifyNoMoreInteractions(management);
         }
     }

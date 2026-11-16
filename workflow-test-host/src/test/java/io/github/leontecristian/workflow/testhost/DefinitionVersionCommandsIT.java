@@ -16,10 +16,9 @@ import io.github.leontecristian.workflow.core.exception.definition.WorkflowDefin
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.testhost.repository.audit.ManagementAuditStore;
 import io.github.leontecristian.workflow.testhost.configuration.integration.DatabaseIntegrationTest;
-import io.github.leontecristian.workflow.testhost.service.definition.ConsoleManagement;
+import io.github.leontecristian.workflow.web.service.administration.WorkflowAdministrationService;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -33,9 +32,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.UnexpectedRollbackException;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import static org.mockito.Mockito.doAnswer;
@@ -54,7 +52,7 @@ import org.springframework.test.util.AopTestUtils;
                 "workflow.console.reviewer.password=f023-local-test"})
 class DefinitionVersionCommandsIT extends DatabaseIntegrationTest {
     @Autowired WorkflowDefinitionService definitions;
-    @Autowired ConsoleManagement management;
+    @Autowired WorkflowAdministrationService management;
     @MockitoSpyBean ManagementAuditStore audits;
     @Autowired JdbcTemplate jdbc;
     @Autowired EntityManager em;
@@ -88,7 +86,6 @@ class DefinitionVersionCommandsIT extends DatabaseIntegrationTest {
 
     @AfterEach void cleanup() {
         reset(AopTestUtils.<ManagementAuditStore>getUltimateTargetObject(audits));
-        SecurityContextHolder.clearContext();
         tx(() -> {
             jdbc.update("DELETE FROM wf_test.management_audit WHERE actor_ref=?", marker);
             jdbc.update("DELETE FROM wf.workflow_instance WHERE started_by=?", marker);
@@ -134,29 +131,69 @@ class DefinitionVersionCommandsIT extends DatabaseIntegrationTest {
 
     @Test void rollbackRestoresDeletionAndRemovesCreationAndReservationWithActualHostAudit() {
         var source = imported(1);
-        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(marker, "ignored", List.of()));
         doAnswer(call -> { call.callRealMethod(); throw new IllegalStateException("F023 test audit failure"); })
                 .when(AopTestUtils.<ManagementAuditStore>getUltimateTargetObject(audits)).insert(any(), any(), any(), any(), anyLong(), any(), any());
-        assertThatThrownBy(() -> management.createDraftFromVersion(source.id(), source.lockVersion(), UUID.randomUUID().toString()))
+        assertThatThrownBy(() -> management.createDraftFromVersion(marker, source.id(), source.lockVersion(), UUID.randomUUID().toString()))
                 .isInstanceOf(org.springframework.dao.InvalidDataAccessApiUsageException.class)
                 .hasRootCauseInstanceOf(IllegalStateException.class).hasRootCauseMessage("F023 test audit failure");
         assertThat(allocated(source.definitionId())).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf.workflow_definition_version WHERE definition_id=?", Integer.class, source.definitionId())).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf_test.management_audit WHERE actor_ref=?", Integer.class, marker)).isZero();
-        assertThatThrownBy(() -> management.deleteDraft(source.id(), source.lockVersion(), UUID.randomUUID().toString()))
+        assertThatThrownBy(() -> management.deleteDraft(marker, source.id(), source.lockVersion(), UUID.randomUUID().toString()))
                 .isInstanceOf(org.springframework.dao.InvalidDataAccessApiUsageException.class)
                 .hasRootCauseInstanceOf(IllegalStateException.class).hasRootCauseMessage("F023 test audit failure");
         assertThat(definitions.findVersion(source.id())).isPresent();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf_test.management_audit WHERE actor_ref=?", Integer.class, marker)).isZero();
         reset(AopTestUtils.<ManagementAuditStore>getUltimateTargetObject(audits));
         String correlation = UUID.randomUUID().toString();
-        var result = management.deleteDraft(source.id(), source.lockVersion(), correlation);
+        var result = management.deleteDraft(marker, source.id(), source.lockVersion(), correlation);
         assertThat(result.before().id()).isEqualTo(source.id());
         var audit = jdbc.queryForMap("SELECT * FROM wf_test.management_audit WHERE correlation_id=?", correlation);
         assertThat(audit.get("entity_id")).isEqualTo(source.id());
         assertThat((String) audit.get("evidence_json")).contains("\"after\":null", "DELETE_DRAFT", "\"before\":{").doesNotContain("designer", "definitionJson");
         assertThat(definitions.findVersion(source.id())).isEmpty();
         assertThat(allocated(source.definitionId())).isEqualTo(1);
+    }
+
+    @Test void outerRollbackAfterSuccessfulSharedServiceReturnRemovesMutationAndAudit() {
+        var source = imported(1);
+        String copyCorrelation = UUID.randomUUID().toString();
+        String deleteCorrelation = UUID.randomUUID().toString();
+        new TransactionTemplate(transactions).executeWithoutResult(status -> {
+            var copy = management.createDraftFromVersion(marker, source.id(), source.lockVersion(), copyCorrelation);
+            assertThat(copy.after().version()).isEqualTo(2);
+            management.deleteDraft(marker, source.id(), source.lockVersion(), deleteCorrelation);
+            assertThat(allocated(source.definitionId())).isEqualTo(2);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf_test.management_audit WHERE actor_ref=?",
+                    Integer.class, marker)).isEqualTo(2);
+            status.setRollbackOnly();
+        });
+        // The owning transaction has completed; these observations use fresh connections/transactions.
+        assertThat(definitions.findVersion(source.id())).isPresent();
+        assertThat(allocated(source.definitionId())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf.workflow_definition_version WHERE definition_id=?",
+                Integer.class, source.definitionId())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf_test.management_audit WHERE actor_ref=?",
+                Integer.class, marker)).isZero();
+    }
+
+    @Test void joinedAuditFailureMarksOuterTransactionRollbackOnly() {
+        var source = imported(1);
+        doAnswer(call -> { call.callRealMethod(); throw new IllegalStateException("F029 joined audit failure"); })
+                .when(AopTestUtils.<ManagementAuditStore>getUltimateTargetObject(audits))
+                .insert(any(), any(), any(), any(), anyLong(), any(), any());
+        assertThatThrownBy(() -> new TransactionTemplate(transactions).executeWithoutResult(status -> {
+            assertThatThrownBy(() -> management.createDraftFromVersion(marker, source.id(), source.lockVersion(),
+                    UUID.randomUUID().toString()))
+                    .isInstanceOf(org.springframework.dao.InvalidDataAccessApiUsageException.class)
+                    .hasRootCauseMessage("F029 joined audit failure");
+            assertThat(status.isRollbackOnly()).as("The managed REQUIRED service joins the host transaction").isTrue();
+        })).isInstanceOf(UnexpectedRollbackException.class);
+        assertThat(allocated(source.definitionId())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf.workflow_definition_version WHERE definition_id=?",
+                Integer.class, source.definitionId())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf_test.management_audit WHERE actor_ref=?",
+                Integer.class, marker)).isZero();
     }
 
     /** Hold the actual family lock in the winning transaction before starting the losing command. */

@@ -47,7 +47,9 @@ import io.github.leontecristian.workflow.web.configuration.WorkflowViewerOptions
 import io.github.leontecristian.workflow.web.controller.runtime.WorkflowRuntimeCommandController;
 import io.github.leontecristian.workflow.web.controller.runtime.WorkflowRuntimeReadController;
 import io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException;
-import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationHost;
+import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationIdentity;
+import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationAuthorization;
+import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationAuditRecorder;
 import io.github.leontecristian.workflow.web.integration.instance.WorkflowViewerAccess;
 import io.github.leontecristian.workflow.web.integration.runtime.WorkflowRuntimeCommandHost;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowAuthorizedRuntimeReadService;
@@ -142,7 +144,13 @@ class WorkflowRuntimeWebUnitTest {
         @Bean WorkflowViewerOptions viewerOptions() { return new WorkflowViewerOptions("/custom", "trusted"); }
         @Bean WorkflowViewerAccess viewerAccess() { return mock(WorkflowViewerAccess.class); }
         @Bean WorkflowAdministrationOptions administrationOptions() { return new WorkflowAdministrationOptions("/custom", "trusted"); }
-        @Bean WorkflowAdministrationHost administrationHost() { return mock(WorkflowAdministrationHost.class); }
+        @Bean WorkflowAdministrationIdentity administrationIdentity() { return () -> "actor"; }
+        @Bean WorkflowAdministrationAuthorization administrationAuthorization() { return mock(WorkflowAdministrationAuthorization.class); }
+        @Bean WorkflowAdministrationAuditRecorder administrationRecorder() { return mock(WorkflowAdministrationAuditRecorder.class); }
+        @Bean java.time.Clock administrationClock() { return java.time.Clock.systemUTC(); }
+        @Bean org.springframework.transaction.PlatformTransactionManager administrationTransactions() {
+            return mock(org.springframework.transaction.PlatformTransactionManager.class);
+        }
     }
     @Configuration(proxyBeanMethods=false) static class Reads {
         @Bean @org.springframework.context.annotation.Primary
