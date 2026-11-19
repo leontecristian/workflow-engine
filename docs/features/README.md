@@ -1,5 +1,7 @@
 # Feature specifications
 
+[F032 — Host contract review](F032-host-contract-review/spec.md) is **READY revision 4 — 2026-11-19**. The approved scope covers registration for items 1–3 and shared command authorization for items 8–11, including partial hosts and separate reassignment destination validation. See the [plan](F032-host-contract-review/plan.md), [tasks](F032-host-contract-review/tasks.md) and [implementation record](F032-host-contract-review/implementation.md).
+
 [F031 — Shared runtime command coordination](F031-shared-runtime-command-coordination/spec.md) is **IMPLEMENTED revision 5 — 2026-11-19**. One request identity serves the four shared endpoint groups. Viewer checks receive the captured actor. Shared HTTP commands coordinate core execution and receipt recovery, and the sandbox renders its own conditional-write conflict. Administration audit is opt-in and runtime reads use an optional clock for cancellation availability. See the [handover](F031-shared-runtime-command-coordination/implementation.md) and [Java migration](../../workflow-web/README.md#request-identity-and-java-adapter-migration-f031).
 
 [F030 — Workflow event batch writer and event catalog](F030-workflow-event-batch-writer/spec.md) is **IMPLEMENTED revision 1 — 2026-11-19**. Hosts use `WorkflowEventBatchWriter.write` for the transactional handoff. The [core integration guide](../../workflow-core/README.md) links the 18-event catalog and documents migration. See the [handover](F030-workflow-event-batch-writer/implementation.md) for authorization and verification.
