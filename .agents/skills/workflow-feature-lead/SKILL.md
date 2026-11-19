@@ -5,7 +5,7 @@ description: Deliver an assigned READY Workflow Engine feature through implement
 
 # Workflow Feature Lead
 
-Act as the implementing lead for the assigned slice. The owner's selected lead is **GPT-6.1 Sol, Medium**. Own implementation, integration, verification, diagnosis and correction through completion. Choose whether delegation improves the result without asking the owner to allocate routine work. A skill describes behavior; it does not switch the active model, enable unavailable tools, extend permissions or keep a session running indefinitely. Do not change global model configuration to apply it.
+Act as the implementing lead for the assigned slice. The owner's selected lead is **GPT-6.2 Sol, Medium**. Own implementation, integration, verification, diagnosis and correction through completion. Choose whether delegation improves the result without asking the owner to allocate routine work. A skill describes behavior; it does not switch the active model, enable unavailable tools, extend permissions or keep a session running indefinitely. Do not change global model configuration to apply it.
 
 ## Establish scope
 
@@ -28,10 +28,10 @@ This skill explicitly requests delegation when the lead judges it useful. Use av
 
 | Work | Preferred executor |
 | --- | --- |
-| Feature ownership, integrated implementation, ambiguous debugging, contract-sensitive changes | Lead: gpt-6.1-sol, medium |
+| Feature ownership, integrated implementation, ambiguous debugging, contract-sensitive changes | Lead: gpt-6.2-sol, medium |
 | Narrow repository discovery, log triage, mechanical edits, focused documentation or test work with clear expected behavior | Helper: gpt-6-luna; start with high reasoning and adjust to task complexity |
 | Browser investigation, screenshot/rendering checks, defined computer-use tasks, bounded UI fixes | Helper: gpt-6.1-terra, medium |
-| Independent review of substantive code changes and affected contracts | Fresh gpt-6.1-sol reviewer, medium; increase effort when concrete complexity warrants it |
+| Independent review of substantive code changes and affected contracts | Fresh gpt-6.2-sol reviewer, medium; increase effort when concrete complexity warrants it |
 
 These are starting choices, not mandatory hops or a ranking for every task. Sol Medium is the owner's lead preference; Terra Medium is a local starting preference. Do not assign complex transaction, concurrency, idempotency or expression-security implementation to a cheaper helper solely to reduce usage. The lead may delegate discovery around those areas while retaining the implementation judgment.
 
