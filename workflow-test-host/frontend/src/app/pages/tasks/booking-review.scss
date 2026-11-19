@@ -1,0 +1,11 @@
+@use '@angular/material' as mat;
+
+.decision-actions { justify-content: flex-end; }
+
+.reject-action {
+  @include mat.button-overrides((
+    outlined-outline-color: var(--mat-sys-error),
+    outlined-label-text-color: var(--mat-sys-error),
+    outlined-state-layer-color: var(--mat-sys-error),
+  ));
+}

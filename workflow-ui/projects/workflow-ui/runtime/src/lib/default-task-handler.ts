@@ -3,6 +3,7 @@ import { Component, Input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import type { WorkflowEditableTaskContract, WorkflowTaskHandlerInputs, WorkflowTaskRejection } from './task-handler';
@@ -12,7 +13,7 @@ import { TaskAnswer, TaskFormDraft, type TaskFieldView } from './task-form-draft
 @Component({
   selector: 'workflow-default-task-handler',
   standalone: true,
-  imports: [NgTemplateOutlet, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+  imports: [NgTemplateOutlet, FormsModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatSelectModule],
   templateUrl: './default-task-handler.html',
   styleUrl: './default-task-handler.scss',
 })
@@ -27,6 +28,7 @@ export class DefaultTaskHandlerComponent implements WorkflowTaskHandlerInputs {
     this.draft = form ? new TaskFormDraft(form) : null;
     this.showResult = this.resultMode === 'REQUIRED';
     this.comment = '';
+    this.rejectedWithoutComment = false;
     this.rejection = undefined;
     this.refreshView();
   }
@@ -40,6 +42,8 @@ export class DefaultTaskHandlerComponent implements WorkflowTaskHandlerInputs {
   activeView: TaskFieldView | null = null;
   showResult = false;
   comment = '';
+  private rejectedWithoutComment = false;
+  readonly commentErrorMatcher = { isErrorState: () => this.missingRejectComment };
   submitting = false;
   private rejection?: WorkflowTaskRejection;
   private visiblePaths = new Set<string>();
@@ -47,6 +51,15 @@ export class DefaultTaskHandlerComponent implements WorkflowTaskHandlerInputs {
   get resultMode() { return this.contract?.resultContract?.mode ?? 'FORBIDDEN'; }
   get disabled(): boolean { return !this.editable || this.submitting; }
   get resultUnavailable(): boolean { return this.resultMode !== 'FORBIDDEN' && !this.draft; }
+  get missingRejectComment(): boolean {
+    return this.rejectedWithoutComment && isBlankComment(this.comment);
+  }
+  get decisionOutcomes() {
+    const outcomes = this.contract.outcomes;
+    const [first, second] = outcomes;
+    return outcomes.length === 2 && first.key === 'APPROVE' && second.key === 'REJECT'
+      ? [second, first] : outcomes;
+  }
   get commentRequired(): string {
     return this.contract.outcomes.filter(outcome => outcome.requiresComment).map(outcome => outcome.label).join(', ');
   }
@@ -110,15 +123,26 @@ export class DefaultTaskHandlerComponent implements WorkflowTaskHandlerInputs {
     return fields.filter(error => !this.visiblePaths.has(error.path)).map(error => error.message);
   }
 
-  canSubmit(outcome: { key?: string; requiresComment: boolean }): boolean {
+  canAttempt(outcome: { key?: string; requiresComment: boolean }): boolean {
     return !this.disabled && !!outcome.key && !this.resultUnavailable
-      && (!outcome.requiresComment || !isBlankComment(this.comment))
-      && (!this.showResult || this.activeView?.valid === true);
+      && (!this.showResult || this.activeView?.valid === true)
+      && (outcome.key === 'REJECT' || !outcome.requiresComment || !isBlankComment(this.comment));
   }
 
-  async submit(outcomeKey: string): Promise<void> {
+  canSubmit(outcome: { key?: string; requiresComment: boolean }): boolean {
+    return this.canAttempt(outcome) && (!outcome.requiresComment || !isBlankComment(this.comment));
+  }
+
+  async submit(outcomeKey: string, commentField?: HTMLTextAreaElement): Promise<void> {
     const outcome = this.contract.outcomes.find(candidate => candidate.key === outcomeKey);
-    if (!outcome || !this.canSubmit(outcome)) return;
+    if (!outcome) return;
+    if (!this.canSubmit(outcome)) {
+      if (this.canAttempt(outcome)) {
+        this.rejectedWithoutComment = true;
+        commentField?.focus();
+      }
+      return;
+    }
     const resultJson = this.showResult ? this.draft?.result(this.activeView ?? undefined) : undefined;
     if (this.showResult && resultJson === undefined) return;
     const contract = this.contract;

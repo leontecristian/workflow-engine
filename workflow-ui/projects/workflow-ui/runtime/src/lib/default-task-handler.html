@@ -19,14 +19,25 @@
   }
   <mat-form-field appearance="outline" subscriptSizing="dynamic">
     <mat-label>Comment</mat-label>
-    <textarea matInput [(ngModel)]="comment" maxlength="2000" rows="3" [disabled]="disabled"></textarea>
+    <textarea #commentField matInput [(ngModel)]="comment" [errorStateMatcher]="commentErrorMatcher"
+              maxlength="2000" rows="3" [disabled]="disabled"></textarea>
+    @if (missingRejectComment) { <mat-error>Add a comment to reject</mat-error> }
     @if (commentRequired; as outcomes) { <mat-hint>Required for {{outcomes}}.</mat-hint> }
   </mat-form-field>
-  <div class="actions">
-    @for (outcome of contract.outcomes; track outcome.key) {
-      <button type="button" mat-flat-button (click)="submit(outcome.key)" [disabled]="!canSubmit(outcome)">
-        {{outcome.label}}
-      </button>
+  <div class="actions decision-actions">
+    @for (outcome of decisionOutcomes; track outcome.key) {
+      @if (outcome.key === 'REJECT') {
+        <button type="button" mat-stroked-button class="reject-action"
+                (click)="submit(outcome.key, commentField)" [disabled]="!canAttempt(outcome)">
+          <mat-icon aria-hidden="true">close</mat-icon>
+          {{outcome.label}}
+        </button>
+      } @else {
+        <button type="button" mat-flat-button (click)="submit(outcome.key)" [disabled]="!canAttempt(outcome)">
+          @if (outcome.key === 'APPROVE') { <mat-icon aria-hidden="true">check</mat-icon> }
+          {{outcome.label}}
+        </button>
+      }
     }
   </div>
 }

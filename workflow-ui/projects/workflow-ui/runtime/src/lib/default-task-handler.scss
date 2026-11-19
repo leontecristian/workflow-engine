@@ -1,3 +1,5 @@
+@use '@angular/material' as mat;
+
 :host, .fields, .list, .field {
   display: grid;
   gap: .75rem;
@@ -12,6 +14,16 @@ mat-form-field { width: 100%; }
   align-items: center;
   gap: .5rem;
   flex-wrap: wrap;
+}
+
+.decision-actions { justify-content: flex-end; }
+
+.reject-action {
+  @include mat.button-overrides((
+    outlined-outline-color: var(--mat-sys-error),
+    outlined-label-text-color: var(--mat-sys-error),
+    outlined-state-layer-color: var(--mat-sys-error),
+  ));
 }
 
 .list { justify-items: start; }

@@ -21,6 +21,30 @@ const form = (mode, descriptor, rejection) => {
 const child = (view, key) => view.children.find(field => field.field.key === key);
 const canComplete = editor => editor.canSubmit(editor.contract.outcomes[0]);
 
+test('Reject focuses Comment and blocks a whitespace-only submission', async () => {
+  const { editor, decisions } = form('FORBIDDEN');
+  const reject = { key: 'REJECT', label: 'Reject', requiresComment: true };
+  editor.contract = { ...editor.contract, outcomes: [reject] };
+  editor.comment = ' \t\n';
+  let focuses = 0;
+  const commentField = { focus() { focuses++; } };
+
+  assert.equal(editor.canAttempt(reject), true);
+  assert.equal(editor.canSubmit(reject), false);
+  await editor.submit('REJECT', commentField);
+  assert.equal(focuses, 1);
+  assert.equal(editor.missingRejectComment, true);
+  assert.deepEqual(decisions, []);
+
+  editor.comment = '  Missing approval evidence.\n';
+  assert.equal(editor.missingRejectComment, false);
+  assert.equal(editor.canSubmit(reject), true);
+  await editor.submit('REJECT', commentField);
+  assert.equal(decisions.length, 1);
+  assert.equal(decisions[0].outcomeKey, 'REJECT');
+  assert.equal(decisions[0].comment, editor.comment);
+});
+
 test('amount review sends zero and an empty Note, preserves exact numbers and validates at the corresponding control', async () => {
   const { editor, decisions } = form('REQUIRED', object([
     field('approvedAmount', 'number', { required: true, limits: { minimum: '0' } }),
