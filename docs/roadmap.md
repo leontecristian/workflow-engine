@@ -124,6 +124,7 @@ At the selected integration/release milestone, reuse applicable evidence and che
 | Business decision engine, decision tables and FIRST/UNIQUE policies | Optional later work requiring a selected need; not a dependency of workflow routing, first integration or the designer. |
 | General delegation, timers/expiration, ANY/QUORUM, inclusive/parallel gateways, subprocesses and active-instance migration | Deferred. ALL is already delivered by F021 and is not part of this deferred scope. |
 | APOLO approval branches and recovery | APOLO selects approver sources, material-change policy and recovery paths. Same-instance resubmission remains provisional. |
+| Durable administration audit recording in `workflow-web` | Deferred. Consider a shared implementation for hosts that need a durable record of definition and task-type changes. [F031](features/F031-shared-runtime-command-coordination/spec.md) proposes an optional host recorder. The storage mechanism and opt-in contract for a shared recorder remain open. |
 | Source move and release ownership | Timing, coordinates, test-host placement and release responsibilities remain open; section 4 records the agreed boundary. |
 | Future feature IDs, dates and owners | Unassigned until the corresponding specification and scheduling decisions. |
 
