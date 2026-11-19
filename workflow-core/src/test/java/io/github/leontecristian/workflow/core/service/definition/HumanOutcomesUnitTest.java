@@ -3,7 +3,20 @@ package io.github.leontecristian.workflow.core.service.definition;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.github.leontecristian.workflow.core.dto.definition.DefinitionStatus;
+import io.github.leontecristian.workflow.core.dto.definition.TaskTypeCapability;
+import io.github.leontecristian.workflow.core.dto.definition.document.ExecutableDefinition;
+import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
+import io.github.leontecristian.workflow.core.dto.runtime.CompletionPolicy;
+import io.github.leontecristian.workflow.core.dto.tasktype.TaskTypeView;
+import io.github.leontecristian.workflow.core.exception.definition.WorkflowDefinitionException;
+import io.github.leontecristian.workflow.core.service.runtime.RuntimeHostSupport;
+import io.github.leontecristian.workflow.core.service.runtime.ServiceActionRegistry;
+import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -77,33 +90,45 @@ class HumanOutcomesUnitTest {
     }
 
     @Test void capabilitiesMustSupportEveryPinnedOutcomeAndContextTracksTheDeployedContract() throws Exception {
-        var catalog = mock(io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService.class);
-        when(catalog.findByCode("REVIEW")).thenReturn(java.util.Optional.of(
-                new io.github.leontecristian.workflow.core.dto.tasktype.TaskTypeView(1, "REVIEW", "Review", null, true, 0)));
-        var supported = new java.util.concurrent.atomic.AtomicReference<>(java.util.Set.of("O0"));
-        DefinitionCapabilityProvider provider = () -> new io.github.leontecristian.workflow.core.dto.definition.DefinitionCapabilities(
-                java.util.Set.of(new io.github.leontecristian.workflow.core.dto.definition.SingleAssignmentCapability("reviewer", java.util.Set.of(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER))),
-                java.util.Set.of(new io.github.leontecristian.workflow.core.dto.definition.TaskTypeCapability("REVIEW", supported.get())));
-        org.springframework.beans.factory.ObjectProvider<DefinitionCapabilityProvider> providers = mock(org.springframework.beans.factory.ObjectProvider.class);
-        when(providers.stream()).thenAnswer(call -> java.util.stream.Stream.of(provider));
-        var actions = mock(io.github.leontecristian.workflow.core.service.runtime.ServiceActionRegistry.class);
-        var validation = new DefinitionValidationService(catalog, providers, loader, actions, mock(io.github.leontecristian.workflow.core.service.runtime.RuntimeHostSupport.class));
+        var catalog = mock(TaskTypeCatalogService.class);
+        when(catalog.findByCode("REVIEW")).thenReturn(Optional.of(
+                new TaskTypeView(1, "REVIEW", "Review", null, true, 0)));
         var document = codec.ingest(fixture(2, "plain").toString());
-        var unavailable = validation.check(document, false);
+        var actions = mock(ServiceActionRegistry.class);
+        var host = mock(RuntimeHostSupport.class);
+        when(host.assignmentKinds("reviewer", CompletionPolicy.SINGLE)).thenReturn(Set.of(AssignmentTargetKind.USER));
+        var reduced = validation(catalog, actions, host, Set.of("O0"));
+        var unavailable = reduced.check(document, false);
         assertThat(unavailable.report().diagnostics()).anyMatch(d -> d.code().equals("WF_DEF_HOST_CAPABILITY_UNAVAILABLE"));
-        supported.set(java.util.Set.of("O0", "O1"));
-        var ready = validation.check(document, false);
+        var full = validation(catalog, actions, host, Set.of("O0", "O1"));
+        var ready = full.check(document, false);
         assertThat(ready.report().diagnostics()).isEmpty();
         assertThat(ready.contextHash()).isNotEqualTo(unavailable.contextHash());
-        assertThat(json.readTree(ready.detailsJson()).path("provenance").path("validator").asText()).isEqualTo("wf-previous-decisions-validator-v1");
-        assertThat(json.readTree(ready.detailsJson()).path("provenance").path("structuralSchemaHash").asText()).isEqualTo(loader.schemaDigest(document.tree()));
+        assertThat(ready.contextHash()).isEqualTo(validation(catalog, actions, host, Set.of("O1", "O0"))
+                .check(document, false).contextHash());
+        var provenance = json.readTree(ready.detailsJson()).path("provenance");
+        assertThat(provenance.path("validator").asText()).isEqualTo("wf-previous-decisions-validator-v1");
+        assertThat(provenance.path("structuralSchemaHash").asText()).isEqualTo(loader.schemaDigest(document.tree()));
+        assertThat(provenance.path("humans").get(0)).isEqualTo(json.readTree("""
+                {"nodeKey":"REVIEW","task":{"code":"REVIEW","selectable":true,"lockVersion":0},
+                 "assignmentCapability":{"resolver":"reviewer","policy":"SINGLE","targetKinds":["USER"]},
+                 "taskCapability":{"taskType":"REVIEW","supportedOutcomes":["O0","O1"]}}
+                """));
         var model = loader.model(document, new DefinitionDiagnostics());
-        var definition = new io.github.leontecristian.workflow.core.dto.definition.document.ExecutableDefinition(1, 1, "review", 1, "hash",
-                io.github.leontecristian.workflow.core.dto.definition.DefinitionStatus.PUBLISHED, model);
-        var reader = new WorkflowDefinitionRuntimeReader(null, null, null, codec, loader, validation, actions);
-        reader.requireCapabilities(definition, true);
-        supported.set(java.util.Set.of("O0"));
-        assertThatThrownBy(() -> reader.requireCapabilities(definition, false)).isInstanceOf(io.github.leontecristian.workflow.core.exception.definition.WorkflowDefinitionException.class);
+        var definition = new ExecutableDefinition(1, 1, "review", 1, "hash", DefinitionStatus.PUBLISHED, model);
+        var oldDeployment = new WorkflowDefinitionRuntimeReader(null, null, null, codec, loader, full, actions);
+        oldDeployment.requireCapabilities(definition, true);
+        var newDeployment = new WorkflowDefinitionRuntimeReader(null, null, null, codec, loader, reduced, actions);
+        assertThatThrownBy(() -> newDeployment.requireCapabilities(definition, false))
+                .isInstanceOfSatisfying(WorkflowDefinitionException.class,
+                        failure -> assertThat(failure.category()).isEqualTo(WorkflowDefinitionException.Category.HOST_CONFIGURATION));
+    }
+
+    private DefinitionValidationService validation(TaskTypeCatalogService catalog, ServiceActionRegistry actions,
+            RuntimeHostSupport host, Set<String> outcomes) {
+        var beans = new DefaultListableBeanFactory();
+        beans.registerSingleton("reviewCapability", new TaskTypeCapability("REVIEW", outcomes));
+        return new DefinitionValidationService(catalog, beans.getBeanProvider(TaskTypeCapability.class), loader, actions, host);
     }
 
     @ParameterizedTest @ValueSource(strings = {"missing", "duplicateRoute", "unknown", "absent", "condition", "default", "nonhuman", "duplicateKey", "bypass", "cycle", "extraHuman", "deadEnd", "unreachable", "badLabel", "badKey", "commentType", "guard", "policy", "result"})

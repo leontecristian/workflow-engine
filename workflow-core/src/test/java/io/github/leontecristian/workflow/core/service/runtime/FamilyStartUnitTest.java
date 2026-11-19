@@ -7,10 +7,13 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.github.leontecristian.workflow.core.dto.definition.document.ExecutableDefinition;
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
 import io.github.leontecristian.workflow.core.dto.runtime.HostStartIntent;
 import io.github.leontecristian.workflow.core.dto.runtime.StartInputs;
@@ -155,13 +158,40 @@ class FamilyStartUnitTest {
         }
     }
 
+    @Test
+    void freshStartChecksPinnedCapabilitiesBeforeLinkingOrEnteringAnyStage() {
+        var receipts = mock(WorkflowCommandReceiptRepository.class);
+        var definitions = mock(WorkflowDefinitionRuntimeReader.class);
+        var host = mock(RuntimeHostSupport.class);
+        var em = mock(EntityManager.class);
+        var link = mock(StartLinkAction.class);
+        var service = service(receipts, definitions, host, em);
+        var start = new StartWorkflow(ID, null, null, 42L, null, null,
+                new HostStartIntent("host-v1", "ab".repeat(32)));
+        var definition = mock(ExecutableDefinition.class);
+        when(definitions.loadForStart(start)).thenReturn(definition);
+        when(host.eventBatchWriter()).thenReturn(mock(WorkflowEventBatchWriter.class));
+        doThrow(new WorkflowExecutionException(Category.HOST_CONFIGURATION))
+                .when(definitions).requireCapabilities(definition, true);
+
+        assertEquals(Category.HOST_CONFIGURATION, assertThrows(WorkflowExecutionException.class,
+                () -> service.start(start, new StartInputs(Map.of()), context, link)).category());
+        var order = inOrder(receipts, definitions);
+        order.verify(receipts).findById(ID);
+        order.verify(definitions).loadForStart(start);
+        order.verify(definitions).requireCapabilities(definition, true);
+        verifyNoInteractions(link, em);
+    }
+
     private WorkflowExecutionService service(WorkflowCommandReceiptRepository receipts,
             WorkflowDefinitionRuntimeReader definitions, RuntimeHostSupport host, EntityManager em) {
+        var beans = new StaticListableBeanFactory();
         return new WorkflowExecutionService(mock(WorkflowInstanceRepository.class), mock(WorkflowActivityRepository.class),
                 mock(WorkflowTaskRepository.class), mock(WorkflowHistoryRepository.class), receipts, em, definitions,
                 mock(TaskTypeCatalogService.class), json, host, mock(RuntimeDefinitionPins.class),
                 mock(RuntimeVariables.class), mock(RuntimeServiceProgression.class), mock(WorkflowTaskEligibilityService.class),
-                new StaticListableBeanFactory().getBeanProvider(WorkflowTaskSubmissionValidator.class));
+                beans.getBeanProvider(WorkflowTaskSubmissionValidator.class),
+                new WorkflowAuthorizationSupport(beans.getBeanProvider(WorkflowAuthorization.class)));
     }
 
     private StartWorkflow command(String key, Long family, Long version) {

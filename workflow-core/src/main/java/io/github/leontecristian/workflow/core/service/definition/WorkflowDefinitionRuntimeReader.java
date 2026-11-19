@@ -106,15 +106,7 @@ public class WorkflowDefinitionRuntimeReader {
         var diagnostics=new DefinitionDiagnostics();
         ServiceBindingValidation.check(definition.model(),actions,diagnostics);
         if (diagnostics.failed()) throw corrupt();
-        var snapshot = capabilities.snapshot();
-        for (var human : definition.model().humans().values()) {
-            if (snapshot == null || snapshot.taskTypes().stream().noneMatch(c -> c.taskType().equals(human.taskType())
-                    && human.outcomes().stream().allMatch(outcome -> c.supportedOutcomes().contains(outcome.key())))
-                    || (starting && (human.completionPolicy() == io.github.leontecristian.workflow.core.dto.runtime.CompletionPolicy.ALL
-                            ? snapshot.allAssignments().stream().noneMatch(c -> c.resolver().equals(human.assignment().resolver()))
-                            : snapshot.assignments().stream().noneMatch(c -> c.resolver().equals(human.assignment().resolver())))))
-                throw corrupt();
-        }
+        capabilities.requireHumanCapabilities(definition.model(), starting);
     }
 
     private ExecutableDefinition inspect(WorkflowDefinitionVersionEntity version) {

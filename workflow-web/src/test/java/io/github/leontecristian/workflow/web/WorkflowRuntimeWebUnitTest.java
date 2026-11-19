@@ -52,6 +52,8 @@ import io.github.leontecristian.workflow.web.integration.administration.Workflow
 import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationAuditRecorder;
 import io.github.leontecristian.workflow.web.integration.instance.WorkflowViewerAccess;
 import io.github.leontecristian.workflow.web.service.runtime.WorkflowRuntimeCommandCoordinator;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowAuthorization;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowAuthorizationSupport;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowAuthorizedRuntimeReadService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeReadAuthorization;
@@ -119,6 +121,9 @@ class WorkflowRuntimeWebUnitTest {
     static class BootHost extends HostBeans {}
     static class HostBeans {
         @Bean WorkflowRuntimeOptions runtimeOptions() { return new WorkflowRuntimeOptions("/custom", "trusted"); }
+        @Bean WorkflowAuthorizationSupport authorizationSupport(org.springframework.beans.factory.ObjectProvider<WorkflowAuthorization> policy) {
+            return new WorkflowAuthorizationSupport(policy);
+        }
         @Bean WorkflowTaskEligibilityService eligibility() { return mock(WorkflowTaskEligibilityService.class); }
         @Bean WorkflowRuntimeQueryService reads() { return mock(WorkflowRuntimeQueryService.class); }
         @Bean WorkflowDefinitionService definitions() { return mock(WorkflowDefinitionService.class); }

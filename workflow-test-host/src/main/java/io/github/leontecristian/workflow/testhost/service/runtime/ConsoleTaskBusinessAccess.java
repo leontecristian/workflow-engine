@@ -5,7 +5,7 @@ import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequ
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
 import org.springframework.stereotype.Component;
 
-/** Host-private shared business association check; operation grants remain in their adapters. */
+/** Host-private shared business association check; operation grants remain in the sandbox authorization policy. */
 @Component
 public class ConsoleTaskBusinessAccess {
     private final ConsoleContext context;
@@ -17,7 +17,9 @@ public class ConsoleTaskBusinessAccess {
     }
 
     public boolean canAccess(TaskEligibilityContext taskContext) {
-        return context.isConsoleActor(taskContext.actorRef())
-                && requests.linkedToInstance(taskContext.task().instanceId());
+        return canAccess(taskContext.actorRef(), taskContext.task().instanceId());
+    }
+    boolean canAccess(String actorRef, long instanceId) {
+        return context.isConsoleActor(actorRef) && requests.linkedToInstance(instanceId);
     }
 }

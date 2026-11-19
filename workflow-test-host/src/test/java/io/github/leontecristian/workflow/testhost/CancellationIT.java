@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -38,22 +38,19 @@ import io.github.leontecristian.workflow.core.dto.tasktype.CreateTaskType;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category;
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
-import io.github.leontecristian.workflow.core.service.definition.DefinitionCapabilityProvider;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowScope;
+import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionRuntimeReader;
 import io.github.leontecristian.workflow.core.service.runtime.AllTaskAssignmentResolver;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowEventBatchWriter;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
 import io.github.leontecristian.workflow.testhost.configuration.integration.CompletionAdapterIntegrationTest;
-import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleAdapters;
-import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
 import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxServiceEffectStore;
 import io.github.leontecristian.workflow.testhost.configuration.integration.RuntimeCommandFixture;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeTransaction;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskOwnershipAuthorization;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleWorkflowCancellationAuthorization;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -75,7 +72,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.util.AopTestUtils;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -98,11 +94,8 @@ class CancellationIT extends CompletionAdapterIntegrationTest {
     @Autowired SandboxServiceEffectStore effects;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactions;
-    @MockitoBean ConsoleWorkflowCancellationAuthorization cancellation;
-    @MockitoSpyBean ConsoleTaskOwnershipAuthorization ownership;
     @MockitoSpyBean WorkflowEventBatchWriter recorder;
-    @MockitoBean(name = "consoleCapabilities") DefinitionCapabilityProvider capabilities;
-    @Autowired ConsoleSettings settings;
+    @MockitoSpyBean WorkflowDefinitionRuntimeReader definitionReader;
     @MockitoSpyBean(name = "sandboxAllResolver") AllTaskAssignmentResolver resolver;
     private final String marker = "cancel.it." + UUID.randomUUID();
     private final ObjectMapper json = new ObjectMapper();
@@ -137,11 +130,9 @@ class CancellationIT extends CompletionAdapterIntegrationTest {
     private static <T> T target(T bean) { return AopTestUtils.getUltimateTargetObject(bean); }
 
     @BeforeEach void authorizeDirectCoreCalls() {
-        DefinitionCapabilityProvider delegate = ReflectionTestUtils.invokeMethod(new ConsoleAdapters(), "consoleCapabilities", settings);
-        when(capabilities.snapshot()).thenAnswer(invocation -> java.util.Objects.requireNonNull(delegate).snapshot());
-        when(cancellation.canAccess(any())).thenReturn(true);
-        when(cancellation.canCancel(any())).thenReturn(true);
-        doReturn(true).when(target(ownership)).canAccess(any());
+        doReturn(true).when(authorization).isAllowed(forScope(WorkflowScope.ACCESS_CANCELLATION));
+        doReturn(true).when(authorization).isAllowed(forScope(WorkflowScope.CANCEL));
+        doReturn(true).when(authorization).isAllowed(forScope(WorkflowScope.ACCESS_OWNERSHIP));
     }
     private void publish(boolean all) throws Exception { publish(all, false); }
     private void publish(boolean all, boolean sequential) throws Exception {
@@ -192,7 +183,8 @@ class CancellationIT extends CompletionAdapterIntegrationTest {
         var claimed = reads.findTask(start.task().id()).orElseThrow();
         assertThat(claimed.assigneeRef()).isEqualTo("cancel.reviewer");
         var command = command(instance);
-        doAnswer(invocation -> { throw new IllegalStateException("capabilities temporarily unavailable"); }).when(capabilities).snapshot();
+        doAnswer(invocation -> { throw new IllegalStateException("capabilities temporarily unavailable"); })
+                .when(target(definitionReader)).requireCapabilities(any(), org.mockito.ArgumentMatchers.anyBoolean());
         var accepted = cancel(command);
         assertThat(accepted.replayed()).isFalse();
         var result = accepted.execution();
@@ -262,22 +254,22 @@ class CancellationIT extends CompletionAdapterIntegrationTest {
 
     @Test void lookupAndMutationRequireCurrentAccessButReplayDoesNotRequireFreshPrivilege() throws Exception {
         publish(false); var start = start(); long instance = start.instance().id(); var command = command(instance);
-        when(cancellation.canCancel(any())).thenReturn(false);
+        doReturn(false).when(authorization).isAllowed(forScope(WorkflowScope.CANCEL));
         failure(() -> cancel(command), Category.CANCELLATION_FORBIDDEN);
         assertThat(tx(() -> execution.findCancellationReplay(command, admin()))).isEmpty();
         assertThat(version(instance)).isEqualTo(command.expectedLockVersion());
-        when(cancellation.canAccess(any())).thenReturn(false);
+        doReturn(false).when(authorization).isAllowed(forScope(WorkflowScope.ACCESS_CANCELLATION));
         failure(() -> cancel(command), Category.NOT_FOUND);
         failure(() -> tx(() -> execution.findCancellationReplay(command, admin())), Category.NOT_FOUND);
-        when(cancellation.canAccess(any())).thenReturn(true);
-        when(cancellation.canCancel(any())).thenReturn(true);
+        doReturn(true).when(authorization).isAllowed(forScope(WorkflowScope.ACCESS_CANCELLATION));
+        doReturn(true).when(authorization).isAllowed(forScope(WorkflowScope.CANCEL));
         var result = cancel(command).execution();
-        when(cancellation.canCancel(any())).thenThrow(new IllegalStateException("must not consult privilege during replay"));
+        doThrow(new IllegalStateException("must not consult privilege during replay")).when(authorization).isAllowed(forScope(WorkflowScope.CANCEL));
         assertThat(tx(() -> execution.findCancellationReplay(command, admin())).orElseThrow()).isEqualTo(result);
         assertThat(cancel(command).execution()).isEqualTo(result);
         failure(() -> tx(() -> execution.findCancellationReplay(command, reviewer())), Category.COMMAND_ID_CONFLICT);
         failure(() -> cancel(new CancelWorkflow(command.commandId(), instance, command.expectedLockVersion(), "different")), Category.COMMAND_ID_CONFLICT);
-        when(cancellation.canAccess(any())).thenThrow(new IllegalStateException("private backend failure"));
+        doThrow(new IllegalStateException("private backend failure")).when(authorization).isAllowed(forScope(WorkflowScope.ACCESS_CANCELLATION));
         failure(() -> cancel(command), Category.AUTHORIZATION_LOOKUP_FAILED);
     }
 
@@ -392,7 +384,7 @@ class CancellationIT extends CompletionAdapterIntegrationTest {
     }
 
     @AfterEach void cleanupOwnedFixtures() {
-        reset(target(recorder), target(resolver), target(ownership));
+        reset(target(recorder), target(resolver), target(definitionReader));
         tx(() -> {
 
             for (long instance : instances) {

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -18,13 +19,19 @@ import io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskEligibilityContext;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmission;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowAuthorizationRequest;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationAuthorizationContext;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowOperation;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowPermission;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowResource;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowScope;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowVariablePage;
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
-import io.github.leontecristian.workflow.core.service.runtime.WorkflowCancellationAuthorization;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowAuthorization;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowAuthorizationSupport;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeReadAuthorization;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService;
@@ -39,10 +46,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockServletContext;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.MockMvc;
@@ -112,7 +121,7 @@ class WorkflowRuntimeReadBoundaryUnitTest {
             assertThat(context.getBeansOfType(WorkflowRuntimeCommandController.class)).isEmpty();
             readableInstance(context);
             mvc(context).perform(get(HINT)).andExpect(status().isOk()).andExpect(content().json(FALSE_HINT));
-            verifyNoInteractions(context.getBean(WorkflowCancellationAuthorization.class));
+            verify(context.getBean(WorkflowAuthorization.class), never()).isAllowed(any());
         }
     }
 
@@ -130,7 +139,7 @@ class WorkflowRuntimeReadBoundaryUnitTest {
             var reads = context.getBean(WorkflowRuntimeQueryService.class);
             var readPolicy = context.getBean(WorkflowRuntimeReadAuthorization.class);
             var clock = context.getBean(Clock.class);
-            var cancellation = context.getBean(WorkflowCancellationAuthorization.class);
+            var cancellation = context.getBean(WorkflowAuthorization.class);
             var mvc = mvc(context);
 
             when(reads.listVariables(1, null, 50, null))
@@ -141,29 +150,46 @@ class WorkflowRuntimeReadBoundaryUnitTest {
             when(instance.status()).thenReturn(InstanceStatus.ACTIVE);
             when(readPolicy.canReadInstance("actor", instance)).thenReturn(false);
             mvc.perform(get(HINT)).andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("NOT_FOUND"));
-            verifyNoInteractions(clock, cancellation);
+            verifyNoInteractions(clock);
+            verify(cancellation, never()).isAllowed(any());
 
             when(readPolicy.canReadInstance("actor", instance)).thenReturn(true);
-            when(cancellation.canAccess(any())).thenReturn(true);
-            when(cancellation.canCancel(any())).thenReturn(true, false)
-                    .thenThrow(new IllegalStateException("private cancellation policy detail"));
             var expected = new WorkflowCancellationAuthorizationContext(1, 2, "request", "7",
                     new WorkflowCommandContext(ActorKind.USER, "actor",
                             Instant.parse("2026-11-19T08:00:00.123456700Z"), null));
+            var access = cancellationRequest(WorkflowScope.ACCESS_CANCELLATION, expected);
+            var cancel = cancellationRequest(WorkflowScope.CANCEL, expected);
+            when(cancellation.isAllowed(access)).thenReturn(true);
+            when(cancellation.isAllowed(cancel)).thenReturn(true, false)
+                    .thenThrow(new IllegalStateException("private cancellation policy detail"));
             var hintRequest = get(HINT).requestAttr("trusted", "request-correlation");
             mvc.perform(hintRequest).andExpect(status().isOk())
                     .andExpect(content().json("{\"allowed\":true,\"lockVersion\":\"9007199254740994\"}"));
             var order = inOrder(readPolicy, clock, cancellation);
             order.verify(readPolicy, times(4)).canReadInstance("actor", instance);
             order.verify(clock).instant();
-            order.verify(cancellation).canAccess(expected);
-            order.verify(cancellation).canCancel(expected);
+            order.verify(cancellation).isAllowed(access);
+            order.verify(cancellation).isAllowed(cancel);
             mvc.perform(hintRequest).andExpect(status().isOk()).andExpect(content().json(FALSE_HINT));
             expectFailure(mvc, hintRequest, 503, "AUTHORIZATION_LOOKUP_FAILED");
             verify(clock, times(3)).instant();
-            verify(cancellation, times(3)).canAccess(expected);
-            verify(cancellation, times(3)).canCancel(expected);
+            verify(cancellation, times(3)).isAllowed(access);
+            verify(cancellation, times(3)).isAllowed(cancel);
         }
+    }
+
+    @Test void completionOnlyPolicySkipsCancellationAndClock() throws Exception {
+        try (var context = readContext(ClockHost.class, CompletionOnlyHost.class)) {
+            readableInstance(context);
+            mvc(context).perform(get(HINT)).andExpect(status().isOk()).andExpect(content().json(FALSE_HINT));
+            verifyNoInteractions(context.getBean(Clock.class));
+            verify(context.getBean(WorkflowAuthorization.class), never()).isAllowed(any());
+        }
+    }
+
+    private static WorkflowAuthorizationRequest cancellationRequest(WorkflowScope scope,
+            WorkflowCancellationAuthorizationContext context) {
+        return new WorkflowAuthorizationRequest.Cancellation(new WorkflowPermission(WorkflowResource.INSTANCE, scope), context);
     }
 
     private static void expectFailure(MockMvc mvc, RequestBuilder request,
@@ -203,6 +229,7 @@ class WorkflowRuntimeReadBoundaryUnitTest {
 
     @Configuration(proxyBeanMethods = false)
     @EnableWebMvc
+    @Import(WorkflowAuthorizationSupport.class)
     static class ReadHost {
         @Bean WorkflowRuntimeOptions runtimeOptions() { return new WorkflowRuntimeOptions("/custom", "trusted"); }
         @Bean WorkflowRequestIdentity identity() { return mock(WorkflowRequestIdentity.class); }
@@ -224,6 +251,17 @@ class WorkflowRuntimeReadBoundaryUnitTest {
 
     @Configuration(proxyBeanMethods = false)
     static class CancellationHost {
-        @Bean WorkflowCancellationAuthorization cancellation() { return mock(WorkflowCancellationAuthorization.class); }
+        @Bean WorkflowAuthorization cancellation() { return policyFor(WorkflowOperation.CANCEL_WORKFLOW); }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class CompletionOnlyHost {
+        @Bean WorkflowAuthorization completion() { return policyFor(WorkflowOperation.COMPLETE_TASK); }
+    }
+
+    private static WorkflowAuthorization policyFor(WorkflowOperation operation) {
+        var policy = mock(WorkflowAuthorization.class);
+        when(policy.supportedOperations()).thenReturn(Set.of(operation));
+        return policy;
     }
 }

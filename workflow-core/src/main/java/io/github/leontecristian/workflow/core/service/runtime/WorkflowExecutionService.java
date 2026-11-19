@@ -13,6 +13,7 @@ import io.github.leontecristian.workflow.core.dto.runtime.AdministrativelyReleas
 import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
 import io.github.leontecristian.workflow.core.dto.runtime.ClaimWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskEligibilityContext;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskCompletionContext;
@@ -24,6 +25,7 @@ import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowExecutionResult;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowOperation;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowScope;
 import io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.AllocatedWorkflowInstance;
@@ -60,8 +62,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Trusted host commands. Completion enforces required host access, authorization and validation adapters.
- * Other commands retain their documented host authorization boundaries. Mutations require the existing host transaction; all returned
+ * Trusted host commands. Core checks current access before receipt lookup and fresh command permission
+ * where required. Mutations require the existing host transaction; all returned
  * results are provisional until its successful commit. Links, resolver and durable event writer must not
  * commit independently or emit remote effects. Runtime adapters are required, never synthesized.
  *
@@ -87,15 +89,9 @@ public class WorkflowExecutionService {
     private final RuntimeVariables variables;
     private final RuntimeServiceProgression services;
     private final ObjectProvider<WorkflowTaskSubmissionValidator> submissionValidator;
-    private final ObjectProvider<WorkflowCancellationAuthorization> cancellationAuthorization;
-    private ObjectProvider<WorkflowTaskReassignmentAuthorization> reassignmentAuthorization;
-    private ObjectProvider<WorkflowTaskCompletionAuthorization> completionAuthorization;
+    private final WorkflowAuthorizationSupport authorization;
+    private ObjectProvider<WorkflowTaskReassignmentTargetValidator> reassignmentTargetValidator;
     private ObjectProvider<WorkflowTaskCompletionValidator> completionValidator;
-
-    @org.springframework.beans.factory.annotation.Autowired
-    public void setCompletionAuthorization(ObjectProvider<WorkflowTaskCompletionAuthorization> authorization) {
-        this.completionAuthorization = authorization;
-    }
 
     @org.springframework.beans.factory.annotation.Autowired
     public void setCompletionValidator(ObjectProvider<WorkflowTaskCompletionValidator> validator) {
@@ -103,30 +99,20 @@ public class WorkflowExecutionService {
     }
 
     @org.springframework.beans.factory.annotation.Autowired
-    public void setReassignmentAuthorization(ObjectProvider<WorkflowTaskReassignmentAuthorization> authorization) {
-        this.reassignmentAuthorization = authorization;
+    public void setReassignmentTargetValidator(ObjectProvider<WorkflowTaskReassignmentTargetValidator> validator) {
+        this.reassignmentTargetValidator = validator;
     }
 
     private final ThreadLocal<Boolean> executing = new ThreadLocal<>();
 
-    public WorkflowExecutionService(WorkflowInstanceRepository instances, WorkflowActivityRepository activities,
-                                    WorkflowTaskRepository tasks, WorkflowHistoryRepository history, WorkflowCommandReceiptRepository receipts,
-                                    EntityManager entityManager, WorkflowDefinitionRuntimeReader definitions, TaskTypeCatalogService catalog,
-                                    RuntimeJson json, RuntimeHostSupport host, RuntimeDefinitionPins pins, RuntimeVariables variables, RuntimeServiceProgression services, WorkflowTaskEligibilityService eligibility,
-                                    ObjectProvider<WorkflowTaskSubmissionValidator> submissionValidator) {
-        this(instances, activities, tasks, history, receipts, entityManager, definitions, catalog, json, host,
-                pins, variables, services, eligibility, submissionValidator, null);
-    }
-
-    @org.springframework.beans.factory.annotation.Autowired
     public WorkflowExecutionService(WorkflowInstanceRepository instances, WorkflowActivityRepository activities,
             WorkflowTaskRepository tasks, WorkflowHistoryRepository history, WorkflowCommandReceiptRepository receipts,
             EntityManager entityManager, WorkflowDefinitionRuntimeReader definitions, TaskTypeCatalogService catalog,
             RuntimeJson json, RuntimeHostSupport host, RuntimeDefinitionPins pins, RuntimeVariables variables,
             RuntimeServiceProgression services, WorkflowTaskEligibilityService eligibility,
             ObjectProvider<WorkflowTaskSubmissionValidator> submissionValidator,
-            ObjectProvider<WorkflowCancellationAuthorization> cancellationAuthorization) {
-        this.cancellationAuthorization = cancellationAuthorization;
+            WorkflowAuthorizationSupport authorization) {
+        this.authorization = authorization;
         this.submissionValidator = submissionValidator;
         this.eligibility = eligibility;
         this.variables = variables;
@@ -151,33 +137,23 @@ public class WorkflowExecutionService {
                 && command.reason().length() <= 2000 && context.actorKind() == ActorKind.USER, Category.INVALID_INPUT);
     }
 
-    private WorkflowCancellationAuthorization cancellationAdapter() {
-        WorkflowCancellationAuthorization adapter;
-        try { adapter = cancellationAuthorization == null ? null : cancellationAuthorization.getIfAvailable(); }
-        catch (RuntimeException failure) { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION, failure); }
-        RuntimeInputs.require(adapter != null, Category.HOST_CONFIGURATION);
-        return adapter;
-    }
-
     private WorkflowCancellationAuthorizationContext cancellationAccess(WorkflowInstanceEntity instance,
-            WorkflowCommandContext context, WorkflowCancellationAuthorization adapter) {
-        var authorization = new WorkflowCancellationAuthorizationContext(instance.getId(), instance.getDefinitionVersionId(),
+            WorkflowCommandContext context) {
+        var cancellation = new WorkflowCancellationAuthorizationContext(instance.getId(), instance.getDefinitionVersionId(),
                 instance.getBusinessType(), instance.getBusinessId(), context);
-        boolean accessible;
-        try { accessible = adapter.canAccess(authorization); }
-        catch (RuntimeException failure) { throw new WorkflowExecutionException(Category.AUTHORIZATION_LOOKUP_FAILED, failure); }
-        RuntimeInputs.require(accessible, Category.NOT_FOUND);
-        return authorization;
+        RuntimeInputs.require(authorization.allowsCancellation(WorkflowScope.ACCESS_CANCELLATION, cancellation),
+                Category.NOT_FOUND);
+        return cancellation;
     }
 
     /** Lookup only: business access remains required, fresh cancellation privilege does not. */
     public Optional<WorkflowCancellationResult> findCancellationReplay(CancelWorkflow command, WorkflowCommandContext context) {
         validateCancellation(command, context);
         return RuntimePersistenceErrors.call(() -> {
-            var adapter = cancellationAdapter();
+            authorization.requireSupport(WorkflowOperation.CANCEL_WORKFLOW);
             var instance = instances.findById(command.instanceId())
                     .orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
-            cancellationAccess(instance, context, adapter);
+            cancellationAccess(instance, context);
             return json.cancellationReplay(receipts.findById(command.commandId()).orElse(null), command, context);
         });
     }
@@ -192,17 +168,15 @@ public class WorkflowExecutionService {
             WorkflowCancellationEffect effect) {
         return guarded(() -> {
             validateCancellation(command, context);
-            var adapter = cancellationAdapter();
+            authorization.requireSupport(WorkflowOperation.CANCEL_WORKFLOW);
             var instance = instances.findById(command.instanceId())
                     .orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
             entityManager.refresh(instance);
-            var authorization = cancellationAccess(instance, context, adapter);
+            var cancellation = cancellationAccess(instance, context);
             var replay = json.cancellationReplay(receipts.findById(command.commandId()).orElse(null), command, context);
             if (replay.isPresent()) return new WorkflowCancellationCommandResult(true, replay.get());
-            boolean permitted;
-            try { permitted = adapter.canCancel(authorization); }
-            catch (RuntimeException failure) { throw new WorkflowExecutionException(Category.AUTHORIZATION_LOOKUP_FAILED, failure); }
-            RuntimeInputs.require(permitted, Category.CANCELLATION_FORBIDDEN);
+            RuntimeInputs.require(authorization.allowsCancellation(WorkflowScope.CANCEL, cancellation),
+                    Category.CANCELLATION_FORBIDDEN);
             RuntimeInputs.require(instance.getLockVersion() == command.expectedLockVersion(), Category.STALE_VERSION);
             RuntimeInputs.require(instance.getStatus() == InstanceStatus.ACTIVE, Category.INVALID_STATE);
             RuntimeInputs.require(instance.getLastHistorySequence() >= 4 && instance.getResultKey() == null
@@ -363,8 +337,8 @@ public class WorkflowExecutionService {
     public WorkflowCommandResult completeTask(CompleteWorkflowTask command, WorkflowCommandContext context) {
         return guarded(() -> {
             RuntimeInputs.validateCompleteTaskCommand(command, context);
-            var authorization = requiredCompletionAdapter(completionAuthorization);
-            completionAccess(command, context, authorization);
+            authorization.requireSupport(WorkflowOperation.COMPLETE_TASK);
+            completionAccess(command, context);
             byte[] fingerprint = json.fingerprint(command, context);
             var replay = completionReplay(command, context, fingerprint);
             if (replay.isPresent()) return new WorkflowCommandResult(true, replay.get());
@@ -382,7 +356,7 @@ public class WorkflowExecutionService {
             var task = tasks.findById(command.taskId()).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
             entityManager.refresh(activity); entityManager.refresh(task);
             RuntimeInputs.require(task.getActivityId().equals(activity.getId()) && activity.getInstanceId().equals(instance.getId()), Category.INVALID_STATE);
-            requireCompletionAccess(task, activity, context, authorization);
+            requireTaskAccess(WorkflowScope.ACCESS_COMPLETION, task, activity, context);
             RuntimeInputs.require(activity.getStatus() == ActivityStatus.ACTIVE && task.getStatus() == TaskStatus.OPEN, Category.INVALID_STATE);
             var definition = pins.load(instance);
             definitions.requireCapabilities(definition, false);
@@ -427,11 +401,8 @@ public class WorkflowExecutionService {
             var completion = new TaskCompletionContext(context,
                     RuntimeViews.task(task, activity), definition.versionId(), human.key(), human.taskType(),
                     command.outcomeKey(), command.comment());
-            boolean permitted;
-            try { permitted = authorization.canComplete(completion); }
-            catch (RuntimeException failure) { throw new WorkflowExecutionException(Category.AUTHORIZATION_LOOKUP_FAILED, failure); }
-            RuntimeInputs.require(permitted, Category.COMPLETION_FORBIDDEN);
-            var validator = requiredCompletionAdapter(completionValidator);
+            RuntimeInputs.require(authorization.allowsCompletion(completion), Category.COMPLETION_FORBIDDEN);
+            var validator = requiredHostAdapter(completionValidator);
             try { validator.validate(completion, command.result()); }
             catch (TaskCompletionRejectedException rejection) {
                 throw new WorkflowExecutionException(Category.BUSINESS_VALIDATION_REJECTED);
@@ -546,13 +517,14 @@ public class WorkflowExecutionService {
     public Optional<WorkflowCommandResult> findReplay(CompleteWorkflowTask command, WorkflowCommandContext context) {
         RuntimeInputs.validateCompleteTaskCommand(command, context);
         return RuntimePersistenceErrors.call(() -> {
-            completionAccess(command, context, requiredCompletionAdapter(completionAuthorization));
+            authorization.requireSupport(WorkflowOperation.COMPLETE_TASK);
+            completionAccess(command, context);
             return completionReplay(command, context, json.fingerprint(command, context))
                     .map(result -> new WorkflowCommandResult(true, result));
         });
     }
 
-    private <T> T requiredCompletionAdapter(ObjectProvider<T> provider) {
+    private <T> T requiredHostAdapter(ObjectProvider<T> provider) {
         List<T> adapters;
         try { adapters = provider == null ? List.of() : provider.stream().limit(2).toList(); }
         catch (RuntimeException failure) { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION, failure); }
@@ -560,21 +532,18 @@ public class WorkflowExecutionService {
         return adapters.get(0);
     }
 
-    private void completionAccess(CompleteWorkflowTask command, WorkflowCommandContext context,
-            WorkflowTaskCompletionAuthorization authorization) {
+    private void completionAccess(CompleteWorkflowTask command, WorkflowCommandContext context) {
         var task = tasks.findById(command.taskId()).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
         var activity = activities.findById(task.getActivityId()).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
         RuntimeInputs.require(activity.getInstanceId().equals(command.instanceId()), Category.NOT_FOUND);
         RuntimeInputs.require(instances.findById(command.instanceId()).isPresent(), Category.NOT_FOUND);
-        requireCompletionAccess(task, activity, context, authorization);
+        requireTaskAccess(WorkflowScope.ACCESS_COMPLETION, task, activity, context);
     }
 
-    private void requireCompletionAccess(WorkflowTaskEntity task, WorkflowActivityEntity activity,
-            WorkflowCommandContext context, WorkflowTaskCompletionAuthorization authorization) {
-        boolean accessible;
-        try { accessible = authorization.canAccess(new TaskEligibilityContext(RuntimeViews.task(task, activity), context.actorRef())); }
-        catch (RuntimeException failure) { throw new WorkflowExecutionException(Category.AUTHORIZATION_LOOKUP_FAILED, failure); }
-        RuntimeInputs.require(accessible, Category.NOT_FOUND);
+    private void requireTaskAccess(WorkflowScope scope, WorkflowTaskEntity task, WorkflowActivityEntity activity,
+            WorkflowCommandContext context) {
+        var taskContext = new TaskEligibilityContext(RuntimeViews.task(task, activity), context.actorRef());
+        RuntimeInputs.require(authorization.allowsTask(scope, taskContext), Category.NOT_FOUND);
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -605,15 +574,6 @@ public class WorkflowExecutionService {
         return findOwnershipReplay(ownershipRequest(command), context);
     }
 
-    private WorkflowTaskReassignmentAuthorization reassignmentAdapter() {
-        try {
-            var adapter = reassignmentAuthorization == null ? null : reassignmentAuthorization.getIfAvailable();
-            RuntimeInputs.require(adapter != null, Category.HOST_CONFIGURATION);
-            return adapter;
-        } catch (WorkflowExecutionException failure) { throw failure; }
-        catch (RuntimeException failure) { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION, failure); }
-    }
-
     private void validateReassignment(io.github.leontecristian.workflow.core.dto.runtime.ReassignWorkflowTask command,
             WorkflowCommandContext context) {
         RuntimeInputs.validateContextAndGetOccurredAtUtc(context);
@@ -624,17 +584,21 @@ public class WorkflowExecutionService {
                 && context.actorKind() == ActorKind.USER, Category.INVALID_INPUT);
     }
 
-    private boolean reassignmentDecision(java.util.function.BooleanSupplier decision) {
-        try { return decision.getAsBoolean(); }
-        catch (RuntimeException failure) { throw new WorkflowExecutionException(Category.AUTHORIZATION_LOOKUP_FAILED, failure); }
+    private boolean isValidReassignmentTarget(TaskEligibilityContext task, TaskAssignmentTarget target) {
+        var validator = requiredHostAdapter(reassignmentTargetValidator);
+        try {
+            return validator.isValidTarget(task, target);
+        } catch (RuntimeException failure) {
+            throw new WorkflowExecutionException(Category.AUTHORIZATION_LOOKUP_FAILED, failure);
+        }
     }
 
     private EnteredStage reassignmentAccess(io.github.leontecristian.workflow.core.dto.runtime.ReassignWorkflowTask command,
-            WorkflowCommandContext context, WorkflowTaskReassignmentAuthorization adapter) {
+            WorkflowCommandContext context) {
         var task = tasks.findById(command.taskId()).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
         var activity = activities.findById(task.getActivityId()).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
         RuntimeInputs.require(activity.getInstanceId().equals(command.instanceId()), Category.NOT_FOUND);
-        RuntimeInputs.require(reassignmentDecision(() -> adapter.canAccess(new TaskEligibilityContext(RuntimeViews.task(task, activity), context.actorRef()))), Category.NOT_FOUND);
+        requireTaskAccess(WorkflowScope.ACCESS_REASSIGNMENT, task, activity, context);
         return new EnteredStage(activity, task);
     }
 
@@ -652,7 +616,8 @@ public class WorkflowExecutionService {
             WorkflowCommandContext context) {
         validateReassignment(command, context);
         return RuntimePersistenceErrors.call(() -> {
-            reassignmentAccess(command, context, reassignmentAdapter());
+            authorization.requireSupport(WorkflowOperation.REASSIGN_TASK);
+            reassignmentAccess(command, context);
             return reassignmentReplay(command, context);
         });
     }
@@ -663,12 +628,13 @@ public class WorkflowExecutionService {
             WorkflowCommandContext context) {
         return guarded(() -> {
             validateReassignment(command, context);
-            var adapter = reassignmentAdapter();
-            var stage = reassignmentAccess(command, context, adapter);
+            authorization.requireSupport(WorkflowOperation.REASSIGN_TASK);
+            var stage = reassignmentAccess(command, context);
             var replay = reassignmentReplay(command, context);
             if (replay.isPresent()) return new WorkflowCommandResult(true, replay.get());
-            RuntimeInputs.require(reassignmentDecision(() -> adapter.canReassign(new TaskEligibilityContext(
-                    RuntimeViews.task(stage.task(), stage.activity()), context.actorRef()))), Category.REASSIGNMENT_FORBIDDEN);
+            var initialAccess = new TaskEligibilityContext(RuntimeViews.task(stage.task(), stage.activity()), context.actorRef());
+            RuntimeInputs.require(authorization.allowsTask(WorkflowScope.REASSIGN, initialAccess),
+                    Category.REASSIGNMENT_FORBIDDEN);
             var instance = instances.findById(command.instanceId()).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
             entityManager.refresh(instance);
             RuntimeInputs.require(instance.getLockVersion() == command.expectedLockVersion(), Category.STALE_VERSION);
@@ -680,8 +646,8 @@ public class WorkflowExecutionService {
             // Host grants may depend on the assignment/owner cached before the aggregate claim.
             // Recheck the serialized current task only on a fresh mutation; receipt replay stays privilege-independent.
             var currentAccess = new TaskEligibilityContext(RuntimeViews.task(task, activity), context.actorRef());
-            RuntimeInputs.require(reassignmentDecision(() -> adapter.canAccess(currentAccess)), Category.NOT_FOUND);
-            RuntimeInputs.require(reassignmentDecision(() -> adapter.canReassign(currentAccess)), Category.REASSIGNMENT_FORBIDDEN);
+            RuntimeInputs.require(authorization.allowsTask(WorkflowScope.ACCESS_REASSIGNMENT, currentAccess), Category.NOT_FOUND);
+            RuntimeInputs.require(authorization.allowsTask(WorkflowScope.REASSIGN, currentAccess), Category.REASSIGNMENT_FORBIDDEN);
             RuntimeInputs.require(activity.getStatus() == ActivityStatus.ACTIVE && task.getStatus() == TaskStatus.OPEN
                     && instance.getCurrentNodeKey().equals(activity.getNodeKey()), Category.INVALID_STATE);
             RuntimeInputs.require(!command.assignment().equals(task.getAssignment()), Category.CONFLICT);
@@ -692,8 +658,7 @@ public class WorkflowExecutionService {
             RuntimeInputs.require(human != null, Category.HOST_CONFIGURATION);
             if (!human.inputs().isEmpty()) RuntimeTaskCreationEvidence.read(history.findCreationByTaskId(task.getId())
                     .orElseThrow(() -> new WorkflowExecutionException(Category.HOST_CONFIGURATION)), task, activity, human.inputs(), json, history);
-            RuntimeInputs.require(reassignmentDecision(() -> adapter.isValidTarget(new TaskEligibilityContext(
-                    RuntimeViews.task(task, activity), context.actorRef()), command.assignment())), Category.INVALID_ASSIGNMENT);
+            RuntimeInputs.require(isValidReassignmentTarget(currentAccess, command.assignment()), Category.INVALID_ASSIGNMENT);
             eligibility.requireTarget(new AssignmentContext(command.commandId(), instance.getId(), definition.versionId(),
                     definition.key(), definition.version(), definition.contentHash(), activity.getNodeKey(),
                     instance.getBusinessType(), instance.getBusinessId(), context), command.assignment());
@@ -745,10 +710,11 @@ public class WorkflowExecutionService {
     }
 
     private EnteredStage authorizedTask(OwnershipRequest request, WorkflowCommandContext context) {
+        authorization.requireSupport(request.operation());
         var task = tasks.findById(request.taskId()).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
         var activity = activities.findById(task.getActivityId()).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
         RuntimeInputs.require(activity.getInstanceId().equals(request.instanceId()), Category.NOT_FOUND);
-        eligibility.requireOwnershipAccess(new TaskEligibilityContext(RuntimeViews.task(task, activity), context.actorRef()));
+        requireTaskAccess(WorkflowScope.ACCESS_OWNERSHIP, task, activity, context);
         return new EnteredStage(activity, task);
     }
 
@@ -832,7 +798,7 @@ public class WorkflowExecutionService {
             return;
         }
         if (request.administrative()) {
-            RuntimeInputs.require(eligibility.canAdministrativelyRelease(new TaskEligibilityContext(view, actorRef)),
+            RuntimeInputs.require(authorization.allowsTask(WorkflowScope.ADMIN_RELEASE, new TaskEligibilityContext(view, actorRef)),
                     Category.ADMIN_RELEASE_FORBIDDEN);
         }
         RuntimeInputs.require(previous != null, Category.TASK_NOT_ASSIGNED);
@@ -868,7 +834,7 @@ public class WorkflowExecutionService {
             roster = assignment.tasks().stream().sorted(java.util.Comparator.comparing(io.github.leontecristian.workflow.core.dto.runtime.ResolvedTask::taskKey)).toList();
             revision = assignment.reviewRevisionRef();
         } else {
-            var assignment = host.resolve(host.resolver(human.assignment().resolver()),assignmentContext);
+            var assignment = host.resolve(human.assignment().resolver(),assignmentContext);
             roster = assignment.tasks(); revision = assignment.reviewRevisionRef();
         }
         long activation=RuntimeProgression.advance(batch.last(),1);

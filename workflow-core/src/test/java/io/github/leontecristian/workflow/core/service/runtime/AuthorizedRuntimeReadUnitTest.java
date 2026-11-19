@@ -6,8 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -20,11 +22,14 @@ import io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskEligibilityContext;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowAuthorizationRequest;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstancePage;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceQuery;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceSummary;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowOperation;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowScope;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationQuery;
@@ -35,6 +40,7 @@ import io.github.leontecristian.workflow.core.exception.runtime.WorkflowRuntimeR
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -45,10 +51,24 @@ class AuthorizedRuntimeReadUnitTest {
     private final WorkflowRuntimeQueryService reads = mock(WorkflowRuntimeQueryService.class);
     private final WorkflowRuntimeReadAuthorization policy = mock(WorkflowRuntimeReadAuthorization.class);
     private final WorkflowTaskEligibilityService eligibility = mock(WorkflowTaskEligibilityService.class);
-    private final StaticListableBeanFactory adapters = new StaticListableBeanFactory();
-    private final WorkflowAuthorizedRuntimeReadService service = new WorkflowAuthorizedRuntimeReadService(
-            reads, policy, eligibility, adapters.getBeanProvider(WorkflowTaskReassignmentAuthorization.class),
-            adapters.getBeanProvider(WorkflowCancellationAuthorization.class));
+    private final WorkflowAuthorizedRuntimeReadService service = withPolicy(null);
+
+    private WorkflowAuthorizedRuntimeReadService withPolicy(WorkflowAuthorization commandPolicy) {
+        var adapters = new StaticListableBeanFactory();
+        if (commandPolicy != null) adapters.addBean("commandPolicy", commandPolicy);
+        return new WorkflowAuthorizedRuntimeReadService(reads, policy, eligibility,
+                new WorkflowAuthorizationSupport(adapters.getBeanProvider(WorkflowAuthorization.class)));
+    }
+
+    private WorkflowAuthorization commandPolicy(WorkflowOperation... operations) {
+        var commandPolicy = mock(WorkflowAuthorization.class);
+        when(commandPolicy.supportedOperations()).thenReturn(Set.of(operations));
+        return commandPolicy;
+    }
+
+    private WorkflowAuthorizationRequest scope(WorkflowScope scope) {
+        return argThat(request -> request != null && request.permission().scope() == scope);
+    }
 
     @Test
     void collectionGrantsDenyBeforeQueryValidationOrStorage() {
@@ -173,37 +193,51 @@ class AuthorizedRuntimeReadUnitTest {
     }
 
     @Test
-    void missingOperationsSuppressHintsAndCompletionStillNeedsItsSeparatePermission() {
+    void missingOperationsSuppressHintsAndReadPolicyMayStillSuggestCompletion() {
+        var commandPolicy = commandPolicy(WorkflowOperation.CLAIM_TASK);
+        var service = withPolicy(commandPolicy);
         var task = task(1, null);
         when(reads.taskClaimPolicy(9, 1)).thenReturn(TaskClaimPolicy.OPTIONAL);
         assertFalse(service.canCompleteTask("alice", task));
-        assertFalse(service.canClaimTask("alice", task));
+        assertFalse(service.canReleaseTask("alice", task(1, "alice")));
+        assertFalse(service.canAdministrativelyReleaseTask("alice", task(1, "alice")));
         assertFalse(service.canReassignTask("alice", task));
         assertFalse(service.hasCancellationAuthorization());
         assertFalse(service.canCancelWorkflow("alice", instance(InstanceStatus.ACTIVE), null));
         when(policy.canCompleteTask(new TaskEligibilityContext(task, "alice"))).thenReturn(true);
         when(eligibility.isEligible(task, "alice")).thenReturn(true);
         assertTrue(service.canCompleteTask("alice", task));
+        verify(commandPolicy, never()).isAllowed(any());
     }
 
     @Test
     void ownerReleaseDoesNotRequireCurrentMembershipAndOtherOwnerCannotComplete() {
         var own = task(1, "alice");
-        when(eligibility.canAccessOwnership(new TaskEligibilityContext(own, "alice"))).thenReturn(true);
+        var commandPolicy = commandPolicy(WorkflowOperation.RELEASE_TASK);
+        var service = withPolicy(commandPolicy);
+        when(commandPolicy.isAllowed(scope(WorkflowScope.ACCESS_OWNERSHIP))).thenReturn(true);
         assertTrue(service.canReleaseTask("alice", own));
+        assertFalse(service.canAdministrativelyReleaseTask("alice", own));
         assertFalse(service.canCompleteTask("bob", own));
         verify(eligibility, never()).isEligible(any(), any());
+        verify(commandPolicy).isAllowed(argThat(request -> request instanceof WorkflowAuthorizationRequest.Task task
+                && task.task().equals(new TaskEligibilityContext(own, "alice"))
+                && request.permission().scope() == WorkflowScope.ACCESS_OWNERSHIP));
     }
 
     @Test
     void reassignmentWorksWithoutOwnershipAndWrapsOperationLookupFailure() {
-        var authorization = mock(WorkflowTaskReassignmentAuthorization.class);
-        adapters.addBean("reassignment", authorization);
+        var authorization = commandPolicy(WorkflowOperation.REASSIGN_TASK);
+        var service = withPolicy(authorization);
         var task = task(1, null);
-        when(authorization.canAccess(any())).thenReturn(true);
-        when(authorization.canReassign(any())).thenReturn(true);
+        when(authorization.isAllowed(scope(WorkflowScope.ACCESS_REASSIGNMENT))).thenReturn(true);
+        assertFalse(service.canReassignTask("alice", task));
+        when(authorization.isAllowed(scope(WorkflowScope.REASSIGN))).thenReturn(true);
         assertTrue(service.canReassignTask("alice", task));
-        when(authorization.canReassign(any())).thenThrow(new IllegalStateException("private"));
+        var order = inOrder(authorization);
+        order.verify(authorization).isAllowed(scope(WorkflowScope.ACCESS_REASSIGNMENT));
+        order.verify(authorization).isAllowed(scope(WorkflowScope.REASSIGN));
+        when(authorization.isAllowed(scope(WorkflowScope.REASSIGN))).thenThrow(new IllegalStateException("private"));
         assertEquals(Category.AUTHORIZATION_LOOKUP_FAILED,
                 assertThrows(WorkflowExecutionException.class, () -> service.canReassignTask("alice", task)).category());
         verifyNoInteractions(eligibility);
@@ -211,16 +245,16 @@ class AuthorizedRuntimeReadUnitTest {
 
     @Test
     void cancellationUsesExplicitMatchingContextAndPreservesTrustedActorKind() {
-        var authorization = mock(WorkflowCancellationAuthorization.class);
-        adapters.addBean("cancellation", authorization);
+        var authorization = commandPolicy(WorkflowOperation.CANCEL_WORKFLOW);
+        var service = withPolicy(authorization);
         assertTrue(service.hasCancellationAuthorization());
         var context = new WorkflowCommandContext(ActorKind.SYSTEM, "alice", Instant.EPOCH, "read");
-        when(authorization.canAccess(any())).thenAnswer(call -> {
-            var supplied = (io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationAuthorizationContext) call.getArgument(0);
-            assertSame(context, supplied.commandContext());
+        when(authorization.isAllowed(scope(WorkflowScope.ACCESS_CANCELLATION))).thenAnswer(call -> {
+            WorkflowAuthorizationRequest.Cancellation supplied = call.getArgument(0);
+            assertSame(context, supplied.cancellation().commandContext());
             return true;
         });
-        when(authorization.canCancel(any())).thenReturn(true);
+        when(authorization.isAllowed(scope(WorkflowScope.CANCEL))).thenReturn(true);
         assertTrue(service.canCancelWorkflow("alice", instance(InstanceStatus.ACTIVE), context));
         assertEquals(Category.HOST_CONFIGURATION, assertThrows(WorkflowExecutionException.class,
                 () -> service.canCancelWorkflow("bob", instance(InstanceStatus.ACTIVE), context)).category());

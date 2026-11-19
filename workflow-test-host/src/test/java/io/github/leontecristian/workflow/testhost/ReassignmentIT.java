@@ -38,21 +38,19 @@ import io.github.leontecristian.workflow.core.dto.tasktype.CreateTaskType;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category;
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
-import io.github.leontecristian.workflow.core.service.definition.DefinitionCapabilityProvider;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowAuthorizationRequest;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowScope;
+import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskReassignmentTargetValidator;
 import io.github.leontecristian.workflow.core.service.runtime.AllTaskAssignmentResolver;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowEventBatchWriter;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
 import io.github.leontecristian.workflow.testhost.configuration.integration.CompletionAdapterIntegrationTest;
-import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleAdapters;
-import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
 import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxServiceEffectStore;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeTransaction;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskOwnershipAuthorization;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleWorkflowCancellationAuthorization;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -76,7 +74,6 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.util.AopTestUtils;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -96,12 +93,8 @@ class ReassignmentIT extends CompletionAdapterIntegrationTest {
     @Autowired SandboxServiceEffectStore effects;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactions;
-    @MockitoBean ConsoleWorkflowCancellationAuthorization cancellation;
-    @MockitoBean io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskReassignmentAuthorization reassignment;
-    @MockitoSpyBean ConsoleTaskOwnershipAuthorization ownership;
+    @MockitoBean ConsoleTaskReassignmentTargetValidator destinations;
     @MockitoSpyBean WorkflowEventBatchWriter recorder;
-    @MockitoBean(name = "consoleCapabilities") DefinitionCapabilityProvider capabilities;
-    @Autowired ConsoleSettings settings;
     @MockitoSpyBean(name = "sandboxAllResolver") AllTaskAssignmentResolver resolver;
     private final String marker = "reassign.it." + UUID.randomUUID();
     private final ObjectMapper json = new ObjectMapper();
@@ -136,14 +129,12 @@ class ReassignmentIT extends CompletionAdapterIntegrationTest {
     private static <T> T target(T bean) { return AopTestUtils.getUltimateTargetObject(bean); }
 
     @BeforeEach void authorizeDirectCoreCalls() {
-        DefinitionCapabilityProvider delegate = ReflectionTestUtils.invokeMethod(new ConsoleAdapters(), "consoleCapabilities", settings);
-        when(capabilities.snapshot()).thenAnswer(invocation -> java.util.Objects.requireNonNull(delegate).snapshot());
-        when(reassignment.canAccess(any())).thenReturn(true);
-        when(reassignment.canReassign(any())).thenReturn(true);
-        when(reassignment.isValidTarget(any(), any())).thenReturn(true);
-        when(cancellation.canAccess(any())).thenReturn(true);
-        when(cancellation.canCancel(any())).thenReturn(true);
-        doReturn(true).when(target(ownership)).canAccess(any());
+        doReturn(true).when(authorization).isAllowed(forScope(WorkflowScope.ACCESS_REASSIGNMENT));
+        doReturn(true).when(authorization).isAllowed(forScope(WorkflowScope.REASSIGN));
+        when(destinations.isValidTarget(any(), any())).thenReturn(true);
+        doReturn(true).when(authorization).isAllowed(forScope(WorkflowScope.ACCESS_CANCELLATION));
+        doReturn(true).when(authorization).isAllowed(forScope(WorkflowScope.CANCEL));
+        doReturn(true).when(authorization).isAllowed(forScope(WorkflowScope.ACCESS_OWNERSHIP));
     }
     private void publish(boolean all) throws Exception { publish(all, false); }
     private void publish(boolean all, boolean sequential) throws Exception {
@@ -243,12 +234,12 @@ class ReassignmentIT extends CompletionAdapterIntegrationTest {
     @Test void permissionTargetNoopAndRecorderFailuresLeaveNoWritesAndReplaySurvivesClosure() throws Exception {
         publish(false); var start = start(); var command = move(start, new TaskAssignmentTarget(AssignmentTargetKind.USER, "reassign.reviewer2"));
         long initial = version(start.instance().id());
-        when(reassignment.canReassign(any())).thenReturn(false);
+        doReturn(false).when(authorization).isAllowed(forScope(WorkflowScope.REASSIGN));
         failure(() -> reassign(command), Category.REASSIGNMENT_FORBIDDEN);
-        when(reassignment.canReassign(any())).thenReturn(true);
-        when(reassignment.isValidTarget(any(), any())).thenReturn(false);
+        doReturn(true).when(authorization).isAllowed(forScope(WorkflowScope.REASSIGN));
+        when(destinations.isValidTarget(any(), any())).thenReturn(false);
         failure(() -> reassign(command), Category.INVALID_ASSIGNMENT);
-        when(reassignment.isValidTarget(any(), any())).thenReturn(true);
+        when(destinations.isValidTarget(any(), any())).thenReturn(true);
         failure(() -> reassign(move(start, start.task().assignment())), Category.CONFLICT);
         doAnswer(invocation -> { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION); }).when(target(recorder)).write(any());
         failure(() -> reassign(command), Category.HOST_CONFIGURATION);
@@ -257,10 +248,10 @@ class ReassignmentIT extends CompletionAdapterIntegrationTest {
         assertThat(reads.findTask(start.task().id()).orElseThrow()).isEqualTo(start.task());
         var accepted = reassign(command);
         cancel(command(start.instance().id()));
-        when(reassignment.canReassign(any())).thenReturn(false);
-        when(reassignment.isValidTarget(any(), any())).thenReturn(false);
+        doReturn(false).when(authorization).isAllowed(forScope(WorkflowScope.REASSIGN));
+        when(destinations.isValidTarget(any(), any())).thenReturn(false);
         assertThat(reassign(command).execution()).isEqualTo(accepted.execution());
-        when(reassignment.canAccess(any())).thenReturn(false);
+        doReturn(false).when(authorization).isAllowed(forScope(WorkflowScope.ACCESS_REASSIGNMENT));
         failure(() -> reassign(command), Category.NOT_FOUND);
     }
     @Test void administrationFiltersUseCurrentExactStateAndPreserveDeniedContinuation() throws Exception {
@@ -310,10 +301,10 @@ class ReassignmentIT extends CompletionAdapterIntegrationTest {
     }
     @Test void refreshedPolicyRejectsAHostCachedOriginalAssignment() throws Exception {
         publish(false); var start = start();
-        when(reassignment.canReassign(any())).thenAnswer(invocation -> {
-            var request = (io.github.leontecristian.workflow.core.dto.runtime.TaskEligibilityContext) invocation.getArgument(0);
-            return request.task().assignment().kind() == AssignmentTargetKind.GROUP;
-        });
+        doAnswer(invocation -> {
+            var request = (WorkflowAuthorizationRequest.Task) invocation.getArgument(0);
+            return request.task().task().assignment().kind() == AssignmentTargetKind.GROUP;
+        }).when(authorization).isAllowed(forScope(WorkflowScope.REASSIGN));
         var pool = Executors.newSingleThreadExecutor();
         try {
             failure(() -> tx(() -> {
@@ -366,7 +357,7 @@ class ReassignmentIT extends CompletionAdapterIntegrationTest {
     }
 
     @AfterEach void cleanupOwnedFixtures() {
-        reset(target(recorder), target(resolver), target(ownership));
+        reset(target(recorder), target(resolver));
         tx(() -> {
 
             for (long instance : instances) {

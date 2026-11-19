@@ -4,10 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.leontecristian.workflow.core.dto.definition.CheckWorkflowDefinition;
-import io.github.leontecristian.workflow.core.dto.definition.DefinitionCapabilities;
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionManagementContext;
 import io.github.leontecristian.workflow.core.dto.definition.ImportWorkflowDraft;
-import io.github.leontecristian.workflow.core.dto.definition.SingleAssignmentCapability;
 import io.github.leontecristian.workflow.core.dto.definition.TaskTypeCapability;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
@@ -31,7 +29,6 @@ import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.dto.tasktype.CreateTaskType;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category;
-import io.github.leontecristian.workflow.core.service.definition.DefinitionCapabilityProvider;
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.runtime.SingleTaskAssignmentResolver;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowEventBatchWriter;
@@ -82,15 +79,15 @@ class SequentialHumanStagesIT extends CompletionAdapterIntegrationTest {
     private final ObjectMapper json = new ObjectMapper();
     private final String marker = "f011.it." + UUID.randomUUID();
     private final String correlation = UUID.randomUUID().toString();
-    private final String code = "F011_" + UUID.randomUUID().toString().replace("-", "");
+    private static final String TASK_CODE = "F011_" + UUID.randomUUID().toString().replace("-", "");
     private final List<Long> instances = new ArrayList<>(), versions = new ArrayList<>();
     private Long family, taskType;
     private TransactionTemplate tx() { var tx = new TransactionTemplate(transactions); tx.setTimeout(30); return tx; }
     private WorkflowCommandContext context(String actor) { return new WorkflowCommandContext(ActorKind.USER, actor, Instant.now(), correlation); }
     @BeforeEach void setup() {
-        host.code = code; host.failureNode = ""; host.failure = ""; host.failRecorder = false; host.distinct = false;
+        host.failureNode = ""; host.failure = ""; host.failRecorder = false; host.distinct = false;
         host.assignments.clear(); host.entered = null; host.release = null;
-        taskType = tx().execute(t -> catalog.create(new CreateTaskType(code, marker, null, true)).after().id());
+        taskType = tx().execute(t -> catalog.create(new CreateTaskType(TASK_CODE, marker, null, true)).after().id());
     }
     @AfterEach void cleanup() {
         host.failRecorder = false; host.failureNode = "";
@@ -108,7 +105,7 @@ class SequentialHumanStagesIT extends CompletionAdapterIntegrationTest {
             jdbc.update("DELETE FROM wf_test.management_audit WHERE correlation_id=?",correlation);
             for (long version : versions) jdbc.update("DELETE FROM wf.workflow_definition_version WHERE id=?",version);
             if (family != null) jdbc.update("DELETE FROM wf.workflow_definition WHERE id=? AND workflow_key=?",family,marker);
-            if (taskType != null) jdbc.update("DELETE FROM wf.workflow_task_type WHERE id=? AND code=?",taskType,code);
+            if (taskType != null) jdbc.update("DELETE FROM wf.workflow_task_type WHERE id=? AND code=?",taskType,TASK_CODE);
         });
     }
     private ObjectNode fixture(String name) throws Exception {
@@ -116,7 +113,7 @@ class SequentialHumanStagesIT extends CompletionAdapterIntegrationTest {
         if (!Files.exists(path)) path = Path.of("..").resolve(path);
         var source = (ObjectNode)json.readTree(Files.readString(path)); source.put("key",marker);
         for (var node : source.path("nodes")) if (node.path("type").asText().equals("HUMAN_TASK")) {
-            ((ObjectNode)node).put("taskType",code);
+            ((ObjectNode)node).put("taskType",TASK_CODE);
             ((ObjectNode)node.get("assignment")).put("resolver","f011.reviewer");
         }
         return source;
@@ -252,7 +249,7 @@ class SequentialHumanStagesIT extends CompletionAdapterIntegrationTest {
         // Keep PARTNER reachable on the new rejection route; old instances retain the original routes.
         ((ObjectNode)source.path("transitions").get(2)).put("to","PARTNER");
         long newer=publish(source);
-        tx().executeWithoutResult(t->{var row=catalog.findByCode(code).orElseThrow(); catalog.update(new io.github.leontecristian.workflow.core.dto.tasktype.UpdateTaskType(row.id(),row.lockVersion(),row.name(),row.description(),false));});
+        tx().executeWithoutResult(t->{var row=catalog.findByCode(TASK_CODE).orElseThrow(); catalog.update(new io.github.leontecristian.workflow.core.dto.tasktype.UpdateTaskType(row.id(),row.lockVersion(),row.name(),row.description(),false));});
         var waiting=complete(command(started.instance().id(),started.task().id(),"APPROVE",null),"reviewer").execution();
         assertThat(waiting.instance().currentNodeKey()).isEqualTo("PARTNER");
         assertThat(waiting.instance().definitionVersionId()).isEqualTo(original);
@@ -321,18 +318,21 @@ class SequentialHumanStagesIT extends CompletionAdapterIntegrationTest {
         }
     }
     @TestConfiguration static class Adapters {
+        @Bean TaskTypeCapability stageTaskCapability() {
+            return new TaskTypeCapability(TASK_CODE, Set.of("APPROVE", "REJECT"));
+        }
+
         @Bean StageHost stageHost(JdbcTemplate jdbc, ConsoleEventStore outbox, ConsoleWire wire, org.springframework.beans.factory.ObjectProvider<WorkflowRuntimeQueryService> reads) { return new StageHost(jdbc,outbox,wire,reads); }
     }
-    static class StageHost implements DefinitionCapabilityProvider, SingleTaskAssignmentResolver, WorkflowServiceAction, WorkflowEventBatchWriter {
+    static class StageHost implements SingleTaskAssignmentResolver, WorkflowServiceAction, WorkflowEventBatchWriter {
         @Override public Set<io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind> targetKinds() { return Set.of(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER); }
-        volatile String code, failureNode="", failure="";
+        volatile String failureNode="", failure="";
         volatile boolean failRecorder, distinct;
         volatile CountDownLatch entered, release;
         final List<AssignmentContext> assignments=new CopyOnWriteArrayList<>();
         private final JdbcTemplate jdbc; private final ConsoleEventStore outbox; private final ConsoleWire wire; private final org.springframework.beans.factory.ObjectProvider<WorkflowRuntimeQueryService> readers;
         StageHost(JdbcTemplate jdbc,ConsoleEventStore outbox,ConsoleWire wire,org.springframework.beans.factory.ObjectProvider<WorkflowRuntimeQueryService> readers) { this.jdbc=jdbc; this.outbox=outbox; this.wire=wire; this.readers=readers; }
         public String identifier() { return "f011.reviewer"; }
-        public DefinitionCapabilities snapshot() { return new DefinitionCapabilities(Set.of(new SingleAssignmentCapability(identifier(), Set.of(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER))),code==null?Set.of():Set.of(new TaskTypeCapability(code,Set.of("APPROVE","REJECT")))); }
         public SingleAssignmentResult resolve(AssignmentContext context) {
             assignments.add(context);
             if(context.humanNodeKey().equals(failureNode)) switch(failure) {

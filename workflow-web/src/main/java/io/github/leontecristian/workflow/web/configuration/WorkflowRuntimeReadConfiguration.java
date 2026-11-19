@@ -8,8 +8,7 @@ import io.github.leontecristian.workflow.web.controller.runtime.WorkflowRuntimeR
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowAuthorizedRuntimeReadService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeReadAuthorization;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService;
-import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskReassignmentAuthorization;
-import io.github.leontecristian.workflow.core.service.runtime.WorkflowCancellationAuthorization;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowAuthorizationSupport;
 import io.github.leontecristian.workflow.web.integration.WorkflowRequestIdentity;
 import io.github.leontecristian.workflow.web.integration.runtime.WorkflowAssignmentDirectory;
 import io.github.leontecristian.workflow.web.service.runtime.RuntimeErrors;
@@ -23,10 +22,8 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 public class WorkflowRuntimeReadConfiguration {
     @Bean public WorkflowAuthorizedRuntimeReadService workflowAuthorizedRuntimeReadService(
             WorkflowRuntimeQueryService reads, WorkflowRuntimeReadAuthorization policy,
-            WorkflowTaskEligibilityService eligibility,
-            ObjectProvider<WorkflowTaskReassignmentAuthorization> reassignment,
-            ObjectProvider<WorkflowCancellationAuthorization> cancellation) {
-        return new WorkflowAuthorizedRuntimeReadService(reads, policy, eligibility, reassignment, cancellation);
+            WorkflowTaskEligibilityService eligibility, WorkflowAuthorizationSupport authorization) {
+        return new WorkflowAuthorizedRuntimeReadService(reads, policy, eligibility, authorization);
     }
     @Bean public WorkflowRuntimeReadController workflowRuntimeReadController(WorkflowAuthorizedRuntimeReadService readsAccess,
             WorkflowRequestIdentity identity, ObjectProvider<WorkflowAssignmentDirectory> directory,

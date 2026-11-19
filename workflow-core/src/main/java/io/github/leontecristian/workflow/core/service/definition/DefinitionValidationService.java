@@ -2,45 +2,44 @@ package io.github.leontecristian.workflow.core.service.definition;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import io.github.leontecristian.workflow.core.dto.definition.DefinitionCapabilities;
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionValidationReport;
 import io.github.leontecristian.workflow.core.dto.definition.DiagnosticStage;
-import io.github.leontecristian.workflow.core.dto.definition.SingleAssignmentCapability;
-import io.github.leontecristian.workflow.core.dto.definition.AllAssignmentCapability;
-import io.github.leontecristian.workflow.core.dto.runtime.CompletionPolicy;
-import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
 import io.github.leontecristian.workflow.core.dto.definition.TaskTypeCapability;
 import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition;
+import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
 import io.github.leontecristian.workflow.core.dto.tasktype.TaskTypeView;
 import io.github.leontecristian.workflow.core.exception.definition.WorkflowDefinitionException;
+import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
+import io.github.leontecristian.workflow.core.service.runtime.RuntimeHostSupport;
+import io.github.leontecristian.workflow.core.service.runtime.ServiceActionRegistry;
 import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
+import org.springframework.util.function.SingletonSupplier;
 
 /** Internal publication-subset checker. No represented host function is ever executed. */
 @Component
 public class DefinitionValidationService {
     static final String IDENTIFIER = "wf-previous-decisions-validator-v1";
     private final TaskTypeCatalogService catalog;
-    private final DefinitionCapabilityProvider provider;
-    private final io.github.leontecristian.workflow.core.service.runtime.RuntimeHostSupport runtimeHost;
+    private final SingletonSupplier<Map<String, TaskTypeCapability>> taskTypes;
+    private final RuntimeHostSupport runtimeHost;
     private final ObjectMapper json = new ObjectMapper();
     private final MinimalDefinitionLoader loader;
-    private final io.github.leontecristian.workflow.core.service.runtime.ServiceActionRegistry actions;
+    private final ServiceActionRegistry actions;
 
-    public DefinitionValidationService(TaskTypeCatalogService catalog, ObjectProvider<DefinitionCapabilityProvider> providers,
-                                       MinimalDefinitionLoader loader, io.github.leontecristian.workflow.core.service.runtime.ServiceActionRegistry actions,
-                                       io.github.leontecristian.workflow.core.service.runtime.RuntimeHostSupport runtimeHost) {
-        this.runtimeHost=runtimeHost;
-        this.actions=actions;
+    public DefinitionValidationService(TaskTypeCatalogService catalog, ObjectProvider<TaskTypeCapability> taskTypes,
+                                       MinimalDefinitionLoader loader, ServiceActionRegistry actions,
+                                       RuntimeHostSupport runtimeHost) {
+        this.runtimeHost = runtimeHost;
+        this.actions = actions;
         this.catalog = catalog;
         this.loader = loader;
-        List<DefinitionCapabilityProvider> registered = providers.stream().toList();
-        if (registered.size() > 1) throw new WorkflowDefinitionException(WorkflowDefinitionException.Category.HOST_CONFIGURATION, List.of());
-        this.provider = registered.isEmpty() ? null : registered.get(0);
+        this.taskTypes = SingletonSupplier.of(() -> indexTaskTypes(taskTypes));
     }
 
     record Checked(DefinitionValidationReport report, byte[] contextHash, String detailsJson) { }
@@ -48,7 +47,6 @@ public class DefinitionValidationService {
     Checked check(DefinitionDocumentCodec.Document document, boolean publication) {
         DefinitionDiagnostics diagnostics = new DefinitionDiagnostics();
         MinimalWorkflowDefinition model = loader.model(document, diagnostics);
-        DefinitionCapabilities capabilities = snapshot();
         ObjectNode provenance = json.createObjectNode();
         boolean extended=MinimalDefinitionLoader.extended(document.tree());
         boolean routing=MinimalDefinitionLoader.routing(document.tree());
@@ -67,7 +65,8 @@ public class DefinitionValidationService {
         }
         provenance.put("schemaVersion", 1); provenance.put("canonicalization", DefinitionContentCanonicalizer.IDENTIFIER);
         var humanContexts = provenance.putArray("humans");
-        if (model != null) {
+        if (model != null && !model.humans().isEmpty()) {
+            var capabilities = taskTypes.obtain();
             for (var human : model.humans().values().stream().sorted(java.util.Comparator.comparing(MinimalWorkflowDefinition.Human::key)).toList()) {
                 var humanContext = humanContexts.addObject();
                 humanContext.put("nodeKey", human.key());
@@ -82,19 +81,14 @@ public class DefinitionValidationService {
                     descriptor.put("selectable", task.selectable()); descriptor.put("lockVersion", task.lockVersion());
                 }
                 String resolver = human.assignment().resolver();
-                Set<AssignmentTargetKind> assignmentKinds = null;
-                if (capabilities != null) {
-                    assignmentKinds = human.completionPolicy() == CompletionPolicy.ALL
-                            ? capabilities.allAssignments().stream().filter(c -> c.resolver().equals(resolver))
-                                    .map(AllAssignmentCapability::targetKinds).findFirst().orElse(null)
-                            : capabilities.assignments().stream().filter(c -> c.resolver().equals(resolver))
-                                    .map(SingleAssignmentCapability::targetKinds).findFirst().orElse(null);
+                Set<AssignmentTargetKind> assignmentKinds;
+                try {
+                    assignmentKinds = runtimeHost.assignmentKinds(resolver, human.completionPolicy());
+                } catch (WorkflowExecutionException failure) {
+                    throw new WorkflowDefinitionException(WorkflowDefinitionException.Category.HOST_CONFIGURATION, failure);
                 }
-                TaskTypeCapability presentation = capabilities == null ? null : capabilities.taskTypes().stream()
-                        .filter(c -> c.taskType().equals(human.taskType())).findFirst().orElse(null);
+                TaskTypeCapability presentation = capabilities.get(human.taskType());
                 if (assignmentKinds != null) {
-                    if (human.completionPolicy() == CompletionPolicy.ALL) runtimeHost.requireAllResolver(resolver, assignmentKinds);
-                    else runtimeHost.requireResolver(resolver, assignmentKinds);
                     var descriptor = humanContext.putObject("assignmentCapability"); descriptor.put("resolver", resolver);
                     descriptor.put("policy", human.completionPolicy().name());
                     var kinds = descriptor.putArray("targetKinds"); assignmentKinds.stream().map(Enum::name).sorted().forEach(kinds::add);
@@ -103,11 +97,9 @@ public class DefinitionValidationService {
                     ObjectNode descriptor = humanContext.putObject("taskCapability"); descriptor.put("taskType", presentation.taskType());
                     var outcomes = descriptor.putArray("supportedOutcomes"); presentation.supportedOutcomes().stream().sorted().forEach(outcomes::add);
                 }
-                if (assignmentKinds == null || presentation == null || !human.outcomes().stream().allMatch(outcome -> presentation.supportedOutcomes().contains(outcome.key())))
+                if (assignmentKinds == null || !supportsOutcomes(presentation, human))
                     diagnostics.error("HOST_CAPABILITY_UNAVAILABLE", DiagnosticStage.HOST, "Required deployed host capability is unavailable.", pointer);
             }
-        } else if (capabilities == null) {
-            diagnostics.error("HOST_CAPABILITY_UNAVAILABLE", DiagnosticStage.HOST, "Deployed host capability provider is unavailable.", null);
         }
         String context = DefinitionContentCanonicalizer.canonical(provenance);
         byte[] contextHash = DefinitionContentCanonicalizer.hash(context);
@@ -120,31 +112,39 @@ public class DefinitionValidationService {
         return new Checked(report, contextHash, details);
     }
 
-    DefinitionCapabilities snapshot() {
-        if (provider == null) return null;
+    void requireHumanCapabilities(MinimalWorkflowDefinition model, boolean starting) {
+        if (model.humans().isEmpty()) return;
+        var capabilities = taskTypes.obtain();
+        for (var human : model.humans().values()) {
+            if (!supportsOutcomes(capabilities.get(human.taskType()), human))
+                throw new WorkflowDefinitionException(WorkflowDefinitionException.Category.HOST_CONFIGURATION, List.of());
+            if (starting) {
+                try {
+                    runtimeHost.requireAssignmentResolver(human.assignment().resolver(), human.completionPolicy());
+                } catch (WorkflowExecutionException failure) {
+                    throw new WorkflowDefinitionException(WorkflowDefinitionException.Category.HOST_CONFIGURATION, failure);
+                }
+            }
+        }
+    }
+
+    private static boolean supportsOutcomes(TaskTypeCapability capability, MinimalWorkflowDefinition.Human human) {
+        return capability != null
+                && human.outcomes().stream().allMatch(outcome -> capability.supportedOutcomes().contains(outcome.key()));
+    }
+
+    private static Map<String, TaskTypeCapability> indexTaskTypes(ObjectProvider<TaskTypeCapability> providers) {
         try {
-            DefinitionCapabilities snapshot = provider.snapshot();
-            if (snapshot == null) throw new IllegalArgumentException("Missing deployment snapshot");
-            Set<String> ids = new HashSet<>();
-            for (SingleAssignmentCapability c : snapshot.assignments()) {
-                if (c == null || !DefinitionInputs.text(c.resolver(), 100, 400, true) || !ids.add(c.resolver()))
-                    throw new IllegalArgumentException("Invalid resolver descriptor");
+            Map<String, TaskTypeCapability> registered = new HashMap<>();
+            for (TaskTypeCapability capability : providers.stream().toList()) {
+                if (!DefinitionInputs.key(capability.taskType()) || capability.supportedOutcomes() == null
+                        || capability.supportedOutcomes().stream().anyMatch(key -> !DefinitionInputs.key(key))
+                        || registered.putIfAbsent(capability.taskType(), capability) != null)
+                    throw new IllegalArgumentException("Invalid or duplicate task capability");
             }
-            ids.clear();
-            for (AllAssignmentCapability c : snapshot.allAssignments()) {
-                if (c == null || !DefinitionInputs.text(c.resolver(), 100, 400, true) || !ids.add(c.resolver()))
-                    throw new IllegalArgumentException("Invalid ALL resolver descriptor");
-            }
-            ids.clear();
-            for (TaskTypeCapability c : snapshot.taskTypes()) {
-                if (c == null || !DefinitionInputs.key(c.taskType()) || !ids.add(c.taskType())
-                        || c.supportedOutcomes().stream().anyMatch(k -> !DefinitionInputs.key(k)))
-                    throw new IllegalArgumentException("Invalid task descriptor");
-            }
-            return snapshot;
+            return Map.copyOf(registered);
         } catch (RuntimeException failure) {
             throw new WorkflowDefinitionException(WorkflowDefinitionException.Category.HOST_CONFIGURATION, failure);
         }
     }
-
 }

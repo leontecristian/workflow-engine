@@ -13,7 +13,6 @@ import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowSharedAssignmentProvider;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService;
-import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskOwnershipAuthorization;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
@@ -30,8 +29,7 @@ class ConsoleSharedAssignmentUnitTest {
     private WorkflowTaskEligibilityService eligibility(WorkflowSharedAssignmentProvider provider) {
         var beans = new DefaultListableBeanFactory();
         beans.registerSingleton("membership", provider);
-        return new WorkflowTaskEligibilityService(beans.getBeanProvider(WorkflowSharedAssignmentProvider.class),
-                beans.getBeanProvider(WorkflowTaskOwnershipAuthorization.class));
+        return new WorkflowTaskEligibilityService(beans.getBeanProvider(WorkflowSharedAssignmentProvider.class));
     }
     private WorkflowTaskView task(TaskStatus status, String closedBy) {
         return new WorkflowTaskView(5, 2, 1, 3, "REVIEW", SandboxSharedAssignmentProvider.FINANCE,

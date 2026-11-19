@@ -10,6 +10,10 @@ import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskEligibilityContext;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowAuthorizationRequest;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowPermission;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowResource;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowScope;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
@@ -18,7 +22,10 @@ import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleS
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeAccess;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskReassignmentAuthorization;
+import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
+import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskReassignmentTargetValidator;
+import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleWorkflowAuthorization;
+import io.github.leontecristian.workflow.testhost.service.runtime.SandboxCompletionPermissions;
 import io.github.leontecristian.workflow.testhost.service.runtime.SandboxSharedAssignmentProvider;
 import java.time.Instant;
 import java.util.Optional;
@@ -31,7 +38,9 @@ class ConsoleReassignmentUnitTest {
     private final ConsoleSettings settings = new ConsoleSettings(new MockEnvironment()
             .withProperty("workflow.console.admin.username", "admin")
             .withProperty("workflow.console.reviewer.username", "reviewer"));
-    private final ConsoleTaskReassignmentAuthorization authorization = new ConsoleTaskReassignmentAuthorization(businessAccess, context, settings);
+    private final ConsoleWorkflowAuthorization authorization = new ConsoleWorkflowAuthorization(context, businessAccess,
+            mock(SandboxRequestStore.class), mock(SandboxCompletionPermissions.class));
+    private final ConsoleTaskReassignmentTargetValidator destinations = new ConsoleTaskReassignmentTargetValidator(settings);
     private final WorkflowRuntimeQueryService reads = mock(WorkflowRuntimeQueryService.class);
     private final WorkflowTaskView task = new WorkflowTaskView(5, 2, 1, 3, "REVIEW", SandboxSharedAssignmentProvider.FINANCE,
             TaskStatus.OPEN, null, Instant.EPOCH, null, null, null, null, null);
@@ -46,13 +55,18 @@ class ConsoleReassignmentUnitTest {
     }
     @Test void knownDestinationsAndAdminPermissionAreSeparateFromBusinessAccess() {
         access(); var request = new TaskEligibilityContext(task, "admin");
-        assertThat(authorization.canAccess(request) && authorization.canReassign(request)).isTrue();
-        assertThat(authorization.isValidTarget(request, new TaskAssignmentTarget(AssignmentTargetKind.USER, "reviewer2"))).isTrue();
-        assertThat(authorization.isValidTarget(request, new TaskAssignmentTarget(AssignmentTargetKind.USER, "Reviewer2"))).isFalse();
-        assertThat(authorization.isValidTarget(request, SandboxSharedAssignmentProvider.APPROVER)).isTrue();
+        var access = new WorkflowAuthorizationRequest.Task(
+                new WorkflowPermission(WorkflowResource.TASK, WorkflowScope.ACCESS_REASSIGNMENT), request);
+        var reassign = new WorkflowAuthorizationRequest.Task(
+                new WorkflowPermission(WorkflowResource.TASK, WorkflowScope.REASSIGN), request);
+        assertThat(authorization.isAllowed(access)).isTrue();
+        assertThat(authorization.isAllowed(reassign)).isTrue();
+        assertThat(destinations.isValidTarget(request, new TaskAssignmentTarget(AssignmentTargetKind.USER, "reviewer2"))).isTrue();
+        assertThat(destinations.isValidTarget(request, new TaskAssignmentTarget(AssignmentTargetKind.USER, "Reviewer2"))).isFalse();
+        assertThat(destinations.isValidTarget(request, SandboxSharedAssignmentProvider.APPROVER)).isTrue();
         when(context.admin()).thenReturn(false);
-        assertThat(authorization.canAccess(request)).isTrue();
-        assertThat(authorization.canReassign(request)).isFalse();
+        assertThat(authorization.isAllowed(access)).isTrue();
+        assertThat(authorization.isAllowed(reassign)).isFalse();
     }
     @Test void targetLookupPagesFixturesAndRechecksAccessAndPermission() {
         access();

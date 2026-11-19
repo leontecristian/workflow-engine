@@ -11,18 +11,18 @@ import io.github.leontecristian.workflow.web.integration.runtime.WorkflowAssignm
 
 /** Sandbox fixture directory for runtime task reads. */
 public class ConsoleRuntimeReadHost implements WorkflowAssignmentDirectory {
-    private final ConsoleTaskReassignmentAuthorization reassignment;
+    private final ConsoleWorkflowAuthorization authorization;
     private final ConsoleSettings settings;
 
-    public ConsoleRuntimeReadHost(ConsoleTaskReassignmentAuthorization reassignment, ConsoleSettings settings) {
-        this.reassignment = reassignment;
+    public ConsoleRuntimeReadHost(ConsoleWorkflowAuthorization authorization, ConsoleSettings settings) {
+        this.authorization = authorization;
         this.settings = settings;
     }
 
     @Override public WorkflowReassignmentTargetPage reassignmentTargets(TaskEligibilityContext task,
             AssignmentTargetKind kind, String query, String cursor, int limit) {
         boolean allowed;
-        try { allowed = reassignment.canAccess(task) && reassignment.canReassign(task); }
+        try { allowed = authorization.canAccessLinkedTask(task) && authorization.isAdministrator(task.actorRef()); }
         catch (RuntimeException failure) {
             throw new WorkflowExecutionException(WorkflowExecutionException.Category.AUTHORIZATION_LOOKUP_FAILED, failure);
         }

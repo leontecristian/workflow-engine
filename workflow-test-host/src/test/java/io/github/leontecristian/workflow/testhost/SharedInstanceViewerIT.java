@@ -3,10 +3,8 @@ package io.github.leontecristian.workflow.testhost;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.leontecristian.workflow.core.dto.definition.CheckWorkflowDefinition;
-import io.github.leontecristian.workflow.core.dto.definition.DefinitionCapabilities;
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionManagementContext;
 import io.github.leontecristian.workflow.core.dto.definition.ImportWorkflowDraft;
-import io.github.leontecristian.workflow.core.dto.definition.SingleAssignmentCapability;
 import io.github.leontecristian.workflow.core.dto.definition.TaskTypeCapability;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
@@ -25,7 +23,6 @@ import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
 import io.github.leontecristian.workflow.core.dto.tasktype.CreateTaskType;
-import io.github.leontecristian.workflow.core.service.definition.DefinitionCapabilityProvider;
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.runtime.SingleTaskAssignmentResolver;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionService;
@@ -45,6 +42,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
@@ -54,7 +54,6 @@ import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
@@ -69,6 +68,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
                 "spring.main.allow-bean-definition-overriding=true",
                 "workflow.console.admin.username=f013-admin", "workflow.console.admin.password=f013-local-test-password",
                 "workflow.console.reviewer.username=f013-reviewer", "workflow.console.reviewer.password=f013-local-test-password"})
+@Import(SharedInstanceViewerIT.Adapters.class)
 class SharedInstanceViewerIT extends CompletionAdapterIntegrationTest {
     @Autowired WorkflowDefinitionService definitions;
     @Autowired TaskTypeCatalogService catalog;
@@ -77,11 +77,9 @@ class SharedInstanceViewerIT extends CompletionAdapterIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactions;
     @Autowired WebApplicationContext web;
-    @TestBean(name = "consoleCapabilities", methodName = "viewerFixtureHost")
-    ViewerFixtureHost fixtures;
     @LocalServerPort int port;
     private final String marker = "f013." + UUID.randomUUID();
-    private final String code = "F013_" + UUID.randomUUID().toString().replace("-", "");
+    private static final String TASK_CODE = "F013_" + UUID.randomUUID().toString().replace("-", "");
     private final List<Long> instances = new ArrayList<>(), versions = new ArrayList<>(), families = new ArrayList<>();
     private Long taskType;
     private final ObjectMapper json = new ObjectMapper();
@@ -93,7 +91,7 @@ class SharedInstanceViewerIT extends CompletionAdapterIntegrationTest {
         document.put("key", marker + "." + name);
         for (var node : document.path("nodes")) {
             if (node.path("type").asText().equals("HUMAN_TASK")) {
-                ((ObjectNode) node).put("taskType", code);
+                ((ObjectNode) node).put("taskType", TASK_CODE);
                 ((ObjectNode) node.path("assignment")).put("resolver", "f013.reviewer");
             }
             if (node.path("type").asText().equals("SERVICE_TASK")) ((ObjectNode) node).put("action", "f013.quantity");
@@ -130,8 +128,7 @@ class SharedInstanceViewerIT extends CompletionAdapterIntegrationTest {
         assertThat(response.getContentType()).startsWith("application/json"); return response.getContentAsString();
     }
     @Test void extractedReadsAndRetainedHostAccess() throws Exception {
-        fixtures.code = code;
-        taskType = tx().execute(status -> catalog.create(new CreateTaskType(code, marker, null, true)).after().id());
+        taskType = tx().execute(status -> catalog.create(new CreateTaskType(TASK_CODE, marker, null, true)).after().id());
         long sequential = start(publish("sequential-review"), StartInputs.empty()); advance(sequential);
         long optional = start(publish("optional-stage-review"), new StartInputs(Map.of("quantity", new TextLiteral("5")))); advance(optional);
         var mvc = MockMvcBuilders.webAppContextSetup(web).addFilters(web.getBean(FilterChainProxy.class)).build();
@@ -174,16 +171,25 @@ class SharedInstanceViewerIT extends CompletionAdapterIntegrationTest {
             }
             for (long version : versions) jdbc.update("DELETE FROM wf.workflow_definition_version WHERE id=?", version);
             for (long family : families) jdbc.update("DELETE FROM wf.workflow_definition WHERE id=? AND workflow_key LIKE ?", family, marker + ".%");
-            if (taskType != null) jdbc.update("DELETE FROM wf.workflow_task_type WHERE id=? AND code=?", taskType, code);
+            if (taskType != null) jdbc.update("DELETE FROM wf.workflow_task_type WHERE id=? AND code=?", taskType, TASK_CODE);
         });
         for (long instance : instances) assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf.workflow_instance WHERE id=?", Integer.class, instance)).isZero();
     }
-    static ViewerFixtureHost viewerFixtureHost() { return new ViewerFixtureHost(); }
-    static class ViewerFixtureHost implements DefinitionCapabilityProvider, SingleTaskAssignmentResolver, WorkflowServiceAction {
+    @TestConfiguration
+    static class Adapters {
+        @Bean
+        ViewerFixtureHost viewerFixtureHost() {
+            return new ViewerFixtureHost();
+        }
+
+        @Bean
+        TaskTypeCapability viewerTaskCapability() {
+            return new TaskTypeCapability(TASK_CODE, Set.of("APPROVE", "REJECT"));
+        }
+    }
+    static class ViewerFixtureHost implements SingleTaskAssignmentResolver, WorkflowServiceAction {
         @Override public Set<io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind> targetKinds() { return Set.of(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER); }
-        String code;
         public String identifier() { return "f013.reviewer"; }
-        public DefinitionCapabilities snapshot() { return new DefinitionCapabilities(Set.of(new SingleAssignmentCapability(identifier(), Set.of(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER))), code == null ? Set.of() : Set.of(new TaskTypeCapability(code, Set.of("APPROVE", "REJECT")))); }
         public SingleAssignmentResult resolve(AssignmentContext context) { return new SingleAssignmentResult(List.of(new ResolvedTask("review", new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER, context.humanNodeKey().equals("MANAGER") ? "f013-manager" : "f013-reviewer"))), null); }
         public ServiceActionDescriptor descriptor() { return new ServiceActionDescriptor("f013.quantity", List.of(new ActionField("quantity", VariableValueType.LONG, true, false)), List.of(new ActionField("recordedQuantity", VariableValueType.LONG, true, false))); }
         public ServiceActionResult execute(ServiceActionContext context, Map<String, WorkflowValue> inputs) { return new ServiceActionResult(Map.of("recordedQuantity", inputs.get("quantity"))); }

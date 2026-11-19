@@ -7,13 +7,21 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowAuthorizationRequest;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowOperation;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowPermission;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowResource;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowScope;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.testhost.exception.console.ConsoleException;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeAccess;
+import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess;
+import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleWorkflowAuthorization;
+import io.github.leontecristian.workflow.testhost.service.runtime.SandboxCompletionPermissions;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -21,19 +29,27 @@ class ConsoleRuntimeAdaptersUnitTest {
     @Test void cancellationPolicyRequiresBusinessLinkAndAdministratorPermission() {
         var context = mock(ConsoleContext.class);
         var requests = mock(io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore.class);
-        var policy = new io.github.leontecristian.workflow.testhost.service.runtime.ConsoleWorkflowCancellationAuthorization(context, requests);
+        var policy = new ConsoleWorkflowAuthorization(context, new ConsoleTaskBusinessAccess(context, requests),
+                requests, mock(SandboxCompletionPermissions.class));
+        assertThat(policy.supportedOperations()).containsExactlyInAnyOrder(
+                WorkflowOperation.COMPLETE_TASK, WorkflowOperation.CLAIM_TASK, WorkflowOperation.RELEASE_TASK,
+                WorkflowOperation.ADMIN_RELEASE_TASK, WorkflowOperation.REASSIGN_TASK, WorkflowOperation.CANCEL_WORKFLOW);
         var commandContext = new WorkflowCommandContext(io.github.leontecristian.workflow.core.dto.runtime.ActorKind.USER,
                 "reviewer", java.time.Instant.EPOCH, null);
         var authorization = new io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationAuthorizationContext(
                 1, 2, "SANDBOX_REQUEST", "3", commandContext);
+        var access = new WorkflowAuthorizationRequest.Cancellation(
+                new WorkflowPermission(WorkflowResource.INSTANCE, WorkflowScope.ACCESS_CANCELLATION), authorization);
+        var cancel = new WorkflowAuthorizationRequest.Cancellation(
+                new WorkflowPermission(WorkflowResource.INSTANCE, WorkflowScope.CANCEL), authorization);
         when(context.isConsoleActor("reviewer")).thenReturn(true);
         when(requests.linkedToInstance(1)).thenReturn(true);
-        assertThat(policy.canAccess(authorization)).isTrue();
-        assertThat(policy.canCancel(authorization)).isFalse();
+        assertThat(policy.isAllowed(access)).isTrue();
+        assertThat(policy.isAllowed(cancel)).isFalse();
         when(context.admin()).thenReturn(true);
-        assertThat(policy.canCancel(authorization)).isTrue();
+        assertThat(policy.isAllowed(cancel)).isTrue();
         when(requests.linkedToInstance(1)).thenReturn(false);
-        assertThat(policy.canAccess(authorization)).isFalse();
+        assertThat(policy.isAllowed(access)).isFalse();
     }
     @Test void runtimeResolverKeepsScopedConsoleFailuresAndRecognizesWrappedConflict() throws Exception {
         var resolver = new io.github.leontecristian.workflow.testhost.service.console.ConsoleRuntimeConflictResolver(

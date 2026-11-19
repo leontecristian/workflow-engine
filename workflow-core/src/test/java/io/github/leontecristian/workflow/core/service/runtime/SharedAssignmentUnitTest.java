@@ -27,32 +27,29 @@ class SharedAssignmentUnitTest {
         when(resolver.identifier()).thenReturn("shared");
         when(resolver.targetKinds()).thenReturn(Set.of(AssignmentTargetKind.GROUP));
         var withoutShared=new RuntimeHostSupport(source(List.of(resolver)),source(List.of()),eligibility(),source(List.of()));
-        assertThatThrownBy(()->withoutShared.requireResolver("shared",Set.of(AssignmentTargetKind.USER)))
+        assertThatThrownBy(()->withoutShared.assignmentKinds("shared",CompletionPolicy.SINGLE))
                 .isInstanceOfSatisfying(WorkflowExecutionException.class,e->assertThat(e.category()).isEqualTo(WorkflowExecutionException.Category.HOST_CONFIGURATION));
-        assertThatThrownBy(()->withoutShared.requireResolver("shared",Set.of(AssignmentTargetKind.GROUP)))
+        assertThatThrownBy(()->withoutShared.resolve("shared",mock(AssignmentContext.class)))
                 .isInstanceOfSatisfying(WorkflowExecutionException.class,e->assertThat(e.category()).isEqualTo(WorkflowExecutionException.Category.HOST_CONFIGURATION));
         var provider=mock(WorkflowSharedAssignmentProvider.class);
-        var descriptor=new io.github.leontecristian.workflow.core.dto.definition.SingleAssignmentCapability("shared",Set.of(AssignmentTargetKind.GROUP));
-        io.github.leontecristian.workflow.core.service.definition.DefinitionCapabilityProvider capabilities=()->
-                new io.github.leontecristian.workflow.core.dto.definition.DefinitionCapabilities(Set.of(descriptor),Set.of());
-        var supported=new RuntimeHostSupport(source(List.of(resolver)),source(List.of()),eligibility(provider),source(List.of(capabilities)));
-        supported.requireResolver("shared",Set.of(AssignmentTargetKind.GROUP));
+        var supported=new RuntimeHostSupport(source(List.of(resolver)),source(List.of()),eligibility(provider),source(List.of()));
+        assertThat(supported.assignmentKinds("shared",CompletionPolicy.SINGLE)).containsExactly(AssignmentTargetKind.GROUP);
         verifyNoInteractions(provider); // Publication checks configuration, never resolves membership/targets.
         when(resolver.resolve(any())).thenReturn(new SingleAssignmentResult(List.of(new ResolvedTask("review",new TaskAssignmentTarget(AssignmentTargetKind.ROLE,"finance"))),null));
-        assertThatThrownBy(()->supported.resolve(resolver,mock(AssignmentContext.class)))
+        assertThatThrownBy(()->supported.resolve("shared",mock(AssignmentContext.class)))
                 .isInstanceOfSatisfying(WorkflowExecutionException.class,e->assertThat(e.category()).isEqualTo(WorkflowExecutionException.Category.INVALID_ASSIGNMENT));
         when(resolver.resolve(any())).thenReturn(new SingleAssignmentResult(List.of(new ResolvedTask("review",new TaskAssignmentTarget(AssignmentTargetKind.GROUP,"finance"))),null));
-        assertThatThrownBy(()->supported.resolve(resolver,mock(AssignmentContext.class)))
+        assertThatThrownBy(()->supported.resolve("shared",mock(AssignmentContext.class)))
                 .isInstanceOfSatisfying(WorkflowExecutionException.class,e->assertThat(e.category()).isEqualTo(WorkflowExecutionException.Category.INVALID_ASSIGNMENT));
         when(provider.targetExists(any(),any())).thenThrow(new IllegalStateException("lookup failed"));
-        assertThatThrownBy(()->supported.resolve(resolver,mock(AssignmentContext.class)))
+        assertThatThrownBy(()->supported.resolve("shared",mock(AssignmentContext.class)))
                 .isInstanceOfSatisfying(WorkflowExecutionException.class,e->assertThat(e.category()).isEqualTo(WorkflowExecutionException.Category.ASSIGNMENT_LOOKUP_FAILED));
     }
     @SuppressWarnings("unchecked")
     private WorkflowTaskEligibilityService eligibility(WorkflowSharedAssignmentProvider... providers) {
         ObjectProvider<WorkflowSharedAssignmentProvider> source=mock(ObjectProvider.class);
         when(source.stream()).thenAnswer(i->Stream.of(providers));
-        return new WorkflowTaskEligibilityService(source, source(List.of()));
+        return new WorkflowTaskEligibilityService(source);
     }
     private WorkflowTaskView view(AssignmentTargetKind kind,String ref) {
         return new WorkflowTaskView(1,2,3,4,"review",new TaskAssignmentTarget(kind,ref),TaskStatus.OPEN,null,
@@ -111,7 +108,7 @@ class SharedAssignmentUnitTest {
     @Test void authorizedMyTasksCombinesVisibilityWithPersonalEligibilityWithoutOwnershipSupport() {
         var tasks=mock(WorkflowTaskRepository.class);
         var membership=mock(WorkflowSharedAssignmentProvider.class);
-        var eligibility=eligibility(membership); // No ownership authorization adapter is registered.
+        var eligibility=eligibility(membership); // No command authorization is registered.
         var policy=mock(WorkflowRuntimeReadAuthorization.class);
         var unreadableMember=row(1);
         var readableNonmember=row(2);
@@ -130,7 +127,7 @@ class SharedAssignmentUnitTest {
         });
         var queries=new WorkflowRuntimeQueryService(null,null,tasks,null,null,new RuntimeJson(),null,eligibility);
         var authorized=new WorkflowAuthorizedRuntimeReadService(queries,policy,eligibility,
-                source(List.of()),source(List.of()));
+                new WorkflowAuthorizationSupport(source(List.of())));
 
         var personal=authorized.listMyTasks("alice",0,50);
         assertThat(personal.items()).extracting(WorkflowTaskView::id).containsExactly(3L,4L);

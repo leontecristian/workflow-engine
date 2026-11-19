@@ -4,10 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.leontecristian.workflow.core.dto.definition.CheckWorkflowDefinition;
-import io.github.leontecristian.workflow.core.dto.definition.DefinitionCapabilities;
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionManagementContext;
 import io.github.leontecristian.workflow.core.dto.definition.ImportWorkflowDraft;
-import io.github.leontecristian.workflow.core.dto.definition.SingleAssignmentCapability;
 import io.github.leontecristian.workflow.core.dto.definition.TaskTypeCapability;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
@@ -32,7 +30,6 @@ import io.github.leontecristian.workflow.core.dto.runtime.WorkflowEvent;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowExecutionResult;
 import io.github.leontecristian.workflow.core.dto.tasktype.CreateTaskType;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
-import io.github.leontecristian.workflow.core.service.definition.DefinitionCapabilityProvider;
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService;
 import io.github.leontecristian.workflow.core.service.runtime.SingleTaskAssignmentResolver;
@@ -46,13 +43,11 @@ import io.github.leontecristian.workflow.testhost.repository.event.ConsoleEventS
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleWire;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -93,7 +88,7 @@ class RestrictedRoutingIT extends CompletionAdapterIntegrationTest {
     private final ObjectMapper json=new ObjectMapper();
     private final String marker="f008.it."+UUID.randomUUID();
     private final String correlation=UUID.randomUUID().toString();
-    private final String taskCode="F008_"+UUID.randomUUID().toString().replace("-","").toUpperCase(Locale.ROOT);
+    private static final String TASK_CODE="F008_"+UUID.randomUUID().toString().replace("-","").toUpperCase(Locale.ROOT);
     private final List<Long> instances=new ArrayList<>(), versions=new ArrayList<>();
     private Long definitionId, taskTypeId;
     private final Instant now=Instant.parse("2026-11-05T00:00:00Z");
@@ -101,8 +96,7 @@ class RestrictedRoutingIT extends CompletionAdapterIntegrationTest {
     private WorkflowCommandContext context(boolean complete) { return new WorkflowCommandContext(ActorKind.USER,complete?"f008-reviewer":"f008-starter",complete?now.plusSeconds(1):now,correlation); }
 
     @BeforeEach void createOwnedCatalog() {
-        host.taskCodes.add(taskCode);
-        taskTypeId=tx().execute(status->catalog.create(new CreateTaskType(taskCode,marker,null,true)).after().id());
+        taskTypeId=tx().execute(status->catalog.create(new CreateTaskType(TASK_CODE,marker,null,true)).after().id());
     }
     @AfterEach void cleanOnlyOwnedFixtures() {
         host.failRecorder.set(false); host.entered=null; host.release=null;
@@ -119,9 +113,8 @@ class RestrictedRoutingIT extends CompletionAdapterIntegrationTest {
             jdbc.update("DELETE FROM wf_test.management_audit WHERE correlation_id=?",correlation);
             for(long version:versions) jdbc.update("DELETE FROM wf.workflow_definition_version WHERE id=?",version);
             if(definitionId!=null) jdbc.update("DELETE FROM wf.workflow_definition WHERE id=? AND workflow_key=?",definitionId,marker);
-            if(taskTypeId!=null) jdbc.update("DELETE FROM wf.workflow_task_type WHERE id=? AND code=?",taskTypeId,taskCode);
+            if(taskTypeId!=null) jdbc.update("DELETE FROM wf.workflow_task_type WHERE id=? AND code=?",taskTypeId,TASK_CODE);
         });
-        host.taskCodes.remove(taskCode);
     }
     private ObjectNode fixture() throws Exception {
         return (ObjectNode)json.readTree("""
@@ -142,7 +135,7 @@ class RestrictedRoutingIT extends CompletionAdapterIntegrationTest {
                {"key":"record","from":"RECORD","to":"ROUTE"},{"key":"fallback","from":"ROUTE","to":"LOW","default":true},
                {"key":"high","from":"ROUTE","to":"HIGH","condition":"#vars.recordedQuantity > 10"},
                {"key":"positive","from":"ROUTE","to":"LOW","condition":"#vars.recordedQuantity > 0"}]}
-            """.formatted(marker,taskCode));
+            """.formatted(marker,TASK_CODE));
     }
     private long publish(ObjectNode source) {
         return tx().execute(status->{
@@ -609,6 +602,10 @@ class RestrictedRoutingIT extends CompletionAdapterIntegrationTest {
     }
 
     @TestConfiguration static class Adapters {
+        @Bean TaskTypeCapability routingTaskCapability() {
+            return new TaskTypeCapability(TASK_CODE, Set.of("COMPLETE", "APPROVE", "REJECT"));
+        }
+
         @Bean WorkflowServiceAction jsonReplacementAction(TestHost host) {
             return new WorkflowServiceAction() {
                 public ServiceActionDescriptor descriptor() { var f=new ActionField("booking",VariableValueType.JSON,true,false); return new ServiceActionDescriptor("f009.replace",List.of(f),List.of(f)); }
@@ -630,16 +627,12 @@ class RestrictedRoutingIT extends CompletionAdapterIntegrationTest {
             };
         }
     }
-    static class TestHost implements DefinitionCapabilityProvider,SingleTaskAssignmentResolver,WorkflowServiceAction,WorkflowEventBatchWriter {
+    static class TestHost implements SingleTaskAssignmentResolver,WorkflowServiceAction,WorkflowEventBatchWriter {
         @Override public Set<io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind> targetKinds() { return Set.of(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER); }
-        final Set<String> taskCodes=ConcurrentHashMap.newKeySet(); final AtomicBoolean failRecorder=new AtomicBoolean();
+        final AtomicBoolean failRecorder=new AtomicBoolean();
         volatile CountDownLatch entered,release;
         private final JdbcTemplate jdbc; private final ConsoleEventStore outbox; private final ConsoleWire wire;
         TestHost(JdbcTemplate jdbc,ConsoleEventStore outbox,ConsoleWire wire) { this.jdbc=jdbc; this.outbox=outbox; this.wire=wire; }
-        @Override public DefinitionCapabilities snapshot() {
-            var types=new HashSet<TaskTypeCapability>(); taskCodes.forEach(code->types.add(new TaskTypeCapability(code,Set.of("COMPLETE", "APPROVE", "REJECT"))));
-            return new DefinitionCapabilities(Set.of(new SingleAssignmentCapability(identifier(), Set.of(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER))),types);
-        }
         @Override public String identifier() { return "f008.reviewer"; }
         @Override public SingleAssignmentResult resolve(AssignmentContext context) { return new SingleAssignmentResult(List.of(new ResolvedTask("review", new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER, "f008-reviewer"))),null); }
         @Override public ServiceActionDescriptor descriptor() { return new ServiceActionDescriptor("f008.record",

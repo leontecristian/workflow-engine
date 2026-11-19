@@ -11,6 +11,8 @@ import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstancePage;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceQuery;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowOperation;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowScope;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationPage;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationQuery;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage;
@@ -21,7 +23,6 @@ import io.github.leontecristian.workflow.core.exception.runtime.WorkflowRuntimeR
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowRuntimeReadAccessException.Access;
 import java.util.ArrayList;
 import java.util.Objects;
-import org.springframework.beans.factory.ObjectProvider;
 
 /**
  * Authorized runtime selection and advisory availability for a trusted actor. Construct explicitly
@@ -32,18 +33,15 @@ public class WorkflowAuthorizedRuntimeReadService {
     private final WorkflowRuntimeQueryService reads;
     private final WorkflowRuntimeReadAuthorization authorization;
     private final WorkflowTaskEligibilityService eligibility;
-    private final ObjectProvider<WorkflowTaskReassignmentAuthorization> reassignmentProviders;
-    private final ObjectProvider<WorkflowCancellationAuthorization> cancellationProviders;
+    private final WorkflowAuthorizationSupport commandAuthorization;
 
     public WorkflowAuthorizedRuntimeReadService(WorkflowRuntimeQueryService reads,
             WorkflowRuntimeReadAuthorization authorization, WorkflowTaskEligibilityService eligibility,
-            ObjectProvider<WorkflowTaskReassignmentAuthorization> reassignmentProviders,
-            ObjectProvider<WorkflowCancellationAuthorization> cancellationProviders) {
+            WorkflowAuthorizationSupport commandAuthorization) {
         this.reads = Objects.requireNonNull(reads);
         this.authorization = Objects.requireNonNull(authorization);
         this.eligibility = Objects.requireNonNull(eligibility);
-        this.reassignmentProviders = Objects.requireNonNull(reassignmentProviders);
-        this.cancellationProviders = Objects.requireNonNull(cancellationProviders);
+        this.commandAuthorization = Objects.requireNonNull(commandAuthorization);
     }
 
     /** Usable before parsing protected collection filters. */
@@ -138,50 +136,49 @@ public class WorkflowAuthorizedRuntimeReadService {
     public boolean canClaimTask(String actorRef, WorkflowTaskView task) {
         var context = taskContext(actorRef, task);
         return task.status() == TaskStatus.OPEN && shared(task) && task.assigneeRef() == null
-                && eligibility.canAccessOwnership(context) && eligibility.isEligible(task, actorRef);
+                && commandAuthorization.supports(WorkflowOperation.CLAIM_TASK)
+                && commandAuthorization.allowsTask(WorkflowScope.ACCESS_OWNERSHIP, context)
+                && eligibility.isEligible(task, actorRef);
     }
 
     public boolean canReleaseTask(String actorRef, WorkflowTaskView task) {
         var context = taskContext(actorRef, task);
         return task.status() == TaskStatus.OPEN && shared(task) && actorRef.equals(task.assigneeRef())
-                && eligibility.canAccessOwnership(context);
+                && commandAuthorization.supports(WorkflowOperation.RELEASE_TASK)
+                && commandAuthorization.allowsTask(WorkflowScope.ACCESS_OWNERSHIP, context);
     }
 
     public boolean canAdministrativelyReleaseTask(String actorRef, WorkflowTaskView task) {
         var context = taskContext(actorRef, task);
         return task.status() == TaskStatus.OPEN && shared(task) && task.assigneeRef() != null
-                && eligibility.canAccessOwnership(context) && eligibility.canAdministrativelyRelease(context);
+                && commandAuthorization.supports(WorkflowOperation.ADMIN_RELEASE_TASK)
+                && commandAuthorization.allowsTask(WorkflowScope.ACCESS_OWNERSHIP, context)
+                && commandAuthorization.allowsTask(WorkflowScope.ADMIN_RELEASE, context);
     }
 
     /** Operation permission used both by availability and the separate directory lookup gate. */
     public boolean canReassignTask(String actorRef, WorkflowTaskView task) {
         var context = taskContext(actorRef, task);
-        var adapters = reassignmentProviders.stream().toList();
-        if (adapters.isEmpty()) return false;
-        RuntimeInputs.require(adapters.size() == 1, Category.HOST_CONFIGURATION);
-        try { return adapters.get(0).canAccess(context) && adapters.get(0).canReassign(context); }
-        catch (RuntimeException failure) { throw new WorkflowExecutionException(Category.AUTHORIZATION_LOOKUP_FAILED, failure); }
+        return commandAuthorization.supports(WorkflowOperation.REASSIGN_TASK)
+                && commandAuthorization.allowsTask(WorkflowScope.ACCESS_REASSIGNMENT, context)
+                && commandAuthorization.allowsTask(WorkflowScope.REASSIGN, context);
     }
 
     /** Allows web to avoid obtaining a command context when this capability is absent. */
     public boolean hasCancellationAuthorization() {
-        var adapters = cancellationProviders.stream().toList();
-        RuntimeInputs.require(adapters.size() <= 1, Category.HOST_CONFIGURATION);
-        return !adapters.isEmpty();
+        return commandAuthorization.supports(WorkflowOperation.CANCEL_WORKFLOW);
     }
 
     /** The caller first authorizes the instance; only this operation takes command context. */
     public boolean canCancelWorkflow(String actorRef, WorkflowInstanceView instance, WorkflowCommandContext context) {
         validateActorRef(actorRef);
         RuntimeInputs.require(instance != null, Category.INVALID_INPUT);
-        if (instance.status() != InstanceStatus.ACTIVE) return false;
-        var adapters = cancellationProviders.stream().toList();
-        if (adapters.isEmpty()) return false;
-        RuntimeInputs.require(adapters.size() == 1 && context != null && actorRef.equals(context.actorRef()), Category.HOST_CONFIGURATION);
+        if (instance.status() != InstanceStatus.ACTIVE || !hasCancellationAuthorization()) return false;
+        RuntimeInputs.require(context != null && actorRef.equals(context.actorRef()), Category.HOST_CONFIGURATION);
         var cancellation = new WorkflowCancellationAuthorizationContext(instance.id(), instance.definitionVersionId(),
                 instance.businessType(), instance.businessId(), context);
-        try { return adapters.get(0).canAccess(cancellation) && adapters.get(0).canCancel(cancellation); }
-        catch (RuntimeException failure) { throw new WorkflowExecutionException(Category.AUTHORIZATION_LOOKUP_FAILED, failure); }
+        return commandAuthorization.allowsCancellation(WorkflowScope.ACCESS_CANCELLATION, cancellation)
+                && commandAuthorization.allowsCancellation(WorkflowScope.CANCEL, cancellation);
     }
 
     private static TaskEligibilityContext taskContext(String actorRef, WorkflowTaskView task) {

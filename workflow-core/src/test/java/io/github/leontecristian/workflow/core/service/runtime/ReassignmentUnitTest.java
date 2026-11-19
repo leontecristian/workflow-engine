@@ -10,6 +10,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -17,6 +18,11 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.argThat;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.github.leontecristian.workflow.core.dto.definition.document.ExecutableDefinition;
+import io.github.leontecristian.workflow.core.dto.definition.document.MinimalWorkflowDefinition;
+import io.github.leontecristian.workflow.core.dto.runtime.ActivityStatus;
+import io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowAuthorizationRequest;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
 import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
@@ -24,23 +30,36 @@ import io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget;
 import io.github.leontecristian.workflow.core.dto.runtime.ReassignWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowOperation;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowResource;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowScope;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationQuery;
 import io.github.leontecristian.workflow.core.entity.runtime.WorkflowTaskEntity;
 import io.github.leontecristian.workflow.core.entity.runtime.WorkflowHistoryEntity;
 import io.github.leontecristian.workflow.core.entity.runtime.WorkflowCommandReceiptEntity;
+import io.github.leontecristian.workflow.core.entity.runtime.WorkflowActivityEntity;
+import io.github.leontecristian.workflow.core.entity.runtime.WorkflowInstanceEntity;
 import io.github.leontecristian.workflow.core.repository.runtime.WorkflowTaskRepository;
 import io.github.leontecristian.workflow.core.repository.runtime.WorkflowHistoryRepository;
 import io.github.leontecristian.workflow.core.repository.runtime.WorkflowInstanceRepository;
 import io.github.leontecristian.workflow.core.repository.runtime.WorkflowActivityRepository;
+import io.github.leontecristian.workflow.core.repository.runtime.WorkflowCommandReceiptRepository;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category;
+import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionRuntimeReader;
+import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
+import jakarta.persistence.EntityManager;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import java.util.List;
 import java.util.Arrays;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 
 /** Database-free tests of the changed evidence, receipt and bounded-query contracts. */
 class ReassignmentUnitTest {
@@ -195,44 +214,130 @@ class ReassignmentUnitTest {
 
     @Test void reassignmentRechecksAssignmentDependentAccessAndPermissionAfterAggregateClaim() {
         for (boolean loseAccess : new boolean[]{true,false}) {
-            var tasks = mock(WorkflowTaskRepository.class);
-            var activities = mock(WorkflowActivityRepository.class);
-            var instances = mock(WorkflowInstanceRepository.class);
-            var receipts = mock(io.github.leontecristian.workflow.core.repository.runtime.WorkflowCommandReceiptRepository.class);
-            var em = mock(jakarta.persistence.EntityManager.class);
-            var adapter = mock(WorkflowTaskReassignmentAuthorization.class);
-            var pins = mock(RuntimeDefinitionPins.class);
-            var task = mock(WorkflowTaskEntity.class);
-            var activity = mock(io.github.leontecristian.workflow.core.entity.runtime.WorkflowActivityEntity.class);
-            var instance = mock(io.github.leontecristian.workflow.core.entity.runtime.WorkflowInstanceEntity.class);
-            var beans = new org.springframework.beans.factory.support.StaticListableBeanFactory();
-            beans.addBean("reassignment",adapter);
-            var service = new WorkflowExecutionService(instances,activities,tasks,mock(WorkflowHistoryRepository.class),receipts,em,
-                    mock(io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionRuntimeReader.class),
-                    mock(io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService.class),json,
-                    mock(RuntimeHostSupport.class),pins,mock(RuntimeVariables.class),mock(RuntimeServiceProgression.class),
-                    mock(WorkflowTaskEligibilityService.class),beans.getBeanProvider(WorkflowTaskSubmissionValidator.class));
-            service.setReassignmentAuthorization(beans.getBeanProvider(WorkflowTaskReassignmentAuthorization.class));
-            var assignment = new java.util.concurrent.atomic.AtomicReference<>(target(AssignmentTargetKind.USER,"original"));
-            when(task.getId()).thenReturn(3L); when(task.getActivityId()).thenReturn(2L);
-            when(task.getAssignment()).thenAnswer(call -> assignment.get());
-            when(activity.getId()).thenReturn(2L); when(activity.getInstanceId()).thenReturn(1L);
-            when(tasks.findById(3L)).thenReturn(java.util.Optional.of(task));
-            when(activities.findById(2L)).thenReturn(java.util.Optional.of(activity));
-            when(instances.findById(1L)).thenReturn(java.util.Optional.of(instance));
-            when(instance.getLockVersion()).thenReturn(3L);
-            when(instance.getStatus()).thenReturn(io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus.ACTIVE);
-            when(instance.getLastHistorySequence()).thenReturn(4L); when(instance.reserveHistorySequence()).thenReturn(5L);
-            when(receipts.findById(id)).thenReturn(java.util.Optional.empty());
-            when(adapter.canAccess(any())).thenAnswer(call -> !loseAccess || ((io.github.leontecristian.workflow.core.dto.runtime.TaskEligibilityContext)call.getArgument(0)).task().assignment().ref().equals("original"));
-            when(adapter.canReassign(any())).thenAnswer(call -> ((io.github.leontecristian.workflow.core.dto.runtime.TaskEligibilityContext)call.getArgument(0)).task().assignment().ref().equals("original"));
-            org.mockito.Mockito.doAnswer(call -> { assignment.set(target(AssignmentTargetKind.USER,"current")); return null; }).when(em).refresh(task);
+            var fixture = new CommandFixture();
+            var validator = mock(WorkflowTaskReassignmentTargetValidator.class);
+            var service = fixture.service(validator);
+            var assignment = new AtomicReference<>(target(AssignmentTargetKind.USER,"original"));
+            when(fixture.task.getAssignment()).thenAnswer(call -> assignment.get());
+            when(fixture.authorization.isAllowed(any())).thenAnswer(call -> {
+                WorkflowAuthorizationRequest.Task request = call.getArgument(0);
+                return request.permission().scope() == WorkflowScope.ACCESS_REASSIGNMENT && !loseAccess
+                        || request.task().task().assignment().ref().equals("original");
+            });
+            org.mockito.Mockito.doAnswer(call -> {
+                assignment.set(target(AssignmentTargetKind.USER, "current"));
+                return null;
+            }).when(fixture.em).refresh(fixture.task);
             category(loseAccess ? Category.NOT_FOUND : Category.REASSIGNMENT_FORBIDDEN,
                     () -> service.reassignTask(command(AssignmentTargetKind.USER,"new","reason"),actor));
-            verify(task,never()).reassign(any());
-            verify(adapter,never()).isValidTarget(any(),any());
-            org.mockito.Mockito.verifyNoInteractions(pins);
+            verify(fixture.task,never()).reassign(any());
+            verifyNoInteractions(validator, fixture.pins);
         }
     }
 
+    @Test void freshAuthorizedReassignmentPassesExactProposedTargetToValidatorAfterPermission() {
+        var fixture = new CommandFixture();
+        var validator = mock(WorkflowTaskReassignmentTargetValidator.class);
+        var service = fixture.service(validator);
+        var command = command(AssignmentTargetKind.USER,"new","reason");
+        when(fixture.authorization.isAllowed(any())).thenReturn(true);
+
+        category(Category.INVALID_ASSIGNMENT, () -> service.reassignTask(command, actor));
+        var order = org.mockito.Mockito.inOrder(fixture.authorization, fixture.receipts, validator);
+        order.verify(fixture.authorization).isAllowed(taskPermission(WorkflowScope.ACCESS_REASSIGNMENT));
+        order.verify(fixture.receipts).findById(command.commandId());
+        order.verify(fixture.authorization).isAllowed(taskPermission(WorkflowScope.REASSIGN));
+        order.verify(fixture.authorization).isAllowed(taskPermission(WorkflowScope.ACCESS_REASSIGNMENT));
+        order.verify(fixture.authorization).isAllowed(taskPermission(WorkflowScope.REASSIGN));
+        order.verify(validator).isValidTarget(argThat(context -> context.actorRef().equals("admin")
+                && context.task().id() == 3), eq(command.assignment()));
+        verify(fixture.task, never()).reassign(any());
+    }
+
+    @Test void absentOrAmbiguousDestinationValidationFailsOnlyOnFreshExecution() throws Exception {
+        var fixture = new CommandFixture();
+        var first = mock(WorkflowTaskReassignmentTargetValidator.class);
+        var second = mock(WorkflowTaskReassignmentTargetValidator.class);
+        var command = command(AssignmentTargetKind.USER,"new","reason");
+        when(fixture.authorization.isAllowed(any())).thenReturn(true);
+        var retained = new WorkflowCommandReceiptEntity(id, 1, WorkflowOperation.REASSIGN_TASK.name(),
+                ActorKind.USER, "admin", json.reassignmentFingerprint(command, actor), RuntimeJson.FINGERPRINT_VERSION,
+                LocalDateTime.parse("2026-01-03T00:00:00"), json.encode(snapshot(AssignmentTargetKind.USER)), (short) 8);
+        for (var service : List.of(fixture.service(), fixture.service(first, second))) {
+            when(fixture.receipts.findById(id)).thenReturn(Optional.empty());
+            assertTrue(service.findReplay(command, actor).isEmpty());
+            category(Category.HOST_CONFIGURATION, () -> service.reassignTask(command, actor));
+            when(fixture.authorization.isAllowed(taskPermission(WorkflowScope.REASSIGN))).thenReturn(false);
+            when(fixture.receipts.findById(id)).thenReturn(Optional.of(retained));
+            assertEquals(command.assignment(), service.findReplay(command, actor).orElseThrow().task().assignment());
+            assertTrue(service.reassignTask(command, actor).replayed());
+            when(fixture.authorization.isAllowed(taskPermission(WorkflowScope.REASSIGN))).thenReturn(true);
+        }
+        verifyNoInteractions(first, second);
+        verify(fixture.task, never()).reassign(any());
+    }
+
+    private WorkflowAuthorizationRequest taskPermission(WorkflowScope scope) {
+        return argThat(request -> request instanceof WorkflowAuthorizationRequest.Task decision
+                && request.permission().resource() == WorkflowResource.TASK && request.permission().scope() == scope
+                && request.actorRef().equals("admin") && request.instanceId() == 1 && decision.task().task().id() == 3);
+    }
+
+    private class CommandFixture {
+        private final WorkflowCommandReceiptRepository receipts = mock(WorkflowCommandReceiptRepository.class);
+        private final EntityManager em = mock(EntityManager.class);
+        private final WorkflowAuthorization authorization = mock(WorkflowAuthorization.class);
+        private final RuntimeDefinitionPins pins = mock(RuntimeDefinitionPins.class);
+        private final WorkflowTaskEntity task = mock(WorkflowTaskEntity.class);
+        private final WorkflowTaskRepository tasks = mock(WorkflowTaskRepository.class);
+        private final WorkflowActivityRepository activities = mock(WorkflowActivityRepository.class);
+        private final WorkflowInstanceRepository instances = mock(WorkflowInstanceRepository.class);
+
+        private CommandFixture() {
+            var activity = mock(WorkflowActivityEntity.class);
+            var instance = mock(WorkflowInstanceEntity.class);
+            when(task.getId()).thenReturn(3L);
+            when(task.getActivityId()).thenReturn(2L);
+            when(task.getTaskKey()).thenReturn("review");
+            when(task.getAssignment()).thenReturn(target(AssignmentTargetKind.USER, "original"));
+            when(task.getStatus()).thenReturn(TaskStatus.OPEN);
+            when(task.getCreatedAt()).thenReturn(LocalDateTime.parse("2026-01-01T00:00:00"));
+            when(activity.getId()).thenReturn(2L);
+            when(activity.getInstanceId()).thenReturn(1L);
+            when(activity.getTaskTypeId()).thenReturn(5L);
+            when(activity.getStatus()).thenReturn(ActivityStatus.ACTIVE);
+            when(activity.getNodeKey()).thenReturn("REVIEW");
+            when(tasks.findById(3L)).thenReturn(Optional.of(task));
+            when(activities.findById(2L)).thenReturn(Optional.of(activity));
+            when(instances.findById(1L)).thenReturn(Optional.of(instance));
+            when(instance.getLockVersion()).thenReturn(3L);
+            when(instance.getStatus()).thenReturn(InstanceStatus.ACTIVE);
+            when(instance.getCurrentNodeKey()).thenReturn("REVIEW");
+            when(instance.getLastHistorySequence()).thenReturn(4L);
+            when(instance.reserveHistorySequence()).thenReturn(5L);
+            when(receipts.findById(id)).thenReturn(Optional.empty());
+            when(authorization.supportedOperations()).thenReturn(Set.of(WorkflowOperation.REASSIGN_TASK));
+            var definition = mock(ExecutableDefinition.class);
+            var model = mock(MinimalWorkflowDefinition.class);
+            var human = mock(MinimalWorkflowDefinition.Human.class);
+            when(model.humans()).thenReturn(Map.of("REVIEW", human));
+            when(definition.model()).thenReturn(model);
+            when(pins.load(instance)).thenReturn(definition);
+        }
+
+        private WorkflowExecutionService service(WorkflowTaskReassignmentTargetValidator... validators) {
+            var beans = new StaticListableBeanFactory();
+            beans.addBean("authorization", authorization);
+            for (int index = 0; index < validators.length; index++) {
+                beans.addBean("validator" + index, validators[index]);
+            }
+            var service = new WorkflowExecutionService(instances, activities, tasks, mock(WorkflowHistoryRepository.class), receipts, em,
+                    mock(WorkflowDefinitionRuntimeReader.class), mock(TaskTypeCatalogService.class), json,
+                    mock(RuntimeHostSupport.class), pins, mock(RuntimeVariables.class), mock(RuntimeServiceProgression.class),
+                    mock(WorkflowTaskEligibilityService.class), beans.getBeanProvider(WorkflowTaskSubmissionValidator.class),
+                    new WorkflowAuthorizationSupport(beans.getBeanProvider(WorkflowAuthorization.class)));
+            service.setReassignmentTargetValidator(beans.getBeanProvider(WorkflowTaskReassignmentTargetValidator.class));
+            return service;
+        }
+    }
 }

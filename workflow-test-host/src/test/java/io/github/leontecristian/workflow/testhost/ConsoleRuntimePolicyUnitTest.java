@@ -12,11 +12,14 @@ import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskEligibilityContext;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowAuthorizationRequest;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowPermission;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowResource;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowScope;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService;
-import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
 import io.github.leontecristian.workflow.testhost.exception.console.ConsoleException;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
@@ -24,8 +27,8 @@ import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntime
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeCoordinator;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeTransaction;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskOwnershipAuthorization;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskReassignmentAuthorization;
+import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleWorkflowAuthorization;
+import io.github.leontecristian.workflow.testhost.service.runtime.SandboxCompletionPermissions;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -45,24 +48,31 @@ class ConsoleRuntimePolicyUnitTest {
 
     @Test void sharedBusinessCheckKeepsAuthenticationAssociationAndLookupFailure() {
         var authorization = new TaskEligibilityContext(task, "reviewer");
-        var ownership = new ConsoleTaskOwnershipAuthorization(context, business);
-        var reassignment = new ConsoleTaskReassignmentAuthorization(business, context, mock(ConsoleSettings.class));
+        var policy = new ConsoleWorkflowAuthorization(context, business, requests, mock(SandboxCompletionPermissions.class));
+        var ownershipAccess = taskRequest(WorkflowScope.ACCESS_OWNERSHIP, authorization);
+        var reassignmentAccess = taskRequest(WorkflowScope.ACCESS_REASSIGNMENT, authorization);
+        var adminRelease = taskRequest(WorkflowScope.ADMIN_RELEASE, authorization);
+        var reassign = taskRequest(WorkflowScope.REASSIGN, authorization);
         assertThat(business.canAccess(authorization)).isFalse();
         verifyNoInteractions(requests);
         when(context.isConsoleActor("reviewer")).thenReturn(true);
-        assertThat(ownership.canAccess(authorization)).isFalse();
-        assertThat(reassignment.canAccess(authorization)).isFalse();
+        assertThat(policy.isAllowed(ownershipAccess)).isFalse();
+        assertThat(policy.isAllowed(reassignmentAccess)).isFalse();
         when(requests.linkedToInstance(1)).thenReturn(true);
-        assertThat(ownership.canAccess(authorization)).isTrue();
-        assertThat(reassignment.canAccess(authorization)).isTrue();
-        assertThat(ownership.canAdministrativelyRelease(authorization)).isFalse();
-        assertThat(reassignment.canReassign(authorization)).isFalse();
+        assertThat(policy.isAllowed(ownershipAccess)).isTrue();
+        assertThat(policy.isAllowed(reassignmentAccess)).isTrue();
+        assertThat(policy.isAllowed(adminRelease)).isFalse();
+        assertThat(policy.isAllowed(reassign)).isFalse();
         when(context.admin()).thenReturn(true);
-        assertThat(ownership.canAdministrativelyRelease(authorization)).isTrue();
-        assertThat(reassignment.canReassign(authorization)).isTrue();
+        assertThat(policy.isAllowed(adminRelease)).isTrue();
+        assertThat(policy.isAllowed(reassign)).isTrue();
         when(requests.linkedToInstance(1)).thenThrow(new IllegalStateException("private"));
-        assertThatThrownBy(() -> ownership.canAccess(authorization)).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> reassignment.canAccess(authorization)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> policy.isAllowed(ownershipAccess)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> policy.isAllowed(reassignmentAccess)).isInstanceOf(IllegalStateException.class);
+    }
+
+    private static WorkflowAuthorizationRequest taskRequest(WorkflowScope scope, TaskEligibilityContext task) {
+        return new WorkflowAuthorizationRequest.Task(new WorkflowPermission(WorkflowResource.TASK, scope), task);
     }
 
     @Test void adminReadBypassesBusinessAssociationButOperationAvailabilityStaysDenied() {

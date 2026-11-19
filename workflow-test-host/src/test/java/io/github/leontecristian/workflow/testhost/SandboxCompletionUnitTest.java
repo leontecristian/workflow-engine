@@ -7,15 +7,22 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskCompletionContext;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskEligibilityContext;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowAuthorizationRequest;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowPermission;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowResource;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowScope;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.exception.runtime.TaskCompletionRejectedException;
 import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
 import io.github.leontecristian.workflow.testhost.dto.sandbox.SandboxRequestView;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskCompletionAuthorization;
+import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess;
+import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleWorkflowAuthorization;
 import io.github.leontecristian.workflow.testhost.service.runtime.SandboxCompletionPermissions;
 import io.github.leontecristian.workflow.testhost.service.runtime.SandboxCompletionPermissions.Resource;
 import io.github.leontecristian.workflow.testhost.service.runtime.SandboxCompletionPermissions.Scope;
@@ -52,18 +59,29 @@ class SandboxCompletionUnitTest {
         var requests = mock(SandboxRequestStore.class);
         var identity = mock(ConsoleContext.class);
         var permissions = mock(SandboxCompletionPermissions.class);
-        var authorization = new ConsoleTaskCompletionAuthorization(identity, requests, permissions);
+        var authorization = new ConsoleWorkflowAuthorization(identity, mock(ConsoleTaskBusinessAccess.class), requests, permissions);
         var task = mock(WorkflowTaskView.class);
         when(task.instanceId()).thenReturn(10L);
-        var context = new TaskEligibilityContext(task, "reviewer");
-        assertThat(authorization.canAccess(context)).isFalse();
+        var access = new WorkflowAuthorizationRequest.Task(
+                new WorkflowPermission(WorkflowResource.TASK, WorkflowScope.ACCESS_COMPLETION),
+                new TaskEligibilityContext(task, "reviewer"));
+        var complete = new WorkflowAuthorizationRequest.Completion(
+                new WorkflowPermission(WorkflowResource.TASK, WorkflowScope.COMPLETE),
+                new TaskCompletionContext(new WorkflowCommandContext(ActorKind.USER, "reviewer", Instant.EPOCH, null),
+                        task, 1L, "REVIEW", "SANDBOX_REVIEW", "APPROVE", "approved"));
+        assertThat(authorization.isAllowed(access)).isFalse();
         when(identity.isConsoleActor("reviewer")).thenReturn(true);
         when(requests.findByInstance(10)).thenReturn(Optional.empty());
-        assertThat(authorization.canAccess(context)).isFalse();
+        assertThat(authorization.isAllowed(access)).isFalse();
         var request = request("primary", null);
         when(requests.findByInstance(10)).thenReturn(Optional.of(request));
+        when(permissions.isAllowed("reviewer", Resource.BOOKING, Scope.VIEW, request)).thenReturn(true);
+        assertThat(authorization.isAllowed(access)).isTrue();
+        assertThat(authorization.isAllowed(complete)).isFalse();
+        when(permissions.isAllowed("reviewer", Resource.BOOKING, Scope.DECIDE, request)).thenReturn(true);
+        assertThat(authorization.isAllowed(complete)).isTrue();
         when(permissions.isAllowed("reviewer", Resource.BOOKING, Scope.VIEW, request)).thenThrow(new IllegalStateException("provider"));
-        assertThatThrownBy(() -> authorization.canAccess(context)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> authorization.isAllowed(access)).isInstanceOf(IllegalStateException.class);
     }
 
     @Test void businessValidatorLocksEvenWithoutResultAndRetainsStoredBaseline() {

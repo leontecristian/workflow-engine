@@ -92,13 +92,13 @@ The required `WorkflowEventBatchWriter` SPI writes the ordered event batch durab
 
 ## ASM-05 — Host capabilities can accurately represent executable support
 
-**Status:** core capability contracts and sandbox providers implemented; APOLO provider/deployment support PENDING VERIFICATION — O2.
+**Status:** core capability discovery and sandbox registrations implemented; APOLO registration/deployment support PENDING VERIFICATION — O2.
 
 **Owner:** workflow contract maintainer with APOLO backend/frontend owners.
 
 **Resolve before:** publishing workflows against that host and deploying changes affecting active tasks.
 
-The design expects the deployed host to supply supported stable task codes and registered extensions, validate support for pinned workflow-node contracts, and retain compatible screens/handlers for published workflows, including future starts. Catalog metadata and selectability do not establish executable support. DefinitionCapabilityProvider and its deployment descriptors already define task-type and SINGLE/ALL assignment support. APOLO still needs its concrete provider, deployed handler/screen mapping and compatibility process; task-type business versions are not part of the model.
+The design expects the deployed host to supply supported stable task codes and registered extensions, validate support for pinned workflow-node contracts, and retain compatible screens/handlers for published workflows, including future starts. Catalog metadata and selectability are separate from executable support. [F032](features/F032-host-contract-review/spec.md) discovers task-type capabilities and separate SINGLE and ALL resolver beans. APOLO still needs these registrations, a deployed handler/screen mapping and a compatibility process.
 
 **Evidence needed:** APOLO implementation of the existing capability contracts, correspondence with deployed handlers/screens, publication validation and an inventory of task codes/node contracts required by retained published workflow versions and active tasks. Verify that disabling catalog selectability preserves execution of published definitions.
 

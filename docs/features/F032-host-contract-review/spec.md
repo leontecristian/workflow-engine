@@ -1,6 +1,6 @@
 # F032 — Host contract review
 
-Revision 4 · READY · 2026-11-19 · Owner: workflow maintainer. [Constitution](../../constitution.md), C03/C07/C09. [Constraints](../../constraints.md), CON-03/08/10. [Assumptions](../../assumptions.md), ASM-05/06.
+Revision 4 · IMPLEMENTED · 2026-11-19 · Owner: workflow maintainer. [Constitution](../../constitution.md), C03/C07/C09. [Constraints](../../constraints.md), CON-03/08/10. [Assumptions](../../assumptions.md), ASM-05/06.
 
 ## Selected scope
 
