@@ -1,12 +1,8 @@
 # Workflow engine roadmap
 
-**Reassignment delivery — 2026-11-14:** [F026 task administration and administrative reassignment](features/F026-task-administration-reassignment/spec.md) is IMPLEMENTED revision 2, with owner-agreed scope and frontend refinements and [handover](features/F026-task-administration-reassignment/implementation.md). This supersedes the unselected reassignment portion of older rows below. F025 cancellation remains preserved; APOLO access and the designer dependency remain unchanged.
+**Updated 2026-11-19. Delivery baseline through F029, administration host simplification (implemented revision 6).**
 
-**Cancellation delivery — 2026-11-14:** the owner authorized and F025 implements [workflow cancellation](features/F025-workflow-cancellation/spec.md). Its [handover](features/F025-workflow-cancellation/implementation.md) records scoped checks and remaining integration limits. This supersedes the unselected cancellation portion of older priority rows below. F024 status/evidence remains independent, reassignment is deferred and APOLO access is still unavailable.
-
-**Updated:** 2026-11-14 · **Delivery baseline:** F026 task administration and reassignment, IMPLEMENTED revision 2
-
-The agreed direction is **working sandbox → first APOLO booking integration → graphical designer**, with reliability required before production. The sandbox, reusable libraries, ALL collective review, previous-decision comments and draft creation/deletion are implemented. F024 runtime starts by workflow family key or ID are implemented and committed. F025 workflow cancellation is implemented under subsequent owner authorization. APOLO integration waits until the owner has access to APOLO.
+The agreed sequence is working sandbox → first APOLO booking integration → graphical designer. The next milestone depends on owner access to APOLO and selection of one cross-team booking approval scenario.
 
 ## Contents
 
@@ -21,9 +17,9 @@ The agreed direction is **working sandbox → first APOLO booking integration �
 
 ## 1. Current position
 
-**✅ Sandbox + shared libraries + F021–F025 → ⏸ APOLO integration → ⏳ Graphical designer**
+**✅ Sandbox + shared libraries + delivery through F029 → ⏸ APOLO integration → ⏳ Graphical designer**
 
-### ✅ Implemented — F001–F025
+### ✅ Implemented — F001–F029
 
 | Features | Capability |
 | --- | --- |
@@ -37,6 +33,10 @@ The agreed direction is **working sandbox → first APOLO booking integration �
 | ✅ F023 | **Draft lifecycle** — create next draft, delete drafts and permanently reserve allocated version numbers |
 | ✅ F024 | **Family starts** — highest-PUBLISHED selection by key/family ID, immutable pins and receipt-first replay |
 | ✅ F025 | **Cancellation** — immediate whole-instance stop, host permission, retained evidence and shared recovery/UI |
+| ✅ [F026](features/F026-task-administration-reassignment/implementation.md) | **Task administration and reassignment** — cross-instance administration and authorized reassignment of open tasks |
+| ✅ [F027](features/F027-runtime-read-policy-separation/implementation.md) | **Runtime reads** — shared authorized reads with host identity and read policy, separate from operation permissions |
+| ✅ [F028](features/F028-completion-authorization-validation/implementation.md) | **Task completion** — current business access for receipt recovery, fresh permission and business validation for new completions |
+| ✅ [F029](features/F029-administration-host-simplification/implementation.md) | **Administration integration** — shared web calls core, while hosts supply identity, authorization, audit and a clock. Mutations and audit share a REQUIRED transaction. |
 
 ### ✅ Family-start delivery
 
@@ -52,7 +52,6 @@ The agreed direction is **working sandbox → first APOLO booking integration �
 
 | Status | Capability | When |
 | --- | --- | --- |
-| ⬜ Deferred | **Administrative reassignment** | Select a separate scope when required by a business scenario. |
 | ⏸ Waiting for access | **APOLO booking integration** | Resume when the owner has access to APOLO. |
 | ⬜ Not implemented | **Graphical designer** | After the first successful APOLO integration. |
 
@@ -60,7 +59,7 @@ The agreed direction is **working sandbox → first APOLO booking integration �
 
 ## 2. Selected priorities
 
-**Current selection — 2026-11-14:** F021–F025 are delivered within their recorded scope. F025 workflow cancellation is IMPLEMENTED revision 1; its handover records focused verification. APOLO integration still waits for access. Reassignment and business withdrawal policy remain separate decisions.
+**Current selection (2026-11-19).** The first APOLO booking integration is next, pending owner access to APOLO. Assignment notifications belong to [APOLO integration](#4-first-apolo-booking-integration). An external variable-update command remains a candidate if a selected use case requires it.
 
 | Order | Work | Completion condition |
 | --- | --- | --- |
@@ -73,9 +72,7 @@ Production readiness applies before any deployment, regardless of designer timin
 
 | Capability | Scope and dependencies | Exit condition |
 | --- | --- | --- |
-| **Audited administrative reassignment** — exact slice open | Specify a separate lifecycle, authorization, API and evidence contract when selected. | Preserve task identity where required, aggregate concurrency, replay, history and atomicity. |
 | **External variable-update command** — conditional scope | F009 supports start/service replacements, not a standalone external update command. Specify one only when a selected scenario requires it. | Authorized updates follow the agreed whole-value and aggregate concurrency contracts, with focused verification. |
-| **Notifications** — capability to be specified | Exact scope, triggers, recipients, channels and delivery sequencing remain open. Preserve the [host-owned delivery boundary](architecture/workflow-engine-design.md#131-reliable-side-effects): core supplies neutral workflow/task events with durable handoff in the command transaction; the host owns notification policy and delivery after commit. | Specify the selected behavior and focused acceptance criteria before implementation, preserving durable delivery and idempotent consumption under CON-07. |
 
 A shared GROUP/ROLE SINGLE task is one shared obligation; it cannot substitute for ALL contributions. Claim/release already exists in F017 and ALL is delivered in F021. The first integration may use SINGLE if that matches the selected business scenario.
 
@@ -83,11 +80,12 @@ Assign feature IDs when specifications begin. Follow the [four-document workflow
 
 ## 4. First APOLO booking integration
 
-**Status:** waiting for owner access to APOLO. Resume integration work when access is available; the concrete business scenario and actual host compatibility still require specification. ALL and F024 family starts are already delivered in the sandbox; F025 planning is complete independently of APOLO access.
+**Status:** waiting for owner access to APOLO. With access, select the booking scenario and verify its host dependencies. For the runtime read and completion paths, map APOLO identity, read policy, completion permission and business validation to the delivered F027/F028 contracts. If the host enables definition/catalog administration, follow the [F029 adapter migration](../workflow-web/README.md#f029-java-adapter-migration) and verify its audit participates in the host transaction.
 
 - Select one cross-team booking approval from the [booking analysis](integrations/apolo/booking-business-analysis.md) and [approval requirements](integrations/apolo/approval-capability.md). APOLO decides approver sources, access/no-self-approval rules, protected material, review membership, final business effects and required recovery paths. Do not invent unresolved overbooking or alternative-resource policy.
 - Preserve one identified immutable approval basis across all steps of an attempt. Specify protection against material edits, transaction-time membership/material/eligibility checks, durable invalidation and historical retention. Same-instance resubmission remains provisional; a failed completion alone does not persist invalidation.
 - Implement APOLO-owned endpoints, screens, assignment/capability/guard adapters and business actions through neutral core contracts. Resolve handlers by stable task code and pinned node contract, retaining support for published definitions. APOLO owns booking-to-instance links; no particular host association table is mandated.
+- **Assignment notifications.** If the selected scenario calls for alerts, APOLO can consume the existing `TASK_CREATED` event for initial assignment and `TASK_REASSIGNED` for a subsequent change of target. Both carry the task ID and assignment kind/reference, so this use case requires no engine changes. APOLO records the events durably in the workflow transaction, resolves recipients according to host policy and delivers notifications idempotently after commit. See the [event delivery contract](architecture/workflow-engine-design.md#131-reliable-side-effects).
 - Verify the effective APOLO build and dependency graph, shared persistence/transaction setup, entity/repository registration and SQL Server flush/concurrency behavior. The [technical summary](integrations/apolo/apolo-technical-summary.md) and reference POM are inputs, not fresh compatibility evidence.
 - Supply production-appropriate durable handoff/delivery, recovery and retention. F006's explicit local outbox-to-inbox delivery demonstrates a sandbox mechanism; it is not an APOLO production adapter.
 
