@@ -14,6 +14,10 @@ Reuse the shared page header and outlined Material card in `workflow-ui/projects
 
 For the card header refinement, verify the assignment and status grouping, claim guidance below that grouping and the action position on desktop and narrow screens. Include optional and required claim fixtures. Reuse the prior browser evidence for the surrounding page and card.
 
+For the Open badge theme update, check the rendered foreground and background against the Material 3 secondary container pair and measure contrast in both color schemes. Confirm equal emphasis for enabled Approve and Reject.
+
+For the Previous decisions layout, check the production task view with sample decisions, including a missing comment, long labels, narrow screens and neutral outcome contrast in light and dark color schemes. Capture the desktop layout for review.
+
 ## Task HTTP migration
 
 Task mutations use `POST /tasks/{taskId}/{operation}` with the original client UUID and operation fields. Lookup-only `POST /commands/{operation}/replay` adds the task reference to the body. Send the exact `X-Task-Precondition` from the contract response on both requests. The token protects the version of the same snapshot that supplies the task header and interaction permissions. Server-side authenticated encryption binds it to the trusted actor, task and purpose. The command coordinator resolves the task's instance and hands the original aggregate version to core. Core continues to own receipt identity, stale-write detection and permission checks. Previous decisions, My Tasks, instance tasks and Task administration use purpose-bound opaque cursors. A hidden row can advance the source scan without exposing its task reference.

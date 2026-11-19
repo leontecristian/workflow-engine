@@ -83,12 +83,15 @@
           <ol class="previous-decisions">
             @for(decision of previousDecisions(); track $index){
               <li>
-                <h3>{{decision.nodeName}} · {{decision.outcomeLabel}}</h3>
-                <div class="task-meta">
+                <div class="previous-decision-heading">
+                  <h3>{{decision.nodeName}}</h3>
+                  <span class="previous-decision-outcome">{{decision.outcomeLabel}}</span>
+                </div>
+                <div class="previous-decision-meta">
                   <span>{{decision.actorLabel}}</span>
                   <time [attr.datetime]="decision.occurredAt">{{decision.occurredAt | date:'medium'}}</time>
                 </div>
-                @if(noPreviousComment(decision.comment)){<p>No comment provided.</p>}
+                @if(noPreviousComment(decision.comment)){<p class="previous-decision-no-comment">No comment provided.</p>}
                 @else{<p class="comment">{{decision.comment}}</p>}
               </li>
             }

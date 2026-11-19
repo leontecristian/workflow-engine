@@ -25,5 +25,30 @@ p { margin: 12px 0 0; }
 .admin-release { margin-top: 12px; }
 .admin-release mat-form-field { flex: 1 1 16rem; min-width: 0; }
 .previous-decisions { list-style: none; padding: 0; margin: 0; }
-.previous-decisions li + li { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--mat-sys-outline-variant); }
+.previous-decisions li { display: grid; gap: 4px; }
+.previous-decisions li + li {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}
+.previous-decision-heading, .previous-decision-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+.previous-decision-heading h3 { margin: 0; }
+.previous-decision-outcome {
+  padding: 2px 8px;
+  border-radius: 12px;
+  background-color: var(--mat-sys-surface-container-high, Canvas);
+  color: var(--mat-sys-on-surface, CanvasText);
+  font-size: 0.875em;
+  font-weight: 600;
+}
+.previous-decision-meta, .previous-decision-no-comment {
+  color: var(--mat-sys-on-surface-variant, CanvasText);
+  font-size: 0.875em;
+}
+.previous-decisions p { margin: 4px 0 0; }
 .comment { white-space: pre-wrap; }
