@@ -79,6 +79,22 @@ Import runtime components lazily from `@workflow-engine/ui/runtime`: `WorkflowIn
 
 Task inspection needs no command provider. To enable completion controls, provide `WORKFLOW_RUNTIME_COMMANDS` with `complete(envelope, signal)` and replay-only `replayComplete(envelope, signal)`. Host transport may use business endpoints and owns credentials/CSRF. Shared controls validate the pinned choice/comment and freeze the UUID, IDs, comment and expected token before dispatch. No command is automatically retried. Task views expose typed assignment targets, while the exact-task contract supplies the display label and current `canComplete` hint; the host must still authorize completion. `diagnosticsEnabled` defaults to false: normal completion refreshes the task and confirms success, while uncertain commands stay frozen. Set it to true only for diagnostic recovery links and raw command details.
 
+### Optional task completion forms
+
+The shared task page uses its generic form when the host omits the editor provider or the pinned `TaskContract.taskType` has no exact match. To customize a type, register a standalone Angular component with the page's injector. Pass all of that injector's registrations in one call.
+
+```typescript
+import { provideWorkflowTaskEditors } from '@workflow-engine/ui/runtime';
+import { BookingReviewComponent } from './booking-review';
+
+// Add to the host's application or route providers.
+provideWorkflowTaskEditors({ BOOKING_REVIEW: BookingReviewComponent });
+```
+
+The component implements `WorkflowTaskHandlerInputs` from the runtime entry point and declares three Angular inputs named `contract`, `editable` and `submitDecision`. It owns its fields and outcome buttons. Render controls from the pinned `TaskContract` (exported from `@workflow-engine/ui`), including its input types, outcome keys and comment requirements, and result mode. Disable editing and submission when `editable` is false. On action, pass a `WorkflowTaskDecision` snapshot with `outcomeKey`, `comment` and optional `resultJson`. Keep exact JSON text if the user entered it directly. The callback resolves after shared handling. Check the page's feedback and accepted submission for the result.
+
+The [sandbox booking component](../workflow-test-host/frontend/src/app/pages/tasks/booking-review.ts) demonstrates the inputs and callback with a typed booking reference, a reviewed-room result and pinned Approve and Reject actions. See the [two-form walkthrough](../README.md#try-the-optional-task-completion-forms).
+
 `CommandRecovery` retains frozen requests and observations across route destruction in memory. The host must call `setScope` whenever its session changes, even when no runtime component is mounted; the sandbox's `ConsoleRuntimeSessionBridge` demonstrates synchronous session invalidation. Shared components also supply their input scope. Clear/log-out/session replacement removes private entries; no browser persistence is installed. Retry submits original values; Find result only looks up a receipt. Original results and separately refreshed current work are labelled independently, and refresh failures retain committed evidence.
 
 Optional `WorkflowRuntimeCommands.start` supplies `freezeBody`, `execute` and `replay` for the host's existing start envelopes. Shared code knows no sandbox request fields. Without this adapter, start restore fails before insertion; completion remains available. Exported envelopes retain `kind`, `body` and `expectedToken`, including raw start-input text. Start forms, validation, exact serialization and business linking remain host-owned.

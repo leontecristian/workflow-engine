@@ -4,6 +4,8 @@ export { WorkflowInstanceTasksComponent } from './lib/instance-tasks';
 export { WorkflowSubmissionsComponent } from './lib/submissions';
 export { WorkflowActivityComponent } from './lib/activity';
 export { WorkflowTaskComponent } from './lib/task';
+export { provideWorkflowTaskEditors } from './lib/task-handler';
+export type { WorkflowTaskDecision, WorkflowTaskHandlerInputs, WorkflowTaskEditorRegistration } from './lib/task-handler';
 export { WorkflowVariablesComponent } from './lib/variables';
 export { WorkflowCommandsComponent } from './lib/commands';
 

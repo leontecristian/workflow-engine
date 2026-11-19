@@ -1,0 +1,26 @@
+<mat-form-field appearance="outline">
+  <mat-label>Comment</mat-label>
+  <textarea matInput [(ngModel)]="comment" maxlength="2000" rows="4" [disabled]="!editable"></textarea>
+  <mat-hint align="end">{{comment.length}} / 2000</mat-hint>
+</mat-form-field>
+@if(resultMode !== 'FORBIDDEN'){
+  <mat-form-field appearance="outline">
+    <mat-label>Result JSON ({{resultMode === 'REQUIRED' ? 'required' : 'optional'}})</mat-label>
+    <textarea matInput class="code" [(ngModel)]="resultDraft" rows="7" spellcheck="false" [disabled]="!editable"></textarea>
+    @if(resultMode === 'OPTIONAL'){<mat-hint>Leave blank to omit the result.</mat-hint>}
+  </mat-form-field>
+  @if(resultSchema; as schema){
+    <mat-expansion-panel>
+      <mat-expansion-panel-header><mat-panel-title>Pinned result schema</mat-panel-title></mat-expansion-panel-header>
+      <pre>{{schema}}</pre>
+    </mat-expansion-panel>
+  }
+}
+<div class="actions">
+  @for(outcome of contract.outcomes; track outcome.key){
+    <button type="button" mat-flat-button (click)="submit(outcome.key)" [disabled]="!canSubmit(outcome)">
+      {{outcome.label}}{{outcome.requiresComment ? ' - comment required' : ''}}
+    </button>
+  }
+</div>
+<p class="muted">Actions marked "comment required" need a reason in the shared comment field.</p>

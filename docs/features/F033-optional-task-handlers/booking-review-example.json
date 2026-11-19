@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "key": "sandbox-booking-task-handlers",
+  "version": 1,
+  "name": "Sandbox booking task handlers",
+  "startPolicy": {
+    "inputContract": [{"key":"bookingReference","type":"STRING","required":true,"nullable":false}],
+    "initialize": {"bookingReference":{"source":"startInput","key":"bookingReference"}}
+  },
+  "variables": [{"key":"bookingReference","type":"STRING","nullable":false}],
+  "nodes": [
+    {"key":"BEGIN","type":"START","name":"Start"},
+    {
+      "key": "bookingReview",
+      "type": "HUMAN_TASK",
+      "name": "Review booking",
+      "taskType": "BOOKING_REVIEW",
+      "assignment": {"resolver":"sandbox.singleReviewer","inputs":{}},
+      "completion": {"policy":"SINGLE"},
+      "inputs": {"bookingReference":{"source":"variable","key":"bookingReference"}},
+      "resultContract": {
+        "mode": "REQUIRED",
+        "schema": {
+          "type": "object",
+          "properties": {"reviewedRoom":{"type":"string","minLength":1,"maxLength":80}},
+          "required": ["reviewedRoom"],
+          "additionalProperties": false
+        }
+      },
+      "outcomes": [
+        {"key":"APPROVE","label":"Approve","requiresComment":false},
+        {"key":"REJECT","label":"Reject","requiresComment":true}
+      ]
+    },
+    {
+      "key": "followUp",
+      "type": "HUMAN_TASK",
+      "name": "Finish booking review",
+      "taskType": "SANDBOX_REVIEW",
+      "assignment": {"resolver":"sandbox.singleReviewer","inputs":{}},
+      "completion": {"policy":"SINGLE"},
+      "resultContract": {"mode":"FORBIDDEN"},
+      "outcomes": [{"key":"COMPLETE","label":"Complete","requiresComment":false}]
+    },
+    {"key":"APPROVED","type":"END","name":"Approved","result":"APPROVED"},
+    {"key":"REJECTED","type":"END","name":"Rejected","result":"REJECTED"}
+  ],
+  "transitions": [
+    {"key":"begin","from":"BEGIN","to":"bookingReview"},
+    {"key":"approve","from":"bookingReview","to":"followUp","outcome":"APPROVE"},
+    {"key":"reject","from":"bookingReview","to":"REJECTED","outcome":"REJECT"},
+    {"key":"complete","from":"followUp","to":"APPROVED","outcome":"COMPLETE"}
+  ]
+}

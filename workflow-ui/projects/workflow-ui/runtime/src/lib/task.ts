@@ -1,11 +1,16 @@
 import { Component, Injector, Input, computed, inject, signal } from '@angular/core';
+import { NgComponentOutlet } from '@angular/common';
 import { CommandRecovery, WORKFLOW_RUNTIME_COMMANDS, WORKFLOW_TASK_REASSIGNMENT } from '@workflow-engine/ui';
 import type { Envelope, TaskView, TaskContract, TaskSubmission, PreviousDecision } from '@workflow-engine/ui';
 import { RuntimeState } from './runtime-state';
 import { PAGE_IMPORTS } from './page-imports';
 import { download } from './variables';
 import { currentWork } from './current-work';
-@Component({selector:"workflow-task",standalone:true,imports:[...PAGE_IMPORTS],styleUrl:"./runtime.scss",templateUrl:"./task.html"})
+import { DefaultTaskHandlerComponent } from './default-task-handler';
+import { WORKFLOW_TASK_EDITORS, type WorkflowTaskDecision, type WorkflowTaskHandlerInputs } from './task-handler';
+import { isBlankComment, isBlankResult } from './task-decision-validation';
+
+@Component({selector:"workflow-task",standalone:true,imports:[...PAGE_IMPORTS, NgComponentOutlet],styleUrl:"./runtime.scss",templateUrl:"./task.html"})
 export class WorkflowTaskComponent extends RuntimeState {
   readonly reassignment=inject(WORKFLOW_TASK_REASSIGNMENT,{optional:true});
   private readonly injector=inject(Injector);
@@ -44,7 +49,7 @@ export class WorkflowTaskComponent extends RuntimeState {
   get uncertain(): boolean {
     return !!this.pendingReassignment() || this.commands.buffer.entries.some(e => e.kind !== "start" && e.body["taskId"] === this.id && this.commands.observations.get(e.body["commandId"]!)?.outcome === "UNKNOWN_OUTCOME");
   }
- protected clearContent(){this.reassignmentAvailability.set(null);this.reassignNotice.set('');this.lookupMiss.set(false);this.cancelPreviousRead();this.previousDecisions.set([]);this.previousCursor.set(null);this.previousError.set('');this.detail.set(null);this.contract.set(null);this.submission.set(null);this.currentTasks.set([]);this.comment="";this.outcome="";this.reason="";this.resultDraft="";}
+ protected clearContent(){this.completing=false;this.handlerLoad.update(load=>load+1);this.reassignmentAvailability.set(null);this.reassignNotice.set('');this.lookupMiss.set(false);this.cancelPreviousRead();this.previousDecisions.set([]);this.previousCursor.set(null);this.previousError.set('');this.detail.set(null);this.contract.set(null);this.submission.set(null);this.currentTasks.set([]);this.reason="";}
   previousDecisions = signal<PreviousDecision[]>([]);
   previousCursor = signal<string | null>(null);
   previousBusy = signal(false);
@@ -86,22 +91,49 @@ export class WorkflowTaskComponent extends RuntimeState {
   readonly inputs = computed(() => Object.entries(this.contract()?.inputs ?? {}));
   submission = signal<TaskSubmission | null>(null);
   currentTasks = signal<TaskView[]>([]);
-  outcome = "";
-  comment = "";
   reason = "";
-  resultDraft = "";
-  get resultMode() { return this.contract()?.resultContract?.mode ?? "FORBIDDEN"; }
-  get resultSchema(): string | undefined {
-    const contract = this.contract()?.resultContract;
-    return contract && contract.mode !== "FORBIDDEN" ? contract.schemaJson : undefined;
-  }
-  get resultBlank(): boolean { return /^[ \t\r\n]*$/.test(this.resultDraft); }
   downloadResult() {
     const text = this.submission()?.resultJson;
     if (text !== undefined) download(text, 'task-result.json');
   }
   commands = inject(CommandRecovery);
   readonly commandProvider=inject(WORKFLOW_RUNTIME_COMMANDS,{optional:true});
+  private readonly taskEditors = inject(WORKFLOW_TASK_EDITORS, { optional: true });
+  private readonly handlerLoad = signal(0);
+  private readonly handlerView = computed(() => {
+    const load = this.handlerLoad();
+    const contract = this.contract(), detail = this.detail();
+    const taskId = this.id, scope = this.sessionScope;
+    if (!this.commandProvider || !scope || !contract || detail?.status !== 'OPEN') return null;
+
+    const sameTask = () => !this.closed && this.sessionScope === scope && this.id === taskId;
+    const current = () => sameTask() && this.handlerLoad() === load
+      && this.contract() === contract && this.detail() === detail;
+    return {
+      contract,
+      component: this.taskEditors?.get(contract.taskType) ?? DefaultTaskHandlerComponent,
+      submitDecision: async (decision: WorkflowTaskDecision) => {
+        if (current() && this.canSubmitDecision()) {
+          await this.complete(decision, taskId, detail.instanceId, contract, current, sameTask);
+        }
+      },
+    };
+  });
+  readonly handler = computed(() => this.handlerView()?.component ?? null);
+  readonly handlerInputs = computed((): WorkflowTaskHandlerInputs | null => {
+    const view = this.handlerView();
+    if (!view) return null;
+    return { contract: view.contract, editable: this.canSubmitDecision(), submitDecision: view.submitDecision };
+  });
+
+  private canSubmitDecision(): boolean {
+    // Observe settlement even when a different recovery command is selected.
+    const runningIds = this.commands.runningIds;
+    return !!this.contract()?.canComplete && this.detail()?.status === 'OPEN'
+      && !this.busy() && !this.reassignBusy() && !this.uncertain
+      && !this.commands.buffer.entries.some(entry => entry.kind === 'complete'
+        && entry.body['taskId'] === this.id && runningIds.has(entry.body['commandId']!));
+  }
   protected onScope(){this.commands.setScope(this.sessionScope);this.reassignBusy.set(false);}
   private completing=false;
   protected clearFailedRead(){if(!this.completing)this.clearContent();}
@@ -135,11 +167,7 @@ export class WorkflowTaskComponent extends RuntimeState {
     // The read-only context has its own request state and never gates completion.
     if(loaded)await this.loadPreviousDecisions();
   }
-  reasonBlank(): boolean { return /^[\u0009-\u000d\u001c-\u0020\u1680\u2000-\u2006\u2008-\u200a\u2028\u2029\u205f\u3000]*$/u.test(this.reason); }
-  commentBlank(): boolean {
-    // Java String.isBlank whitespace; preserve the submitted text exactly.
-    return /^[\u0009-\u000d\u001c-\u0020\u1680\u2000-\u2006\u2008-\u200a\u2028\u2029\u205f\u3000]*$/u.test(this.comment);
-  }
+  reasonBlank(): boolean { return isBlankComment(this.reason); }
   async ownership(kind: 'claim'|'release'|'admin-release'): Promise<void> {
     const contract=this.contract(), detail=this.detail();
     const allowed=kind==='claim'?contract?.canClaim:kind==='release'?contract?.canRelease:contract?.canAdminRelease;
@@ -162,29 +190,40 @@ export class WorkflowTaskComponent extends RuntimeState {
     if(succeeded){await this.load();this.notice.set('Task ownership updated.');}
     else if(conflict){await this.load();this.error.set('The task changed. Current details have been refreshed.');}
   }
-  async complete(outcomeKey: string): Promise<void> {
-    if (this.busy() || !this.commandProvider || !this.detail() || !this.contract()?.canComplete || this.uncertain) return;
+  private async complete(
+    decision: WorkflowTaskDecision,
+    taskId: string,
+    instanceId: string,
+    contract: TaskContract,
+    currentView: () => boolean,
+    sameTask: () => boolean,
+  ): Promise<void> {
     this.completing=true;
     let conflict = false;
     let completionNotice = 'Task completed.';
     const succeeded = await this.run(async (signal,current) => {
-      const selected = this.contract()?.outcomes.find(o => o.key === outcomeKey);
-      if (!selected || this.detail()?.status !== "OPEN") throw new Error("Choose an available outcome on an open task.");
-      if(this.comment.length>2000)throw new Error("Comment exceeds 2000 characters.");
-      this.outcome = selected.key;
-      if (selected.requiresComment && this.commentBlank()) throw new Error("A comment is required for " + selected.label + ".");
-      if (this.resultMode === "REQUIRED" && this.resultBlank) throw new Error("A JSON result is required.");
+      const { outcomeKey, comment, resultJson } = decision ?? {};
+      const selected = contract.outcomes.find(outcome => outcome.key === outcomeKey);
+      if (!selected) throw new Error("Choose an available outcome on an open task.");
+      if (typeof comment !== 'string') throw new Error("Comment must be text.");
+      if (comment.length > 2000) throw new Error("Comment exceeds 2000 characters.");
+      if (selected.requiresComment && isBlankComment(comment)) throw new Error("A comment is required for " + selected.label + ".");
+      if (resultJson !== undefined && typeof resultJson !== 'string') throw new Error("Result must be JSON object text.");
+      const resultMode = contract.resultContract?.mode ?? 'FORBIDDEN';
+      const hasResult = resultJson !== undefined && !isBlankResult(resultJson);
+      if (resultMode === 'REQUIRED' && !hasResult) throw new Error("A JSON result is required.");
+      if (resultMode === 'FORBIDDEN' && hasResult) throw new Error("This task does not accept a JSON result.");
       this.commands.buffer.remember({
         kind: "complete",
         body: {
           commandId: crypto.randomUUID(),
-          instanceId: this.detail()!.instanceId,
-          taskId: this.id,
+          instanceId,
+          taskId,
           outcomeKey: selected.key,
-          comment: this.comment || null,
-          ...(this.resultMode !== "FORBIDDEN" && !this.resultBlank ? {resultJson: this.resultDraft} : {}),
+          comment: comment || null,
+          ...(hasResult ? {resultJson} : {}),
         },
-        expectedToken: this.contract()!.instanceLockVersion,
+        expectedToken: contract.instanceLockVersion,
       });
       try {
         await this.commands.execute(false,signal);
@@ -203,19 +242,25 @@ export class WorkflowTaskComponent extends RuntimeState {
       }
       if(current() && this.diagnosticsEnabled)this.navigate({kind:"commands"});
     });
+    if (!currentView()) return;
     this.completing=false;
-    if (succeeded && !this.diagnosticsEnabled) {
-      await this.load();
-      await this.run(async(signal,current) => {
-        const instanceId = this.detail()?.instanceId;
-        if (!instanceId) return;
-        const tasks = await currentWork(this.api,instanceId,signal);
-        if(current())this.currentTasks.set(tasks);
-      });
-      this.notice.set(completionNotice);
-    } else if (conflict) {
-      await this.load();
+    if ((!succeeded || this.diagnosticsEnabled) && !conflict) return;
+
+    const refresh = this.load();
+    const refreshLoad = this.handlerLoad();
+    const refreshIsCurrent = () => sameTask() && this.handlerLoad() === refreshLoad;
+    await refresh;
+    if (!refreshIsCurrent()) return;
+    if (conflict) {
       this.error.set("The task changed. Current details have been refreshed.");
+      return;
     }
+    await this.run(async (signal, current) => {
+      const refreshedInstanceId = this.detail()?.instanceId;
+      if (!refreshedInstanceId) return;
+      const tasks = await currentWork(this.api, refreshedInstanceId, signal);
+      if (current()) this.currentTasks.set(tasks);
+    });
+    if (refreshIsCurrent()) this.notice.set(completionNotice);
   }
 }

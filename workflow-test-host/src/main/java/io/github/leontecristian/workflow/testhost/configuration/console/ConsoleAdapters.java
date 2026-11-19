@@ -27,6 +27,12 @@ public class ConsoleAdapters {
     }
 
     @Bean
+    @ConditionalOnProperty(name = "workflow.console.capabilities", havingValue = "sample", matchIfMissing = true)
+    TaskTypeCapability bookingReviewCapability() {
+        return new TaskTypeCapability("BOOKING_REVIEW", Set.of("APPROVE", "REJECT"));
+    }
+
+    @Bean
     @ConditionalOnProperty(
             name = "workflow.console.capabilities",
             havingValue = "sample",

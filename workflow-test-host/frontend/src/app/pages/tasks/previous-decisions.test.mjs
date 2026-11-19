@@ -54,8 +54,7 @@ test('failed completion preserves an independent pending previous-decision reque
   const commands={buffer:new CommandBuffer(),observations:new Map(),async execute(){executed++;throw Object.assign(Error('Host rejected input'),{httpStatus:422});}};
   const {page}=component(t,Task,reads,undefined,undefined,[{provide:CommandRecovery,useValue:commands}]);page.id='5';
   const pending=page.load();await tick();assert.equal(page.previousBusy(),true);assert.equal(page.busy(),false);
-  page.comment=failure==='host-validation'?'Accepted local comment':'';
-  await page.complete('APPROVE');
+  await page.handlerInputs().submitDecision({outcomeKey:'APPROVE',comment:failure==='host-validation'?'Accepted local comment':''});
   assert.equal(executed,failure==='host-validation'?1:0);
   assert.match(page.error(),failure==='host-validation'?/Host rejected input/:/comment is required/);
   assert.equal(page.detail().status,'OPEN');assert.equal(signal.aborted,false);assert.equal(page.previousBusy(),true);

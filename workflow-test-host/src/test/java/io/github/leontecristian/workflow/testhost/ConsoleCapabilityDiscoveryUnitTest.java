@@ -11,6 +11,8 @@ import io.github.leontecristian.workflow.testhost.service.console.ConsoleWire;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
+import java.util.Set;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
@@ -24,12 +26,12 @@ class ConsoleCapabilityDiscoveryUnitTest {
                     "workflow.console.admin.username=administrator", "workflow.console.admin.password=fixture",
                     "workflow.console.reviewer.username=reviewer", "workflow.console.reviewer.password=fixture");
 
-    @Test void discoversSampleTaskCapabilityAndBothResolverPoliciesByDefault() {
+    @Test void discoversSampleTaskCapabilitiesAndBothResolverPoliciesByDefault() {
         context.run(application -> {
-            assertThat(application).hasSingleBean(TaskTypeCapability.class);
-            var review = application.getBean(TaskTypeCapability.class);
-            assertThat(review.taskType()).isEqualTo("SANDBOX_REVIEW");
-            assertThat(review.supportedOutcomes()).containsExactlyInAnyOrder("COMPLETE", "APPROVE", "REJECT");
+            assertThat(application.getBeansOfType(TaskTypeCapability.class).values())
+                    .containsExactlyInAnyOrder(
+                            new TaskTypeCapability("SANDBOX_REVIEW", Set.of("COMPLETE", "APPROVE", "REJECT")),
+                            new TaskTypeCapability("BOOKING_REVIEW", Set.of("APPROVE", "REJECT")));
             assertThat(application.getBeansOfType(SingleTaskAssignmentResolver.class).values())
                     .extracting(SingleTaskAssignmentResolver::identifier)
                     .containsExactlyInAnyOrder("sandbox.singleReviewer", "sandbox.sharedGroupReviewer", "sandbox.sharedRoleReviewer");
@@ -38,7 +40,7 @@ class ConsoleCapabilityDiscoveryUnitTest {
         });
     }
 
-    @Test void sampleDisabledOmitsTaskCapabilityAndResolvers() {
+    @Test void sampleDisabledOmitsTaskCapabilitiesAndResolvers() {
         context.withPropertyValues("workflow.console.capabilities=none").run(application -> {
             assertThat(application).hasNotFailed();
             assertThat(application).doesNotHaveBean(TaskTypeCapability.class);

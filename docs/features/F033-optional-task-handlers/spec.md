@@ -1,0 +1,23 @@
+# F033 — Optional task completion handlers
+
+Revision 1 · IMPLEMENTED · 2026-11-19 · Owner: workflow maintainer. [Constitution v6.6.1](../../constitution.md), C03/C07. [Constraints](../../constraints.md), CON-01/03/08/10/13. [Assumptions](../../assumptions.md), ASM-01/05/10. [Design sources](../../design-sources.md).
+
+## Outcome
+
+A host such as APOLO can supply the entire completion form for a task type, including its decision buttons. Users continue opening the shared task detail page from My Tasks, an instance or administration. Hosts that supply no handlers get the current generic experience. Production APOLO integration is outside this slice.
+
+## Required behavior
+
+- **R1 — Selection.** The shared page selects a host registration by exact pinned `TaskContract.taskType` after the authorized contract loads. With no provider or no matching key it selects the built-in generic handler. Exactly one completion form occupies the existing slot. The library owns the default and migrates it onto the same public handler contract. Existing consumers keep their component inputs, navigation and optional runtime command provider.
+- **R2 — Form contract.** Each handler receives the pinned task contract, a current editable flag and a task-scoped submit callback. It owns fields, comment and outcome controls. A click passes one snapshot `{ outcomeKey: string, comment: string, resultJson?: string }`. Preserve supplied text, including significant JSON digits and comment whitespace. Handlers must use outcomes, input types, comment requirements and task-wide result mode from the displayed contract, including for older published versions. A callback resolves after shared handling; resolution alone is not a committed receipt.
+- **R3 — Shared execution.** The page checks current task, session, editability and decision against the displayed contract before building a command. Preserve existing outcome, comment length/blankness and required/optional result rules; reject a supplied nonblank result when forbidden. Invalid, disabled, repeated pending or stale submissions send no new command. Errors and success remain visible through shared feedback. The shell owns identity, expected lock version, command ID, frozen payload, conflict refresh and existing recovery. Host form code needs no command provider or HTTP call. Server authorization and validation remain authoritative.
+- **R4 — Page lifecycle.** Keep assignment, claim/release, reassignment, previous decisions, accepted submissions and command diagnostics in the shared experience. Read-only consumers and closed tasks retain inspection without a completion form. An open task that cannot currently be completed retains its existing explanation and disables submission. Keep an in-progress draft through ordinary edits and local validation errors. Clear the handler and its draft on task/session replacement; a late callback from the previous view cannot submit against the new task.
+- **R5 — Runnable sandbox example.** Ship an importable two-stage sample in the existing sandbox with an assigned `BOOKING_REVIEW` followed by an unregistered `SANDBOX_REVIEW`. The booking form displays booking context, collects a reviewed room and comment, and renders Approve and Reject. Its sample contract requires a structured reviewed-room result for either decision and a comment for Reject. Approve opens the generic follow-up; Reject ends this example. The follow-up uses the migrated generic form and its configured Complete outcome. Document sample capabilities, catalog setup, import/publish/start, reviewer sign-in, where to open each task and where to inspect the submitted decision. Keep existing samples usable.
+
+## Acceptance
+
+1. **AC1 (R1–R2).** A command-enabled host with no registration opens the current generic form. In a host with one registration, matching and unmatched tasks show their respective forms, each with one set of outcome buttons.
+2. **AC2 (R2–R4).** Either form produces one command with the exact decision supplied and the displayed task/version. Missing required input or an invalid outcome yields no command. Read-only, closed and stale views cannot submit. A rejected or uncertain command retains the existing shared feedback/recovery behavior.
+3. **AC3 (R5).** Following the shipped instructions, a reviewer can approve a booking, inspect the recorded room/outcome/comment and complete the subsequent generic task through the normal sandbox UI. The booking form also offers Reject with its required-comment rule.
+
+The sample room field and routing belong to the sandbox. Hosts define their own business forms. See the [implementation record](implementation.md) for verification.

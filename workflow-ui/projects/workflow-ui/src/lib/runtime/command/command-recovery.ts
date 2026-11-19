@@ -12,11 +12,12 @@ export class CommandRecovery {
  readonly result=signal<Observation|null>(null);
  readonly observations=new Map<string,Observation>();
  readonly pendingIds=new Set<string>();
- readonly runningIds=new Set<string>();
+ private readonly running=signal(new Set<string>());
+ get runningIds(){return this.running();}
  private scope:object|null=null;
  private generation=0;
  setScope(scope:object|null){if(scope!==this.scope){this.clear();this.scope=scope;}}
- clear(){this.generation++;this.buffer.clear();this.observations.clear();this.pendingIds.clear();this.runningIds.clear();this.result.set(null);}
+ clear(){this.generation++;this.buffer.clear();this.observations.clear();this.pendingIds.clear();this.running.set(new Set());this.result.set(null);}
  select(id:string){this.buffer.select(id);this.result.set(this.observations.get(id)||null);}
  restore(text:string){if(!this.scope)throw new Error('No current session');const e=this.buffer.restore(text);this.result.set(this.observations.get(e.body['commandId']!)||null);}
  execution():Execution|CancellationExecution|null {const r=this.result()?.result;return !r?null:'execution' in r?r.execution:r.result?.execution||null;}
@@ -27,7 +28,7 @@ export class CommandRecovery {
   const generation=this.generation,id=envelope.body['commandId']!;
   const wasUncertain=this.pendingIds.has(id);
   if(this.runningIds.has(id))throw new Error('Command is already pending');
-  this.runningIds.add(id);
+  this.running.update(ids=>new Set(ids).add(id));
   if((envelope.kind==='cancel'||envelope.kind==='reassign')&&!replay)this.pendingIds.add(id);
   this.result.set(this.observations.get(id)||null);
   try {
@@ -52,7 +53,11 @@ export class CommandRecovery {
    if(generation===this.generation&&(envelope.kind==='cancel'||envelope.kind==='reassign')&&rejected&&!replay&&!wasUncertain)this.pendingIds.delete(id);
    this.record(generation,id,{outcome:rejected?'REJECTED':'UNKNOWN_OUTCOME',message:String(error)});throw error;
   } finally {
-   if(generation===this.generation)this.runningIds.delete(id);
+   if(generation===this.generation){
+    const remaining=new Set(this.runningIds);
+    remaining.delete(id);
+    this.running.set(remaining);
+   }
   }
  }
  private record(generation:number,id:string,observation:Observation){

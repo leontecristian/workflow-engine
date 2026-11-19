@@ -97,7 +97,7 @@
   <button mat-stroked-button (click)="ownership('admin-release')" [disabled]="busy() || uncertain || reasonBlank()">Administrative release</button>}
 </mat-card-content></mat-card>}
 <div class="two-column">
-@if(commandProvider && detail()?.status === 'OPEN'){
+@if(handler(); as completionHandler){
   <mat-card appearance="outlined"
     ><mat-card-header
       ><div>
@@ -109,37 +109,16 @@
       </div></mat-card-header
     ><mat-card-content>
       @if(contract() && !contract()?.canComplete && detail()?.status === 'OPEN'){
-        @if(commandProvider.ownership && contract()?.canClaim){
+        @if(commandProvider?.ownership && contract()?.canClaim){
           <p>Claim this task before completing it.</p>
         } @else {
           <p>You cannot complete this task with your current access.</p>
         }
       }
-      <mat-form-field appearance="outline" class="full-width"
-        ><mat-label>Comment</mat-label
-        ><textarea
-          matInput
-          [disabled]="busy() || !sessionScope || !detail() || !contract() || detail()?.status !== 'OPEN' || !contract()?.canComplete || uncertain"
-          [(ngModel)]="comment"
-          maxlength="2000"
-          rows="4"
-        ></textarea
-        ><mat-hint align="end"
-          >{{comment.length}} / 2000</mat-hint
-        ></mat-form-field
-      >
-      @if(resultMode !== 'FORBIDDEN' && detail()?.status === 'OPEN'){
-        <mat-form-field appearance="outline" class="full-width code-field">
-          <mat-label>Result JSON ({{resultMode === 'REQUIRED' ? 'required' : 'optional'}})</mat-label>
-          <textarea matInput [(ngModel)]="resultDraft" rows="7" spellcheck="false"
-            [disabled]="busy() || !sessionScope || !contract()?.canComplete || uncertain"></textarea>
-          @if(resultMode === 'OPTIONAL'){<mat-hint>Leave blank to omit the result.</mat-hint>}
-        </mat-form-field>
-        @if(resultSchema; as schema){
-          <mat-expansion-panel class="evidence-panel">
-            <mat-expansion-panel-header><mat-panel-title>Pinned result schema</mat-panel-title></mat-expansion-panel-header>
-            <pre>{{schema}}</pre>
-          </mat-expansion-panel>
+      <!-- The callback identifies a contract load. Keystrokes and editability changes keep the same form. -->
+      @for(inputs of [handlerInputs()]; track inputs?.submitDecision) {
+        @if(inputs){
+          <ng-container *ngComponentOutlet="completionHandler; inputs: { contract: inputs.contract, editable: inputs.editable, submitDecision: inputs.submitDecision }" />
         }
       }
       @if(diagnosticsEnabled){<div class="form-footer">
@@ -147,15 +126,7 @@
           >Expected token <code>{{contract()?.instanceLockVersion}}</code></span
         >
       </div>
-      }<div class="actions">
-        @for(o of contract()?.outcomes || []; track o.key) {
-          <button mat-flat-button (click)="complete(o.key)"
-            [disabled]="busy() || !contract() || detail()?.status !== 'OPEN' || !contract()?.canComplete || uncertain || (o.requiresComment && commentBlank()) || (resultMode === 'REQUIRED' && resultBlank)">
-            {{o.label}}{{o.requiresComment ? ' - comment required' : ''}}
-          </button>
-        }
-      </div>
-      <p class="muted">Actions marked "comment required" need a reason in the shared comment field.</p>
+      }
       @if(diagnosticsEnabled){<mat-expansion-panel class="evidence-panel"
         ><mat-expansion-panel-header
           ><mat-panel-title

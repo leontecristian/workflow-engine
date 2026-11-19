@@ -254,6 +254,17 @@ Open **Instances** (administrator only), or `/console/instances`, to monitor per
 
 Startup-only settings, all under `workflow.console`: `capabilities=sample` (default) provides the real sandbox resolver/task support; `none` removes that support while retaining durable recording. `fail-audit`, `fail-start-link`, `fail-event-recording`, and `fail-runtime-after-result` default false and require enabled local mode. They deliberately abort their specified transactions. The post-result switch applies to sandbox business starts. The shared command rollback check uses a test-owned fixture. The capabilities page displays the active settings. Change them only by restarting, and restore normal settings after verification. Changing a reviewer username never reassigns stored tasks. Disabling catalog selectability does not disable published execution; retiring a version prevents new starts while pinned instances and successful receipt replay remain usable.
 
+### Try the optional task completion forms
+
+1. Package the sandbox with `./mvnw.cmd -Pconsole-ui '-Dmaven.test.skip=true' package` using JDK 21. Launch the packaged console as described above with sample capabilities and distinct administrator and reviewer accounts. Open `http://127.0.0.1:8080/console/`.
+2. Sign in as administrator. In **Task types**, create entries for `BOOKING_REVIEW` and `SANDBOX_REVIEW`, or edit existing entries. Check **Selectable for new authoring** on both. In **Definitions**, select **Import definition** → **Choose JSON file**, choose [booking-review-example.json](docs/features/F033-optional-task-handlers/booking-review-example.json), then select **Import draft**. On the version page, select **Validate** and **Publish version**. The example uses key `sandbox-booking-task-handlers` and version 1. If that version already exists, use the published copy or give the import a fresh key/version.
+3. In **Requests & start**, create a named request. Select **Sandbox booking task handlers** and its exact **Published version**. Set **Execution inputs (raw JSON object)** to `{"bookingReference":"BK-1042"}`, then click **Start new command**. Leave **Request data** blank.
+4. Sign in as the configured primary reviewer in a separate browser session. Under **My Tasks**, open **Review booking**. The booking form shows `BK-1042`. Enter `Harbor 302` in **Reviewed room**, enter `Confirmed room availability.` in **Comment**, then click **Approve**.
+5. The sandbox opens **Command recovery** after successful completion. Click **Command task / submission** to reopen the original task. Under **Accepted submission**, check the `APPROVE` outcome, submitted comment and accepted result `{"reviewedRoom":"Harbor 302"}`. You can also reopen the original task from the instance's **Tasks** list.
+6. Return to **My Tasks** and open **Finish booking review** for the same instance. The generic form has a **Comment** field and **Complete**. Enter an optional comment and click **Complete**. To try **Reject**, start a fresh request with the same workflow, fill **Reviewed room** and **Comment**, then click **Reject - comment required**. That branch ends without opening a follow-up.
+
+The [UI integration guide](workflow-ui/README.md#optional-task-completion-forms) shows how a host registers a form.
+
 Isolated tests, separately from packaging:
 
 ```powershell
