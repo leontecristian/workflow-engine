@@ -1,6 +1,6 @@
 # Workflow engine roadmap
 
-**Updated 2026-11-19. Delivery baseline through F031, shared runtime command coordination (implemented revision 5).**
+**Updated 2026-11-19. Delivery baseline through F033, optional task completion handlers (implemented revision 1).**
 
 The agreed sequence is working sandbox → first APOLO booking integration → graphical designer. The next milestone depends on owner access to APOLO and selection of one cross-team booking approval scenario.
 
@@ -17,9 +17,9 @@ The agreed sequence is working sandbox → first APOLO booking integration → g
 
 ## 1. Current position
 
-**✅ Sandbox + shared libraries + delivery through F031 → ⏸ APOLO integration → ⏳ Graphical designer**
+**✅ Sandbox + shared libraries + delivery through F033 → ⏸ APOLO integration → ⏳ Graphical designer**
 
-### ✅ Implemented — F001–F031
+### ✅ Implemented — F001–F033
 
 | Features | Capability |
 | --- | --- |
@@ -39,6 +39,8 @@ The agreed sequence is working sandbox → first APOLO booking integration → g
 | ✅ [F029](features/F029-administration-host-simplification/implementation.md) | **Administration integration** — shared web calls core. Mutations and opt-in host audit share a REQUIRED transaction. |
 | ✅ [F030](features/F030-workflow-event-batch-writer/implementation.md) | **Transactional handoff** — event batch writer and event catalog. |
 | ✅ [F031](features/F031-shared-runtime-command-coordination/implementation.md) | **Shared runtime command coordination** — shared identity, actor-aware viewer access and transaction-aware core receipt recovery. |
+| ✅ [F032](features/F032-host-contract-review/implementation.md) | **Host contract review** — task-type capability beans, separate SINGLE and ALL resolver discovery, and one authorization service with explicit operation support. |
+| ✅ [F033](features/F033-optional-task-handlers/implementation.md) | **Optional task completion handlers** — hosts can register a form by pinned task type. The shared task page uses its generic form by default. Both paths passed the sandbox walkthrough. |
 
 ### ✅ Family-start delivery
 
@@ -61,7 +63,7 @@ The agreed sequence is working sandbox → first APOLO booking integration → g
 
 ## 2. Selected priorities
 
-**Current selection (2026-11-19).** The first APOLO booking integration is next, pending owner access to APOLO. Assignment notifications belong to [APOLO integration](#4-first-apolo-booking-integration). An external variable-update command remains a candidate if a selected use case requires it.
+**Current selection (2026-11-19).** The first APOLO booking integration is next, pending owner access to APOLO and selection of the booking scenario. The sandbox booking walkthrough provides a reference for integrating the shared task page. Assignment notifications belong to the integration milestone. An external variable-update command remains a candidate if a selected use case requires it. [Sandbox walkthrough](../README.md#try-the-optional-task-completion-forms) · [APOLO integration](#4-first-apolo-booking-integration)
 
 | Order | Work | Completion condition |
 | --- | --- | --- |
@@ -82,11 +84,11 @@ Assign feature IDs when specifications begin. Follow the [four-document workflow
 
 ## 4. First APOLO booking integration
 
-**Status:** waiting for owner access to APOLO. With access, select the booking scenario and verify its host dependencies. For the runtime read and completion paths, map APOLO identity, read policy, completion permission and business validation to the delivered F027/F028 contracts. If the host enables definition/catalog administration, follow the [F031 adapter migration](../workflow-web/README.md#request-identity-and-java-adapter-migration-f031) and verify that any opted-in audit participates in the host transaction.
+**Status:** waiting for owner access to APOLO. With access, select the booking scenario and verify its host dependencies. Map APOLO identity and read policy to the shared web adapters. Use the F032 authorization service for the selected commands and retain transaction-time business validation for fresh completions. If the host enables definition or catalog administration with audit recording, verify that audit participates in the host transaction. [F031 web adapter migration](../workflow-web/README.md#request-identity-and-java-adapter-migration-f031) · [F032 core migration](../workflow-core/README.md#migrating-to-f032) · [F032 web migration](../workflow-web/README.md#f032-java-adapter-migration)
 
 - Select one cross-team booking approval from the [booking analysis](integrations/apolo/booking-business-analysis.md) and [approval requirements](integrations/apolo/approval-capability.md). APOLO decides approver sources, access/no-self-approval rules, protected material, review membership, final business effects and required recovery paths. Do not invent unresolved overbooking or alternative-resource policy.
 - Preserve one identified immutable approval basis across all steps of an attempt. Specify protection against material edits, transaction-time membership/material/eligibility checks, durable invalidation and historical retention. Same-instance resubmission remains provisional; a failed completion alone does not persist invalidation.
-- Implement APOLO-owned endpoints, screens, assignment/capability/guard adapters and business actions through neutral core contracts. Resolve handlers by stable task code and pinned node contract, retaining support for published definitions. APOLO owns booking-to-instance links; no particular host association table is mandated.
+- Implement APOLO-owned endpoints and business actions through neutral core contracts. Register task types and the assignment resolvers required by the chosen review policy. If the scenario needs a custom booking form, register it by exact pinned task type through F033 and use the shared task page and its submit callback. Preserve support for published versions. APOLO owns booking-to-instance links. [Optional task completion forms](../workflow-ui/README.md#optional-task-completion-forms)
 - **Assignment notifications.** If the selected scenario calls for alerts, APOLO can consume the existing `TASK_CREATED` event for initial assignment and `TASK_REASSIGNED` for a subsequent change of target. Both carry the task ID and assignment kind/reference, so this use case requires no engine changes. APOLO records the events durably in the workflow transaction, resolves recipients according to host policy and delivers notifications idempotently after commit. See the [event delivery contract](architecture/workflow-engine-design.md#131-reliable-side-effects).
 - Verify the effective APOLO build and dependency graph, shared persistence/transaction setup, entity/repository registration and SQL Server flush/concurrency behavior. The [technical summary](integrations/apolo/apolo-technical-summary.md) and reference POM are inputs, not fresh compatibility evidence.
 - Supply production-appropriate durable handoff/delivery, recovery and retention. F006's explicit local outbox-to-inbox delivery demonstrates a sandbox mechanism; it is not an APOLO production adapter.
