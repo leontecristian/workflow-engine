@@ -13,6 +13,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.leontecristian.workflow.core.dto.runtime.ActionField;
@@ -94,6 +95,7 @@ import org.springframework.web.context.WebApplicationContext;
         "workflow.console.reviewer.username=f015-reviewer","workflow.console.reviewer.password=f015-local-test-password"})
 @Import({SharedRuntimeIT.FailureFixture.class, RuntimeCommandFixture.class})
 class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
+    private static final String PRECONDITION = "X-Task-Precondition";
     @Autowired WorkflowDefinitionService definitions;
     @Autowired WorkflowRuntimeQueryService reads;
     @Autowired TaskTypeCatalogService catalog;
@@ -145,12 +147,25 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
         var result=runtime.start(new SandboxStart(UUID.randomUUID(),versionId,request,0),context()).execution();
         instances.add(result.instance().id());return result;
     }
-    private String completion(WorkflowExecutionResult started,UUID command) throws Exception {
+    private String completion(UUID command) throws Exception {
         return json.writeValueAsString(Map.of("commandId",command.toString(),"outcomeKey","APPROVE"));
     }
     private String replayBody(WorkflowExecutionResult started,UUID command) throws Exception {
         return json.writeValueAsString(Map.of("commandId",command.toString(),"outcomeKey","APPROVE",
-            "instanceId",Long.toString(started.instance().id()),"taskId",Long.toString(started.task().id())));
+            "taskId",Long.toString(started.task().id())));
+    }
+
+    private JsonNode taskContract(MockMvc mvc, MockHttpSession principal, long taskId) throws Exception {
+        var response = mvc.perform(get("/console/api/tasks/" + taskId + "/contract").session(principal))
+                .andReturn().getResponse();
+        assertThat(response.getStatus()).withFailMessage(response.getContentAsString()).isEqualTo(200);
+        return json.readTree(response.getContentAsString());
+    }
+
+    private String reviewedVersion(MockMvc mvc, MockHttpSession principal, long taskId) throws Exception {
+        String precondition = taskContract(mvc, principal, taskId).path("precondition").textValue();
+        assertThat(precondition).isNotBlank();
+        return precondition;
     }
     @Test void movedReadsCompletionReplayAndRollbackRetainHostSemantics() throws Exception {
         if(catalog.findByCode("SANDBOX_REVIEW").isEmpty()) ownedTaskType=tx().execute(t->catalog.create(new CreateTaskType("SANDBOX_REVIEW",marker,null,true)).after().id());
@@ -176,10 +191,11 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
         assertThat(variables).contains("9007199254740993.00");
         assertThat(mvc.perform(get("/console/api/instances").session(reviewer)).andReturn().getResponse().getStatus()).isEqualTo(403);
         assertThat(mvc.perform(get("/console/api/instances").session(admin)).andReturn().getResponse().getStatus()).isEqualTo(200);
-        String endpoint="/console/api/instances/"+instance+"/tasks/"+task+"/complete";
+        String endpoint="/console/api/tasks/"+task+"/complete";
+        String precondition = reviewedVersion(mvc, reviewer, task);
         UUID command=UUID.randomUUID();
-        assertThat(mvc.perform(post(endpoint).session(reviewer).contentType("application/json").header("X-Expected-Lock-Version",started.instance().lockVersion())
-            .content(completion(started,command))).andReturn().getResponse().getStatus()).isEqualTo(403);
+        assertThat(mvc.perform(post(endpoint).session(reviewer).contentType("application/json").header(PRECONDITION, precondition)
+            .content(completion(command))).andReturn().getResponse().getStatus()).isEqualTo(403);
         var core = AopTestUtils.<WorkflowExecutionService>getUltimateTargetObject(execution);
         var completions = new AtomicInteger();
         var transaction = new AtomicReference<Map<Object, Object>>();
@@ -208,7 +224,7 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
         clearInvocations(identity);
         var accepted=mvc.perform(post(endpoint).session(reviewer).contentType("application/json")
             .header(csrf.path("csrfHeaderName").asText(),csrf.path("csrfToken").asText())
-            .header("X-Expected-Lock-Version",started.instance().lockVersion()).content(completion(started,command))).andReturn().getResponse();
+            .header(PRECONDITION, precondition).content(completion(command))).andReturn().getResponse();
         assertThat(accepted.getStatus()).withFailMessage(accepted.getContentAsString()).isEqualTo(200);
         assertThat(json.readTree(accepted.getContentAsString()).path("replayed").asBoolean()).isFalse();
         var recoveries = new AtomicInteger();
@@ -226,14 +242,14 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
                 && input.commandId().equals(command)), any());
         var recovered = mvc.perform(post(endpoint).session(reviewer).contentType("application/json")
             .header(csrf.path("csrfHeaderName").asText(),csrf.path("csrfToken").asText())
-            .header("X-Expected-Lock-Version",started.instance().lockVersion())
-            .content(completion(started,command))).andReturn().getResponse();
+            .header(PRECONDITION, precondition)
+            .content(completion(command))).andReturn().getResponse();
         assertThat(recovered.getStatus()).withFailMessage(recovered.getContentAsString()).isEqualTo(200);
         assertThat(json.readTree(recovered.getContentAsString()).path("replayed").asBoolean()).isTrue();
         assertThat(completions.get()).isEqualTo(2);
         assertThat(recoveries.get()).isEqualTo(1);
         assertThat(mvc.perform(get("/console/api/instances/" + instance + "/history").session(reviewer))
-                .andReturn().getResponse().getStatus()).isEqualTo(200);
+                .andReturn().getResponse().getStatus()).isEqualTo(404);
         assertThat(mvc.perform(get("/console/api/instances").session(admin))
                 .andReturn().getResponse().getStatus()).isEqualTo(200);
         assertThat(mvc.perform(get("/console/api/definitions").session(reviewer)).andReturn().getResponse().getStatus())
@@ -241,14 +257,15 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
         verify(identity, times(5)).requireActorRef();
 
         var replay=mvc.perform(post("/console/api/commands/complete/replay").session(reviewer).contentType("application/json")
-            .header(csrf.path("csrfHeaderName").asText(),csrf.path("csrfToken").asText()).header("X-Expected-Lock-Version",started.instance().lockVersion())
+            .header(csrf.path("csrfHeaderName").asText(),csrf.path("csrfToken").asText()).header(PRECONDITION, precondition)
             .content(replayBody(started,command))).andReturn().getResponse();
         assertThat(replay.getStatus()).withFailMessage(replay.getContentAsString()).isEqualTo(200);
         assertThat(json.readTree(replay.getContentAsString()).path("found").asBoolean()).isTrue();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf.workflow_history WHERE instance_id=? AND event_type='TASK_COMPLETED'",Integer.class,instance)).isEqualTo(1);
         var pending=start();long before=pending.instance().lockVersion();
+        String pendingPrecondition = reviewedVersion(mvc, reviewer, pending.task().id());
         var missing=mvc.perform(post("/console/api/commands/complete/replay").session(reviewer).contentType("application/json")
-            .header(csrf.path("csrfHeaderName").asText(),csrf.path("csrfToken").asText()).header("X-Expected-Lock-Version",before)
+            .header(csrf.path("csrfHeaderName").asText(),csrf.path("csrfToken").asText()).header(PRECONDITION, pendingPrecondition)
             .content(replayBody(pending,UUID.randomUUID()))).andReturn().getResponse();
         assertThat(missing.getStatus()).isEqualTo(200);assertThat(json.readTree(missing.getContentAsString()).path("found").asBoolean()).isFalse();
         assertThat(reads.findInstance(pending.instance().id()).orElseThrow().lockVersion()).isEqualTo(before);
@@ -257,10 +274,10 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
             invocation.callRealMethod();
             throw new IllegalStateException("Configured post-result failure");
         }).when(core).completeTask(argThat(input -> input != null && input.commandId().equals(failedCommand)), any());
-        String pendingEndpoint = "/console/api/instances/" + pending.instance().id() + "/tasks/" + pending.task().id() + "/complete";
+        String pendingEndpoint = "/console/api/tasks/" + pending.task().id() + "/complete";
         var failed = mvc.perform(post(pendingEndpoint).session(reviewer).contentType("application/json")
                 .header(csrf.path("csrfHeaderName").asText(), csrf.path("csrfToken").asText())
-                .header("X-Expected-Lock-Version", before).content(completion(pending, failedCommand))).andReturn().getResponse();
+                .header(PRECONDITION, pendingPrecondition).content(completion(failedCommand))).andReturn().getResponse();
         assertThat(failed.getStatus()).isEqualTo(500);
         assertThat(failed.getContentAsString()).doesNotContain("Configured");
 
@@ -275,7 +292,7 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
         UUID conflictCommand = UUID.randomUUID();
         var conflict = mvc.perform(post(pendingEndpoint).session(reviewer).contentType("application/json")
                 .header(csrf.path("csrfHeaderName").asText(), csrf.path("csrfToken").asText())
-                .header("X-Expected-Lock-Version", before).content(completion(pending, conflictCommand))).andReturn();
+                .header(PRECONDITION, pendingPrecondition).content(completion(conflictCommand))).andReturn();
         assertThat(conflict.getResolvedException()).isInstanceOf(WorkflowExecutionException.class)
                 .hasRootCauseInstanceOf(io.github.leontecristian.workflow.testhost.exception.console.SandboxRequestConflict.class);
         assertThat(conflict.getResponse().getStatus()).isEqualTo(409);
@@ -287,17 +304,20 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
         assertThat(requests.find(request.id())).isEqualTo(request);
         var conflictReplay = mvc.perform(post("/console/api/commands/complete/replay").session(reviewer)
                 .contentType("application/json").header(csrf.path("csrfHeaderName").asText(), csrf.path("csrfToken").asText())
-                .header("X-Expected-Lock-Version", before).content(replayBody(pending, conflictCommand))).andReturn().getResponse();
+                .header(PRECONDITION, pendingPrecondition).content(replayBody(pending, conflictCommand))).andReturn().getResponse();
         assertThat(conflictReplay.getStatus()).isEqualTo(200);
         assertThat(json.readTree(conflictReplay.getContentAsString()).path("found").asBoolean()).isFalse();
 
+        // Advance the test-owned instance version without changing the open task or its business request.
+        assertThat(jdbc.update("UPDATE wf.workflow_instance SET lock_version=lock_version+1 WHERE id=? AND lock_version=?",
+                pending.instance().id(), before)).isEqualTo(1);
         var stale = mvc.perform(post(pendingEndpoint).session(reviewer).contentType("application/json")
                 .header(csrf.path("csrfHeaderName").asText(), csrf.path("csrfToken").asText())
-                .header("X-Expected-Lock-Version", before + 1).content(completion(pending, UUID.randomUUID())))
+                .header(PRECONDITION, pendingPrecondition).content(completion(UUID.randomUUID())))
                 .andReturn().getResponse();
         assertThat(stale.getStatus()).isEqualTo(409);
         assertThat(json.readTree(stale.getContentAsString()).path("code").asText()).isEqualTo("STALE_VERSION");
-        assertThat(reads.findInstance(pending.instance().id()).orElseThrow().lockVersion()).isEqualTo(before);
+        assertThat(reads.findInstance(pending.instance().id()).orElseThrow().lockVersion()).isEqualTo(before + 1);
         assertThat(reads.findTaskSubmission(pending.task().id())).isEmpty();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf.workflow_command_receipt WHERE instance_id=? AND operation_type='COMPLETE_TASK'",Integer.class,pending.instance().id())).isZero();
         if(Boolean.getBoolean("f015.browserHold")) {
@@ -309,6 +329,121 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
             assertThat(Files.exists(done)).as("Focused browser completion signal").isTrue();Files.deleteIfExists(done);
         }
     }
+
+    @Test void amountReviewHttpProjectsAuthorizedFieldsAndReplaysFrozenExactResult() throws Exception {
+        prepareStructuredDefinition(false);
+        var started = startStructured();
+        long taskId = started.task().id();
+        String taskUrl = "/console/api/tasks/" + taskId;
+        var mvc = MockMvcBuilders.webAppContextSetup(web).addFilters(web.getBean(FilterChainProxy.class)).build();
+        var reviewer = session("f015-reviewer", "ROLE_CONSOLE_REVIEWER");
+        var deniedActor = session("f015-reviewer2", "ROLE_CONSOLE_REVIEWER");
+        var admin = session("f015-admin", "ROLE_CONSOLE_ADMIN");
+
+        var reviewerContract = taskContract(mvc, reviewer, taskId);
+        assertThat(reviewerContract.path("task").path("ownershipLabel").textValue()).isEqualTo("Assigned to you");
+        assertThat(reviewerContract.path("canComplete").asBoolean()).isTrue();
+        assertThat(reviewerContract.path("resultContract").path("form").path("fields").get(0).path("label").textValue())
+                .isEqualTo("Approved amount");
+        assertThat(reviewerContract.toString()).doesNotContain("\"schema\"", "instanceLockVersion", "instanceId",
+                "activityId", "assigneeRef", "claimPolicy", "actorRef", "diagnostics", "f015-reviewer");
+        var adminContract = taskContract(mvc, admin, taskId);
+        assertThat(adminContract.has("diagnostics")).isFalse();
+        assertThat(adminContract.path("canComplete").asBoolean()).isFalse();
+        assertThat(adminContract.has("taskType")).isFalse();
+        assertThat(adminContract.path("outcomes").get(0).has("key")).isFalse();
+        var details = mvc.perform(get(taskUrl + "/diagnostics").session(admin)).andReturn().getResponse();
+        assertThat(details.getStatus()).isEqualTo(200);
+        var diagnostics = json.readTree(details.getContentAsString());
+        assertThat(diagnostics.path("task").path("id").textValue()).isEqualTo(Long.toString(taskId));
+        assertThat(diagnostics.path("contract").path("resultContract").path("schema").isObject()).isTrue();
+        for (var ordinarySession : List.of(reviewer, deniedActor)) {
+            var hidden = mvc.perform(get(taskUrl + "/diagnostics").session(ordinarySession)).andReturn().getResponse();
+            assertThat(hidden.getStatus()).isEqualTo(404);
+            assertThat(hidden.getContentAsString()).doesNotContain("schema", "instanceLockVersion", "f015-reviewer");
+        }
+        var requestedDiagnostics = mvc.perform(get(taskUrl + "/contract?diagnostics=true").session(reviewer))
+                .andReturn().getResponse();
+        assertThat(requestedDiagnostics.getContentAsString()).doesNotContain("\"diagnostics\"", "\"schema\"");
+        var denied = mvc.perform(get(taskUrl + "/contract").session(deniedActor)).andReturn().getResponse();
+        assertThat(denied.getStatus()).isEqualTo(404);
+        assertThat(denied.getContentAsString()).doesNotContain("Approved amount", "precondition", "resultContract", "instanceLockVersion");
+
+        for (String url : List.of(taskUrl, "/console/api/instances/" + started.instance().id() + "/tasks", "/console/api/tasks/mine")) {
+            var response = mvc.perform(get(url).session(reviewer)).andReturn().getResponse();
+            assertThat(response.getStatus()).isEqualTo(200);
+            assertThat(response.getContentAsString()).contains("Review approved amount").doesNotContain("taskKey", "instanceId",
+                    "createdAt", "activityId", "assigneeRef", "taskTypeId", "f015-reviewer");
+        }
+        String instanceId = Long.toString(started.instance().id());
+        var adminList = get("/console/api/tasks/administration").param("instanceId", instanceId);
+        var taskAdministration = mvc.perform(adminList.session(admin)).andReturn().getResponse();
+        assertThat(taskAdministration.getStatus()).withFailMessage(taskAdministration.getContentAsString()).isEqualTo(200);
+        var adminRow = json.readTree(taskAdministration.getContentAsString()).path("items").get(0);
+        assertThat(adminRow.path("id").textValue()).isEqualTo(Long.toString(taskId));
+        assertThat(adminRow.path("instanceId").textValue()).isEqualTo(instanceId);
+        assertThat(Instant.parse(adminRow.path("createdAt").textValue())).isEqualTo(reads.findTask(taskId).orElseThrow().createdAt());
+        assertThat(mvc.perform(adminList.session(reviewer)).andReturn().getResponse().getStatus()).isEqualTo(403);
+        assertThat(mvc.perform(get("/console/api/instances/" + instanceId).session(admin))
+                .andReturn().getResponse().getStatus()).isEqualTo(200);
+        assertThat(mvc.perform(get("/console/api/instances/" + instanceId).session(deniedActor))
+                .andReturn().getResponse().getStatus()).isEqualTo(404);
+
+        var csrf = json.readTree(mvc.perform(get("/console/api/session").session(reviewer))
+                .andReturn().getResponse().getContentAsString());
+        String csrfHeader = csrf.path("csrfHeaderName").textValue();
+        String csrfToken = csrf.path("csrfToken").textValue();
+        String precondition = reviewerContract.path("precondition").textValue();
+        assertThat(precondition).isNotBlank();
+        String attempt = json.createObjectNode().put("commandId", UUID.randomUUID().toString())
+                .put("outcomeKey", "COMPLETE").toString();
+        String invalid = attempt.substring(0, attempt.length() - 1) + ",\"result\":{\"approvedAmount\":-1,\"note\":\"\"}}";
+        var rejected = mvc.perform(post(taskUrl + "/complete").session(reviewer).contentType("application/json")
+                .header(csrfHeader, csrfToken).header(PRECONDITION, precondition).content(invalid))
+                .andReturn().getResponse();
+        assertThat(rejected.getStatus()).withFailMessage(rejected.getContentAsString()).isEqualTo(422);
+        assertThat(rejected.getContentAsString()).contains("/approvedAmount").doesNotContain("schemaPath", "instanceId", "execution");
+
+        String commandId = UUID.randomUUID().toString();
+        String frozen = "{\"commandId\":\"" + commandId
+                + "\",\"outcomeKey\":\"COMPLETE\",\"comment\":\"Reviewed\",\"result\":{\"approvedAmount\":0.00,\"note\":\"\"}}";
+        var completed = mvc.perform(post(taskUrl + "/complete").session(reviewer).contentType("application/json")
+                .header(csrfHeader, csrfToken).header(PRECONDITION, precondition).content(frozen))
+                .andReturn().getResponse();
+        assertThat(completed.getStatus()).withFailMessage(completed.getContentAsString()).isEqualTo(200);
+        assertThat(json.readTree(completed.getContentAsString()).path("taskStatus").textValue()).isEqualTo("COMPLETED");
+        assertThat(completed.getContentAsString()).doesNotContain("execution", "instanceId", "historySequence", "receipt");
+
+        String replayBody = "{\"taskId\":\"" + taskId + "\"," + frozen.substring(1);
+        var replay = mvc.perform(post("/console/api/commands/complete/replay").session(reviewer).contentType("application/json")
+                .header(csrfHeader, csrfToken).header(PRECONDITION, precondition).content(replayBody))
+                .andReturn().getResponse();
+        assertThat(replay.getStatus()).withFailMessage(replay.getContentAsString()).isEqualTo(200);
+        assertThat(json.readTree(replay.getContentAsString()).path("result").path("replayed").asBoolean()).isTrue();
+        assertThat(replay.getContentAsString()).doesNotContain("execution", "instanceId", "historySequence", "receipt", commandId);
+        assertThat(taskContract(mvc, reviewer, taskId).has("precondition")).isFalse();
+
+        var submission = mvc.perform(get(taskUrl + "/submission").session(reviewer)).andReturn().getResponse();
+        assertThat(submission.getStatus()).isEqualTo(200);
+        assertThat(submission.getContentAsString()).contains("\"approvedAmount\":0.00", "\"note\":\"\"", "Reviewed", "Complete", "You")
+                .doesNotContain(commandId, "actorRef", "taskId", "outcomeKey", "historySequence", "instanceId", "diagnostics");
+        var adminSubmission = mvc.perform(get(taskUrl + "/submission").session(admin)).andReturn().getResponse();
+        assertThat(adminSubmission.getStatus()).isEqualTo(200);
+        assertThat(adminSubmission.getContentAsString()).contains("\"actorLabel\":\"Sandbox reviewer\"", "\"approvedAmount\":0.00")
+                .doesNotContain(commandId, "actorRef", "f015-reviewer", "diagnostics");
+        var hiddenSubmission = mvc.perform(get(taskUrl + "/submission").session(deniedActor)).andReturn().getResponse();
+        assertThat(hiddenSubmission.getStatus()).isEqualTo(404);
+        assertThat(hiddenSubmission.getContentAsString()).doesNotContain("approvedAmount", commandId);
+        var adminEvidence = mvc.perform(get(taskUrl + "/diagnostics").session(admin)).andReturn().getResponse();
+        assertThat(adminEvidence.getStatus()).isEqualTo(200);
+        assertThat(adminEvidence.getContentAsString()).contains("\"approvedAmount\":0.00", commandId, "f015-reviewer");
+        var submissions = mvc.perform(get("/console/api/activities/" + started.activity().id() + "/submissions")
+                .session(reviewer)).andReturn().getResponse();
+        assertThat(submissions.getStatus()).isEqualTo(200);
+        assertThat(submissions.getContentAsString()).contains("\"approvedAmount\":0.00")
+                .doesNotContain(commandId, "actorRef", "outcomeKey", "historySequence", "instanceId", "diagnostics");
+    }
+
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
     void structuredSubmissionAndSandboxEffectShareTheCompletionTransaction(boolean failDownstream) throws Exception {
@@ -524,12 +659,28 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
         String taskContract = "/console/api/tasks/" + taskId + "/contract";
         String instance = "/console/api/instances/" + instanceId;
         String event = instance + "/history/" + creation.historySequence();
+        var originalCsrf = json.readTree(mvc.perform(get("/console/api/session").session(originalReviewer))
+                .andReturn().getResponse().getContentAsString());
+        String originalClaimVersion = reviewedVersion(mvc, originalReviewer, taskId);
+        String originalClaimId = UUID.randomUUID().toString();
+        mvc.perform(post("/console/api/tasks/" + taskId + "/claim").session(originalReviewer)
+                .contentType("application/json")
+                .header(originalCsrf.path("csrfHeaderName").asText(), originalCsrf.path("csrfToken").asText())
+                .header(PRECONDITION, originalClaimVersion)
+                .content(json.createObjectNode().put("commandId", originalClaimId).toString()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+        mvc.perform(post("/console/api/tasks/" + taskId + "/release").session(originalReviewer)
+                .contentType("application/json")
+                .header(originalCsrf.path("csrfHeaderName").asText(), originalCsrf.path("csrfToken").asText())
+                .header(PRECONDITION, reviewedVersion(mvc, originalReviewer, taskId))
+                .content(json.createObjectNode().put("commandId", UUID.randomUUID().toString()).toString()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
         var csrf = json.readTree(mvc.perform(get("/console/api/session").session(peer))
                 .andReturn().getResponse().getContentAsString());
-        var claimed = mvc.perform(post(instance + "/tasks/" + taskId + "/claim").session(peer)
+        var claimed = mvc.perform(post("/console/api/tasks/" + taskId + "/claim").session(peer)
                 .contentType("application/json")
                 .header(csrf.path("csrfHeaderName").asText(), csrf.path("csrfToken").asText())
-                .header("X-Expected-Lock-Version", entered.progressed().instance().lockVersion())
+                .header(PRECONDITION, reviewedVersion(mvc, peer, taskId))
                 .content(json.createObjectNode().put("commandId", UUID.randomUUID().toString()).toString()))
                 .andReturn().getResponse();
         assertThat(claimed.getStatus()).withFailMessage(claimed.getContentAsString()).isEqualTo(200);
@@ -541,9 +692,12 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
         assertThat(open.getStatus()).isEqualTo(200);
         assertThat(open.getContentAsString()).contains("9007199254740993.00", "2026-11-10");
         var historyResponse = mvc.perform(get(event).session(peer)).andReturn().getResponse();
-        assertThat(historyResponse.getStatus()).isEqualTo(200);
-        assertThat(json.readTree(historyResponse.getContentAsString()).path("detailsJson").asText())
-                .contains("9007199254740993.00");
+        assertThat(historyResponse.getStatus()).isEqualTo(404);
+        assertThat(historyResponse.getContentAsString()).doesNotContain("9007199254740993.00");
+        var adminHistory = mvc.perform(get(event).session(session("f015-admin", "ROLE_CONSOLE_ADMIN")))
+                .andReturn().getResponse();
+        assertThat(adminHistory.getStatus()).isEqualTo(200);
+        assertThat(json.readTree(adminHistory.getContentAsString()).path("detailsJson").asText()).contains("9007199254740993.00");
 
         var answer = CompleteWorkflowTask.parseResult("{\"approvedAmount\":1250.00,\"note\":\"Receiver answer\"}");
         var complete = new CompleteWorkflowTask(UUID.randomUUID(), instanceId, taskId, reads.findInstance(instanceId).orElseThrow().lockVersion(),
@@ -559,6 +713,17 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
         assertThat(denied.getStatus()).isEqualTo(404);
         assertThat(denied.getContentAsString()).doesNotContain("approvedAmount");
         assertThat(mvc.perform(get(taskContract).session(originalReviewer)).andReturn().getResponse().getStatus()).isEqualTo(404);
+        var recoveredClaim = mvc.perform(post("/console/api/commands/claim/replay").session(originalReviewer)
+                .contentType("application/json")
+                .header(originalCsrf.path("csrfHeaderName").asText(), originalCsrf.path("csrfToken").asText())
+                .header(PRECONDITION, originalClaimVersion)
+                .content(json.createObjectNode().put("commandId", originalClaimId).put("taskId", Long.toString(taskId)).toString()))
+                .andReturn().getResponse();
+        assertThat(recoveredClaim.getStatus()).isEqualTo(200);
+        var recovered = json.readTree(recoveredClaim.getContentAsString());
+        assertThat(recovered.path("found").asBoolean()).isTrue();
+        assertThat(recovered.path("result").path("taskStatus").asText()).isEqualTo("OPEN");
+        assertThat(recovered.path("result").has("execution")).isFalse();
     }
 
     @ParameterizedTest

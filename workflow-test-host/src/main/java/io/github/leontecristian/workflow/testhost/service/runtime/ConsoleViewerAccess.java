@@ -4,22 +4,31 @@ import io.github.leontecristian.workflow.core.dto.runtime.TaskEligibilityContext
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistorySummary;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.testhost.exception.console.ConsoleException;
+import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
 import io.github.leontecristian.workflow.web.dto.instance.ViewerLinkReference;
 import io.github.leontecristian.workflow.web.exception.instance.WorkflowViewerException;
 import io.github.leontecristian.workflow.web.integration.instance.WorkflowViewerAccess;
 import java.util.HashSet;
 import java.util.Set;
 
-/** Maps both viewer grants to the sandbox's retained-assignment policy. */
+/** Applies sandbox instance access and the administrator grant for retained evidence. */
 public class ConsoleViewerAccess implements WorkflowViewerAccess {
     private final ConsoleRuntimeAccess access;
     private final WorkflowRuntimeQueryService reads;
-    public ConsoleViewerAccess(ConsoleRuntimeAccess access, WorkflowRuntimeQueryService reads) { this.access = access; this.reads = reads; }
+    private final ConsoleContext identity;
+    public ConsoleViewerAccess(ConsoleRuntimeAccess access, WorkflowRuntimeQueryService reads, ConsoleContext identity) {
+        this.access = access;
+        this.reads = reads;
+        this.identity = identity;
+    }
     @Override public void requireInstanceRead(String actorRef, long id) {
         try { access.instance(actorRef, id); }
         catch (ConsoleException e) { throw new WorkflowViewerException(e.status(), e.code()); }
     }
-    @Override public void requireHistoryRead(String actorRef, long id) { requireInstanceRead(actorRef, id); }
+    @Override public void requireHistoryRead(String actorRef, long id) {
+        if (!identity.isConsoleAdministrator(actorRef)) throw WorkflowViewerException.missing();
+        requireInstanceRead(actorRef, id);
+    }
     @Override public void requireHistoryEventRead(String actorRef, WorkflowHistorySummary event) {
         WorkflowViewerAccess.super.requireHistoryEventRead(actorRef, event);
         if ("TASK_COMPLETED".equals(event.eventType())) {
@@ -34,6 +43,11 @@ public class ConsoleViewerAccess implements WorkflowViewerAccess {
             return true;
         if (event.taskId() == null || event.activityId() == null)
             throw new WorkflowViewerException(500, "HOST_CONFIGURATION");
+        return canReadExactTask(actorRef, event);
+    }
+
+    boolean canReadExactTask(String actorRef, WorkflowHistorySummary event) {
+        if (event.taskId() == null || event.activityId() == null) return false;
         try {
             var task = access.task(actorRef, event.taskId());
             return task.instanceId() == event.instanceId() && task.activityId() == event.activityId();

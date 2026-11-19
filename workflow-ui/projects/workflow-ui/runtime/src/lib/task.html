@@ -1,160 +1,143 @@
-<console-page-header [meta]="meta" /><console-feedback
-  [busy]="busy()"
-  [error]="error()"
-  [notice]="notice()"
-/>
+<console-feedback [busy]="busy()" [error]="error()" [notice]="notice()" />
 
-<mat-card appearance="outlined"
-  ><mat-card-header
-    ><div class="card-heading">
-      <div>
-        <div class="eyebrow">TASK #{{id}}</div>
-        <h2>{{detail()?.nodeName || detail()?.taskKey}}</h2>
-        <p>Task type: <strong>{{detail()?.taskTypeName}}</strong> · Task key: {{detail()?.taskKey}}</p>
-        <p>Assignment: <strong>{{detail()?.assignment?.kind}}: {{contract()?.assignmentLabel || detail()?.assignment?.ref}}</strong></p>
-        <p>Assignee: <strong>{{detail()?.assigneeRef || "Unassigned"}}</strong> · Claim policy: {{contract()?.claimPolicy}}</p>
+@if(detail(); as task) {
+  <div class="task-page">
+    <header>
+      <div class="task-heading">
+        <h1>{{task.nodeName || task.taskTypeName || 'Task'}}</h1>
+        <console-status [value]="task.status" />
       </div>
-      <console-status [value]="detail()?.status" /></div></mat-card-header
-  ><mat-card-content
-    ><div class="actions">
-      <a mat-stroked-button [routerLink]="detail() ? link({kind:'instance',instanceId:detail()!.instanceId}) : null"
-        >Instance #{{detail()?.instanceId}}</a
-      ><a mat-button [routerLink]="detail() ? link({kind:'activity',id:detail()!.activityId}) : null"
-        >Activity #{{detail()?.activityId}}</a
-      ><button mat-button (click)="load()" [disabled]="busy()">
-        <mat-icon aria-hidden="true">refresh</mat-icon> Refresh
-      </button>
-      @if(canReassign()){<button mat-stroked-button (click)="confirmReassignment()" [disabled]="busy() || reassignBusy() || uncertain">Reassign task</button>}
-    </div>
-    @if(pendingReassignment();as command){<p role="status">The reassignment outcome needs checking. Keep the original request until its result is known.</p><button mat-button (click)="sendReassignment(command,true)" [disabled]="reassignBusy()">Check reassignment result</button>
-      @if(lookupMiss()){<p>A missing result does not prove the first attempt cannot commit.</p><button mat-stroked-button (click)="sendReassignment(command,false)" [disabled]="reassignBusy()">Retry original reassignment</button>}}
-    @if(reassignNotice()){<p role="status">{{reassignNotice()}}</p>}
-    @if(diagnosticsEnabled){<console-details [value]="detail()" />}
-    @if(detail()?.status === 'CANCELLED'){<p>{{detail()?.closureReason === 'INSTANCE_CANCELLED' ? 'This task stopped because the workflow was cancelled.' : 'This task was cancelled because the review resolved.'}} No submission was recorded for this task.</p>}
-    @for(task of currentTasks(); track task.id){<a mat-stroked-button [routerLink]="link({kind:'task',id:task.id})">Open current task #{{task.id}}</a>}
-    @if(diagnosticsEnabled && commands.buffer.command){<a mat-button [routerLink]="link({kind:'commands'})">Command recovery</a>}</mat-card-content
-></mat-card>
-@if(!commandProvider && diagnosticsEnabled){<mat-card appearance="outlined"><mat-card-header><h2>Pinned contract</h2></mat-card-header><mat-card-content><console-details [value]="contract()" /></mat-card-content></mat-card>}
-@if(hasPreviousDecisions) {
-  <mat-card appearance="outlined">
-    <mat-card-header>
-      <div class="card-heading">
-        <h2>Previous decisions</h2>
-        @if(previousDecisions().length){<span class="decision-count">{{previousDecisions().length}} shown</span>}
+      <div class="task-meta">
+        @if(task.assignmentLabel && task.assignmentLabel !== task.ownershipLabel){<span>{{task.assignmentLabel}}</span>}
+        @if(task.ownershipLabel){<span>{{task.ownershipLabel}}</span>}
+        @if(task.dueAt){<span>Due <time [attr.datetime]="task.dueAt">{{task.dueAt | date:'medium'}}</time></span>}
+        @if(task.closedAt && task.status !== 'OPEN'){
+          <span>Closed <time [attr.datetime]="task.closedAt">{{task.closedAt | date:'medium'}}</time></span>
+        }
       </div>
-    </mat-card-header>
-    <mat-card-content>
-      <ol class="decision-list" aria-label="Previous decisions">
-        @for(decision of previousDecisions(); track decision.historySequence) {
-          <li class="decision-entry">
-            <span class="decision-avatar" aria-hidden="true">{{decision.actorRef.slice(0,1) | uppercase}}</span>
-            <article class="decision-body">
-              <div class="decision-heading">
-                <h3>{{decision.nodeName}}</h3>
-                <span class="decision-outcome">{{decision.outcomeLabel}}</span>
-              </div>
-              <div class="decision-meta">
-                <span class="decision-actor">{{decision.actorRef}} <span class="decision-actor-kind">({{decision.actorKind}})</span></span>
-                <time [attr.datetime]="decision.occurredAt">{{decision.occurredAt | date:'medium'}}</time>
-              </div>
-              @if(noPreviousComment(decision.comment)){<p class="decision-empty">No comment provided.</p>}
-              @else{<p class="decision-comment">{{decision.comment}}</p>}
-            </article>
-          </li>
+      @if(task.closureLabel){<p>{{task.closureLabel}}</p>}
+
+      @if(contract(); as rules){
+        <div class="task-actions">
+          @if(commandProvider?.ownership && rules.canClaim){
+            <button mat-stroked-button type="button" (click)="ownership('claim')" [disabled]="busy() || uncertain">Claim</button>
+          }
+          @if(commandProvider?.ownership && rules.canRelease){
+            <button mat-stroked-button type="button" (click)="ownership('release')" [disabled]="busy() || uncertain">Release</button>
+          }
+          @if(canReassign()){
+            <button mat-stroked-button type="button" (click)="confirmReassignment()" [disabled]="busy() || uncertain">Reassign task</button>
+          }
+        </div>
+        @if(task.status === 'OPEN' && (!commandProvider || !rules.canComplete)){
+          <p>{{rules.claimRequired && rules.canClaim && commandProvider?.ownership
+            ? 'Claim this task before completing it.'
+            : 'You can view this task with your current access.'}}</p>
         }
-      </ol>
-      @if(previousBusy()){<p role="status">Loading previous decisions…</p>}
-      @if(previousError()){
-        <p role="alert">{{previousError()}}</p>
-        <button mat-button (click)="loadPreviousDecisions(previousDecisions().length > 0)" [disabled]="previousBusy()">Retry</button>
-      }@else if(!previousBusy() && !previousDecisions().length){<p>No previous decisions.</p>}
-      @if(previousCursor() && !previousError()){
-        <button mat-button (click)="loadPreviousDecisions(true)" [disabled]="previousBusy()">Load more</button>
-      }
-    </mat-card-content>
-  </mat-card>
-}
-@if(inputs().length) {
-  <mat-card appearance="outlined">
-    <mat-card-header><h2>Inputs</h2></mat-card-header>
-    <mat-card-content>
-      <dl>
-        @for (entry of inputs(); track entry[0]) {
-          <dt><strong>{{entry[0]}}</strong> ({{entry[1].type}})</dt>
-          <dd><pre>{{entry[1].valueJson}}</pre></dd>
-        }
-      </dl>
-    </mat-card-content>
-  </mat-card>
-}
-@if(commandProvider?.ownership && detail()?.assignment?.kind !== 'USER' && detail()?.status === 'OPEN') {
-<mat-card appearance="outlined"><mat-card-header><h2>Task ownership</h2></mat-card-header><mat-card-content>
-  <div class="actions">
-    @if(contract()?.canClaim){<button mat-flat-button (click)="ownership('claim')" [disabled]="busy() || uncertain">Claim</button>}
-    @if(contract()?.canRelease){<button mat-stroked-button (click)="ownership('release')" [disabled]="busy() || uncertain">Release</button>}
-  </div>
-  @if(contract()?.canAdminRelease){<mat-form-field appearance="outline" class="full-width"><mat-label>Administrative release reason</mat-label><textarea matInput [(ngModel)]="reason" maxlength="1000" [disabled]="busy() || uncertain"></textarea><mat-hint>{{reason.length}} / 1000</mat-hint></mat-form-field>
-  <button mat-stroked-button (click)="ownership('admin-release')" [disabled]="busy() || uncertain || reasonBlank()">Administrative release</button>}
-</mat-card-content></mat-card>}
-<div class="two-column">
-@if(handler(); as completionHandler){
-  <mat-card appearance="outlined"
-    ><mat-card-header
-      ><div>
-        <div class="eyebrow">PINNED CONTRACT · {{contract()?.taskType}}</div>
-        <h2>Complete your task</h2>
-        <p>
-          Your eligibility is checked when you complete the task.
-        </p>
-      </div></mat-card-header
-    ><mat-card-content>
-      @if(contract() && !contract()?.canComplete && detail()?.status === 'OPEN'){
-        @if(commandProvider?.ownership && contract()?.canClaim){
-          <p>Claim this task before completing it.</p>
-        } @else {
-          <p>You cannot complete this task with your current access.</p>
+        @if(commandProvider?.ownership && rules.canAdminRelease){
+          <div class="admin-release">
+            <mat-form-field appearance="outline" subscriptSizing="dynamic">
+              <mat-label>Administrative release reason</mat-label>
+              <textarea matInput [(ngModel)]="reason" maxlength="1000" [disabled]="busy() || uncertain"></textarea>
+            </mat-form-field>
+            <button mat-stroked-button type="button" (click)="ownership('admin-release')" [disabled]="busy() || uncertain || reasonBlank()">Administrative release</button>
+          </div>
         }
       }
-      <!-- The callback identifies a contract load. Keystrokes and editability changes keep the same form. -->
-      @for(inputs of [handlerInputs()]; track inputs?.submitDecision) {
-        @if(inputs){
-          <ng-container *ngComponentOutlet="completionHandler; inputs: { contract: inputs.contract, editable: inputs.editable, submitDecision: inputs.submitDecision }" />
+      @if(reassignmentError()){<p role="alert">{{reassignmentError()}}</p>}
+    </header>
+
+    @if(contract()?.inputs; as inputs){
+      @if(inputs | keyvalue; as entries){
+        @if(entries.length){
+          <section aria-labelledby="task-inputs">
+            <h2 id="task-inputs">Business context</h2>
+            <workflow-task-values [inputs]="inputs" />
+          </section>
         }
       }
-      @if(diagnosticsEnabled){<div class="form-footer">
-        <span class="muted"
-          >Expected token <code>{{contract()?.instanceLockVersion}}</code></span
-        >
-      </div>
-      }
-      @if(diagnosticsEnabled){<mat-expansion-panel class="evidence-panel"
-        ><mat-expansion-panel-header
-          ><mat-panel-title
-            >Exact completion contract</mat-panel-title
-          ></mat-expansion-panel-header
-        >
-        <pre>{{contract() | json}}</pre>
-      </mat-expansion-panel>}
-    </mat-card-content></mat-card
-  >}
-<mat-card appearance="outlined"
-    ><mat-card-header><h2>Accepted submission</h2></mat-card-header
-    ><mat-card-content
-      >@if(submission(); as accepted){
-        @if(diagnosticsEnabled){<console-details [value]="accepted" />}
-        @else{<p>Outcome: {{accepted.outcomeKey}}</p><p>Submitted by {{accepted.actorRef}}</p>@if(accepted.comment){<p>{{accepted.comment}}</p>}}
+    }
+
+    @if(hasPreviousDecisions) {
+      <section aria-labelledby="task-previous">
+        <h2 id="task-previous">Previous decisions</h2>
+        @if(previousDecisions().length){
+          <ol class="previous-decisions">
+            @for(decision of previousDecisions(); track $index){
+              <li>
+                <h3>{{decision.nodeName}} · {{decision.outcomeLabel}}</h3>
+                <div class="task-meta">
+                  <span>{{decision.actorLabel}}</span>
+                  <time [attr.datetime]="decision.occurredAt">{{decision.occurredAt | date:'medium'}}</time>
+                </div>
+                @if(noPreviousComment(decision.comment)){<p>No comment provided.</p>}
+                @else{<p class="comment">{{decision.comment}}</p>}
+              </li>
+            }
+          </ol>
+        }
+        @if(previousBusy()){<p role="status">Loading previous decisions…</p>}
+        @if(previousError()){
+          <p role="alert">{{previousError()}}</p>
+          <button mat-button type="button" (click)="loadPreviousDecisions(previousDecisions().length > 0)">Retry</button>
+        }@else if(!previousBusy() && !previousDecisions().length){
+          <p>No previous decisions.</p>
+        }
+        @if(previousCursor() && !previousError()){
+          <button mat-button type="button" (click)="loadPreviousDecisions(true)" [disabled]="previousBusy()">Load more</button>
+        }
+      </section>
+    }
+
+    @if(uncertain && !busy()){
+      <section aria-labelledby="task-recovery">
+        <h2 id="task-recovery">Check your last action</h2>
+        <p role="status">The result is uncertain. Check the original action before trying again.</p>
+        <button mat-stroked-button type="button" (click)="recover(true)" [disabled]="busy()">Check result</button>
+        @if(recoveryMiss()){
+          <p>No result was found. You can retry with the original request.</p>
+          <button mat-button type="button" (click)="recover(false)" [disabled]="busy()">Retry original action</button>
+        }
+      </section>
+    }
+
+    @if(handler(); as editor){
+      <section aria-labelledby="task-decision">
+        <h2 id="task-decision">Your decision</h2>
+        @for(inputs of [handlerInputs()]; track inputs?.submitDecision) {
+          @if(inputs){
+            <ng-container *ngComponentOutlet="editor; inputs: inputs" />
+          }
+        }
+      </section>
+    }
+
+    @if(submission(); as accepted){
+      <section aria-labelledby="task-recorded">
+        <h2 id="task-recorded">Recorded decision</h2>
+        <h3>{{accepted.outcomeLabel}}</h3>
+        <div class="task-meta">
+          <span>{{accepted.actorLabel}}</span>
+          @if(accepted.occurredAt){<time [attr.datetime]="accepted.occurredAt">{{accepted.occurredAt | date:'medium'}}</time>}
+        </div>
+        @if(accepted.comment){<p class="comment">{{accepted.comment}}</p>}
         @if(accepted.resultJson !== undefined){
-          <h3>Accepted result</h3>
-          <pre>{{accepted.resultJson}}</pre>
-          <button mat-button (click)="downloadResult()">Download result JSON</button>
+          <h3>Result</h3>
+          <workflow-task-values [result]="accepted.resultJson" />
         }
-      }@else{
-      <div class="empty-state small">
-        <mat-icon aria-hidden="true">description</mat-icon>
-        <h3>No accepted submission</h3>
-        <p>A submission appears after successful completion.</p>
-      </div>
-      }</mat-card-content
-    ></mat-card
-  >
-</div>
+      </section>
+    } @else if(task.outcomeLabel) {
+      <section aria-labelledby="task-recorded">
+        <h2 id="task-recorded">Recorded outcome</h2>
+        <p>{{task.outcomeLabel}}</p>
+      </section>
+    }
+
+    @if(nextTaskId(); as next){
+      <div><a mat-stroked-button [routerLink]="link({kind:'task',id:next})">Open next task</a></div>
+    }
+
+  </div>
+} @else if(error() && sessionScope) {
+  <button mat-button type="button" (click)="load()" [disabled]="busy()">Retry</button>
+}

@@ -36,7 +36,7 @@ export class WorkflowTaskAdministrationComponent extends RuntimeState {
    if(this.filters.assignmentRef&&!this.filters.assignmentKind)throw Error('Choose an assignment kind to filter by reference.');
    const filters=Object.fromEntries(Object.entries(this.filters).filter(([,value])=>value!=='')) as unknown as TaskAdministrationFilters;
    const page=await this.api.administrationTasks(filters,cursor,size,signal);
-   if(current()){this.rows.set(page.items);this.next=page.nextAfterId;this.pageCursors=cursors;this.pageIndex=index;this.pageSize=size;this.appliedFilters.set(filters);}
+   if(current()){this.rows.set(page.items);this.next=page.nextCursor;this.pageCursors=cursors;this.pageIndex=index;this.pageSize=size;this.appliedFilters.set(filters);}
   });
  }
  async nextPage(){

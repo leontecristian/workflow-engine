@@ -2,6 +2,7 @@ package io.github.leontecristian.workflow.testhost.service.runtime;
 
 import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskEligibilityContext;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
 import io.github.leontecristian.workflow.web.dto.runtime.WorkflowReassignmentTarget;
@@ -17,6 +18,20 @@ public class ConsoleRuntimeReadHost implements WorkflowAssignmentDirectory {
     public ConsoleRuntimeReadHost(ConsoleWorkflowAuthorization authorization, ConsoleSettings settings) {
         this.authorization = authorization;
         this.settings = settings;
+    }
+
+    @Override public String assignmentLabel(WorkflowTaskView task) {
+        var target = task.assignment();
+        if (target.equals(SandboxSharedAssignmentProvider.FINANCE)) return "Finance team";
+        if (target.equals(SandboxSharedAssignmentProvider.APPROVER)) return "Approvers";
+        return target.kind() == AssignmentTargetKind.USER ? userLabel(target.ref()) : null;
+    }
+
+    String userLabel(String subjectRef) {
+        if (settings.admin.equals(subjectRef)) return "Sandbox administrator";
+        if (settings.reviewer.equals(subjectRef)) return "Sandbox reviewer";
+        if (settings.reviewer2.equals(subjectRef)) return "Sandbox reviewer 2";
+        return null;
     }
 
     @Override public WorkflowReassignmentTargetPage reassignmentTargets(TaskEligibilityContext task,

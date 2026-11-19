@@ -20,7 +20,16 @@ export class CommandRecovery {
  clear(){this.generation++;this.buffer.clear();this.observations.clear();this.pendingIds.clear();this.running.set(new Set());this.result.set(null);}
  select(id:string){this.buffer.select(id);this.result.set(this.observations.get(id)||null);}
  restore(text:string){if(!this.scope)throw new Error('No current session');const e=this.buffer.restore(text);this.result.set(this.observations.get(e.body['commandId']!)||null);}
- execution():Execution|CancellationExecution|null {const r=this.result()?.result;return !r?null:'execution' in r?r.execution:r.result?.execution||null;}
+ execution():Execution|CancellationExecution|null {
+  const r=this.result()?.result;
+  const settled=r&&'found' in r?r.result:r;
+  return settled&&'execution' in settled?settled.execution:null;
+ }
+ taskResult(){
+  const r=this.result()?.result;
+  const settled=r&&'found' in r?r.result:r;
+  return settled&&'taskStatus' in settled?settled:null;
+ }
  async execute(replay:boolean,signal=new AbortController().signal){
   const envelope=this.buffer.command;
   if(!envelope||!this.scope)throw new Error('No command selected in a current session');
@@ -29,7 +38,8 @@ export class CommandRecovery {
   const wasUncertain=this.pendingIds.has(id);
   if(this.runningIds.has(id))throw new Error('Command is already pending');
   this.running.update(ids=>new Set(ids).add(id));
-  if((envelope.kind==='cancel'||envelope.kind==='reassign')&&!replay)this.pendingIds.add(id);
+  const tracksPending=envelope.kind!=='start';
+  if(tracksPending&&!replay)this.pendingIds.add(id);
   this.result.set(this.observations.get(id)||null);
   try {
    const result=envelope.kind==='reassign'
@@ -41,7 +51,7 @@ export class CommandRecovery {
     : envelope.kind==='complete'
      ? await (replay?this.transport!.replayComplete(envelope,signal):this.transport!.complete(envelope,signal))
      : await (this.transport!.ownership?.(envelope,replay,signal) ?? Promise.reject(new Error('Host ownership transport is required')));
-   if(generation===this.generation&&(envelope.kind==='cancel'||envelope.kind==='reassign')){
+   if(generation===this.generation&&tracksPending){
     if(!replay||'found' in result&&result.found)this.pendingIds.delete(id);
    }
    this.record(generation,id,{outcome:replay?'REPLAY_ONLY_LOOKUP':'replayed' in result&&result.replayed?'REPLAYED_ORIGINAL_RESULT':'NEW_COMMITTED_RESULT',result});return result;
@@ -49,8 +59,10 @@ export class CommandRecovery {
    const failure=error as {httpStatus?:number;code?:string};
    const status=failure?.httpStatus;
    const rejected=status&&status<500||status===503&&failure?.code==='RESULT_VALIDATION_FAILED';
-   if(generation===this.generation&&(envelope.kind==='cancel'||envelope.kind==='reassign')&&!rejected)this.pendingIds.add(id);
-   if(generation===this.generation&&(envelope.kind==='cancel'||envelope.kind==='reassign')&&rejected&&!replay&&!wasUncertain)this.pendingIds.delete(id);
+   if(generation===this.generation&&tracksPending&&!rejected)this.pendingIds.add(id);
+   // Task mutation routing rechecks the receipt before returning a definitive stale version.
+   const staleTaskRetry=envelope.kind!=='cancel'&&status===409&&failure.code==='STALE_VERSION';
+   if(generation===this.generation&&tracksPending&&rejected&&!replay&&(!wasUncertain||staleTaskRetry))this.pendingIds.delete(id);
    this.record(generation,id,{outcome:rejected?'REJECTED':'UNKNOWN_OUTCOME',message:String(error)});throw error;
   } finally {
    if(generation===this.generation){

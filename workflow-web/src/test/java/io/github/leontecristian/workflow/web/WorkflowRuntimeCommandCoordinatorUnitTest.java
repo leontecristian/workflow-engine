@@ -16,6 +16,8 @@ import io.github.leontecristian.workflow.core.dto.runtime.AdministrativelyReleas
 import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
 import io.github.leontecristian.workflow.core.dto.runtime.CancelWorkflow;
 import io.github.leontecristian.workflow.core.dto.runtime.ClaimWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.ReassignWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask;
@@ -23,14 +25,20 @@ import io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationCommandResult;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowExecutionResult;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowOperation;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionService;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.web.configuration.WorkflowRuntimeCommandConfiguration;
 import io.github.leontecristian.workflow.web.configuration.WorkflowRuntimeOptions;
 import io.github.leontecristian.workflow.web.exception.WorkflowUnauthenticatedException;
 import io.github.leontecristian.workflow.web.integration.WorkflowRequestIdentity;
 import io.github.leontecristian.workflow.web.service.runtime.WorkflowRuntimeCommandCoordinator;
+import io.github.leontecristian.workflow.web.service.runtime.WorkflowTaskTokens;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -185,18 +193,19 @@ class WorkflowRuntimeCommandCoordinatorUnitTest {
             org.mockito.Mockito.clearInvocations(execution);
             when(identity.requireActorRef()).thenThrow(new WorkflowUnauthenticatedException("private"))
                     .thenReturn(null, "  ", "reviewer", "next");
-            for (String route : List.of("/commands/instances/7/tasks/8/claim", "/commands/commands/claim/replay")) {
-                String extra = route.endsWith("replay") ? ",\"instanceId\":\"7\",\"taskId\":\"8\"" : "";
-                var request = post(route).contentType("application/json").header("X-Expected-Lock-Version", "9")
+            for (String route : List.of("/commands/tasks/8/claim", "/commands/commands/claim/replay")) {
+                String extra = route.endsWith("replay") ? ",\"taskId\":\"8\"" : "";
+                var request = post(route).contentType("application/json").header("X-Task-Precondition", "invalid")
                         .requestAttr("trustedAttribute", "server").content("{\"commandId\":\"" + ID + "\"" + extra + "}");
                 boolean replay = route.endsWith("replay");
                 mvc.perform(request).andExpect(status().is(replay ? 500 : 401))
                         .andExpect(jsonPath("$.code").value(replay ? "HOST_FAILURE" : "UNAUTHENTICATED"))
                         .andExpect(jsonPath("$.correlationId").value("server"));
             }
-            var request = post("/commands/instances/7/tasks/8/claim").contentType("application/json")
-                    .header("X-Expected-Lock-Version", "9").content("{\"commandId\":\"" + ID + "\"}");
-            mvc.perform(request).andExpect(status().isInternalServerError())
+            String commandBody = "{\"commandId\":\"" + ID + "\"}";
+            mvc.perform(post("/commands/tasks/8/claim").contentType("application/json")
+                            .header("X-Task-Precondition", "invalid").content(commandBody))
+                    .andExpect(status().isInternalServerError())
                     .andExpect(jsonPath("$.code").value("HOST_FAILURE"));
             verifyNoInteractions(execution);
             assertThat(transactions.events).isEmpty();
@@ -204,10 +213,26 @@ class WorkflowRuntimeCommandCoordinatorUnitTest {
             var command = new ClaimWorkflowTask(ID, 7, 8, 9);
             var first = new WorkflowCommandContext(ActorKind.USER, "reviewer", CONTEXT.occurredAt(), null);
             var next = new WorkflowCommandContext(ActorKind.USER, "next", CONTEXT.occurredAt(), null);
-            when(execution.claimTask(command, first)).thenReturn(new WorkflowCommandResult(false, null));
+            var reads = context.getBean(WorkflowRuntimeQueryService.class);
+            var task = mock(WorkflowTaskView.class);
+            when(task.instanceId()).thenReturn(7L);
+            when(task.status()).thenReturn(TaskStatus.OPEN);
+            when(reads.findTask(8)).thenReturn(Optional.of(task));
+            var instance = mock(WorkflowInstanceView.class);
+            when(instance.status()).thenReturn(InstanceStatus.ACTIVE);
+            var result = new WorkflowExecutionResult(ID, WorkflowOperation.CLAIM_TASK, instance, null, task, 10, 10);
+            when(execution.claimTask(command, first)).thenReturn(new WorkflowCommandResult(false, result));
             when(execution.claimTask(command, next)).thenThrow(new WorkflowExecutionException(Category.NOT_ASSIGNED));
-            mvc.perform(request.requestAttr("trustedAttribute", 42)).andExpect(status().isOk());
-            mvc.perform(request).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("NOT_ASSIGNED"));
+            var tokens = context.getBean(WorkflowTaskTokens.class);
+            mvc.perform(post("/commands/tasks/8/claim").contentType("application/json")
+                            .header("X-Task-Precondition", tokens.precondition("reviewer", 8, 9))
+                            .requestAttr("trustedAttribute", 42).content(commandBody))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ACTIVE"))
+                    .andExpect(jsonPath("$.taskStatus").value("OPEN")).andExpect(jsonPath("$.execution").doesNotExist());
+            mvc.perform(post("/commands/tasks/8/claim").contentType("application/json")
+                            .header("X-Task-Precondition", tokens.precondition("next", 8, 9)).content(commandBody))
+                    .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("NOT_ASSIGNED"));
+            verify(identity, org.mockito.Mockito.times(5)).requireActorRef();
             verify(execution).claimTask(command, first);
             verify(execution).claimTask(command, next);
         }
@@ -220,6 +245,7 @@ class WorkflowRuntimeCommandCoordinatorUnitTest {
         @Bean Clock clock() { return CLOCK; }
         @Bean WorkflowRequestIdentity identity() { return mock(WorkflowRequestIdentity.class); }
         @Bean WorkflowExecutionService execution() { return mock(WorkflowExecutionService.class); }
+        @Bean WorkflowRuntimeQueryService reads() { return mock(WorkflowRuntimeQueryService.class); }
         @Bean Transactions transactions() { return new Transactions(); }
     }
 

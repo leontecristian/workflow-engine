@@ -32,7 +32,7 @@
         [value]="commands.buffer.command.body"
       />
       <p class="field-note">
-        Original instance token:
+        Original precondition:
         <code
           >{{commands.buffer.command.expectedToken ?? 'Not applicable to
           start'}}</code
@@ -95,6 +95,13 @@
         [value]="result()?.outcome"
       />@if(resultNotFound()){<p>No committed result was found. This lookup did not execute the command.</p>}@if(result()?.message){
       <p class="field-note">{{result()?.message}}</p>
+      }@if(commands.taskResult(); as taskResult){
+        <p>Task status after the action <console-status [value]="taskResult.taskStatus" /></p>
+        @if(taskResult.collectivePending === true){<p>Contribution accepted. The review was waiting for other tasks.</p>}
+        @if(taskResult.collectivePending === false){<p>The submission resolved the review.</p>}
+        @if(taskResult.nextTaskId; as next){
+          <a mat-stroked-button [routerLink]="link({kind:'task',id:next})">Open next task</a>
+        }
       }@if(commandExecution()){<console-details
         [value]="commandExecution()?.instance"
       />

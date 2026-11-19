@@ -33,8 +33,8 @@ public class ConsoleWorkflowAuthorization implements WorkflowAuthorization {
     @Override
     public boolean isAllowed(WorkflowAuthorizationRequest request) {
         return switch (request.permission().scope()) {
-            case ACCESS_COMPLETION -> canAccessBooking(request, SandboxCompletionPermissions.Scope.VIEW);
-            case COMPLETE -> canAccessBooking(request, SandboxCompletionPermissions.Scope.DECIDE);
+            case ACCESS_COMPLETION -> canAccessBooking(request.actorRef(), request.instanceId(), SandboxCompletionPermissions.Scope.VIEW);
+            case COMPLETE -> canAccessBooking(request.actorRef(), request.instanceId(), SandboxCompletionPermissions.Scope.DECIDE);
             case ACCESS_OWNERSHIP, ACCESS_REASSIGNMENT ->
                     canAccessLinkedTask(((WorkflowAuthorizationRequest.Task) request).task());
             case ACCESS_CANCELLATION -> businessAccess.canAccess(request.actorRef(), request.instanceId());
@@ -50,9 +50,12 @@ public class ConsoleWorkflowAuthorization implements WorkflowAuthorization {
         return identity.isConsoleActor(actorRef) && identity.admin();
     }
 
-    private boolean canAccessBooking(WorkflowAuthorizationRequest request, SandboxCompletionPermissions.Scope scope) {
-        String actor = request.actorRef();
-        return identity.isConsoleActor(actor) && requests.findByInstance(request.instanceId())
+    public boolean canDecide(TaskEligibilityContext task) {
+        return canAccessBooking(task.actorRef(), task.task().instanceId(), SandboxCompletionPermissions.Scope.DECIDE);
+    }
+
+    private boolean canAccessBooking(String actor, long instanceId, SandboxCompletionPermissions.Scope scope) {
+        return identity.isConsoleActor(actor) && requests.findByInstance(instanceId)
                 .map(booking -> completionPermissions.isAllowed(
                         actor, SandboxCompletionPermissions.Resource.BOOKING, scope, booking))
                 .orElse(false);

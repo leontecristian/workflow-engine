@@ -1,4 +1,5 @@
-import type { InstanceView, InstanceGraph, HistoryPage, HistoryEvent, HistorySummary } from './models';
+import type { BusinessHistoryEvent, BusinessHistoryPage, BusinessHistorySummary,
+  InstanceView, InstanceGraph, HistoryPage, HistoryEvent, HistorySummary } from './models';
 import { ViewerReadError } from './contracts';
 
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -24,7 +25,17 @@ function summary(value: unknown, id: string): value is HistorySummary {
     && ['correlationId','sourceNodeKey','targetNodeKey','transitionKey'].every(key => nullableText(value[key]))
     && nullableId(value['activityId']) && nullableId(value['taskId']) && Number.isInteger(value['detailsSchemaVersion']);
 }
-export function validateHistory(value: unknown, id: string, after: string): asserts value is HistoryPage {
+const opaqueReference = (value: unknown) => typeof value === 'string' && value.length <= 200 && !!value.trim();
+function businessSummary(value: unknown): value is BusinessHistorySummary {
+  return object(value) && opaqueReference(value['eventRef'])
+    && ['label', 'actorLabel', 'occurredAt'].every(key => text(value[key]));
+}
+export function validateHistory(value: unknown, id: string, after: string): asserts value is HistoryPage | BusinessHistoryPage {
+  if (object(value) && value['representation'] === 'business') {
+    requireValid(Array.isArray(value['items']) && value['items'].length <= 100 && value['items'].every(businessSummary)
+      && (value['nextCursor'] === null || opaqueReference(value['nextCursor'])));
+    return;
+  }
   requireValid(object(value) && Array.isArray(value['items']) && value['items'].length <= 100 && nullableId(value['nextAfterSequence']));
   const requested = BigInt(after);
   let cursor = requested;
@@ -37,7 +48,12 @@ export function validateHistory(value: unknown, id: string, after: string): asse
     requireValid(sourceCursor > requested && sourceCursor >= cursor);
   }
 }
-export function validateEvent(value: unknown, id: string, sequence: string): asserts value is HistoryEvent {
+export function validateEvent(value: unknown, id: string, sequence: string): asserts value is HistoryEvent | BusinessHistoryEvent {
+  if (object(value) && value['representation'] === 'business') {
+    requireValid(businessSummary(value['summary']) && nullableId(value['taskId'])
+      && ['stepName', 'outcomeLabel', 'comment'].every(key => nullableText(value[key])));
+    return;
+  }
   requireValid(object(value) && summary(value['summary'], id) && value['summary'].historySequence === sequence && text(value['detailsJson']));
 }
 export function validateGraph(value: unknown, id: string): asserts value is InstanceGraph {

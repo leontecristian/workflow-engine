@@ -41,7 +41,7 @@ class ConsoleRuntimePolicyUnitTest {
     private final ConsoleTaskBusinessAccess business = new ConsoleTaskBusinessAccess(context, requests);
     private final WorkflowRuntimeQueryService reads = mock(WorkflowRuntimeQueryService.class);
     private final WorkflowTaskEligibilityService eligibility = mock(WorkflowTaskEligibilityService.class);
-    private final ConsoleRuntimeAccess access = new ConsoleRuntimeAccess(reads, context, eligibility, business);
+    private final ConsoleRuntimeAccess access = new ConsoleRuntimeAccess(reads, context, eligibility, business, mock(ConsoleWorkflowAuthorization.class));
     private final WorkflowTaskView task = new WorkflowTaskView(5, 2, 1, 3, "REVIEW",
             new TaskAssignmentTarget(AssignmentTargetKind.USER, "reviewer"), TaskStatus.OPEN,
             null, Instant.EPOCH, null, null, null, null, "reviewer");

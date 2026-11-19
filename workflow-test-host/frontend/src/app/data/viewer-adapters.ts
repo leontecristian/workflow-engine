@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ConsoleSession } from './console-session';
 import { normalizeViewerReadError } from '@workflow-engine/ui';
-import type { WorkflowViewerReads, WorkflowViewerNavigation, ViewerDestination, InstanceView, HistoryPage, HistoryEvent, InstanceGraph } from '@workflow-engine/ui';
+import type { BusinessHistoryEvent, BusinessHistoryPage, WorkflowViewerReads, WorkflowViewerNavigation, ViewerDestination, InstanceView, HistoryPage, HistoryEvent, InstanceGraph } from '@workflow-engine/ui';
 @Injectable({providedIn:'root'})
 export class ConsoleViewerReads implements WorkflowViewerReads {
   private readonly session = inject(ConsoleSession);
@@ -11,8 +11,23 @@ export class ConsoleViewerReads implements WorkflowViewerReads {
     catch(error) { throw normalizeViewerReadError(error); }
   }
   instance(id:string,signal:AbortSignal) { return this.read<InstanceView>('/instances/'+encodeURIComponent(id),signal); }
-  history(id:string,afterSequence:string,limit:number,signal:AbortSignal) { return this.read<HistoryPage>('/instances/'+encodeURIComponent(id)+'/history?'+new URLSearchParams({afterSequence,limit:String(limit)}),signal); }
-  historyEvent(id:string,sequence:string,signal:AbortSignal) { return this.read<HistoryEvent>('/instances/'+encodeURIComponent(id)+'/history/'+encodeURIComponent(sequence),signal); }
+  history(id:string,cursor:string,limit:number,signal:AbortSignal) {
+    const path = '/instances/' + encodeURIComponent(id);
+    if (this.session.admin) {
+      const query = new URLSearchParams({afterSequence:cursor,limit:String(limit)});
+      return this.read<HistoryPage>(path+'/history?'+query,signal);
+    }
+    const query = new URLSearchParams({limit:String(limit)});
+    if (cursor !== '0') query.set('cursor', cursor);
+    return this.read<BusinessHistoryPage>(path+'/business-history?'+query,signal);
+  }
+  historyEvent(id:string,sequence:string,signal:AbortSignal) {
+    const path = '/instances/' + encodeURIComponent(id);
+    const ref = encodeURIComponent(sequence);
+    return this.session.admin && /^[1-9][0-9]*$/.test(sequence)
+      ? this.read<HistoryEvent>(path+'/history/'+ref,signal)
+      : this.read<BusinessHistoryEvent>(path+'/business-history/'+ref,signal);
+  }
   graph(id:string,signal:AbortSignal) { return this.read<InstanceGraph>('/instances/'+encodeURIComponent(id)+'/graph',signal); }
 }
 @Injectable({providedIn:'root'})

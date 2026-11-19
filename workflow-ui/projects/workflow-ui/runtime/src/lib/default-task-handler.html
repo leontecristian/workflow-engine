@@ -1,26 +1,149 @@
-<mat-form-field appearance="outline">
-  <mat-label>Comment</mat-label>
-  <textarea matInput [(ngModel)]="comment" maxlength="2000" rows="4" [disabled]="!editable"></textarea>
-  <mat-hint align="end">{{comment.length}} / 2000</mat-hint>
-</mat-form-field>
-@if(resultMode !== 'FORBIDDEN'){
-  <mat-form-field appearance="outline">
-    <mat-label>Result JSON ({{resultMode === 'REQUIRED' ? 'required' : 'optional'}})</mat-label>
-    <textarea matInput class="code" [(ngModel)]="resultDraft" rows="7" spellcheck="false" [disabled]="!editable"></textarea>
-    @if(resultMode === 'OPTIONAL'){<mat-hint>Leave blank to omit the result.</mat-hint>}
-  </mat-form-field>
-  @if(resultSchema; as schema){
-    <mat-expansion-panel>
-      <mat-expansion-panel-header><mat-panel-title>Pinned result schema</mat-panel-title></mat-expansion-panel-header>
-      <pre>{{schema}}</pre>
-    </mat-expansion-panel>
+@if (resultUnavailable) {
+  <p role="alert">The result fields could not be loaded.</p>
+  @if (reloadForm; as reload) {
+    <button type="button" mat-stroked-button (click)="reload()">Reload task</button>
   }
-}
-<div class="actions">
-  @for(outcome of contract.outcomes; track outcome.key){
-    <button type="button" mat-flat-button (click)="submit(outcome.key)" [disabled]="!canSubmit(outcome)">
-      {{outcome.label}}{{outcome.requiresComment ? ' - comment required' : ''}}
+} @else {
+  @if (resultMode === 'OPTIONAL') {
+    <button type="button" mat-stroked-button (click)="toggleResult(!showResult)" [disabled]="disabled">
+      {{showResult ? 'Remove result' : 'Add result'}}
     </button>
   }
-</div>
-<p class="muted">Actions marked "comment required" need a reason in the shared comment field.</p>
+  @if (activeView; as form) {
+    <div class="result-fields">
+      <ng-container *ngTemplateOutlet="fieldControl; context: {$implicit: form, root: true}"/>
+    </div>
+  }
+  @for (message of formErrors; track $index) {
+    <p class="field-issue" role="alert">{{message}}</p>
+  }
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Comment</mat-label>
+    <textarea matInput [(ngModel)]="comment" maxlength="2000" rows="3" [disabled]="disabled"></textarea>
+    @if (commentRequired; as outcomes) { <mat-hint>Required for {{outcomes}}.</mat-hint> }
+  </mat-form-field>
+  <div class="actions">
+    @for (outcome of contract.outcomes; track outcome.key) {
+      <button type="button" mat-flat-button (click)="submit(outcome.key)" [disabled]="!canSubmit(outcome)">
+        {{outcome.label}}
+      </button>
+    }
+  </div>
+}
+
+<ng-template #fieldControl let-view let-root="root" let-item="item" let-hidden="hidden" let-suppressIssues="suppressIssues">
+  @if (!view.included) {
+    <div class="actions">
+      @if (view.kind !== 'choice' || view.choices.length) {
+        <button type="button" mat-stroked-button (click)="setPresence(view, 'present')"
+                [attr.aria-describedby]="view.answer.descriptionId" [disabled]="disabled">
+          Add {{view.field.label}}
+        </button>
+      }
+      @if (view.canBeNull) {
+        <button type="button" mat-button
+                [attr.aria-label]="'No value for ' + view.field.label"
+                [attr.aria-describedby]="view.answer.descriptionId"
+                (click)="setPresence(view, 'null')" [disabled]="disabled">No value</button>
+      }
+    </div>
+  } @else {
+    @if (view.isNull) {
+      <p class="empty-value">{{view.field.label}} · No value</p>
+    } @else if (view.field.alternatives && view.kind === 'object') {
+      @if (!root && !item) { <h4>{{view.field.label}}</h4> }
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{view.field.selectorLabel || 'Type'}}</mat-label>
+        <mat-select [value]="view.answer.alternative" (selectionChange)="chooseShape(view, $event.value)"
+                    [aria-describedby]="view.answer.descriptionId" [disabled]="disabled">
+          @for (alternative of view.field.alternatives; track $index) {
+            <mat-option [value]="$index">{{alternative.label}}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      @if (view.branch; as branch) {
+        <ng-container *ngTemplateOutlet="fieldControl; context: {$implicit: branch, root: true, hidden: view.field.selectorKey, suppressIssues: true}"/>
+        @if (branch.issue) { <p class="field-issue">{{branch.issue}}</p> }
+      }
+    } @else if (view.kind === 'object') {
+      @if (!root && !item) { <h4>{{view.field.label}}</h4> }
+      <div [class.nested]="!root && !item" class="fields">
+        @for (child of view.children; track child.answer) {
+          @if (child.field.key !== hidden) {
+            <div class="field">
+              <ng-container *ngTemplateOutlet="fieldControl; context: {$implicit: child}"/>
+            </div>
+          }
+        }
+      </div>
+    } @else if (view.kind === 'array') {
+      @if (!root && !item) { <h4>{{view.field.label}}</h4> }
+      <div class="list">
+        @for (child of view.children; track child.answer; let index = $index) {
+          <fieldset class="list-item">
+            <legend>Item {{index + 1}}</legend>
+            <ng-container *ngTemplateOutlet="fieldControl; context: {$implicit: child, item: true}"/>
+            <div class="actions">
+              <button type="button" mat-button [attr.aria-label]="'Move item ' + (index + 1) + ' up'"
+                      (click)="moveItem(view, index, -1)" [disabled]="disabled || $first">Move up</button>
+              <button type="button" mat-button [attr.aria-label]="'Move item ' + (index + 1) + ' down'"
+                      (click)="moveItem(view, index, 1)" [disabled]="disabled || $last">Move down</button>
+              <button type="button" mat-button [attr.aria-label]="'Remove item ' + (index + 1)"
+                      (click)="removeItem(view, index)" [disabled]="disabled">Remove</button>
+            </div>
+          </fieldset>
+        }
+        <button type="button" mat-stroked-button (click)="addItem(view)" [attr.aria-describedby]="view.answer.descriptionId"
+                [disabled]="disabled || view.atItemLimit">Add item</button>
+      </div>
+    } @else if (view.kind === 'fixed') {
+      <p class="empty-value">{{view.field.label}} · {{view.fixed}}</p>
+    } @else {
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{view.field.label}}</mat-label>
+        @if (view.kind === 'choice' || view.kind === 'boolean') {
+          <mat-select [value]="view.selectedChoice" (selectionChange)="choose(view, $event.value)"
+                      [aria-describedby]="view.answer.descriptionId" [disabled]="disabled">
+            @for (choice of view.choices; track $index) {
+              <mat-option [value]="choice.value">{{choice.label}}</mat-option>
+            }
+          </mat-select>
+        } @else if (view.kind === 'string' && !view.format) {
+          <textarea matInput [ngModel]="view.text" (ngModelChange)="writeText(view, $event)" [aria-describedby]="view.answer.descriptionId"
+                    [disabled]="disabled" rows="2"></textarea>
+        } @else {
+          <input matInput [ngModel]="view.text" (ngModelChange)="writeText(view, $event)" [aria-describedby]="view.answer.descriptionId" [disabled]="disabled"
+                 [attr.inputmode]="view.kind === 'number' || view.kind === 'integer' ? 'decimal' : 'text'" spellcheck="false">
+        }
+        @if (view.field.hint) { <mat-hint>Example {{view.field.hint}}</mat-hint> }
+      </mat-form-field>
+    }
+    @if ((!root && !view.required) || view.isNull || (view.canBeNull && view.kind !== 'fixed')) {
+      <div class="actions">
+        @if (view.isNull) {
+          <button type="button" mat-button (click)="setPresence(view, 'present')" [disabled]="disabled">Enter value</button>
+        } @else if (view.canBeNull && view.kind !== 'fixed') {
+          <button type="button" mat-button
+                  [attr.aria-label]="'No value for ' + view.field.label"
+                  [attr.aria-describedby]="view.answer.descriptionId"
+                  (click)="setPresence(view, 'null')" [disabled]="disabled">No value</button>
+        }
+        @if (!root && !view.required) {
+          <button type="button" mat-button [attr.aria-label]="'Remove answer for ' + view.field.label"
+                  (click)="setPresence(view, 'omitted')" [disabled]="disabled">Remove answer</button>
+        }
+      </div>
+    }
+  }
+  <div class="field-description" [id]="view.answer.descriptionId">
+    @if (view.field.help) { <p class="field-help">{{view.field.help}}</p> }
+    @if (view.included && !view.isNull && view.guidance.length) {
+      <p class="field-help">{{view.guidance.join(' · ')}}</p>
+    }
+    @if (!suppressIssues) {
+      @for (message of fieldErrors(view); track $index) {
+        <p class="field-issue">{{message}}</p>
+      }
+    }
+  </div>
+</ng-template>

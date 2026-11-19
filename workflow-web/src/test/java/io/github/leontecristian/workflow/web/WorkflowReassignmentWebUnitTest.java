@@ -36,6 +36,8 @@ import io.github.leontecristian.workflow.core.service.runtime.WorkflowAuthorized
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeReadAuthorization;
 import io.github.leontecristian.workflow.web.integration.runtime.WorkflowAssignmentDirectory;
+import io.github.leontecristian.workflow.web.service.runtime.RuntimeWire;
+import io.github.leontecristian.workflow.web.service.runtime.WorkflowTaskTokens;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -72,29 +74,29 @@ class WorkflowReassignmentWebUnitTest {
             when(access.listAdministrationTasks(eq("actor"), any())).thenReturn(new WorkflowTaskAdministrationPage(List.of(
                     new WorkflowTaskAdministrationItem(task, "REVIEW", "Review", "REVIEW", "Review")), null));
             mvc(context).perform(get("/custom/tasks/administration"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].assignmentLabel").value("Friendly Ana"));
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].ownershipLabel").value("Assigned to Friendly Ana"));
             mvc(context).perform(get("/custom/tasks/2/reassignment-targets").param("kind", "USER"))
                     .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("REASSIGNMENT_FORBIDDEN"));
             verify(access).task("actor", 2);
-            verify(access).canReassignTask("actor", task);
+            verify(access, never()).canReassignTask("actor", task);
         }
     }
 
-    @Test void malformedAndFailingLabelsFallBackToAssignmentReference() throws Exception {
+    @Test void malformedAndFailingLabelsUseNeutralOwnershipWording() throws Exception {
         try (var context = reads()) {
             var access = context.getBean(WorkflowAuthorizedRuntimeReadService.class);
             var directory = context.getBean(WorkflowAssignmentDirectory.class);
             var task = task();
             when(access.listAdministrationTasks(eq("actor"), any())).thenReturn(new WorkflowTaskAdministrationPage(List.of(
                     new WorkflowTaskAdministrationItem(task, "REVIEW", "Review", "REVIEW", "Review")), null));
-            for (String label : new String[]{null, " ", "\ud800", "x".repeat(501)}) {
+            for (String label : new String[]{null, " ", "\ud800", "x".repeat(501), " Ana "}) {
                 when(directory.assignmentLabel(task)).thenReturn(label);
                 mvc(context).perform(get("/custom/tasks/administration"))
-                        .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].assignmentLabel").value("Ana"));
+                        .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].ownershipLabel").value("Assigned to another user"));
             }
             when(directory.assignmentLabel(task)).thenThrow(new IllegalStateException("private directory failure"));
             mvc(context).perform(get("/custom/tasks/administration"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].assignmentLabel").value("Ana"));
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].ownershipLabel").value("Assigned to another user"));
         }
     }
 
@@ -104,17 +106,18 @@ class WorkflowReassignmentWebUnitTest {
             var command = new ReassignWorkflowTask(UUID.fromString("12345678-1234-1234-1234-123456789abc"),
                     9007199254740993L, 2, 9007199254740994L,
                     new TaskAssignmentTarget(AssignmentTargetKind.GROUP, "Finance"), " exact \n reason ");
+            stubTaskTarget(host, 9007199254740993L, 9007199254740994L);
             when(host.reassign(command, "corr")).thenReturn(new WorkflowCommandResult(false, null));
-            mvc(context).perform(post("/custom/instances/9007199254740993/tasks/2/reassign")
-                    .header("X-Expected-Lock-Version", "9007199254740994").requestAttr("trusted", "corr")
+            mvc(context).perform(post("/custom/tasks/2/reassign")
+                    .header("X-Task-Precondition", "9007199254740994").requestAttr("trusted", "corr")
                     .contentType("application/json").content(BODY)).andExpect(status().isOk())
                     .andExpect(jsonPath("$.replayed").value(false));
             verify(host).reassign(command, "corr");
             when(host.replayReassignment(command, "corr")).thenReturn(Optional.empty());
             mvc(context).perform(post("/custom/commands/reassign/replay")
-                    .header("X-Expected-Lock-Version", "9007199254740994").requestAttr("trusted", "corr")
+                    .header("X-Task-Precondition", "9007199254740994").requestAttr("trusted", "corr")
                     .contentType("application/json").content(BODY.substring(0, BODY.length() - 1)
-                            + ",\"instanceId\":\"9007199254740993\",\"taskId\":\"2\"}"))
+                            + ",\"taskId\":\"2\"}"))
                     .andExpect(status().isOk()).andExpect(content().json("{\"found\":false,\"result\":null}"));
             verify(host).replayReassignment(command, "corr");
         }
@@ -128,10 +131,10 @@ class WorkflowReassignmentWebUnitTest {
                     BODY.replace(" exact \\n reason ", " "), BODY.replace(" exact \\n reason ", "x".repeat(1001)),
                     BODY.replace("Finance", "\\ud800"), BODY.replace("\"assignment\":{\"kind\":\"GROUP\",\"ref\":\"Finance\"}", "\"assignment\":null"),
                     BODY.substring(0, BODY.length() - 1) + ",\"actor\":\"fake\"}")) {
-                mvc(context).perform(post("/custom/instances/1/tasks/2/reassign").header("X-Expected-Lock-Version", "0")
+                mvc(context).perform(post("/custom/tasks/2/reassign").header("X-Task-Precondition", "0")
                         .contentType("application/json").content(body)).andExpect(status().isBadRequest());
             }
-            mvc(context).perform(post("/custom/instances/1/tasks/2/reassign").header("X-Expected-Lock-Version", "0")
+            mvc(context).perform(post("/custom/tasks/2/reassign").header("X-Task-Precondition", "0")
                     .contentType("application/json").content(BODY + " ".repeat(16 * 1024))).andExpect(status().is(413));
             verify(context.getBean(WorkflowRuntimeCommandCoordinator.class), never()).reassign(any(), any());
         }
@@ -141,14 +144,19 @@ class WorkflowReassignmentWebUnitTest {
         try (var context = reads()) {
             var host = context.getBean(WorkflowAuthorizedRuntimeReadService.class);
             when(host.listAdministrationTasks(eq("actor"), any())).thenReturn(new WorkflowTaskAdministrationPage(List.of(), 12L));
-            mvc(context).perform(get("/custom/tasks/administration")).andExpect(status().isOk())
-                    .andExpect(content().json("{\"items\":[],\"nextAfterId\":\"12\"}"));
-            verify(host).requireTaskAdministrationAccess("actor");
+            String response = mvc(context).perform(get("/custom/tasks/administration")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items").isEmpty()).andExpect(jsonPath("$.nextCursor").isString())
+                    .andExpect(jsonPath("$.nextAfterId").doesNotExist()).andReturn().getResponse().getContentAsString();
+            String unscoped = new RuntimeWire().tree(response).path("nextCursor").textValue();
+            mvc(context).perform(get("/custom/tasks/administration").param("instanceId", "9").param("cursor", unscoped))
+                    .andExpect(status().isBadRequest());
+            String scoped = context.getBean(WorkflowTaskTokens.class).taskPageCursor("administration", "actor", 9L, 12L);
+            verify(host, org.mockito.Mockito.times(2)).requireTaskAdministrationAccess("actor");
             verify(host).listAdministrationTasks("actor", new WorkflowTaskAdministrationQuery(TaskStatus.OPEN, null, null, null, null, null, 0, 50));
             String taskName = "  Réview %_[x].  ";
             mvc(context).perform(get("/custom/tasks/administration").param("status", "ALL").param("taskType", "REVIEW")
                     .param("assignmentKind", "ROLE").param("assignmentRef", "reviewer").param("assigneeRef", "Ana")
-                    .param("instanceId", "9").param("afterId", "12").param("limit", "100").param("taskName", taskName))
+                    .param("instanceId", "9").param("cursor", scoped).param("limit", "100").param("taskName", taskName))
                     .andExpect(status().isOk());
             verify(host).listAdministrationTasks("actor", new WorkflowTaskAdministrationQuery(null, "REVIEW", AssignmentTargetKind.ROLE,
                     "reviewer", "Ana", 9L, 12, 100, taskName));
@@ -195,7 +203,7 @@ class WorkflowReassignmentWebUnitTest {
     @Test void administrationProjectsOnlyJoinedAuthorizedMetadata() throws Exception {
         try (var context = reads()) {
             var host = context.getBean(WorkflowAuthorizedRuntimeReadService.class);
-            var task = new WorkflowTaskView(2, 3, 1, 4, "REVIEW", new TaskAssignmentTarget(AssignmentTargetKind.USER, "Ana"),
+            var task = new WorkflowTaskView(2, 3, 9007199254740993L, 4, "REVIEW", new TaskAssignmentTarget(AssignmentTargetKind.USER, "Ana"),
                     TaskStatus.COMPLETED, "APPROVE", Instant.parse("2026-11-14T00:00:00Z"), null,
                     Instant.parse("2026-11-14T01:00:00Z"), "Ana", null, "Ana");
             when(context.getBean(WorkflowAssignmentDirectory.class).assignmentLabel(task)).thenReturn("Ana Reviewer");
@@ -203,9 +211,11 @@ class WorkflowReassignmentWebUnitTest {
                     new WorkflowTaskAdministrationItem(task, "REVIEW", "Pinned review", "REVIEW", "Review type")), null));
             mvc(context).perform(get("/custom/tasks/administration").param("status", "COMPLETED"))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].id").value("2"))
+                    .andExpect(jsonPath("$.items[0].instanceId").value("9007199254740993"))
+                    .andExpect(jsonPath("$.items[0].createdAt").value("2026-11-14T00:00:00Z"))
                     .andExpect(jsonPath("$.items[0].nodeName").value("Pinned review"))
-                    .andExpect(jsonPath("$.items[0].taskType").value("REVIEW"))
-                    .andExpect(jsonPath("$.items[0].assignmentLabel").value("Ana Reviewer"))
+                    .andExpect(jsonPath("$.items[0].taskType").doesNotExist())
+                    .andExpect(jsonPath("$.items[0].ownershipLabel").value("Assigned to Ana Reviewer"))
                     .andExpect(jsonPath("$.items[0].outcomeKey").doesNotExist())
                     .andExpect(jsonPath("$.items[0].closedBy").doesNotExist());
             org.mockito.Mockito.verifyNoInteractions(context.getBean(WorkflowRuntimeQueryService.class));
@@ -253,9 +263,9 @@ class WorkflowReassignmentWebUnitTest {
             when(activity.nodeKey()).thenReturn("REVIEW");
             when(host.canReassignTask("actor", task)).thenReturn(false);
             mvc(context).perform(get("/custom/tasks/2/reassignment-availability")).andExpect(status().isOk())
-                    .andExpect(content().json("{\"allowed\":false,\"instanceLockVersion\":\"9007199254740994\"}"));
+                    .andExpect(content().json("{\"allowed\":false}"));
             when(host.canReassignTask("actor", task)).thenReturn(true);
-            mvc(context).perform(get("/custom/tasks/2/reassignment-availability")).andExpect(jsonPath("$.allowed").value(true));
+            mvc(context).perform(get("/custom/tasks/2/reassignment-availability")).andExpect(jsonPath("$.allowed").value(true)).andExpect(jsonPath("$.precondition").isString());
             when(instance.status()).thenReturn(InstanceStatus.CANCELLED);
             mvc(context).perform(get("/custom/tasks/2/reassignment-availability")).andExpect(jsonPath("$.allowed").value(false));
         }
@@ -264,14 +274,20 @@ class WorkflowReassignmentWebUnitTest {
     @Test void reassignmentErrorsKeepSpecifiedStatuses() throws Exception {
         try (var context = commands()) {
             var host = context.getBean(WorkflowRuntimeCommandCoordinator.class);
+            stubTaskTarget(host, 1, 0);
             for (var category : List.of(WorkflowExecutionException.Category.REASSIGNMENT_FORBIDDEN,
                     WorkflowExecutionException.Category.INVALID_ASSIGNMENT)) {
                 org.mockito.Mockito.doThrow(new WorkflowExecutionException(category)).when(host).reassign(any(), any());
-                mvc(context).perform(post("/custom/instances/1/tasks/2/reassign").header("X-Expected-Lock-Version", "0")
+                mvc(context).perform(post("/custom/tasks/2/reassign").header("X-Task-Precondition", "0")
                         .contentType("application/json").content(BODY))
                         .andExpect(status().is(category == WorkflowExecutionException.Category.REASSIGNMENT_FORBIDDEN ? 403 : 422));
             }
         }
+    }
+
+    private static void stubTaskTarget(WorkflowRuntimeCommandCoordinator host, long instanceId, long version) {
+        when(host.taskTarget(eq(2L), any())).thenReturn(new WorkflowRuntimeCommandCoordinator.TaskTarget(2L, instanceId, version));
+        when(host.taskResult(any())).thenAnswer(call -> java.util.Map.of("replayed", call.<WorkflowCommandResult>getArgument(0).replayed()));
     }
 
     private WorkflowTaskView task() {
@@ -282,7 +298,8 @@ class WorkflowReassignmentWebUnitTest {
         return context(WorkflowRuntimeWebUnitTest.Host.class, WorkflowRuntimeWebUnitTest.Commands.class, WorkflowRuntimeCommandConfiguration.class);
     }
     private AnnotationConfigWebApplicationContext reads() {
-        return context(WorkflowRuntimeWebUnitTest.Host.class, WorkflowRuntimeWebUnitTest.Reads.class, WorkflowRuntimeReadConfiguration.class);
+        return context(WorkflowRuntimeWebUnitTest.Host.class, WorkflowRuntimeWebUnitTest.Reads.class,
+                WorkflowRuntimeWebUnitTest.Commands.class, WorkflowRuntimeReadConfiguration.class, WorkflowRuntimeCommandConfiguration.class);
     }
     private AnnotationConfigWebApplicationContext context(Class<?>... types) {
         var context = new AnnotationConfigWebApplicationContext();

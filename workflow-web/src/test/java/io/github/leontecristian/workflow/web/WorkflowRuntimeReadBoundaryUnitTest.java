@@ -92,6 +92,9 @@ class WorkflowRuntimeReadBoundaryUnitTest {
             when(open.status()).thenReturn(TaskStatus.OPEN);
             var completed = mock(WorkflowTaskView.class);
             when(completed.status()).thenReturn(TaskStatus.COMPLETED);
+            when(completed.instanceId()).thenReturn(1L);
+            when(completed.activityId()).thenReturn(2L);
+            WorkflowRuntimeWebUnitTest.stubPinnedTask(context);
             when(reads.findTask(5)).thenReturn(Optional.of(open), Optional.of(completed));
             var submission = new TaskSubmission(5, 2, 1, 3, new UUID(0, 5), ActorKind.USER,
                     "second", Instant.EPOCH, "APPROVE", null, Map.of(), null);
@@ -104,7 +107,9 @@ class WorkflowRuntimeReadBoundaryUnitTest {
             mvc.perform(get("/custom/tasks/5/submission")).andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.code").value("NOT_FOUND"));
             mvc.perform(get("/custom/tasks/5/submission")).andExpect(status().isOk())
-                    .andExpect(jsonPath("$.taskId").value("5"));
+                    .andExpect(jsonPath("$.taskId").doesNotExist())
+                    .andExpect(jsonPath("$.actorLabel").value("You"))
+                    .andExpect(jsonPath("$.outcomeLabel").value("Approve"));
             var order = inOrder(identity, policy);
             order.verify(identity).requireActorRef();
             order.verify(policy).canReadTask(new TaskEligibilityContext(open, "first"));

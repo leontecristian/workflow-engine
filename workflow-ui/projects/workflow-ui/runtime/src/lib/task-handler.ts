@@ -7,11 +7,21 @@ export interface WorkflowTaskDecision {
   readonly resultJson?: string;
 }
 
+export interface WorkflowTaskRejection {
+  readonly message?: string;
+  readonly fieldErrors?: readonly {path: string; message: string}[];
+}
+
+export type WorkflowEditableTaskContract = TaskContract & {
+  taskType: string;
+  outcomes: (TaskContract['outcomes'][number] & {key: string})[];
+};
+
 export interface WorkflowTaskHandlerInputs {
-  contract: TaskContract;
+  contract: WorkflowEditableTaskContract;
   editable: boolean;
   /** Resolves after shared handling, including when the decision is rejected. */
-  submitDecision: (decision: WorkflowTaskDecision) => Promise<void>;
+  submitDecision: (decision: WorkflowTaskDecision) => Promise<void | WorkflowTaskRejection>;
 }
 
 export type WorkflowTaskEditorRegistration = Readonly<Record<string, Type<WorkflowTaskHandlerInputs>>>;

@@ -140,11 +140,11 @@ export class ConsoleSession {
     return value as T;
   }
   /** Runtime commands preserve exact frozen text and classify uncertain transport outcomes. */
-  async runtimeCommand<T>(path:string,body:unknown,token:string|null,raw:boolean,signal:AbortSignal):Promise<T> {
+  async runtimeCommand<T>(path:string,body:unknown,token:string|null,raw:boolean,signal:AbortSignal,taskCommand=false):Promise<T> {
     const scope=this.viewerScope(),session=this.session();
     if(!scope||!session)throw new Error('No current session');
     const headers:Record<string,string>={'Content-Type':'application/json',[session.csrfHeaderName]:session.csrfToken};
-    if(token!==null)headers['X-Expected-Lock-Version']=token;
+    if(token!==null)headers[taskCommand?'X-Task-Precondition':'X-Expected-Lock-Version']=token;
     let response:Response,text:string;
     try {
       response=await fetch('/console/api'+path,{method:'POST',credentials:'same-origin',headers,signal,body:raw?body as string:JSON.stringify(body)});
@@ -154,14 +154,18 @@ export class ConsoleSession {
     let value:unknown;
     try {value=text?JSON.parse(text):null;}catch {throw new Error('Response unavailable. Command outcome may be unknown; use Find result.');}
     if(!response.ok){
-      const v=value as {code?:string;message?:string;diagnostics?:{path?:string;message?:string}[];correlationId?:string}|null;
+      const v=value as {code?:string;message?:string;fieldErrors?:{path:string;message:string}[];diagnostics?:{path?:string;message?:string}[];correlationId?:string}|null;
       const diagnostic=v?.diagnostics?.[0];
       const resultFailure=v?.code?.startsWith('RESULT_');
       const description=diagnostic?.message||v?.message;
-      const message=resultFailure&&description
+      const fieldErrors=v?.fieldErrors??v?.diagnostics?.flatMap(item=>
+        typeof item.path==='string'&&item.message?[{path:item.path,message:item.message}]:[]);
+      const taskMessage=v?.message&&v.message!==v.code?v.message
+        : resultFailure?'Check the result and try again.':'The task action could not be completed.';
+      const message=taskCommand ? taskMessage : resultFailure&&description
         ? (diagnostic?.path?diagnostic.path+' — ':'')+description
         : `${response.status} ${v?.code||'REQUEST_FAILED'} ${JSON.stringify(v?.diagnostics||[])} [${v?.correlationId||''}]`;
-      throw Object.assign(new Error(message),{httpStatus:response.status,code:v?.code});
+      throw Object.assign(new Error(message),{httpStatus:response.status,code:v?.code,fieldErrors});
     }
     return value as T;
   }

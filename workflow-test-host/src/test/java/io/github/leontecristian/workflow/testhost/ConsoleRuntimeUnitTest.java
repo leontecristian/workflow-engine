@@ -25,6 +25,7 @@ import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
 import io.github.leontecristian.workflow.testhost.exception.console.ConsoleException;
 import io.github.leontecristian.workflow.testhost.exception.console.SandboxRequestConflict;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
+import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleWorkflowAuthorization;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeAccess;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeCoordinator;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeTransaction;
@@ -103,7 +104,7 @@ class ConsoleRuntimeUnitTest {
         var reads = mock(WorkflowRuntimeQueryService.class);
         var context = mock(ConsoleContext.class);
         when(context.actor()).thenReturn("reviewer");
-        var access = new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess.class));
+        var access = new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess.class), mock(ConsoleWorkflowAuthorization.class));
         var task = mock(WorkflowTaskView.class);
         when(task.assignment()).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER, "reviewer"));
         when(task.status()).thenReturn(TaskStatus.COMPLETED);

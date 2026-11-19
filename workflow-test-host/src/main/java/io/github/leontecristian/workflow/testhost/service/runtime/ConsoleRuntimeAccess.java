@@ -21,13 +21,16 @@ public class ConsoleRuntimeAccess implements WorkflowRuntimeReadAuthorization {
     private final ConsoleContext context;
     private final WorkflowTaskEligibilityService eligibility;
     private final ConsoleTaskBusinessAccess businessAccess;
+    private final ConsoleWorkflowAuthorization commandPolicy;
 
     public ConsoleRuntimeAccess(WorkflowRuntimeQueryService reads, ConsoleContext context,
-            WorkflowTaskEligibilityService eligibility, ConsoleTaskBusinessAccess businessAccess) {
+            WorkflowTaskEligibilityService eligibility, ConsoleTaskBusinessAccess businessAccess,
+            ConsoleWorkflowAuthorization commandPolicy) {
         this.reads = reads;
         this.context = context;
         this.eligibility = eligibility;
         this.businessAccess = businessAccess;
+        this.commandPolicy = commandPolicy;
     }
 
     @Override public boolean canMonitor(String actorRef) { return context.isConsoleAdministrator(actorRef); }
@@ -83,8 +86,7 @@ public class ConsoleRuntimeAccess implements WorkflowRuntimeReadAuthorization {
     }
 
     @Override public boolean canCompleteTask(TaskEligibilityContext taskContext) {
-        // Sandbox supplies no extra completion veto beyond the core state/assignment policy.
-        return true;
+        return commandPolicy.canDecide(taskContext);
     }
 
     /** Bounded bulk authorization for graph links; avoids an exact-task query per displayed node. */

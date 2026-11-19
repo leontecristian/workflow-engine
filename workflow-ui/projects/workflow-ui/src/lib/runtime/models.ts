@@ -1,66 +1,57 @@
 import type { Decimal, InstanceView } from "../models";
+import type { WorkflowTaskFormField } from "./task-form";
 
 export interface Page<T> { items:T[]; nextAfterId:string|null; }
+export interface TaskPage<T> { items:T[]; nextCursor:string|null; }
 /** Host-approved destination reference and display label; no host directory types escape this boundary. */
 export interface WorkflowReassignmentTarget { ref:string; label:string; }
 /** Bounded destination lookup result. The host owns the opaque cursor; null means no further page. */
 export interface WorkflowReassignmentTargetPage { items:WorkflowReassignmentTarget[]; nextCursor:string|null; }
 export interface SubmissionPage {
-  items: TaskSubmission[];
+  items: (TaskSubmission & { taskId: Decimal })[];
   nextAfterTaskId: Decimal | null;
 }
 
 export interface TaskAssignment { kind: "USER" | "GROUP" | "ROLE"; ref: string; }
 export type TaskResultContract =
-  | { mode: "FORBIDDEN" }
-  | { mode: "OPTIONAL" | "REQUIRED"; schema: object; schemaJson?: string };
+  | { mode: "FORBIDDEN"; form?: never }
+  | { mode: "OPTIONAL" | "REQUIRED"; form?: WorkflowTaskFormField };
 export interface TaskInput {
   readonly type: "STRING" | "LONG" | "DECIMAL" | "BOOLEAN" | "DATE" | "DATETIME" | "JSON";
   /** Exact JSON token text. Extract from the response before reserializing any parsed values. */
   readonly valueJson: string;
 }
 
-export interface TaskView {
-  id: Decimal;
-  activityId: Decimal;
-  instanceId: Decimal;
-  taskTypeId: Decimal;
-  taskKey: string;
+export interface TaskDetail {
   nodeName?: string;
-  taskType?: string;
   taskTypeName?: string;
-  assignment: TaskAssignment;
-  assigneeRef: string | null;
   status: string;
-  outcomeKey: string | null;
-  createdAt: string;
-  dueAt: string | null;
-  closedAt: string | null;
-  closedBy: string | null;
-  closureReason: string | null;
+  dueAt?: string | null;
+  closedAt?: string | null;
+  assignmentLabel?: string;
+  ownershipLabel?: string;
+  closureLabel?: string;
+  outcomeLabel?: string;
 }
+export interface TaskView extends TaskDetail { id: Decimal; }
 export interface PreviousDecision {
-  taskId: Decimal; activityId: Decimal; historySequence: Decimal;
-  nodeKey: string; nodeName: string; outcomeKey: string; outcomeLabel: string;
-  actorKind: string; actorRef: string; occurredAt: string; comment: string | null;
+  nodeName: string; outcomeLabel: string; actorLabel: string; occurredAt: string; comment?: string | null;
 }
-export interface PreviousDecisionPage { items: PreviousDecision[]; nextAfterSequence: Decimal | null; }
+export interface PreviousDecisionPage { items: PreviousDecision[]; nextCursor: string | null; }
 export interface TaskContract {
-  previousDecisions?: { mode: "NONE" | "ALL_PREVIOUS" | "SELECTED" };
-  taskId: Decimal;
-  instanceId: Decimal;
-  instanceLockVersion: Decimal;
-  taskType: string;
-  claimPolicy: "OPTIONAL" | "REQUIRED";
+  task: TaskDetail;
+  precondition?: string;
+  previousDecisionsAvailable: boolean;
+  taskType?: string;
+  claimRequired: boolean;
   canClaim: boolean;
   canRelease: boolean;
   canAdminRelease: boolean;
   canComplete: boolean;
-  assignmentLabel: string;
   resultContract?: TaskResultContract;
   inputs?: Readonly<Record<string, TaskInput>>;
   outcomes: {
-    key: string;
+    key?: string;
     label: string;
     requiresComment: boolean;
   }[];
@@ -83,17 +74,10 @@ export interface ActivityView {
   closureReason: string | null;
 }
 export interface TaskSubmission {
-  taskId: Decimal;
-  activityId: Decimal;
-  instanceId: Decimal;
-  historySequence: Decimal;
-  commandId: string;
-  actorKind: string;
-  actorRef: string;
+  actorLabel: string;
   occurredAt: string;
-  outcomeKey: string;
-  comment: string | null;
-  inputs: Record<string, string>;
+  outcomeLabel: string;
+  comment?: string | null;
   /** Exact result text extracted from the authorized HTTP response. */
   resultJson?: string;
 }
@@ -114,6 +98,14 @@ export interface ReplayResult {
   found: boolean;
   result: CommandResult | null;
 }
+export interface TaskCommandResult {
+  replayed: boolean;
+  status: string;
+  taskStatus: string;
+  collectivePending?: boolean;
+  nextTaskId?: Decimal;
+}
+export interface TaskCommandReplay { found: boolean; result: TaskCommandResult | null; }
 export interface CancellationExecution {
   commandId: string; operation: 'CANCEL_WORKFLOW'; instance: InstanceView; activity: ActivityView;
   cancelledTaskCount: number; firstHistorySequence: Decimal; lastHistorySequence: Decimal;
@@ -122,7 +114,7 @@ export interface CancellationResult { replayed: boolean; execution: Cancellation
 export interface CancellationReplay { found: boolean; result: CancellationResult | null; }
 export interface Observation {
   outcome: string;
-  result?: CommandResult | ReplayResult | CancellationResult | CancellationReplay;
+  result?: CommandResult | ReplayResult | CancellationResult | CancellationReplay | TaskCommandResult | TaskCommandReplay;
   message?: string;
 }
 
@@ -137,4 +129,7 @@ export interface TaskAdministrationFilters {
  assignmentKind?:'USER'|'GROUP'|'ROLE'; assignmentRef?:string; assigneeRef?:string; instanceId?:string;
 }
 
-export type TaskAdministrationRow=Omit<TaskView,'outcomeKey'|'closedBy'|'closureReason'> & {assignmentLabel?:string};
+export interface TaskAdministrationRow extends TaskView {
+ instanceId: Decimal;
+ createdAt: string;
+}

@@ -99,18 +99,18 @@ test('ALL current work follows hidden and completed pages without reopening froz
  const {page}=component(t,CommandsPage,{
   instance:async()=>({id:'1',status:'ACTIVE'}),
   instanceTasks:async(_,cursor,limit)=>{calls.push([cursor,limit]);return cursor===undefined
-   ?{items:[{id:'1',status:'CANCELLED'}],nextAfterId:'50'}
-   :cursor==='50'?{items:[],nextAfterId:'100'}:{items:[{id:'101',status:'OPEN'}],nextAfterId:null};},
+   ?{items:[{id:'1',status:'CANCELLED'}],nextCursor:'first-page'}
+   :cursor==='first-page'?{items:[],nextCursor:'second-page'}:{items:[{id:'101',status:'OPEN'}],nextCursor:null};},
  },undefined,undefined,[{provide:CommandRecovery,useValue:service}]);
  await page.refreshCurrent();
- assert.deepEqual(calls,[[undefined,50],['50',50],['100',50]]);
+ assert.deepEqual(calls,[[undefined,50],['first-page',50],['second-page',50]]);
  assert.deepEqual(Array.from(page.currentTasks(),task=>task.id),['101']);
  assert.equal(original.task.status,'OPEN');
 });
 
 test('current discovery rejects stalled cursors instead of displaying an incomplete success',async t=>{
  const service={buffer:new CommandBuffer(),result:core.signal(null),execution:()=>({instance:{id:'1'}})};
- const {page}=component(t,CommandsPage,{instance:async()=>({id:'1'}),instanceTasks:async()=>({items:[],nextAfterId:'50'})},undefined,undefined,[{provide:CommandRecovery,useValue:service}]);
+ const {page}=component(t,CommandsPage,{instance:async()=>({id:'1'}),instanceTasks:async()=>({items:[],nextCursor:'first-page'})},undefined,undefined,[{provide:CommandRecovery,useValue:service}]);
  await page.refreshCurrent();assert.match(page.error(),/Invalid current-task page cursor/);assert.equal(page.currentInstance(),null);
 });
 
@@ -138,7 +138,7 @@ test('copy exports frozen values and delayed clipboard completion cannot replace
  const descriptor=Object.getOwnPropertyDescriptor(globalThis,'navigator');let release,copied;
  Object.defineProperty(globalThis,'navigator',{configurable:true,value:{clipboard:{writeText:text=>{copied=text;return new Promise(resolve=>release=resolve);}}}});
  t.after(()=>{if(descriptor)Object.defineProperty(globalThis,'navigator',descriptor);else delete globalThis.navigator;});
- const buffer=new CommandBuffer(),first={kind:'complete',body:{commandId:'12345678-1234-1234-1234-123456789abc',instanceId:'9007199254740993',taskId:'2',outcomeKey:'APPROVE',comment:' exact '},expectedToken:'9007199254740999'};
+ const buffer=new CommandBuffer(),first={kind:'complete',body:{commandId:'12345678-1234-1234-1234-123456789abc',taskId:'2',outcomeKey:'APPROVE',comment:' exact '},expectedToken:'opaque-version'};
  buffer.remember(first);
  const service={buffer,result:core.signal(null),execution:()=>null,select:id=>buffer.select(id),setScope(){buffer.clear();}};
  const {page}=component(t,CommandsPage,{},undefined,undefined,[{provide:CommandRecovery,useValue:service}]);

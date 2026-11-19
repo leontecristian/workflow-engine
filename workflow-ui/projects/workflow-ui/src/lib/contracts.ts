@@ -1,12 +1,12 @@
 import { InjectionToken } from '@angular/core';
 import type { UrlTree } from '@angular/router';
-import type { InstanceView, InstanceGraph, HistoryPage, HistoryEvent } from './models';
+import type { BusinessHistoryEvent, BusinessHistoryPage, InstanceView, InstanceGraph, HistoryPage, HistoryEvent } from './models';
 
 /** Host transport; no root HTTP providers or private response caching are installed. */
 export interface WorkflowViewerReads {
   instance(id: string, signal: AbortSignal): Promise<InstanceView>;
-  history(id: string, afterSequence: string, limit: number, signal: AbortSignal): Promise<HistoryPage>;
-  historyEvent(id: string, sequence: string, signal: AbortSignal): Promise<HistoryEvent>;
+  history(id: string, cursor: string, limit: number, signal: AbortSignal): Promise<HistoryPage | BusinessHistoryPage>;
+  historyEvent(id: string, eventRef: string, signal: AbortSignal): Promise<HistoryEvent | BusinessHistoryEvent>;
   graph(id: string, signal: AbortSignal): Promise<InstanceGraph>;
 }
 export const WORKFLOW_VIEWER_READS = new InjectionToken<WorkflowViewerReads>('Workflow viewer reads');

@@ -31,6 +31,7 @@ import io.github.leontecristian.workflow.web.dto.instance.InstanceGraphView.Stat
 import io.github.leontecristian.workflow.web.exception.instance.WorkflowViewerException;
 import io.github.leontecristian.workflow.web.integration.WorkflowRequestIdentity;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
+import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleWorkflowAuthorization;
 import io.github.leontecristian.workflow.web.service.instance.ViewerWire;
 import io.github.leontecristian.workflow.web.service.instance.WorkflowInstanceGraphService;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeAccess;
@@ -72,7 +73,7 @@ class ConsoleInstanceGraphUnitTest {
     private final ViewerWire wire = new ViewerWire();
     private final WorkflowInstanceGraphService graphs =
             new WorkflowInstanceGraphService(
-                    new ConsoleViewerAccess(new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess.class)), reads), definitions, reads, wire);
+                    new ConsoleViewerAccess(new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess.class), mock(ConsoleWorkflowAuthorization.class)), reads, context), definitions, reads, wire);
 
     private WorkflowInstanceView instance(InstanceStatus status, long sequence) {
         return new WorkflowInstanceView(
@@ -328,6 +329,6 @@ class ConsoleInstanceGraphUnitTest {
         assertFalse(graph.edges().stream().filter(e -> e.key().equals("finish")).findFirst().orElseThrow().traversed());
         assertEquals(
                 InstanceStatus.CANCELLED,
-                new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess.class)).instance("unit", ID).status());
+                new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess.class), mock(ConsoleWorkflowAuthorization.class)).instance("unit", ID).status());
     }
 }

@@ -65,3 +65,23 @@ export interface HistoryEvent {
 }
 
 export interface HistoryPage { items: HistorySummary[]; nextAfterSequence: Decimal | null; }
+
+export interface BusinessHistorySummary {
+  eventRef: string;
+  label: string;
+  actorLabel: string;
+  occurredAt: string;
+}
+export interface BusinessHistoryPage {
+  representation: 'business';
+  items: BusinessHistorySummary[];
+  nextCursor: string | null;
+}
+export interface BusinessHistoryEvent {
+  representation: 'business';
+  summary: BusinessHistorySummary;
+  stepName: string | null;
+  outcomeLabel: string | null;
+  comment: string | null;
+  taskId: Decimal | null;
+}

@@ -11,12 +11,11 @@ const command = {
   kind: "complete",
   body: {
     commandId: "12345678-1234-1234-1234-123456789abc",
-    instanceId: "9007199254740993",
     taskId: "9223372036854775807",
     outcomeKey: "COMPLETE",
     comment: "original",
   },
-  expectedToken: "9007199254740999",
+  expectedToken: "opaque-task-version",
 };
 test("retry envelope is detached, frozen and keeps exact original token and UUID", () => {
   const input = structuredClone(command);
@@ -25,7 +24,8 @@ test("retry envelope is detached, frozen and keeps exact original token and UUID
   assert.equal(frozen.body.comment, "original");
   assert.equal(frozen.expectedToken, command.expectedToken);
   assert.throws(() => (frozen.body.comment = "x"));
-  assert.equal(frozen.body.instanceId, "9007199254740993");
+  assert.equal(frozen.body.taskId, "9223372036854775807");
+  assert.ok(!Object.hasOwn(frozen.body, "instanceId"));
 });
 test("full-reload export and restore preserve the original request", () => {
   const buffer = new CommandBuffer();
@@ -107,12 +107,12 @@ test("new actions retain earlier commands and conflicting pasted UUIDs cannot ov
 
 test('ownership envelopes preserve exact inputs and map mutation and replay routes', () => {
  for(const kind of ['claim','release','admin-release']) {
-  const body={commandId:command.body.commandId,instanceId:'9007199254740993',taskId:'3',...(kind==='admin-release'?{reason:'  exact reason  '}: {})};
+  const body={commandId:command.body.commandId,taskId:'3',...(kind==='admin-release'?{reason:'  exact reason  '}: {})};
   const envelope=freezeEnvelope({kind,body,expectedToken:'8'});
-  assert.equal(commandRequest(envelope,false).path,`/instances/9007199254740993/tasks/3/${kind}`);
+  assert.equal(commandRequest(envelope,false).path,`/tasks/3/${kind}`);
   assert.deepEqual(commandRequest(envelope,false).body,kind==='admin-release'?{commandId:body.commandId,reason:body.reason}:{commandId:body.commandId});
   assert.deepEqual(commandRequest(envelope,true).body,body);
   assert.equal(commandRequest(envelope,true).path,`/commands/${kind}/replay`);
  }
- assert.throws(()=>freezeEnvelope({kind:'admin-release',body:{commandId:command.body.commandId,instanceId:'1',taskId:'2',reason:' '},expectedToken:'0'}));
+ assert.throws(()=>freezeEnvelope({kind:'admin-release',body:{commandId:command.body.commandId,taskId:'2',reason:' '},expectedToken:'0'}));
 });

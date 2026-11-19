@@ -24,7 +24,7 @@ export class WorkflowInstanceTasksComponent extends RuntimeState {
       const p = await this.api.instanceTasks(id, cursor, this.pageSize,signal);
       if (!current()) return;
       this.rows.set(p.items);
-      this.next = p.nextAfterId;
+      this.next = p.nextCursor;
     });
   }
   nextPage() {

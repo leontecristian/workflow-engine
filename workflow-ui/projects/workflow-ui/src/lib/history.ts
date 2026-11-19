@@ -5,12 +5,12 @@ import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { ViewerReadState } from './read-state';
-import type { HistorySummary } from './models';
+import type { BusinessHistorySummary, HistorySummary } from './models';
 @Component({selector:'workflow-history', standalone:true, imports:[DatePipe, RouterLink, MatButtonModule, MatCardModule],
   template: `
     <section [attr.aria-label]="messages.history">
       <header>
-        <p>{{messages.instance}} #{{instanceId}}</p>
+        @if(rawEvidence()){<p>{{messages.instance}} #{{instanceId}}</p>}
         <h1>{{messages.history}}</h1>
         @if(navigation?.destination({kind:'instance',instanceId:instanceId}); as link) {
           <a mat-stroked-button [routerLink]="link">{{presentation.backToInstance}}</a>
@@ -34,19 +34,20 @@ import type { HistorySummary } from './models';
               <table [attr.aria-label]="messages.history">
                 <thead><tr>
                   <th scope="col">{{messages.type}}</th><th scope="col">{{messages.actor}}</th>
-                  <th scope="col">{{messages.occurred}} (UTC)</th><th scope="col">{{messages.sequence}}</th>
-                  <th scope="col">{{messages.details}}</th>
+                  <th scope="col">{{messages.occurred}} (UTC)</th>
+                  @if(rawEvidence()){<th scope="col">{{messages.sequence}}</th>}
+                  <th scope="col">{{rawEvidence() ? messages.details : messages.open}}</th>
                 </tr></thead>
                 <tbody>
-                  @for(row of rows();track row.historySequence) {
+                  @for(row of rows();track eventRef(row)) {
                     <tr>
-                      <th scope="row">{{presentation.eventLabel(row.eventType)}}</th>
-                      <td>{{row.actorRef}}</td>
+                      <th scope="row">{{eventLabel(row)}}</th>
+                      <td>{{actorLabel(row)}}</td>
                       <td><time [attr.datetime]="row.occurredAt">{{row.occurredAt | date:'medium':'UTC'}}</time></td>
-                      <td>{{row.historySequence}}</td>
+                      @if(rawEvidence()){<td>{{eventRef(row)}}</td>}
                       <td>
-                        @if(navigation?.destination({kind:'event',instanceId:instanceId,sequence:row.historySequence}); as link) {
-                          <a mat-button [routerLink]="link" [attr.aria-label]="presentation.viewDetails + ' · ' + messages.sequence + ' ' + row.historySequence">{{presentation.viewDetails}}</a>
+                        @if(navigation?.destination({kind:'event',instanceId:instanceId,sequence:eventRef(row)}); as link) {
+                          <a mat-button [routerLink]="link" [attr.aria-label]="presentation.viewDetails + ' · ' + eventLabel(row)">{{presentation.viewDetails}}</a>
                         }
                       </td>
                     </tr>
@@ -77,14 +78,25 @@ import type { HistorySummary } from './models';
     .next { margin-top:1rem; }
   `]})
 export class WorkflowHistoryComponent extends ViewerReadState {
-  readonly rows = signal<HistorySummary[]>([]);
+  readonly rows = signal<(HistorySummary | BusinessHistorySummary)[]>([]);
   readonly next = signal<string | null>(null);
+  readonly rawEvidence = signal(false);
   pageSize = 50;
-  clear() { this.rows.set([]); this.next.set(null); }
+  clear() { this.rows.set([]); this.next.set(null); this.rawEvidence.set(false); }
+  eventRef(row: HistorySummary | BusinessHistorySummary) { return 'eventRef' in row ? row.eventRef : row.historySequence; }
+  eventLabel(row: HistorySummary | BusinessHistorySummary) {
+    return 'label' in row ? row.label : this.presentation.eventLabel(row.eventType);
+  }
+  actorLabel(row: HistorySummary | BusinessHistorySummary) { return 'actorLabel' in row ? row.actorLabel : row.actorRef; }
   async load(cursor='0') {
     const request = this.begin(); if (!request) return;
     try { const page = await this.reads.history(request.id, cursor, this.pageSize, request.signal);
-      if (request.current()) { validateHistory(page, request.id, cursor); this.rows.set(page.items); this.next.set(page.nextAfterSequence); }
+      if (request.current()) {
+        validateHistory(page, request.id, cursor);
+        this.rows.set(page.items);
+        this.rawEvidence.set(!('representation' in page));
+        this.next.set('representation' in page ? page.nextCursor : page.nextAfterSequence);
+      }
     } catch(error) { if(request.current()) this.fail(error); }
     finally { if(request.current()) this.busy.set(false); }
   }

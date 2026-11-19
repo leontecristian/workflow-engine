@@ -8,6 +8,7 @@ import com.fasterxml.jackson.core.exc.StreamConstraintsException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.PreviousDecision;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmission;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmissionPage;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
@@ -23,6 +24,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.ToLongFunction;
+import java.util.function.Function;
+import java.util.function.LongFunction;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
@@ -95,14 +98,14 @@ public class RuntimeWire {
         return new CompletionBody(metadata, resultJson == null ? null : CompleteWorkflowTask.parseResult(resultJson));
     }
 
-    public ResponseEntity<String> submissionPage(TaskSubmissionPage page) {
+    public ResponseEntity<String> submissionPage(TaskSubmissionPage page, Function<TaskSubmission, ?> project) {
         String prefix = "{\"items\":[";
         int bytes = prefix.length();
         List<String> rows = new ArrayList<>();
         Long next = page.nextAfterTaskId();
         for (int index = 0; index < page.items().size(); index++) {
             TaskSubmission submission = page.items().get(index);
-            String row = json(submission);
+            String row = json(project.apply(submission));
             int rowBytes = utf8Length(row) + (index == 0 ? 0 : 1);
             Long candidate = index + 1 == page.items().size() ? page.nextAfterTaskId() : Long.valueOf(submission.taskId());
             if (bytes + rowBytes + submissionPageEnd(candidate).length() > SUBMISSION_PAGE_BYTES) {
@@ -118,7 +121,8 @@ public class RuntimeWire {
 
     /** Bound the encoded projection, including JSON escapes, in both wire encodings. */
     public ResponseEntity<String> previousDecisionPage(
-            io.github.leontecristian.workflow.core.dto.runtime.PreviousDecisionPage page) {
+            io.github.leontecristian.workflow.core.dto.runtime.PreviousDecisionPage page,
+            Function<PreviousDecision, ?> project, LongFunction<String> continuation) {
         String prefix = "{\"items\":[";
         int bytes = prefix.length();
         int units = prefix.length();
@@ -126,10 +130,10 @@ public class RuntimeWire {
         Long next = page.nextAfterSequence();
         for (int index = 0; index < page.items().size(); index++) {
             var item = page.items().get(index);
-            String row = json(item);
+            String row = json(project.apply(item));
             int separator = rows.isEmpty() ? 0 : 1;
             Long candidate = index + 1 == page.items().size() ? page.nextAfterSequence() : Long.valueOf(item.historySequence());
-            String suffix = previousDecisionPageEnd(candidate);
+            String suffix = previousDecisionPageEnd(candidate, continuation);
             if (bytes + separator + utf8Length(row) + suffix.length() > 256 * 1024
                     || 2 * (units + separator + row.length() + suffix.length()) > 256 * 1024) {
                 if (rows.isEmpty()) throw new WorkflowRuntimeException(422, "LIMIT_EXCEEDED");
@@ -140,10 +144,11 @@ public class RuntimeWire {
             bytes += separator + utf8Length(row);
             units += separator + row.length();
         }
-        return jsonResponse(prefix + String.join(",", rows) + previousDecisionPageEnd(next));
+        return jsonResponse(prefix + String.join(",", rows) + previousDecisionPageEnd(next, continuation));
     }
-    private static String previousDecisionPageEnd(Long next) {
-        return "],\"nextAfterSequence\":" + (next == null ? "null" : "\"" + next + "\"") + "}";
+
+    private String previousDecisionPageEnd(Long next, LongFunction<String> continuation) {
+        return "],\"nextCursor\":" + json(next == null ? null : continuation.apply(next)) + "}";
     }
 
     private static String submissionPageEnd(Long next) {

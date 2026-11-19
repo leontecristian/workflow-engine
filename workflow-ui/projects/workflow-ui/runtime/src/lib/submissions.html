@@ -28,9 +28,8 @@
     @for(row of rows(); track row.taskId){
       @if(row.resultJson !== undefined){
         <mat-expansion-panel class="evidence-panel">
-          <mat-expansion-panel-header><mat-panel-title>Task #{{row.taskId}} result</mat-panel-title></mat-expansion-panel-header>
-          <pre>{{row.resultJson}}</pre>
-          <button mat-button (click)="downloadResult(row)">Download result JSON</button>
+          <mat-expansion-panel-header><mat-panel-title>{{row.outcomeLabel}} result</mat-panel-title></mat-expansion-panel-header>
+          <workflow-task-values [result]="row.resultJson" />
         </mat-expansion-panel>
       }
     }

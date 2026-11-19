@@ -22,17 +22,15 @@ const COLUMNS: Record<string, RecordColumn[]> = {
     { key: "resultKey", label: "Result" },
   ],
   submissions: [
-    { key: "taskId", label: "Task ID" },
-    { key: "outcomeKey", label: "Outcome" },
-    { key: "actorRef", label: "Submitted by" },
+    { key: "outcomeLabel", label: "Outcome" },
+    { key: "actorLabel", label: "Submitted by" },
     { key: "occurredAt", label: "Submitted" },
   ],
   tasks: [
     { key: "nodeName", label: "Task" },
     { key: "taskTypeName", label: "Task type" },
-    { key: "instanceId", label: "Instance" },
-    { key: "assignment", label: "Assignment" },
-    { key: "assigneeRef", label: "Assignee" },
+    { key: "assignmentLabel", label: "Assignment" },
+    { key: "ownershipLabel", label: "Ownership" },
     { key: "status", label: "Status" },
   ],
 };
@@ -93,8 +91,6 @@ const COLUMNS: Record<string, RecordColumn[]> = {
                 [disabled]="disabled()"
               >
                 {{ cell(row, column.key) ?? "—" }}</button
-              ><small class="record-id"
-                >@if (column.key === 'nodeName') { {{row.taskKey}} · }#{{ row.id || row.taskId || row.historySequence }}</small
               >
             } @else {
               <span [class.monospace]="isExact(column.key)">{{
@@ -158,7 +154,7 @@ export class ConsoleRecords {
     return [...this.columns().map((column) => column.key), "actions"];
   }
   cell(row: any, key: string): any {
-    if (key === "nodeName") return row.nodeName || row.taskKey;
+    if (key === "nodeName") return row.nodeName || row.taskTypeName || 'Task';
     return key === "assignment" && row.assignment ? `${row.assignment.kind}: ${row.assignment.ref}` : row[key];
   }
   isStatus(key: string): boolean {

@@ -1,16 +1,16 @@
 import { InjectionToken } from '@angular/core';
 import type { InstanceSummary } from '../models';
-import type { Page, PreviousDecisionPage, VariablePage, TaskAdministrationFilters, TaskAdministrationRow, TaskView, TaskContract, TaskSubmission, ActivityView, SubmissionPage, CommandResult, ReplayResult } from './models';
+import type { Page, TaskPage, PreviousDecisionPage, VariablePage, TaskAdministrationFilters, TaskAdministrationRow, TaskView, TaskDetail, TaskContract, TaskSubmission, ActivityView, SubmissionPage, TaskCommandResult, TaskCommandReplay } from './models';
 import type { Envelope, StartEnvelopeAdapter } from './command/command-buffer';
 import type { WorkflowReassignmentTargetPage } from './models';
 /** Host-authorized reads; transport and cancellation belong to the host. */
 export interface WorkflowRuntimeReads {
  listInstances(status:string,cursor:string|undefined,limit:number,signal:AbortSignal):Promise<Page<InstanceSummary>>;
  variables(id:string,afterKey:string|undefined,expectedLockVersion:string|undefined,signal:AbortSignal):Promise<VariablePage>;
- administrationTasks?(filters:TaskAdministrationFilters,cursor:string|undefined,limit:number,signal:AbortSignal):Promise<Page<TaskAdministrationRow>>;
- assignedTasks(cursor:string|undefined,limit:number,signal:AbortSignal):Promise<Page<TaskView>>;
- instanceTasks(id:string,cursor:string|undefined,limit:number,signal:AbortSignal):Promise<Page<TaskView>>;
- task(id:string,signal:AbortSignal):Promise<TaskView>;
+ administrationTasks?(filters:TaskAdministrationFilters,cursor:string|undefined,limit:number,signal:AbortSignal):Promise<TaskPage<TaskAdministrationRow>>;
+ assignedTasks(cursor:string|undefined,limit:number,signal:AbortSignal):Promise<TaskPage<TaskView>>;
+ instanceTasks(id:string,cursor:string|undefined,limit:number,signal:AbortSignal):Promise<TaskPage<TaskView>>;
+ task(id:string,signal:AbortSignal):Promise<TaskDetail>;
  taskContract(id:string,signal:AbortSignal):Promise<TaskContract>;
  previousDecisions(id:string,cursor:string|undefined,limit:number,signal:AbortSignal):Promise<PreviousDecisionPage>;
  taskSubmission(id:string,signal:AbortSignal):Promise<TaskSubmission|null>;
@@ -20,9 +20,9 @@ export interface WorkflowRuntimeReads {
 export const WORKFLOW_RUNTIME_READS = new InjectionToken<WorkflowRuntimeReads>('Workflow runtime reads');
 /** Optional host execution transport, including optional host-owned start codec/dispatch. */
 export interface WorkflowRuntimeCommands {
- complete(envelope:Envelope,signal:AbortSignal):Promise<CommandResult>;
- replayComplete(envelope:Envelope,signal:AbortSignal):Promise<ReplayResult>;
- ownership?(envelope:Envelope,replay:boolean,signal:AbortSignal):Promise<CommandResult | ReplayResult>;
+ complete(envelope:Envelope,signal:AbortSignal):Promise<TaskCommandResult>;
+ replayComplete(envelope:Envelope,signal:AbortSignal):Promise<TaskCommandReplay>;
+ ownership?(envelope:Envelope,replay:boolean,signal:AbortSignal):Promise<TaskCommandResult | TaskCommandReplay>;
  start?: StartEnvelopeAdapter;
 }
 export const WORKFLOW_RUNTIME_COMMANDS = new InjectionToken<WorkflowRuntimeCommands>('Workflow runtime commands');
@@ -42,8 +42,8 @@ export type WorkflowRuntimeMessages = typeof DEFAULT_RUNTIME_MESSAGES;
 
 /** Optional host-owned task administration permissions, directory and command transport. */
 export interface WorkflowTaskReassignment {
- availability(taskId:string,signal:AbortSignal):Promise<{allowed:boolean;instanceLockVersion:string}>;
+ availability(taskId:string,signal:AbortSignal):Promise<{allowed:boolean;precondition?:string}>;
  targets(taskId:string,kind:'USER'|'GROUP'|'ROLE',query:string,cursor:string|undefined,limit:number,signal:AbortSignal):Promise<WorkflowReassignmentTargetPage>;
- reassign(envelope:Envelope,replay:boolean,signal:AbortSignal):Promise<CommandResult|ReplayResult>;
+ reassign(envelope:Envelope,replay:boolean,signal:AbortSignal):Promise<TaskCommandResult|TaskCommandReplay>;
 }
 export const WORKFLOW_TASK_REASSIGNMENT = new InjectionToken<WorkflowTaskReassignment>('Workflow task reassignment');

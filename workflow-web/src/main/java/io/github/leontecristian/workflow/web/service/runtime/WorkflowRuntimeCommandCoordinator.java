@@ -1,6 +1,7 @@
 package io.github.leontecristian.workflow.web.service.runtime;
 
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
+import io.github.leontecristian.workflow.core.dto.runtime.ActivityStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.AdministrativelyReleaseWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.CancelWorkflow;
 import io.github.leontecristian.workflow.core.dto.runtime.ClaimWorkflowTask;
@@ -10,14 +11,24 @@ import io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationCommandResult;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowOperation;
+import io.github.leontecristian.workflow.core.dto.runtime.CompletionPolicy;
+import io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowAuthorizedRuntimeReadService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionService;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
+import io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException;
 import io.github.leontecristian.workflow.web.integration.WorkflowRequestIdentity;
 import io.github.leontecristian.workflow.web.service.WorkflowRequestActors;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -29,19 +40,85 @@ public final class WorkflowRuntimeCommandCoordinator {
     private final WorkflowRequestIdentity identity;
     private final Clock clock;
     private final WorkflowExecutionService execution;
+    private final WorkflowRuntimeQueryService reads;
+    private final Supplier<WorkflowAuthorizedRuntimeReadService> readAccess;
+    private final WorkflowTaskTokens tokens;
     private final TransactionTemplate commandTransaction;
     private final TransactionTemplate readTransaction;
 
     public WorkflowRuntimeCommandCoordinator(WorkflowRequestIdentity identity, Clock clock,
             WorkflowExecutionService execution, PlatformTransactionManager transactionManager) {
+        this(identity, clock, execution, transactionManager, null, () -> null, new WorkflowTaskTokens(null));
+    }
+
+    public WorkflowRuntimeCommandCoordinator(WorkflowRequestIdentity identity, Clock clock,
+            WorkflowExecutionService execution, PlatformTransactionManager transactionManager,
+            WorkflowRuntimeQueryService reads, Supplier<WorkflowAuthorizedRuntimeReadService> readAccess, WorkflowTaskTokens tokens) {
         this.identity = identity;
         this.clock = clock;
         this.execution = execution;
+        this.reads = reads;
+        this.readAccess = readAccess;
+        this.tokens = tokens;
         this.commandTransaction = new TransactionTemplate(transactionManager);
         commandTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.readTransaction = new TransactionTemplate(transactionManager);
         readTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         readTransaction.setReadOnly(true);
+    }
+
+    public record TaskTarget(long taskId, long instanceId, long expectedVersion) {}
+
+    /** Resolve only the owning instance. Core checks current business access before mutation or receipt lookup. */
+    public TaskTarget taskTarget(long taskId, String precondition) {
+        String actorRef = WorkflowRequestActors.requireActor(identity);
+        long expectedVersion = tokens.expectedVersion(precondition, actorRef, taskId);
+        if (reads == null) throw new WorkflowRuntimeException(500, "HOST_CONFIGURATION");
+        // A later assignment can revoke the task view while the original actor retains receipt access.
+        var task = reads.findTask(taskId).orElseThrow(() -> new WorkflowRuntimeException(404, "NOT_FOUND"));
+        return new TaskTarget(taskId, task.instanceId(), expectedVersion);
+    }
+
+    public Map<String, Object> taskResult(WorkflowCommandResult result) {
+        var executionResult = result.execution();
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("replayed", result.replayed());
+        view.put("status", executionResult.instance().status());
+        view.put("taskStatus", executionResult.task().status());
+        if (executionResult.operation() == WorkflowOperation.COMPLETE_TASK) {
+            var activity = executionResult.activity();
+            if (activity.completionPolicy() == CompletionPolicy.ALL)
+                view.put("collectivePending", activity.status() == ActivityStatus.ACTIVE);
+            if (executionResult.instance().status() == InstanceStatus.ACTIVE) {
+                var next = nextTask(executionResult.instance().id(), executionResult.task().id());
+                if (next != null) view.put("nextTaskId", next);
+            }
+        }
+        return view;
+    }
+
+    /** Navigation is optional and uses present read authorization, including on receipt replay. */
+    private Long nextTask(long instanceId, long submittedTaskId) {
+        var access = readAccess.get();
+        if (access == null) return null;
+        String actorRef = WorkflowRequestActors.requireActor(identity);
+        try {
+            var instance = access.instance(actorRef, instanceId);
+            if (instance.status() != InstanceStatus.ACTIVE) return null;
+            long cursor = 0;
+            for (int pageNumber = 0; pageNumber < 5; pageNumber++) {
+                var page = access.listInstanceTasks(actorRef, instanceId, cursor, 100);
+                for (var task : page.items()) {
+                    if (task.id() != submittedTaskId && task.status() == TaskStatus.OPEN) return task.id();
+                }
+                if (page.nextAfterId() == null) return null;
+                cursor = page.nextAfterId();
+            }
+        } catch (RuntimeException unavailable) {
+            org.slf4j.LoggerFactory.getLogger(WorkflowRuntimeCommandCoordinator.class)
+                    .debug("Could not load onward task navigation after a committed command", unavailable);
+        }
+        return null;
     }
 
     public WorkflowCommandResult complete(CompleteWorkflowTask command, String correlation) {

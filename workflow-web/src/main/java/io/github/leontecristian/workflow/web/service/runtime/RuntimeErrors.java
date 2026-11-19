@@ -70,15 +70,32 @@ public class RuntimeErrors {
     private Map<String, Object> resultDiagnostic(WorkflowExecutionException failure) {
         Map<String, Object> diagnostic = new LinkedHashMap<>();
         diagnostic.put("code", failure.category().name());
-        diagnostic.put("message", failure.category() == WorkflowExecutionException.Category.RESULT_SCHEMA_INVALID
-                ? "The result does not match the pinned schema." : "The result was rejected by the host.");
         var locations = failure.diagnostic();
+        diagnostic.put("message", failure.category() == WorkflowExecutionException.Category.RESULT_SCHEMA_INVALID
+                ? fieldCorrection(locations == null ? null : locations.schemaPath()) : "Check this answer before submitting again.");
         // Reserve space for the omission marker while testing the complete, escaped locations.
         diagnostic.put("locationOmitted", true);
         boolean pathFits = addLocation(diagnostic, "path", locations == null || locations.path() == null ? "" : locations.path());
-        boolean schemaFits = addLocation(diagnostic, "schemaPath", locations == null ? null : locations.schemaPath());
-        if (pathFits && schemaFits) diagnostic.remove("locationOmitted");
+        if (pathFits) diagnostic.remove("locationOmitted");
         return diagnostic;
+    }
+
+    private static String fieldCorrection(String schemaPath) {
+        if (schemaPath == null) return "Check the result before submitting again.";
+        String rule = schemaPath.substring(schemaPath.lastIndexOf('/') + 1);
+        return switch (rule) {
+            case "required" -> "Fill in the required fields.";
+            case "minimum" -> "Enter a value at or above the minimum.";
+            case "maximum" -> "Enter a value at or below the maximum.";
+            case "minLength" -> "Enter a longer answer.";
+            case "maxLength" -> "Enter a shorter answer.";
+            case "minItems" -> "Add the required items.";
+            case "maxItems" -> "Remove items to stay within the limit.";
+            case "enum", "const" -> "Choose a permitted answer.";
+            case "format", "pattern" -> "Use the requested format.";
+            case "oneOf" -> "Choose an alternative and check its fields.";
+            default -> "Check this answer before submitting again.";
+        };
     }
 
     private boolean addLocation(Map<String, Object> diagnostic, String key, String location) {

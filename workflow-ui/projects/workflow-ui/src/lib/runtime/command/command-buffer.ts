@@ -27,16 +27,21 @@ export function freezeEnvelope(input:unknown,start?:StartEnvelopeAdapter):Envelo
  } else {
   const hasResult=obj['kind']==='complete'&&Object.hasOwn(source,'resultJson');
   const fields=obj['kind']==='complete'
-   ? hasResult?'commandId,comment,instanceId,outcomeKey,resultJson,taskId':'commandId,comment,instanceId,outcomeKey,taskId'
-   : obj['kind']==='reassign'?'assignmentKind,assignmentRef,commandId,instanceId,reason,taskId':obj['kind']==='cancel'?'commandId,instanceId,reason':obj['kind']==='admin-release'?'commandId,instanceId,reason,taskId':'commandId,instanceId,taskId';
+   ? hasResult?'commandId,comment,outcomeKey,resultJson,taskId':'commandId,comment,outcomeKey,taskId'
+   : obj['kind']==='reassign'?'assignmentKind,assignmentRef,commandId,reason,taskId':obj['kind']==='cancel'?'commandId,instanceId,reason':obj['kind']==='admin-release'?'commandId,reason,taskId':'commandId,taskId';
   if(Object.keys(source).sort().join()!==fields)throw new Error('Invalid command fields');
   for(const [key,value] of Object.entries(source))if(typeof value!=='string'&&!(key==='comment'&&value===null))throw new Error('Invalid command value');
   if(hasResult)freezeResultJson(source['resultJson']);
   if((obj['kind']==='admin-release'||obj['kind']==='reassign') && (typeof source['reason']!=='string' || source['reason'].length>1000 || /^[\u0009-\u000d\u001c-\u0020\u1680\u2000-\u2006\u2008-\u200a\u2028\u2029\u205f\u3000]*$/u.test(source['reason']) || /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(source['reason'])))throw new Error('Invalid administrative reason');
   if(obj['kind']==='reassign'&&(!['USER','GROUP','ROLE'].includes(source['assignmentKind'] as string)||typeof source['assignmentRef']!=='string'||!source['assignmentRef']||source['assignmentRef'].length>200))throw new Error('Invalid assignment');
   if(obj['kind']==='cancel')validateCancellationReason(source['reason']);
-  exactDecimal(source['instanceId'] as string);if(obj['kind']!=='cancel')exactDecimal(source['taskId'] as string);
-  exactDecimal(obj['expectedToken'] as string,true);
+  if(obj['kind']==='cancel'){
+   exactDecimal(source['instanceId'] as string);
+   exactDecimal(obj['expectedToken'] as string,true);
+  }else{
+   exactDecimal(source['taskId'] as string);
+   if(typeof obj['expectedToken']!=='string'||!/^[A-Za-z0-9_-]{1,512}$/.test(obj['expectedToken']))throw new Error('Invalid task precondition');
+  }
   body={...source} as CommandBody;
  }
  return Object.freeze({kind:obj['kind'] as Envelope['kind'],body:Object.freeze({...body}),expectedToken:obj['expectedToken'] as string|null});

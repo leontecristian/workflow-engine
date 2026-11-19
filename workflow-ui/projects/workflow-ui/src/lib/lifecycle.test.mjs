@@ -71,6 +71,22 @@ test('exact event retains input IDs, unknown event types and raw downloadable nu
   globalThis.document={createElement:()=>({click(){}})};page.exportDetails();
   assert.equal(await downloaded.text(),exact);assert.equal(revoked,'blob:exact');
 });
+test('business history follows opaque links without enabling exact evidence rendering',async t=>{
+  const businessSummary={eventRef:'decision-link',label:'Decision recorded',actorLabel:'You',occurredAt:instance.startedAt};
+  const history=component(t,History,{history:async()=>({representation:'business',items:[businessSummary],nextCursor:'next-page'})}).page;
+  await history.load();
+  assert.equal(history.rawEvidence(),false);
+  assert.equal(history.eventRef(history.rows()[0]),'decision-link');
+  assert.equal(history.actorLabel(history.rows()[0]),'You');
+  assert.equal(history.next(),'next-page');
+  const detail={representation:'business',summary:businessSummary,stepName:'Review booking',outcomeLabel:'Approve',comment:'Confirmed',taskId:'5'};
+  const event=component(t,Event,{historyEvent:async(_,requested)=>{assert.equal(requested,'decision-link');return detail;}}).page;
+  event.sequence='decision-link';
+  await event.load();
+  assert.equal(event.business(),detail);
+  assert.equal(event.technical(),null);
+  assert.equal(event.routing(),null);
+});
 test('history/event clear stale protected content and do not display cancellations',async t=>{
   for(const Type of [History,Event]){
     let release;const reads=Type===History?{history:()=>new Promise(r=>release=r)}:{historyEvent:()=>new Promise(r=>release=r)};

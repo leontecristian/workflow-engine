@@ -51,7 +51,7 @@ class ConsoleReassignmentUnitTest {
         when(context.isConsoleActor("admin")).thenReturn(true);
         when(businessAccess.canAccess(any())).thenReturn(true);
         when(reads.findTask(5)).thenReturn(Optional.of(task));
-        return new ConsoleRuntimeAccess(reads, context, mock(WorkflowTaskEligibilityService.class), businessAccess);
+        return new ConsoleRuntimeAccess(reads, context, mock(WorkflowTaskEligibilityService.class), businessAccess, authorization);
     }
     @Test void knownDestinationsAndAdminPermissionAreSeparateFromBusinessAccess() {
         access(); var request = new TaskEligibilityContext(task, "admin");

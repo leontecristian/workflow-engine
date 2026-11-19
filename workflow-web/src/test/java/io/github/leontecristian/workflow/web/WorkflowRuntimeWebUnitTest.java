@@ -21,6 +21,7 @@ import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
 import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
 import io.github.leontecristian.workflow.core.dto.runtime.BooleanLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
+import io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.NullLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
@@ -58,6 +59,8 @@ import io.github.leontecristian.workflow.core.service.runtime.WorkflowAuthorized
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeReadAuthorization;
 import io.github.leontecristian.workflow.web.integration.runtime.WorkflowAssignmentDirectory;
+import io.github.leontecristian.workflow.web.service.runtime.RuntimeWire;
+import io.github.leontecristian.workflow.web.service.runtime.WorkflowTaskTokens;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -202,13 +205,32 @@ class WorkflowRuntimeWebUnitTest {
         try(var c=context(Host.class, Reads.class, WorkflowRuntimeReadConfiguration.class)) {
             var host=c.getBean(WorkflowAuthorizedRuntimeReadService.class); var mvc=mvc(c);
             when(host.listInstanceTasks("actor", 1,0,50)).thenReturn(new WorkflowTaskPage(List.of(),42L));
-            mvc.perform(get("/custom/instances/1/tasks")).andExpect(status().isOk())
-                .andExpect(content().json("{\"items\":[],\"nextAfterId\":\"42\"}"));
+            String response = mvc.perform(get("/custom/instances/1/tasks")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items").isEmpty()).andExpect(jsonPath("$.nextCursor").isString())
+                    .andExpect(jsonPath("$.nextAfterId").doesNotExist()).andReturn().getResponse().getContentAsString();
+            String cursor = new RuntimeWire().tree(response).path("nextCursor").textValue();
+            assertThat(cursor).isNotEqualTo("42");
+            when(host.listInstanceTasks("actor", 1, 42, 50)).thenReturn(new WorkflowTaskPage(List.of(), null));
+            mvc.perform(get("/custom/instances/1/tasks").param("cursor", cursor))
+                    .andExpect(status().isOk()).andExpect(content().json("{\"items\":[],\"nextCursor\":null}"));
+            mvc.perform(get("/custom/instances/2/tasks").param("cursor", cursor)).andExpect(status().isBadRequest());
+            mvc.perform(get("/custom/tasks/mine").param("cursor", cursor)).andExpect(status().isBadRequest());
+            var identity = c.getBean(WorkflowRequestIdentity.class);
+            when(identity.requireActorRef()).thenReturn("other");
+            mvc.perform(get("/custom/instances/1/tasks").param("cursor", cursor)).andExpect(status().isBadRequest());
+            when(identity.requireActorRef()).thenReturn("actor");
+            when(host.listMyTasks("actor", 0, 50)).thenReturn(new WorkflowTaskPage(List.of(), 17L));
+            String mineBody = mvc.perform(get("/custom/tasks/mine")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.nextCursor").isString()).andReturn().getResponse().getContentAsString();
+            String mineCursor = new RuntimeWire().tree(mineBody).path("nextCursor").textValue();
+            when(host.listMyTasks("actor", 17, 50)).thenReturn(new WorkflowTaskPage(List.of(), null));
+            mvc.perform(get("/custom/tasks/mine").param("cursor", mineCursor))
+                    .andExpect(status().isOk()).andExpect(content().json("{\"items\":[],\"nextCursor\":null}"));
             mvc.perform(post("/custom/commands/complete/replay")).andExpect(status().isNotFound());
             for(String q:List.of("unknown=1","limit=0","limit=2&limit=3","afterId=01"))
                 mvc.perform(get("/custom/instances/1/tasks?"+q)).andExpect(status().isBadRequest());
             when(host.task("actor", 5)).thenThrow(new WorkflowRuntimeException(404,"NOT_FOUND"));
-            mvc.perform(get("/custom/tasks/5?unchanged=1")).andExpect(status().isNotFound());
+            mvc.perform(get("/custom/tasks/5")).andExpect(status().isNotFound());
             mvc.perform(get("/custom/tasks/5/contract")).andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.inputs").doesNotExist());
             verify(host, times(2)).task("actor", 5);
@@ -240,19 +262,22 @@ class WorkflowRuntimeWebUnitTest {
                     """);
             mvc.perform(get("/custom/tasks/5")).andExpect(status().isOk())
                     .andExpect(jsonPath("$.nodeName").value("Collect reviews"))
-                    .andExpect(jsonPath("$.taskType").value("SANDBOX_REVIEW"))
+                    .andExpect(jsonPath("$.taskType").doesNotExist())
                     .andExpect(jsonPath("$.taskTypeName").value("Sandbox review"))
-                    .andExpect(jsonPath("$.assignment.kind").value("GROUP"))
-                    .andExpect(jsonPath("$.assignment.ref").value("finance"))
+                    .andExpect(jsonPath("$.assignment").doesNotExist())
+                    .andExpect(jsonPath("$.assignmentLabel").value("Shared task"))
+                    .andExpect(jsonPath("$.id").doesNotExist())
                     .andExpect(jsonPath("$.assignedUserRef").doesNotExist());
             when(host.listInstanceTasks("actor", 1, 0, 50)).thenReturn(new WorkflowTaskPage(List.of(task, task), 42L));
             when(host.listMyTasks("actor", 0, 50)).thenReturn(new WorkflowTaskPage(List.of(task), null));
             mvc.perform(get("/custom/instances/1/tasks")).andExpect(status().isOk())
                     .andExpect(jsonPath("$.items[1].nodeName").value("Collect reviews"))
-                    .andExpect(jsonPath("$.items[1].taskType").value("SANDBOX_REVIEW"))
+                    .andExpect(jsonPath("$.items[1].taskType").doesNotExist())
                     .andExpect(jsonPath("$.items[1].taskTypeName").value("Sandbox review"))
-                    .andExpect(jsonPath("$.items[1].taskKey").value("REVIEW"))
-                    .andExpect(jsonPath("$.nextAfterId").value("42"));
+                    .andExpect(jsonPath("$.items[1].taskKey").doesNotExist())
+                    .andExpect(jsonPath("$.items[1].id").value("5"))
+                    .andExpect(jsonPath("$.nextAfterId").doesNotExist())
+                    .andExpect(jsonPath("$.nextCursor").isString());
             // One definition lookup for the detail response and one for the entire page.
             verify(definitions, times(2)).findVersion(4);
             verify(catalog, times(2)).findById(3);
@@ -271,7 +296,7 @@ class WorkflowRuntimeWebUnitTest {
                     .andExpect(content().json("{\"items\":[],\"nextAfterTaskId\":null}"));
         }
     }
-    @Test void readOnlyContractIncludesPinnedPolicyWithoutOwnershipActions() throws Exception {
+    @Test void readOnlyContractExposesBusinessContextWithoutCommandMetadata() throws Exception {
         try (var c = context(Host.class, Reads.class, WorkflowRuntimeReadConfiguration.class)) {
             var host = c.getBean(WorkflowAuthorizedRuntimeReadService.class);
             var reads = c.getBean(WorkflowRuntimeQueryService.class);
@@ -303,19 +328,21 @@ class WorkflowRuntimeWebUnitTest {
                     """);
 
             mvc(c).perform(get("/custom/tasks/5/contract")).andExpect(status().isOk())
-                    .andExpect(jsonPath("$.claimPolicy").value("REQUIRED"))
-                    .andExpect(jsonPath("$.previousDecisions.mode").value("ALL_PREVIOUS"))
+                    .andExpect(jsonPath("$.claimPolicy").doesNotExist())
+                    .andExpect(jsonPath("$.previousDecisions").doesNotExist())
+                    .andExpect(jsonPath("$.previousDecisionsAvailable").value(true))
+                    .andExpect(jsonPath("$.precondition").doesNotExist())
                     .andExpect(jsonPath("$.inputs").isEmpty())
                     .andExpect(jsonPath("$.resultContract.mode").value("FORBIDDEN"))
-                    .andExpect(jsonPath("$.canComplete").value(true))
+                    .andExpect(jsonPath("$.canComplete").value(false))
                     .andExpect(jsonPath("$.canClaim").value(false))
                     .andExpect(jsonPath("$.canRelease").value(false))
-                    .andExpect(jsonPath("$.canAdminRelease").value(false));
+                    .andExpect(jsonPath("$.canAdminRelease").doesNotExist());
             var snapshotOrder = org.mockito.Mockito.inOrder(host, reads);
             snapshotOrder.verify(host).task("actor", 5);
             snapshotOrder.verify(reads).findInstance(1);
             snapshotOrder.verify(host).task("actor", 5);
-            snapshotOrder.verify(host).canCompleteTask("actor", task);
+            verify(host, org.mockito.Mockito.never()).canCompleteTask("actor", task);
             when(version.documentJson()).thenReturn("""
                     {"nodes":[{"key":"REVIEW","taskType":"REVIEW","outcomes":[],"resultContract":
                       {"mode":"REQUIRED","schema":{"type":"object","properties":{"amount":{"minimum":9007199254740993.00}}}}}]}
@@ -333,34 +360,159 @@ class WorkflowRuntimeWebUnitTest {
                     .andExpect(jsonPath("$.inputs.missing.value").hasJsonPath())
                     .andExpect(jsonPath("$.inputs.missing.value").value(org.hamcrest.Matchers.nullValue()))
                     .andExpect(content().string(org.hamcrest.Matchers.containsString("\"amount\":9007199254740995.00")))
-                    .andExpect(content().string(org.hamcrest.Matchers.containsString("9007199254740993.00")));
+                    .andExpect(jsonPath("$.resultContract.schema").doesNotExist())
+                    .andExpect(jsonPath("$.resultContract.form").doesNotExist());
             verify(host, org.mockito.Mockito.never()).instance("actor", 1);
             verify(host, org.mockito.Mockito.never()).activity("actor", 2);
         }
     }
 
-    @Test void previousDecisionsAuthorizeOnlyReceivingTaskAndValidateEveryContinuation() throws Exception {
+    @Test void previousDecisionsRequireReceivingTaskAccessAndUseAnIndependentlyReadableSourceLabel() throws Exception {
         try (var c = context(Host.class, Reads.class, WorkflowRuntimeReadConfiguration.class)) {
             var host = c.getBean(WorkflowAuthorizedRuntimeReadService.class);
             var reads = c.getBean(WorkflowRuntimeQueryService.class);
+            var directory = c.getBean(WorkflowAssignmentDirectory.class);
             var item = decision(9007199254740993L, 9, " <b>Exact</b>\n ");
+            org.mockito.Mockito.doReturn(task(5)).when(host).task("actor", 5);
+            var source = new WorkflowTaskView(item.taskId(), item.activityId(), 1, 3, "source-key",
+                    new TaskAssignmentTarget(AssignmentTargetKind.USER, item.actorRef()), TaskStatus.COMPLETED,
+                    item.outcomeKey(), Instant.EPOCH, null, Instant.EPOCH, item.actorRef(), null, item.actorRef());
+            when(host.task("actor", item.taskId())).thenReturn(source);
+            when(directory.assignmentLabel(source)).thenReturn("Prior reviewer", "Renamed reviewer");
             when(reads.listPreviousDecisions(5, 0, 20)).thenReturn(
                     new io.github.leontecristian.workflow.core.dto.runtime.PreviousDecisionPage(List.of(item), 9L));
             mvc(c).perform(get("/custom/tasks/5/previous-decisions")).andExpect(status().isOk())
-                    .andExpect(jsonPath("$.items[0].taskId").value("9007199254740993"))
+                    .andExpect(jsonPath("$.items[0].taskId").doesNotExist())
+                    .andExpect(jsonPath("$.items[0].historySequence").doesNotExist())
+                    .andExpect(jsonPath("$.items[0].actorRef").doesNotExist())
+                    .andExpect(jsonPath("$.items[0].actorLabel").value("Prior reviewer"))
                     .andExpect(jsonPath("$.items[0].comment").value(" <b>Exact</b>\n "))
                     .andExpect(jsonPath("$.items[0].result").doesNotExist())
                     .andExpect(jsonPath("$.items[0].inputs").doesNotExist())
-                    .andExpect(jsonPath("$.nextAfterSequence").value("9"));
+                    .andExpect(jsonPath("$.nextCursor").isString());
             verify(host).task("actor", 5);
-            verify(host, org.mockito.Mockito.never()).task("actor", item.taskId());
+            // Recheck the exact source independently and leave the previous decision visible after access loss.
+            mvc(c).perform(get("/custom/tasks/5/previous-decisions")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items[0].actorLabel").value("Renamed reviewer"));
+            org.mockito.Mockito.doThrow(new WorkflowRuntimeException(404, "NOT_FOUND")).when(host).task("actor", item.taskId());
+            mvc(c).perform(get("/custom/tasks/5/previous-decisions")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items[0].actorLabel").value("Reviewer"))
+                    .andExpect(jsonPath("$.items[0].comment").value(" <b>Exact</b>\n "));
+            verify(directory, org.mockito.Mockito.times(2)).assignmentLabel(source);
             when(host.task("actor", 5)).thenThrow(new WorkflowRuntimeException(404, "NOT_FOUND"));
-            mvc(c).perform(get("/custom/tasks/5/previous-decisions?afterSequence=9"))
+            mvc(c).perform(get("/custom/tasks/5/previous-decisions?cursor=9"))
                     .andExpect(status().isNotFound());
             verify(reads, org.mockito.Mockito.never()).listPreviousDecisions(5, 9, 20);
+            org.mockito.Mockito.doReturn(task(5)).when(host).task("actor", 5);
             for (String invalid : List.of("limit=0", "limit=51", "limit=1.5", "limit=9223372036854775808",
-                    "afterSequence=-1", "afterSequence=01", "afterSequence=1&afterSequence=2", "unknown=1"))
+                    "cursor=-1", "cursor=01", "cursor=1&cursor=2", "unknown=1"))
                 mvc(c).perform(get("/custom/tasks/5/previous-decisions?" + invalid)).andExpect(status().isBadRequest());
+        }
+    }
+
+    @Test void sharedReadsRestrictReviewerAndAdministratorRepresentationsAndRejectDeniedAccess() throws Exception {
+        try (var c = context(Host.class, Reads.class, Commands.class,
+                WorkflowRuntimeReadConfiguration.class, WorkflowRuntimeCommandConfiguration.class)) {
+            stubPinnedTask(c);
+            var host = c.getBean(WorkflowAuthorizedRuntimeReadService.class);
+            var reads = c.getBean(WorkflowRuntimeQueryService.class);
+            var identity = c.getBean(WorkflowRequestIdentity.class);
+            var directory = c.getBean(WorkflowAssignmentDirectory.class);
+            var instance = reads.findInstance(1).orElseThrow();
+            when(instance.status()).thenReturn(InstanceStatus.ACTIVE);
+            when(instance.currentNodeKey()).thenReturn("REVIEW");
+            when(instance.lockVersion()).thenReturn(9007199254740994L);
+            var version = c.getBean(WorkflowDefinitionService.class).findVersion(4).orElseThrow();
+            when(version.documentJson()).thenReturn("""
+                    {"nodes":[{"key":"REVIEW","name":"Review amount","taskType":"AMOUNT",
+                    "outcomes":[{"key":"APPROVE","label":"Complete","requiresComment":false}],
+                    "resultContract":{"mode":"REQUIRED","schema":{"type":"object","required":["approvedAmount"],
+                    "properties":{"approvedAmount":{"type":"number","minimum":0}}}}}]}
+                    """);
+            var task = new WorkflowTaskView(5, 2, 1, 3, "sensitive-task-key",
+                    new TaskAssignmentTarget(AssignmentTargetKind.USER, "actor"), TaskStatus.OPEN,
+                    null, Instant.EPOCH, null, null, null, null, "actor");
+            when(host.task("actor", 5)).thenReturn(task);
+            when(host.task("admin", 5)).thenReturn(task);
+            when(host.task("denied", 5)).thenThrow(new WorkflowRuntimeException(404, "NOT_FOUND"));
+            when(host.canCompleteTask("actor", task)).thenReturn(true);
+            when(reads.previousDecisionsPolicy(5)).thenReturn(
+                    io.github.leontecristian.workflow.core.dto.definition.document.PreviousDecisionsPolicy.ALL_PREVIOUS);
+            var mvc = mvc(c);
+            String contractBody = mvc.perform(get("/custom/tasks/5/contract")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.task.ownershipLabel").value("Assigned to you"))
+                    .andExpect(jsonPath("$.task.diagnostics").doesNotExist())
+                    .andExpect(jsonPath("$.taskType").value("AMOUNT"))
+                    .andExpect(jsonPath("$.outcomes[0].key").value("APPROVE"))
+                    .andExpect(jsonPath("$.resultContract.schema").doesNotExist())
+                    .andExpect(jsonPath("$.resultContract.form.fields[0].label").value("Approved amount"))
+                    .andExpect(jsonPath("$.diagnostics").doesNotExist())
+                    .andReturn().getResponse().getContentAsString();
+            String token = new RuntimeWire().tree(contractBody).path("precondition").textValue();
+            var tokens = c.getBean(WorkflowTaskTokens.class);
+            assertThat(tokens.expectedVersion(token, "actor", 5)).isEqualTo(9007199254740994L);
+            assertThatThrownBy(() -> tokens.expectedVersion(token, "admin", 5)).isInstanceOf(WorkflowRuntimeException.class);
+            assertThatThrownBy(() -> tokens.expectedVersion(token, "actor", 6)).isInstanceOf(WorkflowRuntimeException.class);
+            assertThatThrownBy(() -> tokens.after(token, "actor", 5)).isInstanceOf(WorkflowRuntimeException.class);
+            assertThat(contractBody).doesNotContain("instanceLockVersion", "sensitive-task-key");
+            mvc.perform(get("/custom/tasks/5/contract").param("diagnostics", "true"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.diagnostics").doesNotExist());
+            var decision = decision(4, 9, "Confirm");
+            when(reads.listPreviousDecisions(5, 0, 20)).thenReturn(
+                    new io.github.leontecristian.workflow.core.dto.runtime.PreviousDecisionPage(List.of(decision), 9L));
+            String previousBody = mvc.perform(get("/custom/tasks/5/previous-decisions")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items[0].actorLabel").value("Reviewer"))
+                    .andExpect(jsonPath("$.items[0].actorRef").doesNotExist())
+                    .andReturn().getResponse().getContentAsString();
+            when(reads.listPreviousDecisions(5, 9, 20)).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.PreviousDecisionPage(List.of(), null));
+            String cursor = new RuntimeWire().tree(previousBody).path("nextCursor").textValue();
+            mvc.perform(get("/custom/tasks/5/previous-decisions").param("cursor", cursor))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
+
+            when(identity.requireActorRef()).thenReturn("admin");
+            when(directory.assignmentLabel(task)).thenReturn("Assigned reviewer", "Renamed reviewer", " actor ");
+            mvc.perform(get("/custom/tasks/5")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.diagnostics").doesNotExist())
+                    .andExpect(jsonPath("$.ownershipLabel").value("Assigned to Assigned reviewer"));
+            mvc.perform(get("/custom/tasks/5")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.ownershipLabel").value("Assigned to Renamed reviewer"));
+            mvc.perform(get("/custom/tasks/5")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.ownershipLabel").value("Assigned to another user"));
+            mvc.perform(get("/custom/tasks/5/contract")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.canComplete").value(false))
+                    .andExpect(jsonPath("$.taskType").doesNotExist())
+                    .andExpect(jsonPath("$.outcomes[0].key").doesNotExist())
+                    .andExpect(jsonPath("$.precondition").doesNotExist())
+                    .andExpect(jsonPath("$.diagnostics").doesNotExist())
+                    .andExpect(jsonPath("$.task.diagnostics").doesNotExist())
+                    .andExpect(jsonPath("$.resultContract.schema").doesNotExist());
+
+            var completed = new WorkflowTaskView(5, 2, 1, 3, "sensitive-task-key", task.assignment(), TaskStatus.COMPLETED,
+                    "APPROVE", Instant.EPOCH, null, Instant.EPOCH, "actor",
+                    io.github.leontecristian.workflow.core.dto.runtime.TaskClosureReason.TASK_OUTCOME, "actor");
+            when(host.task("admin", 5)).thenReturn(completed);
+            when(host.task("actor", 5)).thenReturn(completed);
+            when(reads.findTaskSubmission(5)).thenReturn(Optional.of(submission(5, WorkflowJsonValue.parse("{\"approvedAmount\":0}"))));
+            mvc.perform(get("/custom/tasks/5")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.diagnostics").doesNotExist())
+                    .andExpect(jsonPath("$.outcomeLabel").value("Complete"));
+            mvc.perform(get("/custom/tasks/5/submission")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.result.approvedAmount").value(0))
+                    .andExpect(jsonPath("$.diagnostics").doesNotExist());
+            when(identity.requireActorRef()).thenReturn("actor");
+            mvc.perform(get("/custom/tasks/5/submission")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.outcomeLabel").value("Complete"))
+                    .andExpect(jsonPath("$.result.approvedAmount").value(0))
+                    .andExpect(jsonPath("$.actorRef").doesNotExist())
+                    .andExpect(jsonPath("$.commandId").doesNotExist())
+                    .andExpect(jsonPath("$.diagnostics").doesNotExist());
+            when(identity.requireActorRef()).thenReturn("denied");
+            for (String suffix : List.of("", "/contract", "/submission", "/previous-decisions",
+                    "/reassignment-availability", "/reassignment-targets")) {
+                mvc.perform(get("/custom/tasks/5" + suffix)).andExpect(status().isNotFound())
+                        .andExpect(jsonPath("$.code").value("NOT_FOUND"))
+                        .andExpect(jsonPath("$.diagnostics").isEmpty());
+            }
         }
     }
 
@@ -369,17 +521,17 @@ class WorkflowRuntimeWebUnitTest {
         var items = new ArrayList<io.github.leontecristian.workflow.core.dto.runtime.PreviousDecision>();
         for (int i = 1; i <= 50; i++) items.add(decision(i, i, "\u0001".repeat(2000)));
         String encoded = wire.previousDecisionPage(
-                new io.github.leontecristian.workflow.core.dto.runtime.PreviousDecisionPage(items, null)).getBody();
+                new io.github.leontecristian.workflow.core.dto.runtime.PreviousDecisionPage(items, null), item -> Map.of("comment", item.comment()), value -> "cursor-" + value).getBody();
         var tree = wire.tree(encoded);
         assertThat(encoded.getBytes(StandardCharsets.UTF_8).length).isLessThanOrEqualTo(256 * 1024);
         assertThat(encoded.length() * 2).isLessThanOrEqualTo(256 * 1024);
         int returned = tree.get("items").size();
         assertThat(returned).isBetween(1, 49);
-        assertThat(tree.get("nextAfterSequence").textValue()).isEqualTo(String.valueOf(returned));
+        assertThat(tree.get("nextCursor").textValue()).isEqualTo("cursor-" + returned);
         assertThat(tree.get("items").get(returned - 1).get("comment").textValue()).hasSize(2000);
         assertThatThrownBy(() -> wire.previousDecisionPage(
                 new io.github.leontecristian.workflow.core.dto.runtime.PreviousDecisionPage(
-                        List.of(decision(1, 1, "x".repeat(256 * 1024))), null)))
+                        List.of(decision(1, 1, "x".repeat(256 * 1024))), null), item -> Map.of("comment", item.comment()), value -> "cursor-" + value))
                 .isInstanceOf(WorkflowRuntimeException.class)
                 .satisfies(failure -> assertThat(((WorkflowRuntimeException) failure).code()).isEqualTo("LIMIT_EXCEEDED"));
     }
@@ -405,31 +557,34 @@ class WorkflowRuntimeWebUnitTest {
             String base = "{\"commandId\":\"12345678-1234-1234-1234-123456789abc\",\"outcomeKey\":\"APPROVE\",\"comment\":\"漢\",\"result\":";
             String result = "{\"amount\":9007199254740993.00,\"zero\":0e+2147483647}";
             String body = base + result + "}";
-            String complete = "/custom/instances/1/tasks/5/complete";
+            String complete = "/custom/tasks/5/complete";
             String replay = "/custom/commands/complete/replay";
-            String replayBody = base + result + ",\"instanceId\":\"1\",\"taskId\":\"5\"}";
+            String replayBody = base + result + ",\"taskId\":\"5\"}";
             String requestAtLimit = body + " ".repeat(256 * 1024 - body.getBytes(StandardCharsets.UTF_8).length);
             when(host.complete(any(), any())).thenReturn(new WorkflowCommandResult(false, null));
+            stubTaskCommands(host, 1L, 0L);
             when(host.replayComplete(any(), any())).thenReturn(Optional.empty());
-            mvc.perform(post(complete).contentType("application/json").header("X-Expected-Lock-Version", "0")
+            mvc.perform(post(complete).contentType("application/json").header("X-Task-Precondition", "0")
                     .content(requestAtLimit.getBytes(StandardCharsets.UTF_8))).andExpect(status().isOk());
-            mvc.perform(post(replay).contentType("application/json").header("X-Expected-Lock-Version", "0")
+            mvc.perform(post(replay).contentType("application/json").header("X-Task-Precondition", "0")
                     .content(replayBody.getBytes(StandardCharsets.UTF_8))).andExpect(status().isOk());
             var command = new CompleteWorkflowTask(UUID.fromString("12345678-1234-1234-1234-123456789abc"),
                     1, 5, 0, "APPROVE", "漢", WorkflowJsonValue.parse(result));
             verify(host).complete(command, null);
             verify(host).replayComplete(command, null);
-            mvc.perform(post(complete).contentType("application/json").header("X-Expected-Lock-Version", "0")
+            mvc.perform(post(complete).contentType("application/json").header("X-Task-Precondition", "0")
                     .content((requestAtLimit + " ").getBytes(StandardCharsets.UTF_8))).andExpect(status().is(413));
             for (String invalid : List.of("null", "[]", "1", "{\"nested\":{\"x\":1,\"x\":2}}")) {
-                mvc.perform(post(complete).contentType("application/json").header("X-Expected-Lock-Version", "0")
+                mvc.perform(post(complete).contentType("application/json").header("X-Task-Precondition", "0")
                         .content(base + invalid + "}")).andExpect(status().isBadRequest());
-                mvc.perform(post(replay).contentType("application/json").header("X-Expected-Lock-Version", "0")
-                        .content(base + invalid + ",\"instanceId\":\"1\",\"taskId\":\"5\"}"))
+                mvc.perform(post(replay).contentType("application/json").header("X-Task-Precondition", "0")
+                        .content(base + invalid + ",\"taskId\":\"5\"}"))
                         .andExpect(status().isBadRequest());
             }
-            org.mockito.Mockito.verifyNoMoreInteractions(host);
+            verify(host, times(1)).complete(any(), any());
+            verify(host, times(1)).replayComplete(any(), any());
 
+            stubPinnedTask(c);
             when(readHost.task("actor", 5)).thenReturn(task(5));
             mvc.perform(get("/custom/tasks/5/submission")).andExpect(content().string("null"));
             when(reads.findTaskSubmission(5)).thenReturn(Optional.of(submission(5, null)));
@@ -455,15 +610,17 @@ class WorkflowRuntimeWebUnitTest {
         try (var c = context(Host.class, Commands.class, WorkflowRuntimeCommandConfiguration.class)) {
             var host = c.getBean(WorkflowRuntimeCommandCoordinator.class);
             var mvc = mvc(c);
-            var request = post("/custom/instances/1/tasks/5/complete").contentType("application/json")
-                    .header("X-Expected-Lock-Version", "0").requestAttr("trusted", "safe")
+            stubTaskCommands(host, 1L, 0L);
+            var request = post("/custom/tasks/5/complete").contentType("application/json")
+                    .header("X-Task-Precondition", "0").requestAttr("trusted", "safe")
                     .content("{\"commandId\":\"12345678-1234-1234-1234-123456789abc\",\"outcomeKey\":\"APPROVE\",\"result\":{}}");
             doThrow(WorkflowExecutionException.invalidResultSchema("/amount", "/properties/amount/minimum"))
                     .when(host).complete(any(), any());
             mvc.perform(request).andExpect(status().is(422))
                     .andExpect(jsonPath("$.code").value("RESULT_SCHEMA_INVALID"))
                     .andExpect(jsonPath("$.diagnostics[0].path").value("/amount"))
-                    .andExpect(jsonPath("$.diagnostics[0].schemaPath").value("/properties/amount/minimum"));
+                    .andExpect(jsonPath("$.diagnostics[0].schemaPath").doesNotExist())
+                    .andExpect(jsonPath("$.diagnostics[0].message").value("Enter a value at or above the minimum."));
 
             doThrow(WorkflowExecutionException.rejectResult("/" + "x".repeat(4200))).when(host).complete(any(), any());
             mvc.perform(request).andExpect(status().is(422)).andExpect(jsonPath("$.code").value("RESULT_REJECTED"))
@@ -511,6 +668,7 @@ class WorkflowRuntimeWebUnitTest {
             var reads = c.getBean(WorkflowRuntimeQueryService.class);
             var host = c.getBean(WorkflowAuthorizedRuntimeReadService.class);
             var result = WorkflowJsonValue.parse("{\"note\":\"" + "漢".repeat(15000) + "\"}");
+            stubPinnedTask(c);
             var rows = new ArrayList<TaskSubmission>();
             for (long id = 1; id <= 26; id++) {
                 var task = task(id);
@@ -532,6 +690,26 @@ class WorkflowRuntimeWebUnitTest {
                     .andExpect(jsonPath("$.items[0].result.note").value("漢".repeat(15000)))
                     .andExpect(jsonPath("$.nextAfterTaskId").doesNotExist());
         }
+    }
+
+    private static void stubTaskCommands(WorkflowRuntimeCommandCoordinator host, long instanceId, long version) {
+        when(host.taskTarget(eq(5L), any())).thenReturn(new WorkflowRuntimeCommandCoordinator.TaskTarget(5L, instanceId, version));
+        when(host.taskResult(any())).thenAnswer(call -> Map.of("replayed", call.<WorkflowCommandResult>getArgument(0).replayed()));
+    }
+
+    static void stubPinnedTask(AnnotationConfigWebApplicationContext c) {
+        var reads = c.getBean(WorkflowRuntimeQueryService.class);
+        var instance = mock(io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView.class);
+        var activity = mock(io.github.leontecristian.workflow.core.dto.runtime.WorkflowActivityView.class);
+        var version = mock(io.github.leontecristian.workflow.core.dto.definition.DefinitionVersionView.class);
+        when(reads.findInstance(1)).thenReturn(Optional.of(instance));
+        when(instance.definitionVersionId()).thenReturn(4L);
+        when(reads.findActivity(2)).thenReturn(Optional.of(activity));
+        when(activity.nodeKey()).thenReturn("REVIEW");
+        when(c.getBean(WorkflowDefinitionService.class).findVersion(4)).thenReturn(Optional.of(version));
+        when(version.documentJson()).thenReturn("""
+                {"nodes":[{"key":"REVIEW","name":"Review work","outcomes":[{"key":"APPROVE","label":"Approve"}]}]}
+                """);
     }
 
     private WorkflowTaskView task(long id) {
@@ -571,17 +749,18 @@ class WorkflowRuntimeWebUnitTest {
                 WorkflowRuntimeCommandConfiguration.class,WorkflowViewerConfiguration.class,WorkflowAdministrationConfiguration.class)) {
             var host=c.getBean(WorkflowRuntimeCommandCoordinator.class);var mvc=mvc(c);
             when(host.complete(any(),eq("corr"))).thenReturn(new WorkflowCommandResult(false,null));
+            stubTaskCommands(host, 9007199254740993L, 9007199254740994L);
             String body="{\"commandId\":\"12345678-1234-1234-1234-123456789abc\",\"outcomeKey\":\"APPROVE\",\"comment\":\" exact \"}";
-            mvc.perform(post("/custom/instances/9007199254740993/tasks/5/complete").contentType("application/json")
-                .header("X-Expected-Lock-Version","9007199254740994").requestAttr("trusted","corr").content(body))
+            mvc.perform(post("/custom/tasks/5/complete").contentType("application/json")
+                .header("X-Task-Precondition","9007199254740994").requestAttr("trusted","corr").content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.replayed").value(false));
             var captured=org.mockito.ArgumentCaptor.forClass(CompleteWorkflowTask.class);
             verify(host).complete(captured.capture(),eq("corr"));
             assertThat(captured.getValue()).isEqualTo(new CompleteWorkflowTask(java.util.UUID.fromString("12345678-1234-1234-1234-123456789abc"),
                 9007199254740993L,5,9007199254740994L,"APPROVE"," exact "));
             when(host.replayComplete(any(),any())).thenReturn(Optional.empty());
-            mvc.perform(post("/custom/commands/complete/replay").contentType("application/json").header("X-Expected-Lock-Version","0")
-                .content(body.substring(0,body.length()-1)+",\"instanceId\":\"1\",\"taskId\":\"5\"}"))
+            mvc.perform(post("/custom/commands/complete/replay").contentType("application/json").header("X-Task-Precondition","0")
+                .content(body.substring(0,body.length()-1)+",\"taskId\":\"5\"}"))
                 .andExpect(status().isOk()).andExpect(content().json("{\"found\":false,\"result\":null}"));
             verify(host,times(1)).complete(any(),any());
             verifyNoInteractions(c.getBean(WorkflowAuthorizedRuntimeReadService.class));
@@ -595,19 +774,20 @@ class WorkflowRuntimeWebUnitTest {
             String body = "{\"commandId\":\"" + uuid + "\",\"reason\":\" exact \"}";
             String token = "9007199254740994";
             String instance = "9007199254740993";
-            String release = "/custom/instances/" + instance + "/tasks/5/admin-release";
+            String release = "/custom/tasks/5/admin-release";
+            stubTaskCommands(host, Long.parseLong(instance), Long.parseLong(token));
             when(host.administrativelyRelease(any(), eq("corr")))
                     .thenReturn(new WorkflowCommandResult(false, null));
             mvc.perform(post(release).contentType("application/json")
-                    .header("X-Expected-Lock-Version", token).requestAttr("trusted", "corr").content(body))
+                    .header("X-Task-Precondition", token).requestAttr("trusted", "corr").content(body))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.replayed").value(false));
             var command = new io.github.leontecristian.workflow.core.dto.runtime.AdministrativelyReleaseWorkflowTask(
                     java.util.UUID.fromString(uuid), Long.parseLong(instance), 5, Long.parseLong(token), " exact ");
             verify(host).administrativelyRelease(command, "corr");
             when(host.replayAdministrativeRelease(command, "corr")).thenReturn(Optional.empty());
             mvc.perform(post("/custom/commands/admin-release/replay").contentType("application/json")
-                    .header("X-Expected-Lock-Version", token).requestAttr("trusted", "corr")
-                    .content(body.substring(0, body.length() - 1) + ",\"instanceId\":\"" + instance + "\",\"taskId\":\"5\"}"))
+                    .header("X-Task-Precondition", token).requestAttr("trusted", "corr")
+                    .content(body.substring(0, body.length() - 1) + ",\"taskId\":\"5\"}"))
                     .andExpect(status().isOk()).andExpect(content().json("{\"found\":false,\"result\":null}"));
             verify(host).replayAdministrativeRelease(command, "corr");
 
@@ -615,10 +795,11 @@ class WorkflowRuntimeWebUnitTest {
                     body.replace(" exact ", "x\",\"reason\":\"y"),
                     body.replace(" exact ", "x\",\"assignee\":\"fake"))) {
                 mvc.perform(post(release).contentType("application/json")
-                        .header("X-Expected-Lock-Version", token).content(bad))
+                        .header("X-Task-Precondition", token).content(bad))
                         .andExpect(status().isBadRequest());
             }
-            org.mockito.Mockito.verifyNoMoreInteractions(host);
+            verify(host, times(1)).administrativelyRelease(any(), any());
+            verify(host, times(1)).replayAdministrativeRelease(any(), any());
         }
     }
     @Test void commandParsingAndSafeErrorCategoriesArePreserved() throws Exception {
@@ -626,14 +807,15 @@ class WorkflowRuntimeWebUnitTest {
             var host=c.getBean(WorkflowRuntimeCommandCoordinator.class);var mvc=mvc(c);
             String body="{\"commandId\":\"12345678-1234-1234-1234-123456789abc\",\"outcomeKey\":\"APPROVE\",\"comment\":null}";
             for(String bad:List.of(body.replace("null","3"),body.replace("null","null,\"actor\":\"fake\""),body.replace("APPROVE","APPROVE\",\"outcomeKey\":\"REJECT"),body.replace("12345678-1234-1234-1234-123456789abc","1-1-1-1-1")))
-                mvc.perform(post("/custom/instances/1/tasks/5/complete").contentType("application/json").header("X-Expected-Lock-Version","0").content(bad))
+                mvc.perform(post("/custom/tasks/5/complete").contentType("application/json").header("X-Task-Precondition","0").content(bad))
                     .andExpect(status().isBadRequest());
             verifyNoInteractions(host);
+            stubTaskCommands(host, 1L, 0L);
             for(var category:List.of(WorkflowExecutionException.Category.STALE_VERSION,WorkflowExecutionException.Category.LIMIT_EXCEEDED,
                     WorkflowExecutionException.Category.NOT_ASSIGNED,WorkflowExecutionException.Category.ASSIGNMENT_LOOKUP_FAILED,WorkflowExecutionException.Category.HOST_CONFIGURATION)) {
                 doThrow(new WorkflowExecutionException(category)).when(host).complete(any(),any());
                 int status=category==WorkflowExecutionException.Category.STALE_VERSION?409:category==WorkflowExecutionException.Category.LIMIT_EXCEEDED?422:category==WorkflowExecutionException.Category.NOT_ASSIGNED?403:category==WorkflowExecutionException.Category.ASSIGNMENT_LOOKUP_FAILED?503:500;
-                mvc.perform(post("/custom/instances/1/tasks/5/complete").contentType("application/json").header("X-Expected-Lock-Version","0")
+                mvc.perform(post("/custom/tasks/5/complete").contentType("application/json").header("X-Task-Precondition","0")
                     .requestAttr("trusted","safe").content(body)).andExpect(status().is(status)).andExpect(jsonPath("$.correlationId").value("safe"));
             }
         }

@@ -1,0 +1,24 @@
+:host { display: block; }
+.task-page { display: grid; gap: 16px; max-width: 52rem; min-width: 0; }
+header, section {
+  min-width: 0;
+  padding: clamp(16px, 3vw, 24px);
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+h1, h2, h3 { margin: 0 0 12px; }
+h1, h2 { font-weight: 550; }
+h1 { font-size: clamp(1.55rem, 4vw, 2rem); line-height: 1.2; margin: 0; }
+h2 { font-size: 1.25rem; }
+h3 { font-size: 1rem; }
+p { margin: 12px 0 0; }
+.task-heading, .task-meta, .task-actions, .admin-release {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+}
+.task-meta { margin-top: 8px; color: var(--mat-sys-on-surface-variant); }
+.task-actions:not(:empty), .admin-release { margin-top: 12px; }
+.admin-release mat-form-field { flex: 1 1 16rem; min-width: 0; }
+.previous-decisions { list-style: none; padding: 0; margin: 0; }
+.previous-decisions li + li { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--mat-sys-outline-variant); }
+.comment { white-space: pre-wrap; }

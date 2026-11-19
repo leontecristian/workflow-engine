@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "key": "sandbox-conditional-items-review",
+  "version": 1,
+  "name": "Sandbox conditional items review",
+  "startPolicy": {
+    "inputContract": [],
+    "initialize": {}
+  },
+  "variables": [],
+  "nodes": [
+    { "key": "BEGIN", "type": "START", "name": "Start" },
+    {
+      "key": "reviewItems",
+      "type": "HUMAN_TASK",
+      "name": "Review requested items",
+      "taskType": "SANDBOX_REVIEW",
+      "assignment": { "resolver": "sandbox.singleReviewer", "inputs": {} },
+      "completion": { "policy": "SINGLE" },
+      "resultContract": {
+        "mode": "REQUIRED",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "title": "Requested items",
+              "minItems": 1,
+              "maxItems": 5,
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "title": "Booking",
+                    "properties": {
+                      "kind": { "type": "string", "title": "Item type", "const": "BOOKING" },
+                      "bookingId": { "type": "string", "title": "Booking reference", "minLength": 1 },
+                      "decision": { "$ref": "#/$defs/decision" },
+                      "reason": { "$ref": "#/$defs/reason" }
+                    },
+                    "required": ["kind", "bookingId", "decision"],
+                    "additionalProperties": false,
+                    "if": { "properties": { "decision": { "const": "REJECT" } }, "required": ["decision"] },
+                    "then": { "properties": { "reason": { "minLength": 1 } }, "required": ["reason"] }
+                  },
+                  {
+                    "type": "object",
+                    "title": "Resource",
+                    "properties": {
+                      "kind": { "type": "string", "title": "Item type", "const": "RESOURCE" },
+                      "resourceId": { "type": "string", "title": "Resource reference", "minLength": 1 },
+                      "decision": { "$ref": "#/$defs/decision" },
+                      "reason": { "$ref": "#/$defs/reason" }
+                    },
+                    "required": ["kind", "resourceId", "decision"],
+                    "additionalProperties": false,
+                    "if": { "properties": { "decision": { "const": "REJECT" } }, "required": ["decision"] },
+                    "then": { "properties": { "reason": { "minLength": 1 } }, "required": ["reason"] }
+                  }
+                ]
+              }
+            }
+          },
+          "required": ["items"],
+          "additionalProperties": false,
+          "$defs": {
+            "decision": { "type": "string", "enum": ["APPROVE", "REJECT"] },
+            "reason": { "type": "string", "maxLength": 500 }
+          }
+        }
+      },
+      "outcomes": [{ "key": "COMPLETE", "label": "Complete", "requiresComment": false }]
+    },
+    { "key": "DONE", "type": "END", "name": "Done", "result": "COMPLETED" }
+  ],
+  "transitions": [
+    { "key": "begin", "from": "BEGIN", "to": "reviewItems" },
+    { "key": "done", "from": "reviewItems", "to": "DONE", "outcome": "COMPLETE" }
+  ]
+}

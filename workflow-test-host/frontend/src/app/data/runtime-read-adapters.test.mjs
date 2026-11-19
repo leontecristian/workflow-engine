@@ -15,7 +15,7 @@ test('task and activity reads isolate exact result object tokens and preserve om
  const amount='{ "nested": {"result":9007199254740993.00}, "exponent":1E+2 }';
  const schema='{"type":"object","properties":{"amount":{"const":9007199254740993.00}}}';
  const responses=[
-  '{"resultContract":{"mode":"OPTIONAL","schema":'+schema+'}}',
+  '{"task":{"status":"OPEN"},"resultContract":{"mode":"OPTIONAL","form":{"kind":"object","label":"Result","fields":[{"formId":4,"label":"Amount","kind":"number","help":{"textId":1,"text":"Shared help"}},4,{"label":"Other amount","kind":"number","help":{"textId":1}}]}}}',
   '{"taskId":"1","result":'+amount+'}',
   '{"taskId":"2"}',
   '{"items":[{"taskId":"1","result":'+amount+'},{"taskId":"2"},{"taskId":"3","result":{}}],"nextAfterTaskId":"3"}',
@@ -25,7 +25,19 @@ test('task and activity reads isolate exact result object tokens and preserve om
  const session={async administrationCall(){return responses.shift();}};
  const {page:reads}=component(t,ConsoleRuntimeReads,{},undefined,undefined,[{provide:ConsoleSession,useValue:session}]);
  const signal=new AbortController().signal;
- assert.equal((await reads.taskContract('1',signal)).resultContract.schemaJson,schema);
+ const contract=await reads.taskContract('1',signal);
+ assert.equal(contract.resultContract.form.fields[0],contract.resultContract.form.fields[1]);
+ assert.equal(contract.resultContract.form.fields[0].label,'Amount');
+ assert.equal(contract.resultContract.form.fields[2].help,'Shared help');
+ t.mock.method(globalThis,'fetch',async(path,options)=>{
+   assert.equal(path,'/console/api/tasks/1/diagnostics');
+   assert.equal(options.signal,signal);
+   return new Response('{"task":{"id":"1","activityId":"2","instanceId":"3"},"contract":{"resultContract":{"schema":'+schema+'}},"submission":{"result":'+amount+'}}');
+ });
+ const diagnostics=await reads.readTaskDiagnostics('1',signal);
+ assert.equal(diagnostics.contractJson,'{"resultContract":{"schema":'+schema+'}}');
+ assert.equal(diagnostics.resultJson,amount);
+ assert.ok(!Object.hasOwn(contract.resultContract,'schema'));
  const accepted=await reads.taskSubmission('1',signal);
  assert.equal(accepted.resultJson,amount);
  assert.ok(!Object.hasOwn(accepted,'result'));
@@ -46,7 +58,7 @@ test('task contract inputs preserve exact tokens and keep null distinct from a m
   approved:['BOOLEAN','false'],
  };
  const inputs=Object.entries(tokens).map(([key,[type,token]])=>`"${key}":{"type":"${type}","value":${token}}`).join(',');
- const responses=[`{"inputs":{${inputs}}}`,'{"inputs":{"broken":{"type":"JSON"}}}'];
+ const responses=[`{"task":{"status":"OPEN"},"inputs":{${inputs}}}`,'{"task":{"status":"OPEN"},"inputs":{"broken":{"type":"JSON"}}}'];
  const session={async administrationCall(){return responses.shift();}};
  const {page:reads}=component(t,ConsoleRuntimeReads,{},undefined,undefined,[{provide:ConsoleSession,useValue:session}]);
  const signal=new AbortController().signal;
@@ -56,20 +68,20 @@ test('task contract inputs preserve exact tokens and keep null distinct from a m
  await assert.rejects(reads.taskContract('1',signal),/Invalid read response/);
 });
 
-test('previous-decision adapter keeps receiving-task IDs and exclusive cursors exact',async t=>{
- const calls=[];const text='{"items":[{"taskId":"9007199254740993","historySequence":"9007199254740995","comment":" <b>Exact</b> "}],"nextAfterSequence":"9007199254740995"}';
+test('previous-decision adapter keeps receiving-task navigation and opaque cursors exact',async t=>{
+ const calls=[];const text='{"items":[{"nodeName":"Review","actorLabel":"Reviewer","comment":" <b>Exact</b> "}],"nextCursor":"continued-page"}';
  const session={async administrationCall(...args){calls.push(args);return text;}};
  const {page:reads}=component(t,ConsoleRuntimeReads,{},undefined,undefined,[{provide:ConsoleSession,useValue:session}]);
  const signal=new AbortController().signal;
- const page=await reads.previousDecisions('9007199254740997','9007199254740991',20,signal);
- assert.equal(calls.length,1);assert.equal(calls[0][0],'/tasks/9007199254740997/previous-decisions?afterSequence=9007199254740991&limit=20');assert.equal(calls[0][1],signal);
- assert.equal(page.items[0].taskId,'9007199254740993');assert.equal(page.items[0].comment,' <b>Exact</b> ');assert.equal(page.nextAfterSequence,'9007199254740995');
+ const page=await reads.previousDecisions('9007199254740997','original-page',20,signal);
+ assert.equal(calls.length,1);assert.equal(calls[0][0],'/tasks/9007199254740997/previous-decisions?cursor=original-page&limit=20');assert.equal(calls[0][1],signal);
+ assert.equal(page.items[0].actorLabel,'Reviewer');assert.equal(page.items[0].comment,' <b>Exact</b> ');assert.equal(page.nextCursor,'continued-page');
 });
 
 test('administration sends exact filters and stable bounded cursor without loading instance pages',async t=>{
- const calls=[];const {page:reads}=component(t,ConsoleRuntimeReads,{},undefined,undefined,[{provide:ConsoleSession,useValue:{administrationCall:async(...args)=>{calls.push(args);return '{"items":[],"nextAfterId":"9007199254740993"}';}}}]);
+ const calls=[];const {page:reads}=component(t,ConsoleRuntimeReads,{},undefined,undefined,[{provide:ConsoleSession,useValue:{administrationCall:async(...args)=>{calls.push(args);return '{"items":[],"nextCursor":"9007199254740993"}';}}}]);
  const filters={status:'OPEN',taskName:' Review & 100%_ ',taskType:'SANDBOX_REVIEW',assignmentKind:'GROUP',assignmentRef:'Finance & Legal',assigneeRef:'reviewer',instanceId:'9007199254740993'};
  const page=await reads.administrationTasks(filters,'9007199254740994',100,new AbortController().signal);
  assert.equal(calls.length,1);assert.ok(calls[0][0].startsWith('/tasks/administration?'));const query=new URLSearchParams(calls[0][0].split('?')[1]);
- for(const [key,value] of Object.entries(filters))assert.equal(query.get(key),value);assert.equal(query.get('afterId'),'9007199254740994');assert.equal(query.get('limit'),'100');assert.equal(page.nextAfterId,'9007199254740993');
+ for(const [key,value] of Object.entries(filters))assert.equal(query.get(key),value);assert.equal(query.get('cursor'),'9007199254740994');assert.equal(query.get('limit'),'100');assert.equal(page.nextCursor,'9007199254740993');
 });

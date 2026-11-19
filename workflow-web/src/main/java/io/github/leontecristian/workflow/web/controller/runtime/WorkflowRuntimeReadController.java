@@ -27,16 +27,20 @@ import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinit
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
 import io.github.leontecristian.workflow.web.dto.runtime.WorkflowTaskContract;
+import io.github.leontecristian.workflow.web.dto.runtime.WorkflowResultForm;
 import io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowAuthorizedRuntimeReadService;
 import io.github.leontecristian.workflow.web.integration.WorkflowRequestIdentity;
 import io.github.leontecristian.workflow.web.integration.runtime.WorkflowAssignmentDirectory;
 import io.github.leontecristian.workflow.web.service.runtime.RuntimeErrors;
 import io.github.leontecristian.workflow.web.service.runtime.RuntimeWire;
+import io.github.leontecristian.workflow.web.service.runtime.WorkflowTaskProjection;
+import io.github.leontecristian.workflow.web.service.runtime.WorkflowTaskTokens;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -57,13 +61,23 @@ public class WorkflowRuntimeReadController {
     private final RuntimeWire wire;
     private final RuntimeErrors errors;
     private final boolean commandsAvailable;
+    private final WorkflowTaskTokens tokens;
     public WorkflowRuntimeReadController(WorkflowRuntimeQueryService reads, WorkflowDefinitionService definitions, TaskTypeCatalogService catalog,
             WorkflowAuthorizedRuntimeReadService access, WorkflowRequestIdentity identity,
             WorkflowAssignmentDirectory directory, Clock clock,
             RuntimeWire wire, RuntimeErrors errors, boolean commandsAvailable) {
+        this(reads, definitions, catalog, access, identity, directory, clock, wire, errors, commandsAvailable,
+                new WorkflowTaskTokens(null));
+    }
+
+    public WorkflowRuntimeReadController(WorkflowRuntimeQueryService reads, WorkflowDefinitionService definitions,
+            TaskTypeCatalogService catalog, WorkflowAuthorizedRuntimeReadService access, WorkflowRequestIdentity identity,
+            WorkflowAssignmentDirectory directory, Clock clock, RuntimeWire wire, RuntimeErrors errors,
+            boolean commandsAvailable, WorkflowTaskTokens tokens) {
         this.reads = reads; this.definitions = definitions; this.access = access; this.wire = wire; this.errors = errors;
         this.commandsAvailable = commandsAvailable;
         this.catalog = catalog; this.identity = identity; this.directory = directory; this.clock = clock;
+        this.tokens = tokens;
     }
     @GetMapping("/instances/{id}/variables")
     public ResponseEntity<String> variables(@PathVariable String id,HttpServletRequest r) {
@@ -130,31 +144,30 @@ public class WorkflowRuntimeReadController {
     }
     @GetMapping("/instances/{id}/tasks")
     public ResponseEntity<String> tasks(@PathVariable String id, HttpServletRequest r) {
-        query(r, "afterId", "limit");
-        long key = decimal(id, false);
-
-        var page =
-                access.listInstanceTasks(requireActor(identity),
-                        key, after(r.getParameter("afterId")), limit(r.getParameter("limit")));
-        return wire.response(
-                taskPage(page));
+        query(r, "cursor", "limit");
+        long instanceId = decimal(id, false);
+        String actorRef = requireActor(identity);
+        long afterId = tokens.taskPageAfter("instance", r.getParameter("cursor"), actorRef, instanceId);
+        var page = access.listInstanceTasks(actorRef, instanceId, afterId, limit(r.getParameter("limit")));
+        var projection = projection(actorRef);
+        var items = page.items().stream().map(task -> projection.task(task, true)).toList();
+        return taskPage(items, page.nextAfterId(), "instance", actorRef, instanceId);
     }
     @GetMapping("/tasks/mine")
     public ResponseEntity<String> mine(HttpServletRequest r) {
-        query(r, "afterId", "limit");
-        var page =
-                access.listMyTasks(requireActor(identity),
-
-                        after(r.getParameter("afterId")),
-                        limit(r.getParameter("limit")));
-        return wire.response(
-                taskPage(page));
+        query(r, "cursor", "limit");
+        String actorRef = requireActor(identity);
+        long afterId = tokens.taskPageAfter("mine", r.getParameter("cursor"), actorRef, 0);
+        var page = access.listMyTasks(actorRef, afterId, limit(r.getParameter("limit")));
+        var projection = projection(actorRef);
+        var items = page.items().stream().map(task -> projection.task(task, true)).toList();
+        return taskPage(items, page.nextAfterId(), "mine", actorRef, 0);
     }
     @GetMapping("/tasks/administration")
     public ResponseEntity<String> administrationTasks(HttpServletRequest request) {
         String actorRef = requireActor(identity);
         access.requireTaskAdministrationAccess(actorRef);
-        query(request, "status", "taskType", "assignmentKind", "assignmentRef", "assigneeRef", "instanceId", "afterId", "limit", "taskName");
+        query(request, "status", "taskType", "assignmentKind", "assignmentRef", "assigneeRef", "instanceId", "cursor", "limit", "taskName");
         TaskStatus status = TaskStatus.OPEN;
         String requested = request.getParameter("status");
         if ("ALL".equals(requested)) status = null;
@@ -166,20 +179,16 @@ public class WorkflowRuntimeReadController {
         AssignmentTargetKind kind = kindValue == null ? null : assignmentKind(kindValue);
         String ref = filter(request, "assignmentRef", 200);
         if (ref != null && kind == null) throw WorkflowRuntimeException.invalid();
+        Long instanceId = request.getParameter("instanceId") == null
+                ? null : decimal(request.getParameter("instanceId"), false);
+        long scopeId = instanceId == null ? 0 : instanceId;
+        long afterId = tokens.taskPageAfter("administration", request.getParameter("cursor"), actorRef, scopeId);
         var page = access.listAdministrationTasks(actorRef, new WorkflowTaskAdministrationQuery(status,
-                filter(request, "taskType", 100), kind, ref, filter(request, "assigneeRef", 200),
-                request.getParameter("instanceId") == null ? null : decimal(request.getParameter("instanceId"), false),
-                after(request.getParameter("afterId")), limit(request.getParameter("limit")), filter(request, "taskName", 200)));
-        var items = page.items().stream().map(item -> {
-            var row = (com.fasterxml.jackson.databind.node.ObjectNode) wire.tree(wire.json(item.task()));
-            row.remove(java.util.List.of("outcomeKey", "closedBy", "closureReason"));
-            row.put("nodeName", item.nodeName());
-            row.put("taskType", item.taskTypeCode());
-            row.put("taskTypeName", item.taskTypeName());
-            row.put("assignmentLabel", assignmentLabel(item.task()));
-            return row;
-        }).toList();
-        return wire.response(wire.page(items, page.nextAfterId(), "nextAfterId", row -> Long.parseLong(row.path("id").asText())));
+                filter(request, "taskType", 100), kind, ref, filter(request, "assigneeRef", 200), instanceId,
+                afterId, limit(request.getParameter("limit")), filter(request, "taskName", 200)));
+        var projection = projection(actorRef);
+        var items = page.items().stream().map(item -> projection.administrationTask(item)).toList();
+        return taskPage(items, page.nextAfterId(), "administration", actorRef, scopeId);
     }
 
     @GetMapping("/tasks/{id}/reassignment-availability")
@@ -192,9 +201,16 @@ public class WorkflowRuntimeReadController {
         var instance = reads.findInstance(first.instanceId()).orElseThrow();
         var task = access.task(actorRef, taskId);
         var activity = reads.findActivity(task.activityId()).orElseThrow();
-        boolean allowed = task.status() == TaskStatus.OPEN && instance.status() == InstanceStatus.ACTIVE
+        boolean allowed = canReassign(actorRef, task, instance, activity);
+        return wire.response(allowed ? Map.of("allowed", true, "precondition",
+                tokens.precondition(actorRef, task.id(), instance.lockVersion())) : Map.of("allowed", false));
+    }
+
+    private boolean canReassign(String actorRef, WorkflowTaskView task,
+            io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView instance,
+            io.github.leontecristian.workflow.core.dto.runtime.WorkflowActivityView activity) {
+        return commandsAvailable && task.status() == TaskStatus.OPEN && instance.status() == InstanceStatus.ACTIVE
                 && activity.nodeKey().equals(instance.currentNodeKey()) && access.canReassignTask(actorRef, task);
-        return wire.response(Map.of("allowed", allowed, "instanceLockVersion", instance.lockVersion()));
     }
 
     @GetMapping("/tasks/{id}/reassignment-targets")
@@ -202,7 +218,8 @@ public class WorkflowRuntimeReadController {
         query(request, "kind", "query", "cursor", "limit");
         String actorRef = requireActor(identity);
         var task = access.task(actorRef, decimal(id, false));
-        if (!access.canReassignTask(actorRef, task)) throw new WorkflowRuntimeException(403, "REASSIGNMENT_FORBIDDEN");
+        if (!commandsAvailable || !access.canReassignTask(actorRef, task))
+            throw new WorkflowRuntimeException(403, "REASSIGNMENT_FORBIDDEN");
         var kind = assignmentKind(request.getParameter("kind"));
         String search = request.getParameter("query");
         if (search == null) search = "";
@@ -236,69 +253,52 @@ public class WorkflowRuntimeReadController {
         return value;
     }
     @GetMapping("/tasks/{id}")
-    public ResponseEntity<String> task(@PathVariable String id) {
-        return wire.response(new TaskLabels().project(access.task(requireActor(identity), decimal(id, false))));
+    public ResponseEntity<String> task(@PathVariable String id, HttpServletRequest request) {
+        query(request);
+        String actorRef = requireActor(identity);
+        return wire.response(projection(actorRef).task(access.task(actorRef, decimal(id, false)), false));
     }
 
-    private Map<String, Object> taskPage(io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage page) {
-        var labels = new TaskLabels();
-        return wire.page(page.items().stream().map(labels::project).toList(), page.nextAfterId(),
-                "nextAfterId", row -> Long.parseLong(row.path("id").asText()));
+    private ResponseEntity<String> taskPage(List<Map<String, Object>> items, Long nextAfterId, String list,
+            String actorRef, long scopeId) {
+        var result = wire.page(items, nextAfterId, "nextCursor", row -> (Long) row.get("id"));
+        if (result.get("nextCursor") instanceof Long position)
+            result.put("nextCursor", tokens.taskPageCursor(list, actorRef, scopeId, position));
+        return wire.response(result);
     }
 
-    /** Request-local lookups run only after the host has authorized the returned tasks. */
-    private final class TaskLabels {
-        private final Map<Long, String> activityNodes = new java.util.HashMap<>();
-        private final Map<Long, Long> instanceVersions = new java.util.HashMap<>();
-        private final Map<Long, String> taskTypeNames = new java.util.HashMap<>();
-        private final Map<Long, Map<String, com.fasterxml.jackson.databind.JsonNode>> versionNodes = new java.util.HashMap<>();
-
-        com.fasterxml.jackson.databind.node.ObjectNode project(WorkflowTaskView task) {
-            String nodeKey = activityNodes.computeIfAbsent(task.activityId(), id ->
-                    reads.findActivity(id).orElseThrow().nodeKey());
-            long versionId = instanceVersions.computeIfAbsent(task.instanceId(), id ->
-                    reads.findInstance(id).orElseThrow().definitionVersionId());
-            var nodes = versionNodes.computeIfAbsent(versionId, id -> {
-                var version = definitions.findVersion(id)
-                        .orElseThrow(() -> new IllegalStateException("Pinned definition missing"));
-                Map<String, com.fasterxml.jackson.databind.JsonNode> result = new java.util.HashMap<>();
-                for (var node : wire.tree(version.documentJson()).path("nodes"))
-                    result.put(node.path("key").asText(), node);
-                return result;
-            });
-            var node = nodes.get(nodeKey);
-            if (node == null) throw new IllegalStateException("Pinned human contract missing");
-            var result = (com.fasterxml.jackson.databind.node.ObjectNode) wire.tree(wire.json(task));
-            result.put("nodeName", node.path("name").asText(nodeKey));
-            result.put("taskType", node.path("taskType").asText());
-            result.put("taskTypeName", taskTypeNames.computeIfAbsent(task.taskTypeId(), id ->
-                    catalog.findById(id).orElseThrow(() -> new IllegalStateException("Task type missing")).name()));
-            return result;
-        }
+    private WorkflowTaskProjection projection(String actorRef) {
+        return new WorkflowTaskProjection(reads, access, definitions, catalog, directory, wire, actorRef);
     }
     @GetMapping("/tasks/{id}/submission")
     public ResponseEntity<String> submission(@PathVariable String id) {
         long key = decimal(id, false);
         String actorRef = requireActor(identity);
         var authorized = access.task(actorRef, key);
+        var projection = projection(actorRef);
         var submission = reads.findTaskSubmission(key).orElse(null);
         // Open-task ownership can grant a read before completion. Authorize the final task if
         // the submission became visible after the initial grant.
-        if (submission != null && authorized.status() != TaskStatus.COMPLETED
-                && access.task(actorRef, key).status() != TaskStatus.COMPLETED) {
-            throw new WorkflowRuntimeException(404, "NOT_FOUND");
+        if (submission != null && authorized.status() != TaskStatus.COMPLETED) {
+            authorized = access.task(actorRef, key);
+            if (authorized.status() != TaskStatus.COMPLETED)
+                throw new WorkflowRuntimeException(404, "NOT_FOUND");
         }
-        return wire.response(submission);
+        return wire.response(submission == null ? null : projection.submission(submission, authorized, false));
     }
     @GetMapping("/tasks/{id}/previous-decisions")
     public ResponseEntity<String> previousDecisions(@PathVariable String id, HttpServletRequest r) {
-        query(r, "afterSequence", "limit");
+        query(r, "cursor", "limit");
         long key = decimal(id, false);
-        long cursor = after(r.getParameter("afterSequence"));
+        String actorRef = requireActor(identity);
+        var receivingTask = access.task(actorRef, key);
+        long cursor = tokens.after(r.getParameter("cursor"), actorRef, key);
         long count = r.getParameter("limit") == null ? 20 : decimal(r.getParameter("limit"), false);
         if (count > 50) throw WorkflowRuntimeException.invalid();
-        access.task(requireActor(identity), key);
-        return wire.previousDecisionPage(reads.listPreviousDecisions(key, cursor, (int) count));
+        var projection = projection(actorRef);
+        return wire.previousDecisionPage(reads.listPreviousDecisions(key, cursor, (int) count),
+                decision -> projection.previousDecision(decision, receivingTask),
+                sequence -> tokens.continuation(actorRef, key, sequence));
     }
     @GetMapping("/tasks/{id}/contract")
     public ResponseEntity<String> contract(@PathVariable String id) {
@@ -311,39 +311,51 @@ public class WorkflowRuntimeReadController {
         var task = access.task(actorRef, taskId);
         var activity = reads.findActivity(task.activityId()).orElseThrow();
         var claimPolicy = reads.taskClaimPolicy(task.instanceId(), task.id());
-        var version =
-                definitions
-                        .findVersion(instance.definitionVersionId())
-                        .orElseThrow(() -> new IllegalStateException("Pinned definition missing"));
-        var nodes = wire.tree(version.documentJson()).get("nodes");
-        for (var node : nodes)
-            if (activity.nodeKey().equals(node.path("key").asText())) {
-                var outcomes = new java.util.ArrayList<WorkflowTaskContract.Outcome>();
-                for (var outcome : node.get("outcomes")) {
-                    outcomes.add(
-                            new WorkflowTaskContract.Outcome(
-                                    outcome.get("key").textValue(), outcome.get("label").textValue(), outcome.get("requiresComment").booleanValue()));
-                }
-                boolean open = task.status() == TaskStatus.OPEN;
-                boolean shared = task.assignment().kind() != AssignmentTargetKind.USER;
-                boolean assigned = task.assigneeRef() != null;
-                boolean canComplete = open && (!shared || assigned || claimPolicy == TaskClaimPolicy.OPTIONAL)
-                        && access.canCompleteTask(actorRef, task);
-                var resultContract = node.get("resultContract");
-                if (resultContract == null) resultContract = JsonNodeFactory.instance.objectNode().put("mode", "FORBIDDEN");
-                var inputs = new LinkedHashMap<String, WorkflowTaskContract.Input>();
-                reads.taskInputs(task.instanceId(), task.id()).forEach((key, value) ->
-                        inputs.put(key, new WorkflowTaskContract.Input(value.type(), wireValue(value))));
-                return wire.largeResponse(new WorkflowTaskContract(
-                        task.id(), task.instanceId(), instance.lockVersion(), node.get("taskType").textValue(),
-                        outcomes, canComplete, assignmentLabel(task), claimPolicy,
-                        commandsAvailable && open && shared && !assigned && access.canClaimTask(actorRef, task),
-                        commandsAvailable && open && shared && assigned && access.canReleaseTask(actorRef, task),
-                        commandsAvailable && open && shared && assigned && access.canAdministrativelyReleaseTask(actorRef, task),
-                        resultContract, inputs, new WorkflowTaskContract.PreviousDecisions(
-                                reads.previousDecisionsPolicy(taskId).mode().name())));
-            }
-        throw new IllegalStateException("Pinned human contract missing");
+        var projection = projection(actorRef);
+        var node = projection.node(task, instance.definitionVersionId(), activity.nodeKey());
+        var outcomes = new java.util.ArrayList<WorkflowTaskContract.Outcome>();
+        for (var outcome : node.path("outcomes")) {
+            outcomes.add(new WorkflowTaskContract.Outcome(outcome.path("key").textValue(),
+                    outcome.path("label").textValue(), outcome.path("requiresComment").asBoolean()));
+        }
+        boolean open = task.status() == TaskStatus.OPEN;
+        boolean shared = task.assignment().kind() != AssignmentTargetKind.USER;
+        boolean assigned = task.assigneeRef() != null;
+        boolean claimRequired = open && shared && !assigned && claimPolicy == TaskClaimPolicy.REQUIRED;
+        boolean active = commandsAvailable && open && instance.status() == InstanceStatus.ACTIVE
+                && activity.nodeKey().equals(instance.currentNodeKey());
+        boolean canComplete = active && !claimRequired && access.canCompleteTask(actorRef, task);
+        boolean canClaim = active && shared && !assigned && access.canClaimTask(actorRef, task);
+        boolean canRelease = active && shared && assigned && access.canReleaseTask(actorRef, task);
+        boolean canAdminRelease = active && shared && assigned && access.canAdministrativelyReleaseTask(actorRef, task);
+        boolean canReassign = active && access.canReassignTask(actorRef, task);
+        var resultContract = node.get("resultContract");
+        if (resultContract == null) resultContract = JsonNodeFactory.instance.objectNode().put("mode", "FORBIDDEN");
+        var inputs = new LinkedHashMap<String, WorkflowTaskContract.Input>();
+        reads.taskInputs(task.instanceId(), task.id()).forEach((key, value) ->
+                inputs.put(key, new WorkflowTaskContract.Input(value.type(), wireValue(value))));
+        String previousMode = reads.previousDecisionsPolicy(taskId).mode().name();
+        Map<String, Object> contract = new LinkedHashMap<>();
+        contract.put("task", projection.task(task, node, false));
+        contract.put("outcomes", outcomes.stream().map(outcome -> canComplete
+                ? Map.of("key", outcome.key(), "label", outcome.label(), "requiresComment", outcome.requiresComment())
+                : Map.of("label", outcome.label(), "requiresComment", outcome.requiresComment())).toList());
+        contract.put("canComplete", canComplete);
+        contract.put("canClaim", canClaim);
+        contract.put("canRelease", canRelease);
+        if (canAdminRelease) contract.put("canAdminRelease", true);
+        contract.put("claimRequired", claimRequired);
+        contract.put("inputs", inputs);
+        contract.put("previousDecisionsAvailable", !"NONE".equals(previousMode));
+        Map<String, Object> form = new LinkedHashMap<>();
+        form.put("mode", resultContract.path("mode").textValue());
+        if (canComplete && resultContract.has("schema")) form.put("form", WorkflowResultForm.fromSchema(resultContract.get("schema")));
+        contract.put("resultContract", form);
+        String type = node.path("taskType").textValue();
+        if (canComplete) contract.put("taskType", type);
+        if (canComplete || canClaim || canRelease || canAdminRelease || canReassign)
+            contract.put("precondition", tokens.precondition(actorRef, task.id(), instance.lockVersion()));
+        return wire.largeResponse(contract);
     }
     @GetMapping("/activities/{id}")
     public ResponseEntity<String> activity(@PathVariable String id) {
@@ -355,10 +367,14 @@ public class WorkflowRuntimeReadController {
         long key = decimal(id, false);
         String actorRef = requireActor(identity);
         access.activity(actorRef, key);
-        var page = visibleSubmissions(actorRef, key, after(r.getParameter("afterTaskId")), limit(r.getParameter("limit")));
-        return wire.submissionPage(page);
+        var visibleTasks = new LinkedHashMap<Long, WorkflowTaskView>();
+        var projection = projection(actorRef);
+        var page = visibleSubmissions(actorRef, key, after(r.getParameter("afterTaskId")), limit(r.getParameter("limit")),
+                visibleTasks);
+        return wire.submissionPage(page, submission -> projection.submission(submission, visibleTasks.get(submission.taskId()), true));
     }
-    private TaskSubmissionPage visibleSubmissions(String actorRef, long activityId, long after, int limit) {
+    private TaskSubmissionPage visibleSubmissions(String actorRef, long activityId, long after, int limit,
+            Map<Long, WorkflowTaskView> visibleTasks) {
         var visible = new java.util.ArrayList<TaskSubmission>();
         long cursor = after;
         int examined = 0;
@@ -369,7 +385,10 @@ public class WorkflowRuntimeReadController {
                 cursor = submission.taskId(); examined++;
                 var task = reads.findTask(submission.taskId())
                         .orElseThrow(() -> new IllegalStateException("Submission task missing"));
-                if (access.canReadTask(actorRef, task)) visible.add(submission);
+                if (access.canReadTask(actorRef, task)) {
+                    visible.add(submission);
+                    visibleTasks.put(task.id(), task);
+                }
                 if (visible.size() == limit || examined == 500) {
                     boolean more = index + 1 < page.items().size() || page.nextAfterTaskId() != null;
                     return new TaskSubmissionPage(visible, more ? cursor : null);
@@ -380,14 +399,6 @@ public class WorkflowRuntimeReadController {
             cursor = page.nextAfterTaskId();
         }
         return new TaskSubmissionPage(visible, cursor);
-    }
-    private String assignmentLabel(WorkflowTaskView task) {
-        String label;
-        try { label = directory.assignmentLabel(task); }
-        catch (RuntimeException unavailable) { label = null; }
-        if (label == null || label.isBlank() || !RuntimeWire.unicode(label) || label.length() > 200)
-            return task.assignment().ref();
-        return label;
     }
     @ExceptionHandler(Exception.class)
     public ResponseEntity<String> error(Exception failure, HttpServletRequest request) { return errors.error(failure, request); }

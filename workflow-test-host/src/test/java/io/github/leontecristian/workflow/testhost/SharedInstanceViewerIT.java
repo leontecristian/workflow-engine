@@ -60,7 +60,7 @@ import org.springframework.web.context.WebApplicationContext;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
-/** Four real read routes and the sandbox adapter, on the guarded test catalog only.
+/** Viewer routes and the sandbox adapter, on the guarded test catalog only.
  * Command calls below only prepare representative retained viewer state.
  */
 @SpringBootTest(classes = WorkflowTestHostApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -137,8 +137,9 @@ class SharedInstanceViewerIT extends CompletionAdapterIntegrationTest {
         for (String suffix : List.of("", "/history", "/history/1", "/graph")) {
             read(mvc, null, "/instances/" + sequential + suffix, 401);
             read(mvc, unrelated, "/instances/" + sequential + suffix, 404);
-            read(mvc, current, "/instances/" + sequential + suffix, 200);
-            read(mvc, historical, "/instances/" + sequential + suffix, 200);
+            int reviewerStatus = suffix.startsWith("/history") ? 404 : 200;
+            read(mvc, current, "/instances/" + sequential + suffix, reviewerStatus);
+            read(mvc, historical, "/instances/" + sequential + suffix, reviewerStatus);
         }
         var graph = json.readTree(read(mvc, admin, "/instances/" + sequential + "/graph", 200));
         assertThat(graph.path("instance").path("currentNodeKey").asText()).isEqualTo("PARTNER");
@@ -147,8 +148,56 @@ class SharedInstanceViewerIT extends CompletionAdapterIntegrationTest {
         read(mvc, admin, "/instances/" + sequential + "/history?afterSequence=" + history.path("nextAfterSequence").asText(), 200);
         var event = json.readTree(read(mvc, admin, "/instances/" + sequential + "/history/5", 200));
         assertThat(event.path("detailsJson").asText()).contains("9007199254740993", "12500.00");
+        assertThat(event.path("summary").path("actorRef").asText()).isEqualTo("f013-manager");
+        assertThat(read(mvc, historical, "/instances/" + sequential + "/history/5", 404))
+                .doesNotContain("Viewer fixture", "detailsJson", "f013-manager");
+        String business = "/instances/" + sequential + "/business-history";
+        for (String suffix : List.of("", "/1")) {
+            read(mvc, null, business + suffix, 401);
+            assertThat(read(mvc, unrelated, business + suffix, 404))
+                    .doesNotContain("Workflow started", "eventRef", "f013-manager");
+        }
+        String currentBody = read(mvc, current, business, 200);
+        // Instance visibility comes from assignment. The open partner task has no linked sandbox request.
+        assertThat(currentBody).contains("Workflow started", "Review opened")
+                .doesNotContain("Task opened", "Decision recorded", "historySequence", "commandId", "actorRef", "f013-manager");
+        assertThat(read(mvc, current, business + "/5", 404)).doesNotContain("Viewer fixture", "outcomeLabel", "detailsJson");
+        var businessPage = json.readTree(read(mvc, historical, business + "?limit=1", 200));
+        String cursor = businessPage.path("nextCursor").asText();
+        assertThat(cursor).matches("[A-Za-z0-9_-]{1,200}").doesNotMatch("[0-9]+");
+        assertThat(businessPage.has("nextAfterSequence")).isFalse();
+        var nextPage = json.readTree(read(mvc, historical, business + "?cursor=" + cursor, 200));
+        var decision = java.util.stream.StreamSupport.stream(nextPage.path("items").spliterator(), false)
+                .filter(item -> "Decision recorded".equals(item.path("label").asText())).findFirst().orElseThrow();
+        String eventRef = decision.path("eventRef").asText();
+        assertThat(decision.path("actorLabel").asText()).isEqualTo("You");
+        assertThat(eventRef).matches("[A-Za-z0-9_-]{1,200}").doesNotMatch("[0-9]+");
+        String eventBody = read(mvc, historical, business + "/" + eventRef, 200);
+        assertThat(eventBody).doesNotContain("detailsJson", "actorRef", "commandId", "correlationId",
+                "detailsSchemaVersion", "outcomeKey", "historySequence", "f013-manager");
+        var businessEvent = json.readTree(eventBody);
+        assertThat(businessEvent.path("summary").path("label").asText()).isEqualTo("Decision recorded");
+        assertThat(businessEvent.path("outcomeLabel").asText()).isEqualTo("Approve");
+        assertThat(businessEvent.path("comment").asText()).contains("Viewer fixture", "9007199254740993");
+        assertThat(businessEvent.path("taskId").asText()).isEqualTo(event.path("summary").path("taskId").asText());
+        assertThat(json.readTree(read(mvc, historical, business + "/5", 200)).path("comment"))
+                .isEqualTo(businessEvent.path("comment"));
+        read(mvc, current, business + "/" + eventRef, 404);
+        read(mvc, current, business + "?cursor=" + cursor, 400);
+        read(mvc, historical, business + "/" + cursor, 404);
+        read(mvc, historical, business + "?cursor=" + eventRef, 400);
+        read(mvc, historical, "/instances/" + optional + "/business-history/" + eventRef, 404);
+        read(mvc, historical, "/instances/" + optional + "/business-history?cursor=" + cursor, 400);
+        assertThat(read(mvc, admin, business + "/5", 200)).doesNotContain("detailsJson", "actorRef", "commandId");
         var skipped = json.readTree(read(mvc, admin, "/instances/" + optional + "/graph", 200));
         assertThat(skipped.path("instance").path("status").asText()).isEqualTo("COMPLETED");
+        String optionalBusiness = "/instances/" + optional + "/business-history";
+        var automatic = java.util.stream.StreamSupport.stream(
+                        json.readTree(read(mvc, historical, optionalBusiness, 200)).path("items").spliterator(), false)
+                .filter(item -> "Automatic step completed".equals(item.path("label").asText())).findFirst().orElseThrow();
+        String automaticBody = read(mvc, historical, optionalBusiness + "/" + automatic.path("eventRef").asText(), 200);
+        assertThat(json.readTree(automaticBody).path("stepName").asText()).isEqualTo("Record quantity");
+        assertThat(automaticBody).doesNotContain("f013.quantity", "\"nodeKey\"", "\"inputs\"", "\"outputs\"", "\"detailsJson\"");
         assertThat(reads.findInstance(sequential).orElseThrow()).isEqualTo(before);
         if (Boolean.getBoolean("f013.browserHold")) {
             Path local = repository().resolve(".local"); Files.createDirectories(local);

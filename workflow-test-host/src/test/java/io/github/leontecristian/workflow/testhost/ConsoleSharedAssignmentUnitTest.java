@@ -17,6 +17,7 @@ import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBus
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeAccess;
+import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleWorkflowAuthorization;
 import io.github.leontecristian.workflow.testhost.service.runtime.SandboxSharedAssignmentProvider;
 import java.time.Instant;
 import java.util.Optional;
@@ -44,7 +45,9 @@ class ConsoleSharedAssignmentUnitTest {
         when(context.actor()).thenReturn("first");
         var businessAccess = mock(ConsoleTaskBusinessAccess.class);
         when(businessAccess.canAccess(org.mockito.ArgumentMatchers.any())).thenReturn(true);
-        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), businessAccess);
+        var commandPolicy = mock(ConsoleWorkflowAuthorization.class);
+        when(commandPolicy.canDecide(any())).thenReturn(true);
+        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), businessAccess, commandPolicy);
         var open = task(TaskStatus.OPEN, null);
         when(reads.taskClaimPolicy(1, 5)).thenReturn(io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy.OPTIONAL);
         assertThat(access.canReadTask(open)).isTrue();
@@ -69,7 +72,7 @@ class ConsoleSharedAssignmentUnitTest {
         var context = mock(ConsoleContext.class);
         when(context.actor()).thenReturn("first");
         var businessAccess = mock(ConsoleTaskBusinessAccess.class);
-        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), businessAccess);
+        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), businessAccess, mock(ConsoleWorkflowAuthorization.class));
         var task = new WorkflowTaskView(5, 2, 1, 3, "REVIEW", SandboxSharedAssignmentProvider.FINANCE,
                 TaskStatus.OPEN, null, Instant.EPOCH, null, null, null, null, "first");
         when(businessAccess.canAccess(org.mockito.ArgumentMatchers.any())).thenReturn(true);
@@ -95,9 +98,11 @@ class ConsoleSharedAssignmentUnitTest {
     @Test void siblingCompletionDetailsRequireExactTaskAccessEvenWithInstanceHistoryAccess() {
         var reads=mock(WorkflowRuntimeQueryService.class);
         var access=mock(ConsoleRuntimeAccess.class);
-        var host=new io.github.leontecristian.workflow.testhost.service.runtime.ConsoleViewerAccess(access,reads);
+        var identity=mock(ConsoleContext.class);
+        var host=new io.github.leontecristian.workflow.testhost.service.runtime.ConsoleViewerAccess(access,reads,identity);
         var summary=mock(io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistorySummary.class);
         when(summary.instanceId()).thenReturn(1L);when(summary.eventType()).thenReturn("TASK_COMPLETED");when(summary.taskId()).thenReturn(5L);
+        when(identity.isConsoleAdministrator("second")).thenReturn(true);
         when(reads.findHistoryEvent(eq(1L),eq(9L),any())).thenReturn(Optional.of(new io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistoryEvent(summary,"{}")));
         when(access.task("second", 5)).thenThrow(io.github.leontecristian.workflow.testhost.exception.console.ConsoleException.missing());
         var viewer=new io.github.leontecristian.workflow.web.service.instance.WorkflowInstanceViewerService(reads,host,
@@ -116,7 +121,7 @@ class ConsoleSharedAssignmentUnitTest {
         when(context.actor()).thenReturn("first");
         var businessAccess = mock(ConsoleTaskBusinessAccess.class);
         when(businessAccess.canAccess(org.mockito.ArgumentMatchers.any())).thenReturn(true);
-        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), businessAccess);
+        var access = new ConsoleRuntimeAccess(reads, context, eligibility(provider), businessAccess, mock(ConsoleWorkflowAuthorization.class));
         assertThatThrownBy(() -> access.canReadTask(task(TaskStatus.OPEN, null)))
                 .isInstanceOfSatisfying(WorkflowExecutionException.class,
                         failure -> assertThat(failure.category()).isEqualTo(WorkflowExecutionException.Category.ASSIGNMENT_LOOKUP_FAILED));

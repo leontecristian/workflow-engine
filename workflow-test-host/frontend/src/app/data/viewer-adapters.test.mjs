@@ -8,12 +8,25 @@ function service(t,Type,providers){
   const injector=core.createEnvironmentInjector(providers,null);
   t.after(()=>injector.destroy());return core.runInInjectionContext(injector,()=>new Type());
 }
-test('read adapter exposes exactly the four paths with exact IDs and host cancellation',async t=>{
+test('read adapter keeps raw history paths for an administrator with exact IDs and host cancellation',async t=>{
   const calls=[];
-  const adapter=service(t,ConsoleViewerReads,[{provide:ConsoleSession,useValue:{viewerRead:async(...args)=>{calls.push(args);return {};}}}]);
+  const adapter=service(t,ConsoleViewerReads,[{provide:ConsoleSession,useValue:{admin:true,viewerRead:async(...args)=>{calls.push(args);return {};}}}]);
   const signal=new AbortController().signal,id='9007199254740993';
   await adapter.instance(id,signal);await adapter.history(id,'9007199254740995',100,signal);await adapter.historyEvent(id,'9007199254740995',signal);await adapter.graph(id,signal);
   assert.deepEqual(calls.map(c=>c[0]),['/instances/'+id,'/instances/'+id+'/history?afterSequence=9007199254740995&limit=100','/instances/'+id+'/history/9007199254740995','/instances/'+id+'/graph']);
+  assert.ok(calls.every(c=>c[1]===signal));
+});
+test('reviewer history uses business projections for paging, event references and old numeric bookmarks',async t=>{
+  const calls=[];
+  const adapter=service(t,ConsoleViewerReads,[{provide:ConsoleSession,useValue:{admin:false,viewerRead:async(...args)=>{calls.push(args);return {};}}}]);
+  const signal=new AbortController().signal;
+  const id='9007199254740993', cursor='a'.repeat(48), eventRef='b'.repeat(48);
+  const path='/instances/'+id+'/business-history';
+  await adapter.history(id,'0',10,signal);
+  await adapter.history(id,cursor,10,signal);
+  await adapter.historyEvent(id,eventRef,signal);
+  await adapter.historyEvent(id,'5',signal);
+  assert.deepEqual(calls.map(c=>c[0]),[path+'?limit=10',path+'?limit=10&cursor='+cursor,path+'/'+eventRef,path+'/5']);
   assert.ok(calls.every(c=>c[1]===signal));
 });
 test('sandbox read transport preserves exact details and invalidates sessions on 401',async t=>{
@@ -40,6 +53,7 @@ test('read failures normalize separately from command recovery and same-user log
 });
 test('navigation delegates exact viewer intents to existing sandbox destinations',t=>{
   const navigation=service(t,ConsoleViewerNavigation,[{provide:Router,useValue:{createUrlTree:parts=>parts}}]);
+  assert.deepEqual(Array.from(navigation.destination({kind:'history',instanceId:'9007199254740993'})),['/history','9007199254740993']);
   assert.deepEqual(Array.from(navigation.destination({kind:'event',instanceId:'9007199254740993',sequence:'9007199254740995'})),['/history-event','9007199254740993','9007199254740995']);
   assert.deepEqual(Array.from(navigation.destination({kind:'task',id:'9007199254740997'})),['/task','9007199254740997']);
   assert.deepEqual(Array.from(navigation.destination({kind:'activity',id:'9007199254740999'})),['/activity','9007199254740999']);

@@ -10,7 +10,7 @@ import type {WorkflowViewerReads, WorkflowViewerNavigation, ViewerDestination, I
 import { WORKFLOW_ADMINISTRATION_API } from '@workflow-engine/ui';
 import { WORKFLOW_RUNTIME_READS, WORKFLOW_RUNTIME_COMMANDS, WORKFLOW_CANCELLATION, WORKFLOW_TASK_REASSIGNMENT, CommandRecovery } from '@workflow-engine/ui';
 import type { WorkflowCancellation, CancellationResult, WorkflowReassignmentTargetPage } from '@workflow-engine/ui';
-import type { WorkflowRuntimeReads, WorkflowRuntimeCommands, TaskView, TaskContract, Envelope, CommandResult, ReplayResult, PreviousDecisionPage } from '@workflow-engine/ui';
+import type { WorkflowRuntimeReads, WorkflowRuntimeCommands, TaskView, TaskContract, Envelope, ActivityView, TaskCommandResult, TaskCommandReplay, PreviousDecisionPage } from '@workflow-engine/ui';
 import { WorkflowTaskAdministrationComponent, WorkflowTaskComponent, WorkflowCommandsComponent } from '@workflow-engine/ui/runtime';
 import { WorkflowDefinitionsComponent } from '@workflow-engine/ui/administration';
 import type { WorkflowAdministrationApi, AdministrationPage, DefinitionView } from '@workflow-engine/ui';
@@ -34,10 +34,8 @@ function cancellationFixture():WorkflowCancellation|null {
    const at='2026-11-14T12:00:00Z';
    Object.assign(instance,{status:'CANCELLED',endedAt:at,endedBy:'fixture-admin',terminationReason:envelope.body['reason'],lockVersion:'9007199254740994',lastHistorySequence:'7'});
    graph.nodes[1].state='CANCELLED';
-   Object.assign(fixtureTask,{status:'CANCELLED',closedAt:at,closedBy:'fixture-admin',closureReason:'INSTANCE_CANCELLED'});
-   fixtureContract.canComplete=false;
-   const {task,...execution}=fixtureResult(envelope).execution;
-   committed={replayed:false,execution:{...execution,operation:'CANCEL_WORKFLOW',instance:{...instance},activity:{...execution.activity,status:'CANCELLED',outcomeKey:null,closureReason:'INSTANCE_CANCELLED',closedBy:'fixture-admin',closedAt:at},cancelledTaskCount:1,firstHistorySequence:'5',lastHistorySequence:'7'}};
+   Object.assign(fixtureTask,{status:'CANCELLED',closedAt:at,closureLabel:'The workflow was cancelled.'});
+   committed={replayed:false,execution:{commandId:envelope.body['commandId']!,operation:'CANCEL_WORKFLOW',instance:{...instance},activity:{...fixtureActivity,status:'CANCELLED',outcomeKey:null,closureReason:'INSTANCE_CANCELLED',closedBy:'fixture-admin',closedAt:at},cancelledTaskCount:1,firstHistorySequence:'5',lastHistorySequence:'7'}};
    return committed;
   },
   replay:async()=>({found:!!committed,result:committed&&{...committed,replayed:true}}),
@@ -67,17 +65,16 @@ const evidenceEvents: HistoryEvent[] = [
         let body:unknown=instance;
         if(request.url==='/host-administration/definitions')body={items:[{id,key:'alternate-definition',name:'Host administration definition',description:null,createdAt:instance.startedAt,createdBy:'fixture',lockVersion:'9007199254740993'}],nextAfterId:null};
         else if(request.url==='/host-task/30')body=fixtureTask;
-        else if(request.url==='/host-task/30/contract')body=fixtureContract;
-        else if(request.url==='/host-task/30/submission')body=null;
+        else if(request.url==='/host-task/30/contract')body=fixtureContract();
+        else if(request.url==='/host-task/30/submission')body=fixtureSubmission;
         else if(request.url.startsWith('/host-task/30/previous-decisions'))body={
-          items:[{taskId:'9007199254740995',activityId:'10',historySequence:request.url.includes('afterSequence=9')?'12':'9',
-            nodeKey:'MANAGER',nodeName:'Manager <img src=x onerror=alert(1)>',outcomeKey:'APPROVE',outcomeLabel:'Approved',
-            actorKind:'USER',actorRef:'actual-manager',occurredAt:instance.startedAt,
-            comment:request.url.includes('afterSequence=9')?null:'  <script>alert("unsafe")</script>\n  Exact comment whitespace  '}],
-          nextAfterSequence:request.url.includes('afterSequence=9')?null:'9',
+          items:[{nodeName:'Manager <img src=x onerror=alert(1)>',outcomeLabel:'Approved',
+            actorLabel:'Fixture manager',occurredAt:instance.startedAt,
+            comment:request.url.includes('cursor=page-two')?null:'  <script>alert("unsafe")</script>\n  Exact comment whitespace  '}],
+          nextCursor:request.url.includes('cursor=page-two')?null:'page-two',
         };
-        else if(request.url==='/host-task/instance-tasks')body={items:[fixtureTask],nextAfterId:null};
-        else if(request.url.startsWith('/host-command/'))body=request.url.endsWith('/replay')?{found:false,result:null}:fixtureResult(request.body as Envelope);
+        else if(request.url==='/host-task/instance-tasks')body={items:[fixtureTask],nextCursor:null};
+        else if(request.url.startsWith('/host-command/'))body=request.url.endsWith('/replay')?{found:false,result:null}:completeFixture(request.body as Envelope);
         else if(request.url.endsWith('/graph'))body=graph;
         else if(request.url.includes('/history/'))body=namedOutputEvidence
           ? evidenceEvents.find(event=>request.url.endsWith('/'+event.summary.historySequence))
@@ -119,54 +116,73 @@ function administrationFixture(): WorkflowAdministrationApi {
 
 function reassignmentFixture(){
  if(!reassignmentEvidence)return null;
- let committed:CommandResult|null=null;
+ let committed:TaskCommandResult|null=null;
  return {
-  availability:async()=>({allowed:fixtureTask.status==='OPEN',instanceLockVersion:fixtureContract.instanceLockVersion}),
+  availability:async()=>({allowed:fixtureTask.status==='OPEN',precondition:fixtureContract().precondition}),
   targets:async(_id:string,kind:string,query:string):Promise<WorkflowReassignmentTargetPage>=>{if(taskLayoutEvidence && new URLSearchParams(location.search).has('delayedDestinationSearch'))await new Promise(resolve=>setTimeout(resolve,1800));return {items:[{ref:kind==='USER'?'new-reviewer':kind==='GROUP'?'Finance':'Approver',label:kind==='USER'?'New reviewer':kind==='GROUP'?'Finance reviewers':'Approver role'}].filter(row=>(row.ref+' '+row.label).toLowerCase().includes(query.toLowerCase())),nextCursor:null};},
   reassign:async(envelope:Envelope,replay:boolean)=>{
    if(replay)return {found:!!committed,result:committed&&{...committed,replayed:true}};
    const assignment={kind:envelope.body['assignmentKind'] as 'USER'|'GROUP'|'ROLE',ref:envelope.body['assignmentRef']!};
-   fixtureTask.assignment=assignment;fixtureTask.assigneeRef=assignment.kind==='USER'?assignment.ref:null;
-   fixtureContract.assignmentLabel=assignment.ref;fixtureContract.instanceLockVersion=String(BigInt(fixtureContract.instanceLockVersion)+1n);
-   committed={replayed:false,execution:{...fixtureResult(envelope).execution,operation:'REASSIGN_TASK',task:{...fixtureTask},instance:{...instance,lockVersion:fixtureContract.instanceLockVersion}}};
+   fixtureTarget=assignment;
+   fixtureTask.ownershipLabel=assignment.kind==='USER'?'Assigned to '+assignment.ref:undefined;
+   fixtureTask.assignmentLabel=assignment.kind==='USER'?undefined:assignment.ref;
+   fixtureVersion++;
+   committed={replayed:false,status:instance.status,taskStatus:fixtureTask.status};
    return committed;
   }
  };
 }
 const completedInputFixture = taskInputEvidence === 'completed' || previousDecisionEvidence === 'completed';
-const fixtureTask:TaskView={id:'30',instanceId:id,activityId:'20',taskTypeId:'1',taskKey:'REVIEW',assignment:{kind:'USER',ref:'fixture'},assigneeRef:'fixture',status:completedInputFixture?'COMPLETED':'OPEN',outcomeKey:completedInputFixture?'APPROVE':null,createdAt:instance.startedAt,dueAt:null,closedAt:completedInputFixture?instance.startedAt:null,closedBy:completedInputFixture?'fixture':null,closureReason:null};
-const fixtureContract:TaskContract={taskId:'30',instanceId:id,instanceLockVersion:instance.lockVersion,taskType:'REVIEW',claimPolicy:'OPTIONAL',canClaim:false,canRelease:false,canAdminRelease:false,canComplete:!completedInputFixture,assignmentLabel:'Fixture reviewer',outcomes:[{key:'APPROVE',label:'Host approve',requiresComment:true}],
-  previousDecisions:{mode:previousDecisionEvidence==='none' || !previousDecisionEvidence?'NONE':previousDecisionEvidence==='selected'?'SELECTED':'ALL_PREVIOUS'},
-  ...(taskInputEvidence && {
-    inputs:{
-      booking:{type:'JSON',valueJson:'{"amount":9007199254740993.00}'},
-      financeReview:{type:'JSON',valueJson:'{"approved":true}'},
-      dueOn:{type:'DATE',valueJson:'"2026-11-10"'},
-      note:{type:'STRING',valueJson:'null'},
-    },
-    resultContract:{mode:'REQUIRED',schema:{type:'object'}},
-  }),
-};
-if(taskLayoutEvidence){fixtureTask.assignment={kind:'USER',ref:'reviewer.'+'longreference'.repeat(14)};fixtureTask.assigneeRef=fixtureTask.assignment.ref;}
-function fixtureResult(envelope:Envelope):CommandResult{return {replayed:false,execution:{commandId:envelope.body['commandId']!,operation:'COMPLETE',instance,activity:{id:'20',instanceId:id,nodeKey:'REVIEW',activationSequence:'1',taskTypeId:'1',completionPolicy:'SINGLE',contributionOutcomeKey:null,requiredTaskCount:1,reviewRevisionRef:null,status:'COMPLETED',outcomeKey:'APPROVE',enteredAt:instance.startedAt,closedAt:instance.startedAt,closedBy:'fixture',closureReason:null},task:{...fixtureTask,status:'COMPLETED'},firstHistorySequence:'5',lastHistorySequence:'6'}};}
+const fixtureTask:TaskView={id:'30',nodeName:'Host assigned review',taskTypeName:'Review task',ownershipLabel:'Assigned to you',
+ status:completedInputFixture?'COMPLETED':'OPEN',closedAt:completedInputFixture?instance.startedAt:null};
+let fixtureVersion=1;
+let fixtureTarget={kind:'USER' as 'USER'|'GROUP'|'ROLE',ref:taskLayoutEvidence?'reviewer.'+'longreference'.repeat(14):'fixture'};
+let fixtureSubmission:{outcomeLabel:string;actorLabel:string;occurredAt:string;comment:string|null}|null=null;
+const fixtureActivity:ActivityView={id:'20',instanceId:id,nodeKey:'REVIEW',activationSequence:'1',taskTypeId:'1',completionPolicy:'SINGLE',contributionOutcomeKey:null,requiredTaskCount:1,reviewRevisionRef:null,status:'ACTIVE',outcomeKey:null,enteredAt:instance.startedAt,closedAt:null,closedBy:null,closureReason:null};
+function fixtureContract():TaskContract{
+ const {id:taskId,...task}=fixtureTask;
+ const open=task.status==='OPEN';
+ return {task,precondition:open?'fixture-version-'+fixtureVersion:undefined,
+  taskType:open?'REVIEW':undefined,claimRequired:false,canClaim:false,canRelease:false,canAdminRelease:false,canComplete:open,
+  outcomes:[{...(open?{key:'APPROVE'}:{}),label:'Host approve',requiresComment:true}],
+  previousDecisionsAvailable:!!previousDecisionEvidence && previousDecisionEvidence!=='none',
+  ...(taskInputEvidence&&{inputs:{
+   booking:{type:'JSON',valueJson:'{"amount":9007199254740993.00}'},
+   financeReview:{type:'JSON',valueJson:'{"approved":true}'},
+   dueOn:{type:'DATE',valueJson:'"2026-11-10"'},
+   note:{type:'STRING',valueJson:'null'},
+  },resultContract:{mode:'REQUIRED',form:{label:'Result',kind:'object',fields:[]}}}),
+ };
+}
+function completeFixture(envelope:Envelope):TaskCommandResult{
+ fixtureTask.status='COMPLETED';
+ fixtureTask.closedAt=instance.startedAt;
+ fixtureSubmission={outcomeLabel:'Host approve',actorLabel:'You',occurredAt:instance.startedAt,comment:envelope.body['comment']??null};
+ return {replayed:false,status:'COMPLETED',taskStatus:'COMPLETED'};
+}
+function administrationRow(taskId:string,instanceId:string,name:string,status:string,assignment=fixtureTarget){
+ return {...fixtureTask,id:taskId,nodeName:name,status,taskType:'REVIEW',instanceId,createdAt:instance.startedAt,
+  assignmentLabel:assignment.kind==='USER'?'Reviewer':assignment.ref,assignment,
+  assigneeRef:assignment.kind==='USER'?assignment.ref:null};
+}
 @Injectable() class RuntimeReads implements WorkflowRuntimeReads {
  private state=inject(FixtureState);
  administrationTasks(filters:{status:string;taskType?:string;taskName?:string;assignmentKind?:string;assignmentRef?:string;assigneeRef?:string;instanceId?:string},cursor?:string,limit=50,signal?:AbortSignal){
-  if(!taskLayoutEvidence)return Promise.resolve({items:filters.status==='OPEN'||filters.status==='ALL'?[{...fixtureTask,nodeName:'Finance review',taskType:'REVIEW',taskTypeName:'Review task'}, {...fixtureTask,id:'31',instanceId:'9007199254740994',assignment:{kind:'GROUP' as const,ref:'Finance'},assigneeRef:null,nodeName:'Another instance review',taskType:'REVIEW',taskTypeName:'Review task'}]:[{...fixtureTask,id:'32',status:filters.status,nodeName:'Closed review',taskType:'REVIEW',taskTypeName:'Review task'}],nextAfterId:null});
+  if(!taskLayoutEvidence)return Promise.resolve({items:filters.status==='OPEN'||filters.status==='ALL'?[administrationRow('30',id,'Finance review','OPEN'),administrationRow('31','9007199254740994','Another instance review','OPEN',{kind:'GROUP',ref:'Finance'})]:[administrationRow('32',id,'Closed review',filters.status)],nextCursor:null});
   const kinds=['USER','GROUP','ROLE'] as const;
   const rows=Array.from({length:55},(_,index)=>{
    const kind=kinds[index%3];const ref=index===0?'reviewer.'+'longreference'.repeat(14):kind==='USER'?'fixture':kind==='GROUP'?'Finance':'Approver';
-   return {...fixtureTask,id:String(BigInt(id)+BigInt(index+1)),instanceId:String(BigInt(id)+BigInt(Math.floor(index/20))),
-    assignment:{kind,ref},assigneeRef:kind==='USER'?ref:null,status:filters.status==='ALL'?'OPEN':filters.status,
-    nodeName:index===0?'Review the retained international request with a deliberately long descriptive task name that must wrap without changing table spacing':'Independent review '+(index+1),taskType:'REVIEW',taskTypeName:'Review task'};
+   return administrationRow(String(BigInt(id)+BigInt(index+1)),String(BigInt(id)+BigInt(Math.floor(index/20))),
+    index===0?'Review the retained international request with a deliberately long descriptive task name that must wrap without changing table spacing':'Independent review '+(index+1),
+    filters.status==='ALL'?'OPEN':filters.status,{kind,ref});
   }).filter(row=>(!filters.taskType||filters.taskType===row.taskType)&&(!filters.assignmentKind||filters.assignmentKind===row.assignment.kind)
     &&(!filters.assignmentRef||filters.assignmentRef===row.assignment.ref)&&(!filters.assigneeRef||filters.assigneeRef===row.assigneeRef)&&(!filters.instanceId||filters.instanceId===row.instanceId));
   const candidates=rows.filter(row=>!cursor||BigInt(row.id)>BigInt(cursor));const selected=candidates.slice(0,limit);
-  const nextAfterId=candidates.length>limit?selected[selected.length-1].id:null;
+  const nextCursor=candidates.length>limit?selected[selected.length-1].id:null;
   const items=this.state.mode==='layout-empty'&&!cursor?[]:selected.filter(row=>!filters.taskName||row.nodeName.toLowerCase().includes(filters.taskName.toLowerCase()));
-  return new Promise<{items:typeof rows;nextAfterId:string|null}>((resolve,reject)=>{
+  return new Promise<{items:typeof rows;nextCursor:string|null}>((resolve,reject)=>{
    const abort=()=>{clearTimeout(timer);reject(new DOMException('Aborted','AbortError'));};
-   const timer=setTimeout(()=>{signal?.removeEventListener('abort',abort);resolve({items,nextAfterId});},this.state.mode==='delayed'?1500:50);
+   const timer=setTimeout(()=>{signal?.removeEventListener('abort',abort);resolve({items,nextCursor});},this.state.mode==='delayed'?1500:50);
    if(signal?.aborted)abort();else signal?.addEventListener('abort',abort,{once:true});
   });
  }
@@ -174,15 +190,15 @@ function fixtureResult(envelope:Envelope):CommandResult{return {replayed:false,e
  private read<T>(path:string,signal:AbortSignal){return firstValueFrom(this.http.get<T>(path).pipe(takeUntil(fromEvent(signal,'abort'))));}
  task(_id:string,signal:AbortSignal){return this.read<TaskView>('/host-task/30',signal);}
  taskContract(_id:string,signal:AbortSignal){return this.read<TaskContract>('/host-task/30/contract',signal);}
- previousDecisions(_id:string,cursor:string|undefined,_limit:number,signal:AbortSignal){return this.read<PreviousDecisionPage>('/host-task/30/previous-decisions'+(cursor?'?afterSequence='+cursor:''),signal);}
+ previousDecisions(_id:string,cursor:string|undefined,_limit:number,signal:AbortSignal){return this.read<PreviousDecisionPage>('/host-task/30/previous-decisions'+(cursor?'?cursor='+cursor:''),signal);}
  taskSubmission(_id:string,signal:AbortSignal){return this.read<null>('/host-task/30/submission',signal);}
- instanceTasks(_id:string,_cursor:string|undefined,_limit:number,signal:AbortSignal){return this.read<{items:TaskView[];nextAfterId:null}>('/host-task/instance-tasks',signal);}
+ instanceTasks(_id:string,_cursor:string|undefined,_limit:number,signal:AbortSignal){return this.read<{items:TaskView[];nextCursor:null}>('/host-task/instance-tasks',signal);}
  listInstances():never{throw new Error('Outside fixture');}variables():never{throw new Error('Outside fixture');}assignedTasks():never{throw new Error('Outside fixture');}activity():never{throw new Error('Outside fixture');}submissions():never{throw new Error('Outside fixture');}
 }
 @Injectable() class RuntimeCommands implements WorkflowRuntimeCommands {
  private http=inject(HttpClient);
- complete(envelope:Envelope,signal:AbortSignal){return firstValueFrom(this.http.post<CommandResult>('/host-command/complete',envelope).pipe(takeUntil(fromEvent(signal,'abort'))));}
- replayComplete(envelope:Envelope,signal:AbortSignal){return firstValueFrom(this.http.post<ReplayResult>('/host-command/replay',envelope).pipe(takeUntil(fromEvent(signal,'abort'))));}
+ complete(envelope:Envelope,signal:AbortSignal){return firstValueFrom(this.http.post<TaskCommandResult>('/host-command/complete',envelope).pipe(takeUntil(fromEvent(signal,'abort'))));}
+ replayComplete(envelope:Envelope,signal:AbortSignal){return firstValueFrom(this.http.post<TaskCommandReplay>('/host-command/replay',envelope).pipe(takeUntil(fromEvent(signal,'abort'))));}
 }
 @Component({selector:'fixture-read-only-task',standalone:false,providers:[{provide:WORKFLOW_TASK_REASSIGNMENT,useValue:null},{provide:WORKFLOW_RUNTIME_COMMANDS,useValue:null},CommandRecovery],template:'<h2>Read-only consumer without commands</h2><workflow-task id="30" [sessionScope]="scope"/>'})
 class ReadOnlyTask {scope={};}

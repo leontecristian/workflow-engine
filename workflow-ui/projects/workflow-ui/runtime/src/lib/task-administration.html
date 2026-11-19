@@ -31,12 +31,12 @@
  }
  <div class="task-table-scroll"><table mat-table [dataSource]="rows()" class="task-table" aria-label="Task administration">
  <ng-container matColumnDef="id"><th mat-header-cell *matHeaderCellDef>ID</th><td mat-cell *matCellDef="let row"><a class="task-id" [routerLink]="link({kind:'task',id:row.id})">#{{row.id}}</a></td></ng-container>
- <ng-container matColumnDef="task"><th mat-header-cell *matHeaderCellDef>Task</th><td mat-cell *matCellDef="let row">{{row.nodeName || row.taskKey}}</td></ng-container>
- <ng-container matColumnDef="type"><th mat-header-cell *matHeaderCellDef>Type</th><td mat-cell *matCellDef="let row">{{row.taskTypeName || row.taskType}}</td></ng-container>
- <ng-container matColumnDef="instance"><th mat-header-cell *matHeaderCellDef>Instance</th><td mat-cell *matCellDef="let row">{{row.instanceId}}</td></ng-container>
+ <ng-container matColumnDef="task"><th mat-header-cell *matHeaderCellDef>Task</th><td mat-cell *matCellDef="let row">{{row.nodeName || row.taskTypeName || 'Task'}}</td></ng-container>
+ <ng-container matColumnDef="type"><th mat-header-cell *matHeaderCellDef>Type</th><td mat-cell *matCellDef="let row">{{row.taskTypeName}}</td></ng-container>
+ <ng-container matColumnDef="instance"><th mat-header-cell *matHeaderCellDef>Instance</th><td mat-cell *matCellDef="let row"><a class="task-id" [routerLink]="link({kind:'instance',instanceId:row.instanceId})" [attr.aria-label]="'Open instance '+row.instanceId">#{{row.instanceId}}</a></td></ng-container>
  <ng-container matColumnDef="status"><th mat-header-cell *matHeaderCellDef>Status</th><td mat-cell *matCellDef="let row"><console-status [value]="row.status" /></td></ng-container>
- <ng-container matColumnDef="assignment"><th mat-header-cell *matHeaderCellDef>Assignment</th><td mat-cell *matCellDef="let row">{{row.assignment.kind}}: {{row.assignmentLabel || row.assignment.ref}}</td></ng-container>
- <ng-container matColumnDef="assignee"><th mat-header-cell *matHeaderCellDef>Assignee</th><td mat-cell *matCellDef="let row">{{row.assigneeRef || 'Unassigned'}}</td></ng-container>
+ <ng-container matColumnDef="assignment"><th mat-header-cell *matHeaderCellDef>Assignment</th><td mat-cell *matCellDef="let row">{{row.assignmentLabel}}</td></ng-container>
+ <ng-container matColumnDef="assignee"><th mat-header-cell *matHeaderCellDef>Ownership</th><td mat-cell *matCellDef="let row">{{row.ownershipLabel}}</td></ng-container>
  <ng-container matColumnDef="created"><th mat-header-cell *matHeaderCellDef>Created</th><td mat-cell *matCellDef="let row">{{row.createdAt | date:'medium'}}</td></ng-container>
  <tr mat-header-row *matHeaderRowDef="['id','task','type','instance','status','assignment','assignee','created']"></tr><tr mat-row *matRowDef="let row;columns:['id','task','type','instance','status','assignment','assignee','created']"></tr>
  </table></div>

@@ -1,1 +1,37 @@
-<workflow-task [sessionScope]="session.viewerScope()" [id]="id" [diagnosticsEnabled]="true" />
+<workflow-task [sessionScope]="session.viewerScope()" [id]="id()" />
+
+@if(inspectionScope()){
+  @let state = inspection();
+  <details #disclosure [open]="state.open" (toggle)="toggleInspection(disclosure.open)">
+    <summary>Technical details</summary>
+    @if(state.loading){
+      <p role="status">Loading technical details…</p>
+    } @else if(state.failed){
+      <p role="alert">Technical details could not be loaded.</p>
+      <button mat-button type="button" (click)="loadInspection()">Retry technical details</button>
+    }
+    @if(state.data; as technical){
+      <div class="inspection-links">
+        <a mat-button [routerLink]="['/instance', technical.task.instanceId]">Instance #{{technical.task.instanceId}}</a>
+        <a mat-button [routerLink]="['/activity', technical.task.activityId]">Activity #{{technical.task.activityId}}</a>
+      </div>
+      <h3>Exact task record</h3>
+      <pre>{{diagnosticText(technical.taskJson)}}</pre>
+      <h3>Pinned completion contract</h3>
+      @if(state.precondition; as precondition){
+        <p>Version precondition <code>{{precondition}}</code></p>
+      }
+      <pre>{{diagnosticText(technical.contractJson)}}</pre>
+      @if(technical.submissionJson; as submissionJson){
+        <h3>Exact accepted submission</h3>
+        <pre>{{diagnosticText(submissionJson)}}</pre>
+      }
+      @if(technical.resultJson !== undefined){
+        <button mat-button type="button" (click)="downloadResult(technical.resultJson, 'task-result.json')">Download result JSON</button>
+      }
+      @if(hasTaskCommand){
+        <a mat-button routerLink="/commands">Command recovery</a>
+      }
+    }
+  </details>
+}

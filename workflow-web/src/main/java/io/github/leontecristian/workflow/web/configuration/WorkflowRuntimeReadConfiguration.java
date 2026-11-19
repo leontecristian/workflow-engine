@@ -13,12 +13,15 @@ import io.github.leontecristian.workflow.web.integration.WorkflowRequestIdentity
 import io.github.leontecristian.workflow.web.integration.runtime.WorkflowAssignmentDirectory;
 import io.github.leontecristian.workflow.web.service.runtime.RuntimeErrors;
 import io.github.leontecristian.workflow.web.service.runtime.RuntimeWire;
+import io.github.leontecristian.workflow.web.service.runtime.WorkflowTaskTokens;
 import java.time.Clock;
 import java.util.Map;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 /** Plain explicit import: dependency/scanning alone activates no routes. */
+@Import(WorkflowTaskTokenConfiguration.class)
 public class WorkflowRuntimeReadConfiguration {
     @Bean public WorkflowAuthorizedRuntimeReadService workflowAuthorizedRuntimeReadService(
             WorkflowRuntimeQueryService reads, WorkflowRuntimeReadAuthorization policy,
@@ -30,12 +33,12 @@ public class WorkflowRuntimeReadConfiguration {
             ObjectProvider<Clock> clock,
             WorkflowRuntimeOptions options, WorkflowRuntimeQueryService reads, WorkflowDefinitionService definitions,
             TaskTypeCatalogService catalog,
-            ObjectProvider<WorkflowRuntimeCommandController> commands) {
+            ObjectProvider<WorkflowRuntimeCommandController> commands, WorkflowTaskTokens tokens) {
         var wire = new RuntimeWire();
         return new WorkflowRuntimeReadController(reads, definitions, catalog, readsAccess, identity,
                 directory.getIfAvailable(() -> new WorkflowAssignmentDirectory() {}), clock.getIfAvailable(),
                 wire, new RuntimeErrors(wire, options),
-                commands.getIfAvailable() != null);
+                commands.getIfAvailable() != null, tokens);
     }
     @Bean public RequestMappingHandlerMapping workflowRuntimeReadHandlerMapping(WorkflowRuntimeOptions options) {
         var mapping = new RequestMappingHandlerMapping() {

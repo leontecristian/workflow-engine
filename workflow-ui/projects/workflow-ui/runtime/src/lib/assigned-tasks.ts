@@ -24,7 +24,7 @@ export class WorkflowAssignedTasksComponent extends RuntimeState {
       const p = await this.api.assignedTasks(cursor, this.pageSize,signal);
       if(!current())return;
       this.rows.set(p.items);
-      this.next = p.nextAfterId;
+      this.next = p.nextCursor;
     });
   }
   nextPage() {
