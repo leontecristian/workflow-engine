@@ -20,6 +20,16 @@ The notes record Spring Boot 3.4.5 and specific dependency versions. These remai
 
 ## Agreed workflow integration direction
 
+### APOLO source findings (2026-11-19)
+
+APOLO revision `0a4ce46f7` declares Spring Boot 3.4.5 and Java 17. The backend WAR consumes the frontend JAR. The Angular 19 NgModule shell owns routing and Keycloak session handling. Its schedule route uses the optional ID as a project or people filter. A shared Task page needs a host route and an authorized link to the booking. The combined WAR dependency graph, including Jackson and Hibernate, and the Angular package build remain unverified.
+
+`LiquibaseConfig` runs the host master against its injected datasource when enabled. The integration still needs to verify discovery of both sets of entities and repositories and rollback of booking and workflow writes in one transaction. Existing booking mutations publish JMS through `BookingEventHandler`. The checked-in `ArtemisJmsConfig` disables embedded broker persistence, so this source path alone does not establish durable workflow handoff.
+
+Calendar edits, transfers, recurrence, planning updates and imports can write bookings through different services. For example, `BookingTransferService` checks project permissions and calls a lower-level booking update, while `LeaveImportBookingV2Service` has dedicated update and delete paths. A calendar-only check would leave other writers outside the [proposed booking edit rule](booking-business-analysis.md#booking-edits-during-cross-team-approval).
+
+### Library integration
+
 The [standalone Maven reactor](../../../pom.xml) contains three modules. `workflow-core` supplies the Spring/JPA engine, `workflow-web` supplies the optional HTTP adapter, and `workflow-test-host` is the executable sandbox. The Angular 19 [workflow-ui library](../../../workflow-ui/README.md) builds separately. APOLO will consume web/core in backend and UI in its existing frontend, with business orchestration and contextual authorization owned by APOLO. Core's eventual source integration remains agreed; exact locations/coordinates for the added libraries remain OPEN. Internal packages still replace separate expression, persistence and starter artifacts.
 
 The supplied backend POM represents a large host application with many infrastructure dependencies; it must not become core's parent or dependency. Future inheritance from APOLO's root parent is intended, subject to reviewing its effective dependency/plugin configuration. Core declares its own required libraries, has no backend implementation or test-host dependency, and keeps host integration contracts free of JPA entities and security/messaging-provider types. Share versions through root dependency management without pulling backend-only infrastructure into core. APOLO supplies runtime infrastructure and business extensions.

@@ -224,6 +224,8 @@ The library owns neutral workflow/task event meaning and authoritative task hist
 
 ### First APOLO integration
 
+The [booking edit proposal and open planning conflict](booking-business-analysis.md#booking-edits-during-cross-team-approval) record two decisions for the first scenario. Read-only behavior after a booking’s own submission is proposed. The interaction with budget-wide planning approval remains open.
+
 1. Deliver one cross-team booking approval through an APOLO-owned booking endpoint.
 2. APOLO supplies the scenario's business rules, assignment mapping and supported task types.
 3. Verify host authorization, no self-approval, audited administrative changes, material-change review invalidation and shared-transaction rollback.

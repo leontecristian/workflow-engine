@@ -1,6 +1,6 @@
 # Workflow management — APOLO business analysis
 
-> **Updated 2026-10-25.** This document records APOLO-owned business requirements and their decision status. It does not define generic engine behavior. Read the [consolidated design](../../architecture/workflow-engine-design.md) with the subsequent selected changes in [database design v1.4](../../architecture/workflow-engine-database-design.md); older engine examples do not override those decisions.
+> **Updated 2026-11-19.** This document records APOLO-owned business requirements and their decision status. It does not define generic engine behavior. Read the [consolidated design](../../architecture/workflow-engine-design.md) with the subsequent selected changes in [database design v1.4](../../architecture/workflow-engine-database-design.md); older engine examples do not override those decisions.
 
 ## Agreed delivery and ownership
 
@@ -52,6 +52,16 @@ Rejecting an approval rolls back that command; an invalidation marker written in
 Preserve the full old basis, its identity and its links to decisions for the required audit/recovery period. If a new attempt reuses the instance and variable key, retain the old value in immutable evidence before replacement and keep an unambiguous attempt-to-evidence reference; the current variable row alone cannot preserve earlier attempts. Engine variable-write history may supply that evidence within its limits, or APOLO may use another immutable host record. The exact mechanism, retention and same-instance resubmission remain feature decisions. No booking-snapshot entity, write-once variable primitive or business-specific mismatch outcome is added to the engine.
 
 **Required APOLO feature decisions:** protected fields and related records, baseline schema/identity, guard coverage and controlled write paths, concurrency protocol, comparison/eligibility rules, durable mismatch handling, correction/resubmission route and historical-basis retention. This policy does not choose these implementation details or claim that protection is already implemented.
+
+## Booking edits during cross-team approval
+
+**Observed in APOLO at `0a4ce46f7` (source review, 2026-11-19).** The checked-in budget and planning action configuration grants ordinary edits in Draft and Rejected. At runtime the available actions depend on status, business domain and the actor’s permissions. Specific exceptions exist for budget overruns and planning confirmations. See `approval_flow.sql`, `BudgetService.validateBudgetBaseDataUpdate` and `BudgetPlanningService.checkEmployeeActionIsEditOrApprove`. Effective deployment settings were not inspected.
+
+Planning submission moves draft or unclassified phases to `SENT` when it enters a sent stage. With phase-level status enabled, checked calendar writes on a non-draft phase require the global `BUDGET_PLANNING_APPROVED/ADD_EDIT` privilege. The scheduler checks phase and country when deciding whether to lock an appointment. The booking’s own `Sent` status also occurs through planning propagation and leave import. It does not establish that an individual booking was submitted for cross-team approval. See `BudgetPlanningService.sendToApproval`, `BookingService.checkApprovedPhasePermission`, `SfScheduleRenderingService.isEventLocked`, `BookingStatusMapper` and `LeaveImportBookingV2Service.determineBookingStatusId`.
+
+**PROPOSED — read-only after booking submission.** Once submission succeeds for a cross-team approval, the booking and its daily allocations would be read-only for ordinary edits for as long as that booking’s own approval attempt is pending. APOLO would enforce the rule on the server and explain it in the calendar. Edit, delete, split, transfer, recurrence, bulk operations and applicable background writers would preserve the submitted work. Authorized reviewers could still record decisions and comments. Recall and any privileged correction route require separate decisions. The agreed approval-basis protections above continue to apply.
+
+**OPEN — budget-wide planning approval.** Planning transitions call `BookingService.updateBookingStatus`, which selects bookings across the budget, applies the mapped status and recalculates availability for status changes. If a selected booking has a pending cross-team approval, APOLO still needs to decide what happens to the planning transition, the booking status and its availability. No precedence or conflict behavior has been selected.
 
 ## Overbooking — DEFERRED, APOLO-owned
 
