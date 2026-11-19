@@ -54,7 +54,7 @@ Revision 1.5 reconciles the body with migrations 001–006 and delivered contrac
 
 **Physical choices and verification.** The nine-table schema, collations, constraints and numeric JPA mapping are implemented. Feature records identify scoped SQL Server evidence for early writes, flush ordering, final version capture and shared transactions; this document does not replace that evidence or close historical gaps. APOLO's effective database/JPA compatibility and production acceptance remain separate integration gates under O7.
 
-The initial design excludes graph-level parallel branches, ANY and QUORUM policies, weighted voting, optional participants, changing the task roster after activation, general reassignment and delegation, timers, external workers, live migration, and the optional business decision engine. Unsupported policies must fail validation. A task due date is metadata only.
+The initial design excludes graph-level parallel branches, ANY and QUORUM policies, weighted voting, optional participants, changing the task roster after activation, delegation, timers, external workers, live migration, and the optional business decision engine. Unsupported policies must fail validation. A task due date is metadata only.
 
 This document specifies persistence; it does not introduce another datasource, transaction manager, migration runner, or workflow service deployment. Core owns its schema resources. The test host runs them locally; APOLO includes the same resources through its existing Liquibase master.
 
@@ -62,7 +62,7 @@ This document specifies persistence; it does not introduce another datasource, t
 
 - An instance pins exactly one workflow definition version for its lifetime.
 - At a committed waiting position, an ACTIVE instance has one ACTIVE human-task activity and at least one OPEN task within that activity. Previously completed contributions may coexist with those open tasks.
-- An activity's task membership and required task count are fixed at activation. Claim/release changes shared-task ownership without changing the original target or membership. General audited reassignment remains deferred.
+- An activity's task membership and required task count are fixed at activation. Claim/release changes shared-task ownership without changing the effective target or roster. F026 allows authorized reassignment of an OPEN task within that fixed roster.
 - The schema can retain repeated activations with distinct identities; current executable definitions are acyclic. Re-entry remains broader design.
 - Every task in an activity inherits the same catalog type through the activity. Its outcomes, input bindings and result contract come from that activity's node in the instance's pinned workflow definition. Each task has a stable key unique within its activity.
 - A terminal instance has no active activity and no open tasks. Reaching END with result REJECTED is normal workflow completion.
@@ -138,9 +138,9 @@ At node entry, the host assignment resolver returns a nonempty bounded collectio
 
 The initial activity uses one task type resolved from the pinned node's stable `taskType` code. All task slots are required; there is no optional flag and no denominator that shrinks when a task is cancelled. `required_task_count` records the frozen count and must equal the number of task rows for the activity.
 
-Task keys identify obligations, not people. The schema deliberately does not make assignees unique within an activity. A host may require distinct assignees or distinct actual decision makers for a particular approval process; it must enforce that rule at assignment and completion and preserve it in any future reassignment/override contract. ALL means all required work items have contributed. It does not by itself prove that different people made the decisions.
+Task keys identify obligations, not people. The schema deliberately does not make assignees unique within an activity. A host may require distinct assignees or distinct actual decision makers for a particular approval process; it must enforce that rule at assignment and completion and preserve it when validating a reassignment destination or authorizing an override. ALL means all required work items have contributed. It does not by itself prove that different people made the decisions.
 
-The original assignment target remains stable. F017 claim/release sets or clears the responsible individual on OPEN shared tasks without changing id, activity_id, task_key or roster membership. Direct USER tasks need no claim action. General audited reassignment remains deferred; its broader design preserves identity and evidence. Adding, deleting, waiving or individually cancelling a required task while its activity remains active is unsupported.
+TASK_CREATED retains the original assignment target. F017 claim/release sets or clears the responsible individual on OPEN shared tasks without changing id, activity_id, task_key or roster membership. Direct USER tasks need no claim action. [F026 reassignment](../features/F026-task-administration-reassignment/spec.md) updates the effective target and records TASK_REASSIGNED while preserving the task and its frozen inputs. Adding, deleting, waiving or individually cancelling a required task while its activity remains active is unsupported.
 
 ### 4.2 Initial completion policies
 
@@ -387,7 +387,7 @@ Physical table: `wf.workflow_instance`. This row is the serialization boundary f
 
 ACTIVE requires null result_key, ended_at, ended_by and termination_reason. COMPLETED requires result_key and end actor/time, with null termination_reason. CANCELLED requires end actor/time and termination_reason, with null result_key. A normal END result named CANCELLED still uses lifecycle COMPLETED; administrative cancellation is a different operation.
 
-Enforce ended_at >= started_at when ended_at is present, and last_history_sequence >= 0. An ACTIVE committed waiting instance is at a HUMAN_TASK node with exactly one active activity. Although the storage shape can represent automatic-only completion, the current graph subset requires at least one human stage on every START-to-END path. Administrative cancellation is a stored lifecycle shape, not a delivered general cancellation command. Temporary automatic-node positions exist only inside the transaction.
+Enforce ended_at >= started_at when ended_at is present, and last_history_sequence >= 0. An ACTIVE committed waiting instance is at a HUMAN_TASK node with exactly one active activity. Although the storage shape can represent automatic-only completion, the current graph subset requires at least one human stage on every START-to-END path. [F025 cancellation](../features/F025-workflow-cancellation/spec.md) closes the waiting instance, its active human activity and the activity’s OPEN tasks atomically. Temporary automatic-node positions exist only inside the transaction.
 
 No current_activity_id pointer is stored; the filtered active-activity index provides that lookup and avoids a circular FK. current_node_key must agree with the active activity's node when waiting. It is validated against the pinned JSON; a database FK cannot enforce that relationship without a graph projection.
 
@@ -444,7 +444,7 @@ Unique constraints: (instance_id, activation_sequence) and (instance_id, id). Th
 
 SINGLE requires required_task_count = 1 and a null contribution_outcome_key. ALL requires a non-null contribution_outcome_key. The engine validates the contribution key and completed aggregate outcome against this activation's human node in the pinned definition. There are no outcome FKs: their authority is immutable JSON, not the catalog. Validate that the resolved catalog code agrees with that node's taskType at activation.
 
-ACTIVE requires no outcome or closure fields. COMPLETED requires outcome_key, closed_at, closed_by and closure_reason. CANCELLED requires closure fields and a null outcome_key. Require closed_at >= entered_at. Current SINGLE/ALL completion writes closure_reason = TASK_OUTCOME, also recorded with outcomeKey in ACTIVITY_COMPLETED. The earlier SINGLE_TASK_COMPLETED, ALL_TASKS_CONTRIBUTED and DECISIVE_OUTCOME categories were proposals, not delivered values. Administrative cancellation/supersession reasons remain future operation scope.
+ACTIVE requires no outcome or closure fields. COMPLETED requires outcome_key, closed_at, closed_by and closure_reason. CANCELLED requires closure fields and a null outcome_key. Require closed_at >= entered_at. Current SINGLE/ALL completion writes closure_reason = TASK_OUTCOME, also recorded with outcomeKey in ACTIVITY_COMPLETED. The earlier SINGLE_TASK_COMPLETED, ALL_TASKS_CONTRIBUTED and DECISIVE_OUTCOME categories were proposals, not delivered values. Whole-instance cancellation sets the activity closure reason to INSTANCE_CANCELLED. Supersession remains separate scope.
 
 Identity, node, task type, policy, contribution key, review reference and required count are immutable after activation. The policy fields are a runtime copy of the pinned node's contract; they cannot be edited independently. There is no approved_count or rejected_count cache. Derive completion from task rows while holding the instance claim.
 
@@ -463,8 +463,8 @@ Physical table: `wf.workflow_task`. There are multiple task rows per activity. T
 | `id` | BIGINT IDENTITY | N | Primary key and exact completion target. |
 | `activity_id` | BIGINT | N | Parent activity. |
 | `task_key` | key | N | Stable slot/obligation key within that activity. |
-| `assignment_kind` | VARCHAR(5) | N | Stable original target kind: USER, GROUP or ROLE. |
-| `assignment_ref` | ref | N | Stable original assignment target reference. |
+| `assignment_kind` | VARCHAR(5) | N | Effective target kind (USER, GROUP or ROLE). |
+| `assignment_ref` | ref | N | Effective assignment target reference. |
 | `assignee_ref` | ref | Y | Responsible individual: initialized for new USER tasks, or set by a shared-task claim. |
 | `status` | VARCHAR(12) | N | OPEN, COMPLETED or CANCELLED. |
 | `outcome_key` | key | Y | Submitted task outcome; populated only for COMPLETED. |
@@ -486,7 +486,7 @@ Completion commands identify the exact task, outcomeKey, expected instance versi
 
 Task evidence and comments are persisted in history, without a new task result/input column. F016 migration 004 replaced assigned_user_ref with the preserving USER assignment backfill. F017 migration 005 added assignee_ref and backfilled only OPEN USER tasks: historical closed USER rows may retain null ownership. New USER tasks initialize their owner from assignment_ref; shared tasks start unclaimed.
 
-With OPTIONAL claim policy, an eligible member may complete an unclaimed shared task; REQUIRED needs a claim first. A claimed task requires its current eligible owner for completion. Owner release requires host business access but no reason and remains possible after membership loss; administrator release requires authorization and a recorded reason. USER tasks reject claim/release. Administrative release does not authorize completion on another person's behalf; general completion overrides/reassignment remain deferred.
+With OPTIONAL claim policy, an eligible member may complete an unclaimed shared task; REQUIRED needs a claim first. A claimed task requires its current eligible owner for completion. Owner release requires host business access but no reason and remains possible after membership loss; administrator release requires authorization and a recorded reason. USER tasks reject claim/release. Administrative release does not authorize completion on another person's behalf; F026 requires separate permission to reassign an OPEN task. General completion overrides remain deferred.
 
 ### 11.1 Structured completion and result retrieval
 
@@ -622,7 +622,7 @@ Composite FK (instance_id, activity_id) references activity(instance_id, id). Co
 
 command_id is a correlation value, not an FK to command_receipt. This preserves the documented write order and allows receipt retention to differ from history retention. Atomic persistence still requires every successful command's applicable history and receipt to commit together. There is no reverse receipt-to-history FK cycle.
 
-Delivered event categories include INSTANCE_STARTED, ACTIVITY_ENTERED, TASK_CREATED, TASK_COMPLETED, TASK_CANCELLED, ACTIVITY_COMPLETED, TRANSITION_TAKEN, SERVICE_TASK_COMPLETED, GATEWAY_ROUTED, VARIABLES_WRITTEN and INSTANCE_COMPLETED. F017 adds TASK_CLAIMED/TASK_RELEASED; F021 adds ACTIVITY_INPUTS_CAPTURED for shared nonempty inputs. Earlier names ACTIVITY_OPENED, SERVICE_EXECUTED and ROUTING_EVALUATED were proposals, not aliases. General reassignment, cancellation and supersession events remain future operation scope.
+Delivered event categories include INSTANCE_STARTED, ACTIVITY_ENTERED, TASK_CREATED, TASK_COMPLETED, TASK_CANCELLED, ACTIVITY_COMPLETED, TRANSITION_TAKEN, SERVICE_TASK_COMPLETED, GATEWAY_ROUTED, VARIABLES_WRITTEN and INSTANCE_COMPLETED. F017 adds TASK_CLAIMED/TASK_RELEASED; F021 adds ACTIVITY_INPUTS_CAPTURED for shared nonempty inputs. Earlier names ACTIVITY_OPENED, SERVICE_EXECUTED and ROUTING_EVALUATED were proposals, not aliases. F025 records TASK_CANCELLED for each newly cancelled task, followed by ACTIVITY_CANCELLED and INSTANCE_CANCELLED. F026 records TASK_REASSIGNED. Supersession events remain deferred.
 
 Evidence is event-specific: assignment target/claim ownership and release reason; accepted outcome/comment/result; captured typed inputs and references; pinned policy and frozen roster; cancellation cause; service inputs/outputs and variable-write provenance; evaluated routing paths/values; and the opaque host review reference. ACTIVITY_COMPLETED contains outcomeKey and closureReason = TASK_OUTCOME, not duplicate submissions or an aggregate result array. F021 reconstructs original ALL collections from accepted task evidence. Record required bounded evidence, not full host entities or security/context objects.
 
@@ -663,7 +663,7 @@ For completion, the fingerprint includes the entire structured result; changing 
 
 The delivered WorkflowExecutionResult contains commandId, operation, instance/activity/task snapshots, and first/last history sequence bounds. Completion identifies the submitted task and its owning activity, even if the instance now waits at a successor; a nonfinal ALL result retains that activity as ACTIVE. Start identifies the entered activity and its task-key-first representative task. Current work is discovered through authorized reads, not a proposed createdTaskIds array or transitionTaken flag. The instance snapshot retains the actual managed lockVersion after final flush, exactly encoded; replay may show an older version than current state.
 
-Runtime request fingerprints use wf-runtime-request-v3 for no-result commands and wf-runtime-request-v4 for result-bearing completion. F021 writes receipt result schema v6 for ALL; SINGLE continues v5 with supported earlier readers retained. These versions differ from definition canonicalization and history detail versions. Claim/release/admin-release are also successful receipt-backed operations; general cancellation/reassignment/variable-only commands remain deferred.
+Runtime request fingerprints use wf-runtime-request-v3 for no-result commands and wf-runtime-request-v4 for result-bearing completion. F021 writes receipt result schema v6 for ALL; SINGLE continues v5 with supported earlier readers retained. These versions differ from definition canonicalization and history detail versions. Claim/release/admin-release also use receipts. F025 cancellation uses result schema v7 and F026 reassignment uses v8. A standalone variable-update command remains deferred.
 
 Do not reconstruct the old result from today's mutable instance. Reauthorize access to the stored result on retry. Return only stable command-result data; do not cache authorization decisions or an available-actions projection as permanent authority.
 
@@ -747,7 +747,7 @@ The early flush is a write within the shared transaction, not an independent com
 
 Do not substitute `entityManager.lock(instance, OPTIMISTIC_FORCE_INCREMENT)` followed by flush for this ordinary field update. JPA permits deferred forced increments, so that call does not establish the required early checked write. The explicit comparison to the client's expected value is also necessary: a freshly loaded managed entity may already have a newer version than the user's request. [S2]
 
-A start command has no pre-existing instance to claim. Resolve its successful receipt first, validate the optional correlation pair, then create the instance, initial history and any activity/tasks in the shared transaction. Host association writes share that boundary; the host integration must provide a point after instance ID allocation and before actions needing those associations to establish them. A failure rolls back both the instance and its new business links. Let Hibernate initialize its lockVersion and capture its actual final value after flushing. Every successful mutation of an existing instance, including delivered claim/release and any future reassignment, cancellation or variable-only command, follows the history-reservation claim protocol. An identical receipt replay performs no new mutation, association write or sequence allocation.
+A start command has no pre-existing instance to claim. Resolve its successful receipt first, validate the optional correlation pair, then create the instance, initial history and any activity/tasks in the shared transaction. Host association writes share that boundary; the host integration must provide a point after instance ID allocation and before actions needing those associations to establish them. A failure rolls back both the instance and its new business links. Let Hibernate initialize its lockVersion and capture its actual final value after flushing. Every successful mutation of an existing instance, including claim/release, reassignment and whole-instance cancellation, follows the history-reservation claim protocol. An identical receipt replay performs no new mutation, association write or sequence allocation.
 
 ### 16.2 Concurrent participants and duplicate requests
 
@@ -755,7 +755,7 @@ All mutations serialize on the instance; there is no separate lock per parallel 
 
 Two tasks cannot independently close the activity. A decisive result cancels the remaining open tasks atomically; a later sibling command cannot contribute to an already closed activation. A uniqueness race at receipt insertion or another concurrency failure rolls back the full outer transaction. The outer coordinator can then perform a fresh read for the winning receipt without replaying effects. PROPAGATION_REQUIRED alone does not make an inner method return equal an outer commit. [S11]
 
-Task completion, claim/release and current variable writes use this instance boundary; future reassignment, cancellation and standalone variable mutations must retain it. The document retains the existing required instance-token contract. Introducing task-specific tokens to reduce sibling conflicts is a later API/concurrency change, not implicit in task multiplicity.
+Task completion, claim/release, reassignment, whole-instance cancellation and current variable writes use this instance boundary. Any future standalone variable mutation must retain it. The document retains the existing required instance-token contract. Introducing task-specific tokens to reduce sibling conflicts is a later API/concurrency change, not implicit in task multiplicity.
 
 ### 16.3 Lock order and host effects
 
@@ -775,7 +775,7 @@ A host validation failure rejects and rolls back the attempted command; it does 
 
 Same-instance resubmission remains an APOLO integration decision. The database shape supports repeated-node activations, but current publication rejects cycles; same-instance loops/resubmission are not delivered runtime behavior. All previous activity/task IDs and snapshots remain intact. Technical supersession of an execution is distinct from business cancellation of a booking; preserve predecessor/replacement instance references in the host recovery event evidence.
 
-A permanent defect in an immutable published workflow cannot be repaired by changing its JSON in place. Correct permitted host data or deploy a compatible implementation fix when appropriate. When changed graph content is necessary, specify and authorize a termination and linked replacement process; no general termination/reassignment/recovery command is delivered by this baseline. A new definition version does not move existing instances automatically.
+A permanent defect in an immutable published workflow cannot be repaired by changing its JSON in place. Correct permitted host data or deploy a compatible implementation fix when appropriate. When changed graph content is necessary, the host must specify and authorize the linked replacement process. F025 supplies cancellation for an ACTIVE instance waiting at a human task. A new definition version does not move existing instances automatically.
 
 Workflow history is authoritative execution evidence. Host logs and outbound messages do not replace it. Failed fully rolled-back commands can be recorded in host operational logs with their correlation IDs, but do not appear as committed transitions or successful receipts. Administrative definition and task-catalog changes use the host's management-audit facility. Record actor, action and result; include content revision/hash for definition changes and code, before/after metadata and lock versions for catalog changes.
 
@@ -844,7 +844,7 @@ These scenarios preserve required guarantees and broader design expectations. De
 | Failure after final vote | Downstream failure rolls back the final task completion, aggregate closure and all current-command effects, preserving earlier committed contributions. |
 | Node outcome membership | Two nodes sharing one task code may allow different outcomes/inputs. The engine rejects a completion allowed only at the other node, rejects an undeclared ALL contribution key at publication, and continues using the pinned rules after another workflow version is published. SQL is not claimed to enforce JSON outcome membership. |
 | Ownership | History cannot reference another instance's activity or another activity's task. |
-| Reassignment | Broader design only: general reassignment remains deferred. Delivered claim/release preserves the original target, task identity and roster; verify its separate ownership and authorization rules under F017. |
+| Reassignment | F026 allows authorized reassignment of OPEN tasks and preserves task identity and roster. F017 claim/release changes ownership within the effective target. |
 | Actor policy | Host distinct-person/no-self-approval policies remain required where selected. Administrator release grants no completion override; general override commands remain deferred. |
 | Snapshot consistency | Material changes cannot combine old contributions with decisions for a new review revision. |
 | Duplicate result | Retrying an earlier command returns its original result even after the instance has advanced. Changed domain input with the same successful command ID conflicts. |
@@ -883,7 +883,7 @@ The following register distinguishes the selected simplifications from remaining
 | Engine business correlation | Selected: retain separate nullable business_type/business_id columns, both present or both null, immutable from creation and indexed without global uniqueness. Correlation is optional lookup metadata, not membership or authorization. |
 | Process concurrency | One active process position and one active human activity per instance. |
 | Completion policies | SINGLE and ALL only; ALL contribution key and first committed decisive outcome semantics. |
-| Roster and assignment | Fixed required task slots with stable USER/GROUP/ROLE targets and F017 claim ownership; general audited reassignment remains deferred. Hosts own distinct-person policy. |
+| Roster and assignment | Fixed required task slots with USER/GROUP/ROLE targets, F017 claim ownership and F026 audited reassignment of open tasks. Hosts own distinct-person policy. |
 | Task catalog | Selected: workflow_task_type with code immutable from creation, retained rows, editable metadata, selectable flag and technical lock_version. Physical deletion and code renaming are unsupported, including for unused entries; use selectable = false. No business version or publication lifecycle. |
 | Node contracts | Pinned outcomes, incoming bindings, result/comment contracts, claim/completion policy, optional outputVariable and previousDecisions. Delivered schemas validate the supported subset; nonempty guards and resolver bindings remain deferred. |
 | Structured submissions | Implemented F018: bounded object result alongside outcome/comment, immutable TASK_COMPLETED evidence with empty legacy inputs; no new result table/column. F020 incoming data is captured separately. |

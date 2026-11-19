@@ -887,11 +887,11 @@ The first decisive command that commits wins; there is no implicit rejection pri
 
 ### 9.3 Task lifecycle and ownership
 
-Tasks use OPEN, COMPLETED and CANCELLED states. Approve/reject/request-changes are configured outcomes, not lifecycle states. Internal sibling cancellation is implemented; general administrative cancellation/reassignment, delegation, expiration and timers remain separate scope. Due dates are metadata only.
+Tasks use OPEN, COMPLETED and CANCELLED states. Approve/reject/request-changes are configured outcomes, not lifecycle states. Early ALL resolution cancels open siblings. [F025](../features/F025-workflow-cancellation/spec.md) lets a host-authorized user cancel an ACTIVE instance waiting at a human task, closing the activity and its OPEN tasks while retaining accepted decisions. [F026](../features/F026-task-administration-reassignment/spec.md) lets an authorized administrator change an OPEN task’s effective assignment target while preserving its identity and roster slot. Delegation, expiration and timers remain deferred. Due dates are metadata only.
 
-[F016](../features/F016-shared-group-role-task-assignment/spec.md) supplies stable USER/GROUP/ROLE targets. Membership is host-owned and checked currently; changes neither rewrite targets nor alter the roster. [F017](../features/F017-task-claim-release/spec.md) separates original assignment from nullable current assignee_ref and pins OPTIONAL (default) or REQUIRED claiming on the human node. USER tasks initialize their assignee and complete without claiming under either policy. GROUP/ROLE tasks can be claimed/released; REQUIRED needs a claim, while OPTIONAL allows eligible unclaimed completion. A claimed task permits completion only by its claimant, still subject to current eligibility and business access.
+[F016](../features/F016-shared-group-role-task-assignment/spec.md) supplies USER/GROUP/ROLE assignment targets. Membership is host-owned and checked currently; changes neither rewrite targets nor alter the roster. [F017](../features/F017-task-claim-release/spec.md) separates the assignment target from nullable current assignee_ref and pins OPTIONAL (default) or REQUIRED claiming on the human node. USER tasks initialize their assignee and complete without claiming under either policy. GROUP/ROLE tasks can be claimed/released; REQUIRED needs a claim, while OPTIONAL allows eligible unclaimed completion. A claimed task permits completion only by its claimant, still subject to current eligibility and business access.
 
-Eligible peers retain claimed-task visibility. Under business access, an owner who loses membership retains discovery/release; administrative release requires explicit host authorization and a recorded reason. Own receipt recovery uses business access and the original actor independently of current membership/admin privilege. Ownership commands share aggregate concurrency, history and receipt guarantees. Neither claiming nor membership grants a business-policy override. APOLO’s no-self-approval, country/access and future reassignment rules remain host responsibilities.
+Eligible peers retain claimed-task visibility. Under business access, an owner who loses membership retains discovery/release; administrative release requires explicit host authorization and a recorded reason. Own receipt recovery uses business access and the original actor independently of current membership/admin privilege. Ownership commands share aggregate concurrency, history and receipt guarantees. Neither claiming nor membership grants a business-policy override. APOLO’s no-self-approval, country/access and reassignment rules remain host responsibilities.
 
 <a id="94-persistent-task-type-registry"></a>
 
@@ -1006,7 +1006,7 @@ The nine core tables are established by F001 and evolved through ordered forward
 | workflow_instance | Pinned definition, optional immutable business correlation, current position/status and numeric version |
 | workflow_variable | Current typed scalar/JSON values |
 | workflow_activity | Human-node activation, catalog reference, completion policy, contribution outcome, required task count and resolution |
-| workflow_task | Activity obligation, task key, original USER/GROUP/ROLE target, current assignee and lifecycle/outcome |
+| workflow_task | Activity obligation, task key, effective USER/GROUP/ROLE target, current assignee and lifecycle/outcome |
 | workflow_history | Ordered immutable execution evidence, including accepted submissions and captured inputs |
 | workflow_command_receipt | Command identity, versioned fingerprint and committed result |
 
@@ -1153,7 +1153,7 @@ Design for at-least-once delivery, retry visibility, and idempotent consumers. A
 
 ### 13.2 Audit and privacy
 
-Record manual and automatic transitions, the exact workflow version, evaluated routing conditions, relevant facts and authenticated/system actors. Separate business decision versions, matched table-rule keys and table outputs are added only with the optional extension. Use a command correlation ID to connect the events of one operation. Task history explains creation, assignment, claim/release, completion and cancellation (and must cover reassignment if introduced), including task/activity IDs, actor, timestamp, previous/resulting status or assignee, outcome and permitted comment. Forwarding events to host logging does not replace the authoritative persisted workflow/task history. Deferred task operations need audit semantics when introduced.
+Record manual and automatic transitions, the exact workflow version, evaluated routing conditions, relevant facts and authenticated/system actors. Separate business decision versions, matched table-rule keys and table outputs are added only with the optional extension. Use a command correlation ID to connect the events of one operation. Task history explains creation, assignment, claim/release, reassignment, completion and cancellation, including task/activity IDs, actor, timestamp, previous/resulting status or assignee, outcome and permitted comment. Forwarding events to host logging does not replace the authoritative persisted workflow/task history. Deferred task operations need audit semantics when introduced.
 
 Only collect facts needed to explain the decision. Restrict access, retention, and redaction by host policy; never log arbitrary expression contexts or entire domain entities. A redacted value or hash may support integrity checks without making complete historical reproduction possible. State that limitation explicitly.
 
@@ -1567,7 +1567,7 @@ The sibling Maven workspace remains optional during separate development. The co
 | O11 | PARTLY IMPLEMENTED; APOLO/designer pending | Angular 19.2/toolchain alignment and standalone library/NgModule consumption have scoped F012–F015 evidence. APOLO theme/translation/auth integration and later graph-editor tooling/interactions remain open. |
 | O12 | IMPLEMENTED extraction; host integration OPEN | F013–F015 specify API activation, required adapters, wire compatibility, authorized queries, frontend exports and standalone builds. Later features extend them. APOLO source/build placement and production consumption remain open. |
 
-Claim/release (F017), structured submissions (F018), named outputs/original bindings (F019), immutable human inputs (F020), ALL review (F021) and previous decisions (F022) are implemented. Delegation, general administrative reassignment/cancellation commands, expiration, timers/reminders, policies beyond SINGLE/ALL, graph parallelism, subprocesses and live migration remain deferred. Internal ALL sibling cancellation does not supply a general cancellation API.
+Claim/release (F017), structured submissions (F018), named outputs/original bindings (F019), immutable human inputs (F020), ALL review (F021), previous decisions (F022), whole-instance cancellation (F025) and administrative reassignment of open tasks (F026) are implemented. Delegation, individual-task cancellation, expiration, timers/reminders, policies beyond SINGLE/ALL, graph parallelism, subprocesses and live migration remain deferred.
 
 No migration of existing APOLO runtime instances, automatic replacement of existing rules, or universal database support is implied.
 
