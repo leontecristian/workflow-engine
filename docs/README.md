@@ -21,7 +21,7 @@ The constitution is version **6.6.1**, established on **2026-10-24** and last am
 
 The [workflow UI and REST integration record](architecture/workflow-ui-web-integration.md) preserves the Angular 19 target and adopted `workflow-ui`/`workflow-web` boundaries, now reflected in the [current consolidated design](architecture/workflow-engine-design.md). The original adoption authorized documentation only. F012 subsequently delivered Angular alignment, and F013–F015 delivered the shared libraries and viewer, administration and runtime extraction. APOLO integration remains separate; F011 retains its historical scope and acceptance evidence.
 
-The constitution defines constraints that all feature specifications must respect. The [consolidated design](architecture/workflow-engine-design.md) remains the detailed architectural baseline, with scoped superseding decisions from [database design v1.5](architecture/Workflow_Engine_Database_Design_v1.md) documented in [design sources](design-sources.md). Active engine designs live in `docs/architecture/`, including the [workflow definition language](architecture/workflow-definition-language-design.md), which distinguishes agreed and implemented contracts from remaining proposals and deferred scope. Feature specifications define exact behavior within those constraints. Plans describe the intended approach; tasks track execution; implementation records what was built and actually checked.
+The constitution defines constraints that all feature specifications must respect. The [consolidated design](architecture/workflow-engine-design.md) remains the detailed architectural baseline, with scoped superseding decisions from [database design v1.5](architecture/workflow-engine-database-design.md) documented in [design sources](design-sources.md). Active engine designs live in `docs/architecture/`, including the [workflow definition language](architecture/workflow-definition-language-design.md), which distinguishes agreed and implemented contracts from remaining proposals and deferred scope. Feature specifications define exact behavior within those constraints. Plans describe the intended approach; tasks track execution; implementation records what was built and actually checked.
 
 The constraints register makes confirmed boundaries easy to reference. The assumptions register identifies expectations that need verification and keeps provisional business choices distinct from mandatory guarantees. Both derive from the existing design; they do not finalize its open contracts or change the constitution version.
 
@@ -46,7 +46,7 @@ workflow-engine/
     frontend-style-guide.md
     architecture/
       workflow-engine-design.md
-      Workflow_Engine_Database_Design_v1.md
+      workflow-engine-database-design.md
       workflow-definition-language-design.md
       workflow-ui-web-integration.md
     testing/

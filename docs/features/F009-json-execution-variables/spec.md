@@ -6,7 +6,7 @@
 
 APOLO supplies a DTO-derived JSON snapshot through explicit start/service mappings. Authors can write new conditions over existing supplied fields without a Java action per predicate or a separately maintained structure schema. New data still needs to be supplied by APOLO. Core evaluates expressions; it does not fetch or serialize host DTOs.
 
-Authority: C03/C05–C10; CON-06–09/12/14; ASM-02–05/08/11; [source precedence](../../design-sources.md), [language design](../../architecture/workflow-definition-language-design.md) sections 10–14 and [database design](../../architecture/Workflow_Engine_Database_Design_v1.md) section 12. Build on [F007](../F007-typed-bindings-service-tasks/spec.md) and [F008](../F008-restricted-expressions-routing/spec.md), retaining their scope and acceptance gaps.
+Authority: C03/C05–C10; CON-06–09/12/14; ASM-02–05/08/11; [source precedence](../../design-sources.md), [language design](../../architecture/workflow-definition-language-design.md) sections 10–14 and [database design](../../architecture/workflow-engine-database-design.md) section 12. Build on [F007](../F007-typed-bindings-service-tasks/spec.md) and [F008](../F008-restricted-expressions-routing/spec.md), retaining their scope and acceptance gaps.
 
 ## Selected scope
 

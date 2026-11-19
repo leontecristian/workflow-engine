@@ -1,6 +1,6 @@
 # Implement a Reusable Workflow Engine Module for Booking approval
 
-> **Updated 2026-10-25 — APOLO approval-basis policy.** Read the [consolidated design](../../architecture/workflow-engine-design.md) with the later selected changes in [database design v1.4](../../architecture/Workflow_Engine_Database_Design_v1.md), which supersede older engine scope/registry examples below. Java 17 is the compilation target; JDK 21 is the runtime. OPEN, PROVISIONAL and DEFERRED items below are not implementation decisions.
+> **Updated 2026-10-25 — APOLO approval-basis policy.** Read the [consolidated design](../../architecture/workflow-engine-design.md) with the later selected changes in [database design v1.4](../../architecture/workflow-engine-database-design.md), which supersede older engine scope/registry examples below. Java 17 is the compilation target; JDK 21 is the runtime. OPEN, PROVISIONAL and DEFERRED items below are not implementation decisions.
 
 ## Objective
 

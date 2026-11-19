@@ -17,7 +17,7 @@ The proposed continuation is F004 for minimal definition management/validation a
 - [F001 specification](../F001-initial-database-schema/spec.md) and [physical schema contract](../F001-initial-database-schema/schema-contract.md).
 - The actual [initial changelog](../../../workflow-core/src/main/resources/db/changelog/workflow/changes/001-initial-schema.xml), which remains unchanged.
 - [F002 specification](../F002-task-type-catalog/spec.md), implementation and evidence; preserve its catalog API and mappings.
-- [Database design v1.4](../../architecture/Workflow_Engine_Database_Design_v1.md), [language design](../../architecture/workflow-definition-language-design.md) and [source precedence](../../design-sources.md).
+- [Database design v1.4](../../architecture/workflow-engine-database-design.md), [language design](../../architecture/workflow-definition-language-design.md) and [source precedence](../../design-sources.md).
 - [Development workflow](../../specification-driven-development.md), [package conventions](../../package-structure.md) and [coding standards](../../coding-standards.md).
 
 The F001 contract and applied DDL describe physical storage; later owner decisions describe intended language behavior. Neither may silently overwrite the other. The legacy-column treatment below resolves the difference for this read-only foundation only.

@@ -130,7 +130,7 @@ A detailed proposal is still a proposal. The owner confirmed `SINGLE`, `ALL` and
 
 ### 1.4 Source precedence
 
-Use the [architecture document](workflow-engine-design.md) as the general baseline. Apply the later [database document](Workflow_Engine_Database_Design_v1.md)'s **explicitly selected revisions** where they overlap, following the [project's source-precedence record](../design-sources.md). Do not treat all newer database proposals as approved, and do not let older illustrative JSON restore superseded decisions.
+Use the [architecture document](workflow-engine-design.md) as the general baseline. Apply the later [database document](workflow-engine-database-design.md)'s **explicitly selected revisions** where they overlap, following the [project's source-precedence record](../design-sources.md). Do not treat all newer database proposals as approved, and do not let older illustrative JSON restore superseded decisions.
 
 The owner-selected routing revision of 31 October 2026 supersedes the earlier requirement to reject overlapping conditions. Section 5.2 and constitution C08 now require ordered first-match routing. Other unresolved language choices remain proposals.
 
@@ -2992,7 +2992,7 @@ The owning feature specifications trace delivered rules to acceptance scenarios 
 | ID | Source | How used |
 | --- | --- | --- |
 | A1 | [Reusable Workflow Engine — Technical Design — APOLO-first Embedded Library, current v0.12][A1] | General architecture and existing proposals, including first-match routing; original research used v0.9, current reconciliation uses v0.12. Original shared file: `workflow-engine-design(1).md`; current path `docs/architecture/workflow-engine-design.md`. |
-| A2 | [Workflow engine database design, v1.4][A2] | Explicit later selections and detailed persistence/execution proposals. Shared filename remains `Workflow_Engine_Database_Design_v1.md`. |
+| A2 | [Workflow engine database design, v1.4][A2] | Explicit later selections and detailed persistence/execution proposals. Shared filename remains `workflow-engine-database-design.md`. |
 
 Both documents were originally read from the shared project copies. This records the provenance of the design draft, not a new verification of its content. The active copies now live alongside this document in `docs/architecture/` in the engine repository.
 
@@ -3038,7 +3038,7 @@ Research checked on **25 October 2026**. Versioned standards are identified expl
 | S21 | [RFC 6901 — JSON Pointer][S21] | Standard JSON value locations. |
 
 [A1]: workflow-engine-design.md
-[A2]: Workflow_Engine_Database_Design_v1.md
+[A2]: workflow-engine-database-design.md
 [S1]: https://www.omg.org/spec/BPMN/2.0.2
 [S2]: https://www.omg.org/spec/BPMN/2.0.2/PDF
 [S3]: https://states-language.net/spec.html

@@ -466,7 +466,7 @@ The proposed runtime read-policy separation in F027 is still a draft and is not 
 | Architecture and boundaries | [Consolidated design](workflow-engine-design.md), [constitution](../constitution.md) |
 | Current behavior versus historical proposals | [Design-source precedence](../design-sources.md), [feature index and handovers](../features/README.md) |
 | Definition language | [Workflow definition language design](workflow-definition-language-design.md), with newer owning feature specs taking precedence |
-| Persistence | [Database design](Workflow_Engine_Database_Design_v1.md) |
+| Persistence | [Database design](workflow-engine-database-design.md) |
 | Host integration | [Web contract](../../workflow-web/README.md), [UI contract](../../workflow-ui/README.md), [APOLO integration record](workflow-ui-web-integration.md) |
 | Runnable examples | [Request approval](../features/F006-test-host-definition-console/request-status-review.json), [conditional review](../features/F011-sequential-human-stages/optional-stage-review.json) |
 | Delivery sequence | [Roadmap](../roadmap.md) |

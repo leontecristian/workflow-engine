@@ -1323,7 +1323,7 @@ workflow-engine/
     ├── design-sources.md            # Local designs, supporting sources and precedence
     ├── architecture/
     │   ├── workflow-engine-design.md
-    │   ├── Workflow_Engine_Database_Design_v1.md
+    │   ├── workflow-engine-database-design.md
     │   └── workflow-definition-language-design.md
     └── features/
         └── <feature-id>-<name>/     # Created when specification work begins

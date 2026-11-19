@@ -1,6 +1,6 @@
 # Workflow management — APOLO business analysis
 
-> **Updated 2026-10-25.** This document records APOLO-owned business requirements and their decision status. It does not define generic engine behavior. Read the [consolidated design](../../architecture/workflow-engine-design.md) with the subsequent selected changes in [database design v1.4](../../architecture/Workflow_Engine_Database_Design_v1.md); older engine examples do not override those decisions.
+> **Updated 2026-10-25.** This document records APOLO-owned business requirements and their decision status. It does not define generic engine behavior. Read the [consolidated design](../../architecture/workflow-engine-design.md) with the subsequent selected changes in [database design v1.4](../../architecture/workflow-engine-database-design.md); older engine examples do not override those decisions.
 
 ## Agreed delivery and ownership
 
