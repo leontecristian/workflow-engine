@@ -1,38 +1,56 @@
 <console-feedback [busy]="busy()" [error]="error()" [notice]="notice()" />
 
 @if(detail(); as task) {
-  <div class="task-page">
+  <console-page-header [titleActions]="true" [meta]="{
+    title: task.nodeName || task.taskTypeName || 'Task',
+    eyebrow: 'YOUR WORKSPACE',
+    description: handler() ? 'Review the request and record your decision.' : 'View the task details and any recorded decision.',
+    icon: 'assignment_turned_in'
+  }" />
+
+  <mat-card appearance="outlined" class="task-card">
     <header>
-      <div class="task-heading">
-        <h1>{{task.nodeName || task.taskTypeName || 'Task'}}</h1>
-        <console-status [value]="task.status" />
-      </div>
-      <div class="task-meta">
-        @if(task.assignmentLabel && task.assignmentLabel !== task.ownershipLabel){<span>{{task.assignmentLabel}}</span>}
-        @if(task.ownershipLabel){<span>{{task.ownershipLabel}}</span>}
-        @if(task.dueAt){<span>Due <time [attr.datetime]="task.dueAt">{{task.dueAt | date:'medium'}}</time></span>}
-        @if(task.closedAt && task.status !== 'OPEN'){
-          <span>Closed <time [attr.datetime]="task.closedAt">{{task.closedAt | date:'medium'}}</time></span>
+      @let rules = contract();
+      @let canClaim = commandProvider?.ownership && rules?.canClaim;
+      <div class="task-summary">
+        <div class="task-summary-copy">
+          <div class="task-meta">
+            @if(task.assignmentLabel && task.assignmentLabel !== task.ownershipLabel){
+              <span>@if(task.assignmentLabel !== 'Shared task'){Assigned to: }{{task.assignmentLabel}}</span>
+            }
+            @if(task.ownershipLabel){<span>{{task.ownershipLabel}}</span>}
+            <console-status [value]="task.status" />
+            @if(task.dueAt){<span>Due <time [attr.datetime]="task.dueAt">{{task.dueAt | date:'medium'}}</time></span>}
+            @if(task.closedAt && task.status !== 'OPEN'){
+              <span>Closed <time [attr.datetime]="task.closedAt">{{task.closedAt | date:'medium'}}</time></span>
+            }
+          </div>
+          @if(canClaim && rules?.claimRequired){
+            <p class="task-claim-guidance">Claim this task before completing it.</p>
+          } @else if(canClaim && rules?.canComplete){
+            <p class="task-claim-guidance">You can review this task without claiming it.</p>
+          }
+        </div>
+
+        @if(rules){
+          <div class="task-actions">
+            @if(canClaim){
+              <button mat-stroked-button type="button" (click)="ownership('claim')" [disabled]="busy() || uncertain">Claim task</button>
+            }
+            @if(commandProvider?.ownership && rules.canRelease){
+              <button mat-stroked-button type="button" (click)="ownership('release')" [disabled]="busy() || uncertain">Release</button>
+            }
+            @if(canReassign()){
+              <button mat-stroked-button type="button" (click)="confirmReassignment()" [disabled]="busy() || uncertain">Reassign task</button>
+            }
+          </div>
         }
       </div>
       @if(task.closureLabel){<p>{{task.closureLabel}}</p>}
 
-      @if(contract(); as rules){
-        <div class="task-actions">
-          @if(commandProvider?.ownership && rules.canClaim){
-            <button mat-stroked-button type="button" (click)="ownership('claim')" [disabled]="busy() || uncertain">Claim</button>
-          }
-          @if(commandProvider?.ownership && rules.canRelease){
-            <button mat-stroked-button type="button" (click)="ownership('release')" [disabled]="busy() || uncertain">Release</button>
-          }
-          @if(canReassign()){
-            <button mat-stroked-button type="button" (click)="confirmReassignment()" [disabled]="busy() || uncertain">Reassign task</button>
-          }
-        </div>
-        @if(task.status === 'OPEN' && (!commandProvider || !rules.canComplete)){
-          <p>{{rules.claimRequired && rules.canClaim && commandProvider?.ownership
-            ? 'Claim this task before completing it.'
-            : 'You can view this task with your current access.'}}</p>
+      @if(rules){
+        @if(task.status === 'OPEN' && (!commandProvider || !rules.canComplete) && !(rules.claimRequired && canClaim)){
+          <p>You can view this task with your current access.</p>
         }
         @if(commandProvider?.ownership && rules.canAdminRelease){
           <div class="admin-release">
@@ -134,10 +152,10 @@
     }
 
     @if(nextTaskId(); as next){
-      <div><a mat-stroked-button [routerLink]="link({kind:'task',id:next})">Open next task</a></div>
+      <div class="task-next"><a mat-stroked-button [routerLink]="link({kind:'task',id:next})">Open next task</a></div>
     }
 
-  </div>
+  </mat-card>
 } @else if(error() && sessionScope) {
   <button mat-button type="button" (click)="load()" [disabled]="busy()">Retry</button>
 }

@@ -77,6 +77,19 @@ Previously issued opaque links and cursors expire at upgrade, even with the same
 
 **REUSED** — Earlier packaged Chrome verification covers the unchanged shared viewer, lazy sandbox Task diagnostics and the F026 Instance and Created columns. The earlier task precondition, frozen request and authorized replay evidence still applies. No budget investigation or rebuild of the NgModule consumer was needed.
 
+## Task page appearance follow-up · 2026-11-19
+
+The task name now appears in the shared workspace heading, with the clipboard icon and Reviewer workspace aligned to its right on desktop. Assignment, status, actions, business context and decisions use the same outlined Material card as My tasks. The workspace label stacks below the title on narrow screens.
+
+- **PASS — frontend build.** Ran `npm run build:viewer` and `npm run build` in the sandbox frontend with Node 22.22.0 and npm 10.9.4. The production CSP check passed. The existing Sass and initial bundle budget warnings remain.
+- **PASS — unit tests.** Ran the focused `task.test.mjs` and `task-wrapper.test.mjs` suites. All 18 tests passed.
+- **PASS — browser layout.** Checked the production assets in Chrome with intercepted read-only fixtures. Opened the task from My tasks and confirmed the white card match, right-aligned workspace label, loaded clipboard glyph and decision comment validation at 1440px. Checked a long title and form bounds at 768px, 390px and 320px. Confirmed the task-type and generic title fallbacks and the recorded-decision view. Chrome exited after the check.
+- **REUSED — F034 delivery evidence above (2026-11-19).** The HTTP, database and live command checks continue to apply because the follow-up changes presentation only. Live-host and database checks were NOT RUN for this follow-up.
+
+The card header now groups assignment with status and places claim guidance directly below. Task actions align to the right when space allows and stack below the guidance at narrow widths.
+
+- **PASS — card header refinement.** Rebuilt the library and sandbox production frontend, including the CSP check. Chrome with read-only fixtures verified adjacent assignment and status, optional and required claim guidance, right-aligned and vertically centered Claim task at 1280px, and left-aligned stacking at 390px and 320px. Chrome exited after capture. The preceding unit and integration results continue to apply to the task commands and diagnostics. Those suites were NOT RUN for this layout refinement.
+
 ## Deployment and limits
 
 Deploy compatible web, Angular and host transport versions together. Outstanding exports from the prior instance-scoped protocol need recovery before upgrade. Provide a stable token key where recovery must survive restart or move between hosts. Generic fields follow the order in the immutable pinned document. Existing published documents retain their stored canonical property order. Production APOLO and the full repository suite were NOT RUN.

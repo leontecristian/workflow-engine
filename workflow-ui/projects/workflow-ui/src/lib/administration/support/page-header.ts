@@ -18,7 +18,11 @@ export interface PageMeta {
     .with-title-actions h1 { grid-column:1; grid-row:2; }
     .with-title-actions .page-context { grid-column:2; grid-row:2; }
     .with-title-actions .page-actions { display:flex; grid-column:3; grid-row:2; align-items:center; }
+    .with-title-actions .page-actions:empty { display:none; }
     .with-title-actions .description { grid-column:1 / -1; grid-row:3; }
+    @media(min-width:761px) {
+      .page-heading.with-title-actions:has(.page-actions:empty) { grid-template-columns:minmax(0,1fr) auto; }
+    }
     @media(max-width:760px) {
       .page-heading.with-title-actions { grid-template-columns:minmax(0,1fr) auto; }
       .with-title-actions .page-actions { grid-column:2; }
