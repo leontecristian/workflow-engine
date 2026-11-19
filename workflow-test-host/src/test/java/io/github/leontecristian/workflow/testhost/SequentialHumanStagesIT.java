@@ -34,7 +34,7 @@ import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutio
 import io.github.leontecristian.workflow.core.service.definition.DefinitionCapabilityProvider;
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.runtime.SingleTaskAssignmentResolver;
-import io.github.leontecristian.workflow.core.service.runtime.WorkflowEventRecorder;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowEventBatchWriter;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowServiceAction;
@@ -323,7 +323,7 @@ class SequentialHumanStagesIT extends CompletionAdapterIntegrationTest {
     @TestConfiguration static class Adapters {
         @Bean StageHost stageHost(JdbcTemplate jdbc, ConsoleEventStore outbox, ConsoleWire wire, org.springframework.beans.factory.ObjectProvider<WorkflowRuntimeQueryService> reads) { return new StageHost(jdbc,outbox,wire,reads); }
     }
-    static class StageHost implements DefinitionCapabilityProvider, SingleTaskAssignmentResolver, WorkflowServiceAction, WorkflowEventRecorder {
+    static class StageHost implements DefinitionCapabilityProvider, SingleTaskAssignmentResolver, WorkflowServiceAction, WorkflowEventBatchWriter {
         @Override public Set<io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind> targetKinds() { return Set.of(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER); }
         volatile String code, failureNode="", failure="";
         volatile boolean failRecorder, distinct;
@@ -358,7 +358,7 @@ class SequentialHumanStagesIT extends CompletionAdapterIntegrationTest {
             }
             return new ServiceActionResult(Map.of("data",new WorkflowValue(VariableValueType.JSON,WorkflowJsonValue.parse("{\"after\":true}"))));
         }
-        public void record(List<WorkflowEvent> events) {
+        public void write(List<WorkflowEvent> events) {
             for(var event:events) outbox.record(event,wire.json(event));
             if(failRecorder) throw new IllegalStateException("Recorder failure after successor creation");
         }

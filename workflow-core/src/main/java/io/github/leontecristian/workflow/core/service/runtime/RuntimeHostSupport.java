@@ -23,11 +23,11 @@ public class RuntimeHostSupport {
     private RuntimeException allResolverConfigurationFailure;
     private final WorkflowTaskEligibilityService eligibility;
     private final DefinitionCapabilityProvider capabilities;
-    private final List<WorkflowEventRecorder> recorders;
+    private final List<WorkflowEventBatchWriter> eventBatchWriters;
     private final RuntimeException resolverConfigurationFailure;
 
     public RuntimeHostSupport(ObjectProvider<SingleTaskAssignmentResolver> resolvers,
-                              ObjectProvider<WorkflowEventRecorder> recorders,
+                              ObjectProvider<WorkflowEventBatchWriter> eventBatchWriters,
                               WorkflowTaskEligibilityService eligibility,
                               ObjectProvider<DefinitionCapabilityProvider> capabilities) {
         this.eligibility = eligibility;
@@ -46,16 +46,16 @@ public class RuntimeHostSupport {
         }
         this.resolvers = Map.copyOf(registered);
         this.resolverConfigurationFailure = error;
-        this.recorders = recorders.stream().toList();
+        this.eventBatchWriters = eventBatchWriters.stream().toList();
     }
 
     @org.springframework.beans.factory.annotation.Autowired
     public RuntimeHostSupport(ObjectProvider<SingleTaskAssignmentResolver> resolvers,
-                              ObjectProvider<WorkflowEventRecorder> recorders,
+                              ObjectProvider<WorkflowEventBatchWriter> eventBatchWriters,
                               WorkflowTaskEligibilityService eligibility,
                               ObjectProvider<DefinitionCapabilityProvider> capabilities,
                               ObjectProvider<AllTaskAssignmentResolver> allResolvers) {
-        this(resolvers, recorders, eligibility, capabilities);
+        this(resolvers, eventBatchWriters, eligibility, capabilities);
         var registered = new HashMap<String, AllTaskAssignmentResolver>();
         try {
             for (var resolver : allResolvers.stream().toList()) {
@@ -118,9 +118,9 @@ public class RuntimeHostSupport {
         return result;
     }
 
-    WorkflowEventRecorder recorder() {
-        RuntimeInputs.require(recorders.size() == 1, Category.HOST_CONFIGURATION);
-        return recorders.get(0);
+    WorkflowEventBatchWriter eventBatchWriter() {
+        RuntimeInputs.require(eventBatchWriters.size() == 1, Category.HOST_CONFIGURATION);
+        return eventBatchWriters.get(0);
     }
 
     SingleTaskAssignmentResolver resolver(String id) {
@@ -172,9 +172,9 @@ public class RuntimeHostSupport {
         return result;
     }
 
-    void record(WorkflowEventRecorder recorder, List<WorkflowEvent> events) {
+    void writeEvents(WorkflowEventBatchWriter writer, List<WorkflowEvent> events) {
         try {
-            recorder.record(List.copyOf(events));
+            writer.write(List.copyOf(events));
         } catch (RuntimeException failure) {
             throw RuntimePersistenceErrors.translate(failure);
         }

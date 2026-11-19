@@ -62,7 +62,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Trusted host commands. Completion enforces required host access, authorization and validation adapters.
  * Other commands retain their documented host authorization boundaries. Mutations require the existing host transaction; all returned
- * results are provisional until its successful commit. Links, resolver and durable recorder must not
+ * results are provisional until its successful commit. Links, resolver and durable event writer must not
  * commit independently or emit remote effects. Runtime adapters are required, never synthesized.
  *
  * <p>After STALE_VERSION/CONCURRENT_COMMAND finish rollback. The host may reauthorize and invoke
@@ -273,7 +273,7 @@ public class WorkflowExecutionService {
                 try { effect.apply(before); }
                 catch (RuntimeException failure) { throw new WorkflowExecutionException(Category.CANCELLATION_EFFECT_FAILED, failure); }
             }
-            var recorder = host.recorder();
+            var writer = host.eventBatchWriter();
             var batch = new RuntimeHistoryBatch(entityManager, json, instance.getId(), instance.getDefinitionVersionId(), command.commandId(), context);
             batch.beginAt(first - 1);
             for (var task : open) {
@@ -294,7 +294,7 @@ public class WorkflowExecutionService {
                     context.actorKind(), context.actorRef(), json.fingerprint(command, context), RuntimeJson.FINGERPRINT_VERSION,
                     time, json.evidence(result), (short) 7));
             entityManager.flush();
-            host.record(recorder, batch.events());
+            host.writeEvents(writer, batch.events());
             entityManager.flush();
             RuntimeInputs.require(result.instance().equals(RuntimeViews.instance(instance, definition))
                     && result.activity().equals(RuntimeViews.activity(activity)), Category.HOST_CONFIGURATION);
@@ -321,7 +321,7 @@ public class WorkflowExecutionService {
             byte[] fingerprint = json.fingerprint(command, inputs, context);
             var replay = startReplay(command, context, fingerprint);
             if (replay.isPresent()) return new WorkflowCommandResult(true, replay.get());
-            var recorder = host.recorder();
+            var writer = host.eventBatchWriter();
             var definition = definitions.loadForStart(command);
             definitions.requireCapabilities(definition, true);
             var model = definition.model();
@@ -355,7 +355,7 @@ public class WorkflowExecutionService {
             RuntimeInputs.require("HUMAN_TASK".equals(paused.type()),Category.HOST_CONFIGURATION);
             var stage = enterStage(definition,instance,paused.key(),command.commandId(),context,batch,state,submissions);
             instance.waitAt(paused.key(),batch.last());
-            return finish(command.commandId(), WorkflowOperation.START_WORKFLOW, context, fingerprint, definition, instance, stage.activity(), stage.task(), 1, batch, recorder, json.fingerprintVersion(command));
+            return finish(command.commandId(), WorkflowOperation.START_WORKFLOW, context, fingerprint, definition, instance, stage.activity(), stage.task(), 1, batch, writer, json.fingerprintVersion(command));
         });
     }
 
@@ -369,7 +369,7 @@ public class WorkflowExecutionService {
             var replay = completionReplay(command, context, fingerprint);
             if (replay.isPresent()) return new WorkflowCommandResult(true, replay.get());
             RuntimeInputs.require(context.actorKind() == ActorKind.USER, Category.NOT_ASSIGNED);
-            var recorder = host.recorder();
+            var writer = host.eventBatchWriter();
             var instance = instances.findById(command.instanceId()).orElseThrow(() -> new WorkflowExecutionException(Category.NOT_FOUND));
             entityManager.refresh(instance);
             RuntimeInputs.require(instance.getLockVersion() == command.expectedLockVersion(), Category.STALE_VERSION);
@@ -458,7 +458,7 @@ public class WorkflowExecutionService {
             if (!resolved) {
                 // The early instance claim already advanced the sole contribution history sequence.
                 return finish(command.commandId(),WorkflowOperation.COMPLETE_TASK,context,fingerprint,definition,instance,
-                        activity,task,first,batch,recorder,json.fingerprintVersion(command));
+                        activity,task,first,batch,writer,json.fingerprintVersion(command));
             }
             for (var sibling : roster.stream().sorted(java.util.Comparator.comparing(WorkflowTaskEntity::getTaskKey)).toList()) {
                 if (sibling.getStatus() != TaskStatus.OPEN) continue;
@@ -494,7 +494,7 @@ public class WorkflowExecutionService {
                 batch.next("INSTANCE_COMPLETED",null,null,null,Map.of("resultKey",end.result()),Map.of("resultKey",end.result()));
                 instance.complete(end.key(),end.result(),batch.last(),time,context.actorRef());
             }
-            return finish(command.commandId(), WorkflowOperation.COMPLETE_TASK, context, fingerprint, definition, instance, activity, task, first, batch, recorder, json.fingerprintVersion(command));
+            return finish(command.commandId(), WorkflowOperation.COMPLETE_TASK, context, fingerprint, definition, instance, activity, task, first, batch, writer, json.fingerprintVersion(command));
         });
     }
 
@@ -710,7 +710,7 @@ public class WorkflowExecutionService {
                     "previousAssignmentKind", previous.kind().name(), "previousAssignmentRef", previous.ref(),
                     "assignmentKind", task.getAssignmentKind().name(), "assignmentRef", task.getAssignmentRef()), (short) 1);
             return finish(command.commandId(), WorkflowOperation.REASSIGN_TASK, context, json.reassignmentFingerprint(command, context),
-                    definition, instance, activity, task, sequence, batch, host.recorder(), RuntimeJson.FINGERPRINT_VERSION);
+                    definition, instance, activity, task, sequence, batch, host.eventBatchWriter(), RuntimeJson.FINGERPRINT_VERSION);
         });
     }
 
@@ -813,7 +813,7 @@ public class WorkflowExecutionService {
             batch.beginAt(sequence - 1);
             recordOwnershipChange(request, context.actorRef(), activity, task, batch);
             return finish(request.commandId(), request.operation(), context, fingerprint, definition, instance, activity, task,
-                    sequence, batch, host.recorder(), RuntimeJson.FINGERPRINT_VERSION);
+                    sequence, batch, host.eventBatchWriter(), RuntimeJson.FINGERPRINT_VERSION);
         });
     }
 
@@ -933,13 +933,13 @@ public class WorkflowExecutionService {
 
     private WorkflowCommandResult finish(UUID commandId, WorkflowOperation operation, WorkflowCommandContext context, byte[] fingerprint,
             ExecutableDefinition definition, WorkflowInstanceEntity instance, WorkflowActivityEntity activity, WorkflowTaskEntity task,
-            long first, RuntimeHistoryBatch batch, WorkflowEventRecorder recorder, String fingerprintVersion) {
+            long first, RuntimeHistoryBatch batch, WorkflowEventBatchWriter writer, String fingerprintVersion) {
         entityManager.flush(); // Capture actual final managed token after every instance update, not a predicted increment.
         WorkflowExecutionResult result = snapshot(commandId, operation, definition, instance, activity, task, first);
         entityManager.persist(new WorkflowCommandReceiptEntity(commandId, instance.getId(), operation.name(), context.actorKind(), context.actorRef(),
                 fingerprint, fingerprintVersion, RuntimeInputs.validateContextAndGetOccurredAtUtc(context), json.evidence(result), (short)(operation == WorkflowOperation.REASSIGN_TASK ? 8 : activity.getCompletionPolicy() == CompletionPolicy.ALL ? 6 : 5)));
-        entityManager.flush(); // Detect a receipt-PK loser before invoking the durable recorder; never recover in this transaction.
-        host.record(recorder, batch.events());
+        entityManager.flush(); // Detect a receipt-PK loser before invoking the durable event writer; never recover in this transaction.
+        host.writeEvents(writer, batch.events());
         entityManager.flush();
         RuntimeInputs.require(result.equals(snapshot(commandId, operation, definition, instance, activity, task, first)), Category.HOST_CONFIGURATION);
         return new WorkflowCommandResult(false, result);

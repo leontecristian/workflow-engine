@@ -2,7 +2,11 @@ package io.github.leontecristian.workflow.core.dto.runtime;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
-/** Durable-handoff fact with a deliberately limited payload; no comments or business material. */
+/**
+ * Durable handoff of a workflow history fact to the host.
+ * See the <a href="doc-files/workflow-events.html">workflow event catalog</a> for
+ * envelope fields, event versions, triggers, payload keys and consumer examples.
+ */
 public record WorkflowEvent(
         short eventSchemaVersion,
         String eventId,

@@ -85,7 +85,7 @@ class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
     @Autowired AtomicBoolean failCompletion;
     @Autowired WorkflowExecutionService execution;
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
-    io.github.leontecristian.workflow.core.service.runtime.WorkflowEventRecorder recorder;
+    io.github.leontecristian.workflow.core.service.runtime.WorkflowEventBatchWriter recorder;
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
     io.github.leontecristian.workflow.testhost.service.runtime.SandboxSharedAssignmentProvider membership;
     private final io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget target =
@@ -335,11 +335,11 @@ class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
         long instanceId = opened.instance().id(), taskId = opened.task().id();
         denied(() -> runtime.complete(command(opened, "APPROVE"), actor(owner)), CLAIM_REQUIRED);
         var claim = claim(opened);
-        io.github.leontecristian.workflow.core.service.runtime.WorkflowEventRecorder recorderTarget = org.springframework.test.util.AopTestUtils.getUltimateTargetObject(recorder);
+        io.github.leontecristian.workflow.core.service.runtime.WorkflowEventBatchWriter recorderTarget = org.springframework.test.util.AopTestUtils.getUltimateTargetObject(recorder);
         org.mockito.Mockito.doAnswer(invocation -> {
             invocation.callRealMethod();
             throw new IllegalStateException("test recorder failure");
-        }).when(recorderTarget).record(org.mockito.ArgumentMatchers.argThat(batch ->
+        }).when(recorderTarget).write(org.mockito.ArgumentMatchers.argThat(batch ->
                 batch.stream().anyMatch(event -> "TASK_CLAIMED".equals(event.eventType()))));
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> asActor(owner, false, () -> runtime.claim(claim, actor(owner))))
                 .isInstanceOf(RuntimeException.class);

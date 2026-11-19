@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Workflow event catalog</title>
+</head>
+<body>
+<h1>Workflow event catalog</h1>
+<p>The workflow engine emits one event for each history row and hands off one batch per new
+    command in increasing history sequence order. The host persists the batch in the command
+    transaction and delivers the stored events after commit. Use the stable event ID for
+    idempotent consumption and delivery retries.</p>
+
+<h2>Envelope</h2>
+<dl>
+    <dt><code>eventType</code>, <code>eventSchemaVersion</code></dt>
+    <dd>The event type and its outgoing schema version. Stored history details have their own
+        version.</dd>
+    <dt><code>eventId</code>, <code>historySequence</code></dt>
+    <dd><code>eventId</code> is the stable string <code>instanceId:historySequence</code>.
+        <code>historySequence</code> is the event's sequence within its instance.</dd>
+    <dt><code>commandId</code></dt>
+    <dd>UUID of the originating command. Several events can share a command ID.</dd>
+    <dt><code>instanceId</code>, <code>definitionVersionId</code></dt>
+    <dd>The instance and its pinned definition version.</dd>
+    <dt><code>actorKind</code>, <code>actorRef</code>, <code>occurredAt</code>,
+        <code>correlationId</code></dt>
+    <dd>The command actor's kind (<code>USER</code> or <code>SYSTEM</code>) and reference,
+        the command timestamp and optional correlation ID. Assignment targets and individual owners
+        appear in the payload where applicable.</dd>
+    <dt><code>activityId</code>, <code>taskId</code></dt>
+    <dd>Activity events carry the activity ID. Task events carry both IDs.
+        <code>VARIABLES_WRITTEN</code> carries the activity ID for human output writes and the
+        task ID for SINGLE human output writes. These references are null in other cases.</dd>
+    <dt><code>sourceNodeKey</code>, <code>targetNodeKey</code>, <code>transitionKey</code></dt>
+    <dd>The traversed edge's keys on <code>TRANSITION_TAKEN</code>. These fields are null on
+        other events.</dd>
+</dl>
+
+<h2>Event types and payloads</h2>
+<p>The payload is a map of strings to strings, including counts and booleans. Empty means an
+    empty map. Keys are present unless marked conditional. Input values, submission values,
+    comments and reassignment reasons are outside the outgoing payload contract.</p>
+<table>
+    <caption>Current event schemas</caption>
+    <thead>
+    <tr><th scope="col">Event type</th><th scope="col">Version</th><th scope="col">When emitted</th><th scope="col">Payload keys</th></tr>
+    </thead>
+    <tbody>
+    <tr><th scope="row"><code>INSTANCE_STARTED</code></th><td>1</td><td>A new instance starts.</td><td>Empty</td></tr>
+    <tr><th scope="row"><code>START_INPUTS_ACCEPTED</code></th><td>1</td><td>Start processing accepts inputs for an extended definition, including an empty input map.</td><td>Empty</td></tr>
+    <tr><th scope="row"><code>INSTANCE_COMPLETED</code></th><td>1</td><td>The instance reaches its end result.</td><td><code>resultKey</code></td></tr>
+    <tr><th scope="row"><code>INSTANCE_CANCELLED</code></th><td>1</td><td>Whole-instance cancellation closes the instance.</td><td><code>cancelledTaskCount</code></td></tr>
+    <tr><th scope="row"><code>TRANSITION_TAKEN</code></th><td>1</td><td>Execution follows an edge.</td><td><code>outcomeKey</code> only when leaving a human node. Otherwise empty.</td></tr>
+    <tr><th scope="row"><code>GATEWAY_ROUTED</code></th><td>1</td><td>A gateway selects its outgoing transition.</td><td><code>nodeKey</code>, <code>selectedTransitionKey</code></td></tr>
+    <tr><th scope="row"><code>SERVICE_TASK_COMPLETED</code></th><td>1</td><td>A service action completes.</td><td><code>nodeKey</code>, <code>action</code></td></tr>
+    <tr><th scope="row"><code>VARIABLES_WRITTEN</code></th><td>1</td><td>A nonempty batch of variable writes is applied.</td><td><code>nodeKey</code>, <code>writeCount</code></td></tr>
+    <tr><th scope="row"><code>ACTIVITY_ENTERED</code></th><td>1</td><td>Execution enters a human activity.</td><td>Empty</td></tr>
+    <tr><th scope="row"><code>ACTIVITY_INPUTS_CAPTURED</code></th><td>1</td><td>An ALL human activity captures a shared input snapshot.</td><td>Empty</td></tr>
+    <tr><th scope="row"><code>ACTIVITY_COMPLETED</code></th><td>1</td><td>A human activity resolves with an outcome.</td><td><code>outcomeKey</code></td></tr>
+    <tr><th scope="row"><code>ACTIVITY_CANCELLED</code></th><td>1</td><td>Instance cancellation closes the active human activity.</td><td><code>closureReason</code> (<code>INSTANCE_CANCELLED</code>)</td></tr>
+    <tr><th scope="row"><code>TASK_CREATED</code></th><td>3</td><td>Each task in the resolved roster is created with its initial assignment.</td><td><code>taskKey</code>, <code>assignmentKind</code>, <code>assignmentRef</code>. <code>assigneeRef</code> only when an individual owner exists.</td></tr>
+    <tr><th scope="row"><code>TASK_CLAIMED</code></th><td>1</td><td>A user claims a shared task.</td><td><code>assigneeRef</code></td></tr>
+    <tr><th scope="row"><code>TASK_RELEASED</code></th><td>1</td><td>The owner or an administrator releases a claim.</td><td><code>previousAssigneeRef</code>, <code>administrative</code></td></tr>
+    <tr><th scope="row"><code>TASK_REASSIGNED</code></th><td>1</td><td>An administrator changes the assignment target.</td><td><code>previousAssignmentKind</code>, <code>previousAssignmentRef</code>, <code>assignmentKind</code>, <code>assignmentRef</code></td></tr>
+    <tr><th scope="row"><code>TASK_COMPLETED</code></th><td>1</td><td>A task submission is accepted.</td><td><code>outcomeKey</code></td></tr>
+    <tr><th scope="row"><code>TASK_CANCELLED</code></th><td>1</td><td>Instance cancellation or early activity resolution closes an open task.</td><td><code>taskKey</code>, <code>closureReason</code> (<code>INSTANCE_CANCELLED</code> or <code>ACTIVITY_RESOLVED</code>)</td></tr>
+    </tbody>
+</table>
+
+<h2>APOLO booking review and assignment</h2>
+<p>Suppose APOLO starts a workflow to review bookings <code>B-742</code> and <code>B-743</code>.
+    In the workflow creation transaction, APOLO associates both bookings with the engine-issued
+    instance ID <code>120</code> in its own business data. After commit, its consumer receives
+    a <code>TASK_CREATED</code> event. The following excerpt shows a direct assignment to Maria.</p>
+<pre><code>{
+  "eventSchemaVersion": 3,
+  "eventType": "TASK_CREATED",
+  "instanceId": 120,
+  "taskId": 701,
+  "actorRef": "alex",
+  "payload": {
+    "taskKey": "review",
+    "assignmentKind": "USER",
+    "assignmentRef": "maria",
+    "assigneeRef": "maria"
+  }
+}</code></pre>
+<p>For initial assignment to the Finance group, the creation payload is:</p>
+<pre><code>{"taskKey":"review","assignmentKind":"GROUP","assignmentRef":"FINANCE"}</code></pre>
+<p>The GROUP payload omits <code>assigneeRef</code>. A later <code>TASK_CLAIMED</code>
+    identifies the individual who claims the task. Changing the assignment target emits
+    <code>TASK_REASSIGNED</code>.</p>
+
+<p>When Maria opens the task, APOLO uses <code>event.instanceId()</code> for two reads.</p>
+<ol>
+    <li>Look up the APOLO-owned associations for instance <code>120</code> to find the two
+        booking references. Apply APOLO's booking access policy before showing the details.
+        The optional workflow <code>businessType</code> and <code>businessId</code> fields
+        provide correlation. APOLO's associations establish booking membership.</li>
+    <li>Resolve Maria's actor reference from the authenticated request and call
+        <code>WorkflowAuthorizedRuntimeReadService.instance(viewerActorRef, event.instanceId())</code>.
+        The authorized <code>WorkflowInstanceView</code> supplies current <code>status()</code>,
+        <code>currentNodeKey()</code> and <code>definitionVersionId()</code>. The event's
+        <code>actorRef</code> identifies Alex as the originating command actor.</li>
+</ol>
+<p>APOLO uses <code>event.taskId()</code>, here <code>701</code>, for the review itself. Both
+    paths below are relative to the host's runtime API mount and check the authenticated viewer's
+    access to the task.</p>
+<p>When Maria opens the review, APOLO calls <code>GET /tasks/701/contract</code>. Suppose the
+    workflow author bound a JSON input named <code>bookingRefs</code> and configured two outcomes.
+    This response excerpt shows the input snapshot captured at activity entry and the outcome choices
+    from the pinned definition version.</p>
+<pre><code>{
+  "inputs": {
+    "bookingRefs": { "type": "JSON", "value": ["B-742", "B-743"] }
+  },
+  "outcomes": [
+    { "key": "APPROVE", "label": "Approve", "requiresComment": false },
+    { "key": "REJECT", "label": "Reject", "requiresComment": true }
+  ]
+}</code></pre>
+<p>After Maria approves, APOLO calls <code>GET /tasks/701/submission</code> and reads the accepted
+    <code>outcomeKey</code>. An illustrative response excerpt is
+    <code>{"actorRef":"maria","outcomeKey":"APPROVE"}</code>. An authorized read before a submission
+    exists returns JSON <code>null</code>.</p>
+
+<h2>ALL review outcomes</h2>
+<p>Suppose the booking review is an ALL activity with ID <code>301</code> and two reviewer tasks.
+    The configured contribution outcome is <code>APPROVE</code>, so both reviewers must approve
+    for the activity to resolve with <code>APPROVE</code>. A <code>REJECT</code> resolves it
+    immediately. Read the outcome from <code>event.payload().get("outcomeKey")</code> in both
+    completion event types.</p>
+<table>
+    <caption>Completion events in emission order across two commands</caption>
+    <thead>
+    <tr><th scope="col">Command</th><th scope="col">Event type</th><th scope="col">activityId</th><th scope="col">taskId</th><th scope="col">outcomeKey</th><th scope="col">Meaning for APOLO</th></tr>
+    </thead>
+    <tbody>
+    <tr><td>Maria approves</td><td><code>TASK_COMPLETED</code></td><td>301</td><td>701</td><td><code>APPROVE</code></td><td>Maria's decision. Task 702 stays open and the activity remains active.</td></tr>
+    <tr><td>Alex rejects</td><td><code>TASK_COMPLETED</code></td><td>301</td><td>702</td><td><code>REJECT</code></td><td>Alex's decision.</td></tr>
+    <tr><td>Same rejection command</td><td><code>ACTIVITY_COMPLETED</code></td><td>301</td><td>null</td><td><code>REJECT</code></td><td>The activity's final outcome, used for routing.</td></tr>
+    </tbody>
+</table>
+<p>Pair each <code>TASK_COMPLETED</code> outcome with <code>event.taskId()</code> and the
+    submitting <code>event.actorRef()</code>. Pair <code>ACTIVITY_COMPLETED</code> with
+    <code>event.activityId()</code> to identify the resolved activity.</p>
+</body>
+</html>

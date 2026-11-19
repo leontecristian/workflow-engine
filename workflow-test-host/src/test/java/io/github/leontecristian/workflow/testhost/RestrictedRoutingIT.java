@@ -36,7 +36,7 @@ import io.github.leontecristian.workflow.core.service.definition.DefinitionCapab
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.expression.RestrictedExpressionService;
 import io.github.leontecristian.workflow.core.service.runtime.SingleTaskAssignmentResolver;
-import io.github.leontecristian.workflow.core.service.runtime.WorkflowEventRecorder;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowEventBatchWriter;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowServiceAction;
@@ -630,7 +630,7 @@ class RestrictedRoutingIT extends CompletionAdapterIntegrationTest {
             };
         }
     }
-    static class TestHost implements DefinitionCapabilityProvider,SingleTaskAssignmentResolver,WorkflowServiceAction,WorkflowEventRecorder {
+    static class TestHost implements DefinitionCapabilityProvider,SingleTaskAssignmentResolver,WorkflowServiceAction,WorkflowEventBatchWriter {
         @Override public Set<io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind> targetKinds() { return Set.of(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER); }
         final Set<String> taskCodes=ConcurrentHashMap.newKeySet(); final AtomicBoolean failRecorder=new AtomicBoolean();
         volatile CountDownLatch entered,release;
@@ -661,7 +661,7 @@ class RestrictedRoutingIT extends CompletionAdapterIntegrationTest {
             jdbc.update("INSERT INTO wf_test.management_audit(occurred_at,actor_ref,operation,entity_kind,entity_id,correlation_id,evidence_json) VALUES(SYSUTCDATETIME(),?,'F008_EFFECT','TASK_TYPE',1,?,N'{}')",
                     context.commandContext().actorRef(),context.commandContext().correlationId());
         }
-        @Override public void record(List<WorkflowEvent> events) {
+        @Override public void write(List<WorkflowEvent> events) {
             for(var event:events) outbox.record(event,wire.json(event));
             if(failRecorder.get()) throw new IllegalStateException("Test recorder rollback");
         }

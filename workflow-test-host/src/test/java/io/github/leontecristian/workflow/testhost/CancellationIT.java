@@ -40,7 +40,7 @@ import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutio
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.definition.DefinitionCapabilityProvider;
 import io.github.leontecristian.workflow.core.service.runtime.AllTaskAssignmentResolver;
-import io.github.leontecristian.workflow.core.service.runtime.WorkflowEventRecorder;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowEventBatchWriter;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
@@ -96,7 +96,7 @@ class CancellationIT extends CompletionAdapterIntegrationTest {
     @Autowired PlatformTransactionManager transactions;
     @MockitoBean ConsoleWorkflowCancellationAuthorization cancellation;
     @MockitoSpyBean ConsoleTaskOwnershipAuthorization ownership;
-    @MockitoSpyBean WorkflowEventRecorder recorder;
+    @MockitoSpyBean WorkflowEventBatchWriter recorder;
     @MockitoBean(name = "consoleCapabilities") DefinitionCapabilityProvider capabilities;
     @Autowired ConsoleSettings settings;
     @MockitoSpyBean(name = "sandboxAllResolver") AllTaskAssignmentResolver resolver;
@@ -287,7 +287,7 @@ class CancellationIT extends CompletionAdapterIntegrationTest {
         if (recorderFailure) doAnswer(invocation -> {
             invocation.callRealMethod();
             throw new IllegalStateException("recorder failed after durable writes");
-        }).when(target(recorder)).record(any());
+        }).when(target(recorder)).write(any());
         failure(() -> tx(() -> execution.cancelWorkflow(command, admin(), context -> {
             calls.incrementAndGet();
             assertThat(context.instance().status()).isEqualTo(InstanceStatus.ACTIVE);

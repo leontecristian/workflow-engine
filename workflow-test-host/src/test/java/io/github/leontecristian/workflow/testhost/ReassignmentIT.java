@@ -40,7 +40,7 @@ import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutio
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.definition.DefinitionCapabilityProvider;
 import io.github.leontecristian.workflow.core.service.runtime.AllTaskAssignmentResolver;
-import io.github.leontecristian.workflow.core.service.runtime.WorkflowEventRecorder;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowEventBatchWriter;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
@@ -99,7 +99,7 @@ class ReassignmentIT extends CompletionAdapterIntegrationTest {
     @MockitoBean ConsoleWorkflowCancellationAuthorization cancellation;
     @MockitoBean io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskReassignmentAuthorization reassignment;
     @MockitoSpyBean ConsoleTaskOwnershipAuthorization ownership;
-    @MockitoSpyBean WorkflowEventRecorder recorder;
+    @MockitoSpyBean WorkflowEventBatchWriter recorder;
     @MockitoBean(name = "consoleCapabilities") DefinitionCapabilityProvider capabilities;
     @Autowired ConsoleSettings settings;
     @MockitoSpyBean(name = "sandboxAllResolver") AllTaskAssignmentResolver resolver;
@@ -250,7 +250,7 @@ class ReassignmentIT extends CompletionAdapterIntegrationTest {
         failure(() -> reassign(command), Category.INVALID_ASSIGNMENT);
         when(reassignment.isValidTarget(any(), any())).thenReturn(true);
         failure(() -> reassign(move(start, start.task().assignment())), Category.CONFLICT);
-        doAnswer(invocation -> { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION); }).when(target(recorder)).record(any());
+        doAnswer(invocation -> { throw new WorkflowExecutionException(Category.HOST_CONFIGURATION); }).when(target(recorder)).write(any());
         failure(() -> reassign(command), Category.HOST_CONFIGURATION);
         reset(target(recorder));
         assertThat(version(start.instance().id())).isEqualTo(initial);

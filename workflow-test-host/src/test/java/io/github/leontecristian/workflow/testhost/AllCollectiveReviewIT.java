@@ -34,7 +34,7 @@ import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutio
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category;
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.runtime.AllTaskAssignmentResolver;
-import io.github.leontecristian.workflow.core.service.runtime.WorkflowEventRecorder;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowEventBatchWriter;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowServiceAction;
 import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
@@ -101,7 +101,7 @@ class AllCollectiveReviewIT extends CompletionAdapterIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactions;
     @Autowired WebApplicationContext web;
-    @MockitoSpyBean WorkflowEventRecorder recorder;
+    @MockitoSpyBean WorkflowEventBatchWriter recorder;
     @MockitoSpyBean(name = "sandboxAllResolver") AllTaskAssignmentResolver resolver;
     @LocalServerPort int port;
     private final ObjectMapper json = new ObjectMapper();
@@ -248,9 +248,9 @@ class AllCollectiveReviewIT extends CompletionAdapterIntegrationTest {
         if (!early) complete(command(instance, task(instance, "FINANCE").id(), "APPROVE"));
         var before = reads.findInstance(instance).orElseThrow(); int history = count("wf.workflow_history", instance), receipts = count("wf.workflow_command_receipt", instance);
         var finalCommand = command(instance, task(instance, "ROLE").id(), early ? "REJECT" : "APPROVE");
-        WorkflowEventRecorder target = AopTestUtils.getUltimateTargetObject(recorder);
+        WorkflowEventBatchWriter target = AopTestUtils.getUltimateTargetObject(recorder);
         doAnswer(invocation -> { invocation.callRealMethod(); throw new IllegalStateException("F021 recorder rollback after downstream effect"); })
-                .when(target).record(argThat(events -> events.stream().anyMatch(e -> e.eventType().equals("ACTIVITY_COMPLETED"))));
+                .when(target).write(argThat(events -> events.stream().anyMatch(e -> e.eventType().equals("ACTIVITY_COMPLETED"))));
         try { assertThatThrownBy(() -> complete(finalCommand)).isInstanceOf(RuntimeException.class); }
         finally { reset(target); }
         assertThat(reads.findInstance(instance).orElseThrow()).isEqualTo(before);
@@ -552,7 +552,7 @@ class AllCollectiveReviewIT extends CompletionAdapterIntegrationTest {
     }
 
     @AfterEach void cleanupOwnedFixtures() {
-        WorkflowEventRecorder recorderTarget = AopTestUtils.getUltimateTargetObject(recorder);
+        WorkflowEventBatchWriter recorderTarget = AopTestUtils.getUltimateTargetObject(recorder);
         AllTaskAssignmentResolver resolverTarget = AopTestUtils.getUltimateTargetObject(resolver);
         reset(recorderTarget); reset(resolverTarget);
         tx().executeWithoutResult(t -> {

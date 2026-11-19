@@ -143,7 +143,7 @@ class RuntimeCommandsUnitTest {
         when(catalog.findByCode("SANDBOX_REVIEW")).thenReturn(Optional.of(new TaskTypeView(5,"SANDBOX_REVIEW","Review",null,false,0)));
         var resolver=mock(SingleTaskAssignmentResolver.class); when(host.resolver(anyString())).thenReturn(resolver);
         when(host.resolve(eq(resolver),any())).thenReturn(new SingleAssignmentResult(List.of(new ResolvedTask("review",new TaskAssignmentTarget(shared ? AssignmentTargetKind.GROUP : AssignmentTargetKind.USER, shared ? "finance" : "reviewer"))),null));
-        var recorder=mock(WorkflowEventRecorder.class); when(host.recorder()).thenReturn(recorder);
+        var writer=mock(WorkflowEventBatchWriter.class); when(host.eventBatchWriter()).thenReturn(writer);
         when(registry.descriptor("sandbox.recordQuantity")).thenReturn(new ServiceActionDescriptor("sandbox.recordQuantity",List.of(new ActionField("quantity",VariableValueType.LONG,true,false)),List.of(new ActionField("recordedQuantity",VariableValueType.LONG,true,false))));
         when(registry.action(anyString())).thenReturn(action);
         when(action.execute(any(),any())).thenAnswer(i -> new ServiceActionResult(Map.of("recordedQuantity",((Map<String,WorkflowValue>)i.getArgument(1)).get("quantity"))));

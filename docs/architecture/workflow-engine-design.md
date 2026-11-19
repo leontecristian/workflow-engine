@@ -844,7 +844,7 @@ For example, snapshot a sandbox budget of 520000 and threshold of 500000 at subm
 | Assignment resolvers | Resolve one SINGLE task or the bounded ALL roster with task-owned USER/GROUP/ROLE targets |
 | Authorization guard (for example, `hasAuthorisation`) | Optional registered host guard for start or a human outcome; receives trusted context and declared inputs. When present it must pass. No mandatory WorkflowAuthorization completion hook is required. |
 | Start/service bindings | Supply explicit values to variables before expression evaluation; no general facts-fetching expression provider |
-| `WorkflowEventRecorder` | Persist a durable event handoff in the transaction |
+| `WorkflowEventBatchWriter` | Persist the ordered event batch in the existing command transaction |
 
 Expose only the context needed by each extension. Read-only guards do not receive a mutable engine service. Actions receive declared inputs and return outputs for validated bindings, not unrestricted variable-update operations or engine internals.
 
@@ -1147,7 +1147,7 @@ The library owns the meaning and neutral contract of workflow/task events. APOLO
 
 Never send email, call an external API, or publish to a non-transactional broker as though that operation could be undone by SQL rollback. Instead, record an event handoff within the command transaction and deliver it after commit. Business updates required for an approval's atomic result must remain in the booking/workflow transaction; moving them to an asynchronous event consumer would change the agreed consistency guarantee.
 
-The event contract contains a stable event ID, command ID, instance ID, definition reference, event type, actor, timestamp, and the minimum required payload. Specify event schema versioning, correlation and causation fields in the integration contract. Prefer task/business references over full entities; authorized consumers obtain additional business data through host services. The host can connect `WorkflowEventRecorder` to an existing transactional outbox/publication registry. The sandbox supplies a reference implementation.
+The event contract contains a stable event ID, command ID, instance ID, definition reference, event type, actor, timestamp, and the minimum required payload. The [event catalog and core integration guide](../../workflow-core/README.md) describe the outgoing envelope, payload versions and writer lookup and replay rules. Authorized consumers obtain additional business data through host services. The host can connect `WorkflowEventBatchWriter` to an existing transactional outbox or publication registry. The sandbox supplies a reference implementation.
 
 Design for at-least-once delivery, retry visibility, and idempotent consumers. A simple after-commit callback without durable storage is not the project's reliability contract. An outbox may serialize its payload, but workflow state remains in the relational model rather than being reconstructed from that payload.
 

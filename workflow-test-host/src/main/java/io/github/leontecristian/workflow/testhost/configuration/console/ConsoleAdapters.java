@@ -8,11 +8,11 @@ import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
 import io.github.leontecristian.workflow.core.service.definition.DefinitionCapabilityProvider;
 import io.github.leontecristian.workflow.core.service.runtime.SingleTaskAssignmentResolver;
 import io.github.leontecristian.workflow.core.service.runtime.AllTaskAssignmentResolver;
-import io.github.leontecristian.workflow.core.service.runtime.WorkflowEventRecorder;
+import io.github.leontecristian.workflow.core.service.runtime.WorkflowEventBatchWriter;
 import io.github.leontecristian.workflow.testhost.repository.event.ConsoleEventStore;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleWire;
-import io.github.leontecristian.workflow.testhost.service.event.ConsoleEventRecorder;
+import io.github.leontecristian.workflow.testhost.service.event.ConsoleEventBatchWriter;
 import io.github.leontecristian.workflow.testhost.service.runtime.SandboxSharedAssignmentProvider;
 import io.github.leontecristian.workflow.testhost.service.runtime.SandboxSharedAssignmentResolver;
 import io.github.leontecristian.workflow.testhost.service.sandbox.SandboxAssignmentResolver;
@@ -76,8 +76,8 @@ public class ConsoleAdapters {
     }
 
     @Bean
-    WorkflowEventRecorder consoleRecorder(
+    WorkflowEventBatchWriter consoleEventBatchWriter(
             ConsoleEventStore events, ConsoleWire wire, ConsoleSettings settings) {
-        return new ConsoleEventRecorder(events, wire, settings);
+        return new ConsoleEventBatchWriter(events, wire, settings);
     }
 }

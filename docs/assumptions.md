@@ -84,7 +84,7 @@ The selected mapping is Hibernate-managed BIGINT lock_version represented by Jav
 
 **Resolve before:** production integration relying on workflow events.
 
-The implemented required WorkflowEventRecorder SPI records the ordered event batch durably in the existing host transaction; delivery after commit remains host-owned. [F006’s evidence](features/F006-test-host-definition-console/implementation.md) records sandbox outbox survival across restarts and idempotent inbox delivery. That does not establish distributed exactly-once delivery or production recovery. The existence and suitability of an APOLO outbox/publication registry have not been established.
+The required `WorkflowEventBatchWriter` SPI writes the ordered event batch durably in the existing host transaction. Delivery after commit remains host-owned. [F006’s evidence](features/F006-test-host-definition-console/implementation.md) records sandbox outbox survival across restarts and idempotent inbox delivery. Distributed exactly-once delivery and production recovery remain unverified. APOLO's outbox or publication registry remains to be evaluated.
 
 **Evidence needed:** selected adapter/storage mechanism, transaction participation, event identity/versioning, delivery/recovery ownership, restart durability and idempotent consumption behavior.
 
