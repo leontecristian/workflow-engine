@@ -50,6 +50,7 @@ import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleS
 import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxServiceEffectStore;
+import io.github.leontecristian.workflow.testhost.configuration.integration.RuntimeCommandFixture;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeTransaction;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskOwnershipAuthorization;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleWorkflowCancellationAuthorization;
@@ -71,6 +72,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -84,12 +86,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 @TestPropertySource(properties = {"workflow.console.enabled=true", "workflow.console.capabilities=sample",
         "workflow.console.admin.username=cancel.admin", "workflow.console.admin.password=integration-only-admin",
         "workflow.console.reviewer.username=cancel.reviewer", "workflow.console.reviewer.password=integration-only-reviewer"})
+@Import(RuntimeCommandFixture.class)
 class CancellationIT extends CompletionAdapterIntegrationTest {
     @Autowired WorkflowDefinitionService definitions;
     @Autowired TaskTypeCatalogService catalog;
     @Autowired WorkflowRuntimeQueryService reads;
     @Autowired WorkflowExecutionService execution;
     @Autowired ConsoleRuntimeTransaction runtime;
+    @Autowired RuntimeCommandFixture runtimeCommands;
     @Autowired SandboxRequestStore requests;
     @Autowired SandboxServiceEffectStore effects;
     @Autowired JdbcTemplate jdbc;
@@ -248,7 +252,7 @@ class CancellationIT extends CompletionAdapterIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf.workflow_variable WHERE instance_id=? AND variable_key='reviewCollection'", Integer.class, instance)).isZero();
         assertThat(count("wf_test.service_effect", instance)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT quantity FROM wf_test.service_effect WHERE instance_id=?", Long.class, instance)).isEqualTo(7L);
-        assertThat(runtime.replayComplete(completionWithId(start, contribution.commandId()), reviewer()).orElseThrow().execution()).isEqualTo(contribution);
+        assertThat(runtimeCommands.replayComplete(completionWithId(start, contribution.commandId()), reviewer()).orElseThrow().execution()).isEqualTo(contribution);
         var keys = jdbc.queryForList("SELECT t.task_key FROM wf.workflow_history h JOIN wf.workflow_task t ON t.id=h.task_id WHERE h.instance_id=? AND h.event_type='TASK_CANCELLED' ORDER BY h.sequence_number", String.class, instance);
         assertThat(keys).isSorted();
     }

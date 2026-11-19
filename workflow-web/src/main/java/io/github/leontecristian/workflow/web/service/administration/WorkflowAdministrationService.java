@@ -19,6 +19,7 @@ import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogSe
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionManagementContext;
 import io.github.leontecristian.workflow.web.dto.administration.WorkflowAdministrationAudit;
 import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationAuditRecorder;
+import org.springframework.lang.Nullable;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
 import java.time.Clock;
@@ -30,11 +31,11 @@ import java.time.Clock;
 public class WorkflowAdministrationService {
     private final WorkflowDefinitionService definitions;
     private final TaskTypeCatalogService catalog;
-    private final WorkflowAdministrationAuditRecorder audits;
+    @Nullable private final WorkflowAdministrationAuditRecorder audits;
     private final Clock clock;
 
     public WorkflowAdministrationService(WorkflowDefinitionService definitions, TaskTypeCatalogService catalog,
-            WorkflowAdministrationAuditRecorder audits, Clock clock) {
+            @Nullable WorkflowAdministrationAuditRecorder audits, Clock clock) {
         this.definitions = definitions;
         this.catalog = catalog;
         this.audits = audits;
@@ -166,7 +167,7 @@ public class WorkflowAdministrationService {
             Object before,
             Object after,
             DefinitionManagementContext context, String correlation) {
-        if (!changed) return;
+        if (!changed || audits == null) return;
         audits.record(new WorkflowAdministrationAudit(operation, kind, id, context, correlation, before, after));
     }
 

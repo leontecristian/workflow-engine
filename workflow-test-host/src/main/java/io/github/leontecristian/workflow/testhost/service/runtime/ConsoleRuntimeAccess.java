@@ -30,25 +30,21 @@ public class ConsoleRuntimeAccess implements WorkflowRuntimeReadAuthorization {
         this.businessAccess = businessAccess;
     }
 
-    private boolean administrator(String actorRef) {
-        return actorRef.equals(context.actor()) && context.admin();
-    }
-
-    @Override public boolean canMonitor(String actorRef) { return administrator(actorRef); }
-    @Override public boolean canAdministerTasks(String actorRef) { return administrator(actorRef); }
+    @Override public boolean canMonitor(String actorRef) { return context.isConsoleAdministrator(actorRef); }
+    @Override public boolean canAdministerTasks(String actorRef) { return context.isConsoleAdministrator(actorRef); }
     @Override public boolean canListInstance(String actorRef, WorkflowInstanceSummary instance) {
-        return administrator(actorRef);
+        return context.isConsoleAdministrator(actorRef);
     }
     @Override public boolean canReadInstance(String actorRef, WorkflowInstanceView instance) {
-        return administrator(actorRef) || assigned(instance.id(), null, actorRef);
+        return context.isConsoleAdministrator(actorRef) || assigned(instance.id(), null, actorRef);
     }
     @Override public boolean canReadActivity(String actorRef, WorkflowActivityView activity) {
-        return administrator(actorRef) || assigned(activity.instanceId(), activity.id(), actorRef);
+        return context.isConsoleAdministrator(actorRef) || assigned(activity.instanceId(), activity.id(), actorRef);
     }
 
-    public WorkflowTaskView task(long id) {
+    public WorkflowTaskView task(String actorRef, long id) {
         var task = reads.findTask(id).orElseThrow(ConsoleException::missing);
-        if (!canReadTask(task))
+        if (!canReadTask(new TaskEligibilityContext(task, actorRef)))
             throw ConsoleException.missing();
         return task;
     }
@@ -69,7 +65,7 @@ public class ConsoleRuntimeAccess implements WorkflowRuntimeReadAuthorization {
     @Override public boolean canReadTask(TaskEligibilityContext taskContext) {
         var task = taskContext.task();
         String actor = taskContext.actorRef();
-        if (administrator(actor)) return true;
+        if (context.isConsoleAdministrator(actor)) return true;
         if (task.status() == TaskStatus.OPEN) {
             if (!canAccessBusiness(taskContext)) return false;
             if (actor.equals(task.assigneeRef())) return true;
@@ -78,7 +74,7 @@ public class ConsoleRuntimeAccess implements WorkflowRuntimeReadAuthorization {
     }
 
     private boolean canReadByAssignment(WorkflowTaskView task, String actor) {
-        if (administrator(actor)) return true;
+        if (context.isConsoleAdministrator(actor)) return true;
         if (task.assignment().kind() == AssignmentTargetKind.USER)
             return actor.equals(task.assignment().ref());
         if (task.status() == TaskStatus.OPEN)
@@ -92,14 +88,14 @@ public class ConsoleRuntimeAccess implements WorkflowRuntimeReadAuthorization {
     }
 
     /** Bounded bulk authorization for graph links; avoids an exact-task query per displayed node. */
-    public java.util.Set<Long> readableActivities(long instanceId, java.util.Set<Long> candidates) {
-        if (context.admin() || candidates.isEmpty()) return java.util.Set.copyOf(candidates);
+    public java.util.Set<Long> readableActivities(String actorRef, long instanceId, java.util.Set<Long> candidates) {
+        if (context.isConsoleAdministrator(actorRef) || candidates.isEmpty()) return java.util.Set.copyOf(candidates);
         var visible = new java.util.HashSet<Long>();
         long cursor = 0;
         for (int page = 0; page < 100; page++) {
             var tasks = reads.listTasks(instanceId, cursor, 100);
             for (var task : tasks.items())
-                if (candidates.contains(task.activityId()) && canReadByAssignment(task, context.actor())) visible.add(task.activityId());
+                if (candidates.contains(task.activityId()) && canReadByAssignment(task, actorRef)) visible.add(task.activityId());
             if (tasks.nextAfterId() == null) return java.util.Set.copyOf(visible);
             cursor = tasks.nextAfterId();
         }
@@ -107,9 +103,13 @@ public class ConsoleRuntimeAccess implements WorkflowRuntimeReadAuthorization {
     }
 
     public WorkflowInstanceView instance(long id) {
+        return instance(context.actor(), id);
+    }
+
+    public WorkflowInstanceView instance(String actorRef, long id) {
         var instance = reads.findInstance(id).orElseThrow(ConsoleException::missing);
         try {
-            if (!canReadInstance(context.actor(), instance)) throw ConsoleException.missing();
+            if (!canReadInstance(actorRef, instance)) throw ConsoleException.missing();
         } catch (WorkflowExecutionException failure) {
             if (failure.category() == WorkflowExecutionException.Category.LIMIT_EXCEEDED)
                 throw new ConsoleException(422, "LIMIT_EXCEEDED");

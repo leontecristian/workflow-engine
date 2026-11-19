@@ -33,10 +33,10 @@ import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinit
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
-import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
 import io.github.leontecristian.workflow.testhost.configuration.integration.CompletionAdapterIntegrationTest;
 import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
+import io.github.leontecristian.workflow.testhost.configuration.integration.RuntimeCommandFixture;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeTransaction;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -46,18 +46,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mock.env.MockEnvironment;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -66,7 +61,6 @@ import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -75,14 +69,14 @@ import org.springframework.web.context.WebApplicationContext;
     properties={"workflow.console.enabled=true","workflow.console.capabilities=sample",
         "workflow.console.admin.username=f016-admin","workflow.console.admin.password=f016-local-test-password",
         "workflow.console.reviewer.username=f016-reviewer","workflow.console.reviewer.password=f016-local-test-password"})
-@Import(SharedAssignmentIT.FailureFixture.class)
+@Import(RuntimeCommandFixture.class)
 class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
     @Autowired WorkflowDefinitionService definitions;
     @Autowired WorkflowRuntimeQueryService reads;
     @Autowired TaskTypeCatalogService catalog;
     @Autowired SandboxRequestStore requests;
     @Autowired ConsoleRuntimeTransaction runtime;
-    @Autowired AtomicBoolean failCompletion;
+    @Autowired RuntimeCommandFixture runtimeCommands;
     @Autowired WorkflowExecutionService execution;
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
     io.github.leontecristian.workflow.core.service.runtime.WorkflowEventBatchWriter recorder;
@@ -103,26 +97,6 @@ class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
     private Path repository() { return Files.isDirectory(Path.of("docs"))?Path.of(""):Path.of(".."); }
     private WorkflowCommandContext context() { return new WorkflowCommandContext(ActorKind.USER,"f016-admin",Instant.now(),marker); }
 
-    /** Test-only selection of the existing post-result failure under the real transaction proxy.
-     * Start and ordinary completion still call the production transaction body unchanged.
-     */
-    @TestConfiguration(proxyBeanMethods=false)
-    static class FailureFixture {
-        @Bean AtomicBoolean failCompletion() { return new AtomicBoolean(); }
-        @Bean @Primary ConsoleRuntimeTransaction fixtureRuntime(WorkflowExecutionService execution,
-                WorkflowRuntimeQueryService reads,SandboxRequestStore requests,ConsoleSettings settings,AtomicBoolean failCompletion) {
-            var failureSettings=new ConsoleSettings(new MockEnvironment().withProperty("workflow.console.enabled","true")
-                .withProperty("workflow.console.admin.username",settings.admin).withProperty("workflow.console.admin.password",settings.adminPassword)
-                .withProperty("workflow.console.reviewer.username",settings.reviewer).withProperty("workflow.console.reviewer.password",settings.reviewerPassword)
-                .withProperty("workflow.console.fail-runtime-after-result","true"));
-            var failed=new ConsoleRuntimeTransaction(execution,reads,requests,failureSettings);
-            return new ConsoleRuntimeTransaction(execution,reads,requests,settings) {
-                @Override @Transactional public WorkflowCommandResult complete(CompleteWorkflowTask command,WorkflowCommandContext context) {
-                    return failCompletion.get()?failed.complete(command,context):super.complete(command,context);
-                }
-            };
-        }
-    }
     private MockHttpSession session(String actor,String role) {
         var s=new MockHttpSession();s.setAttribute("SPRING_SECURITY_CONTEXT",new SecurityContextImpl(
             UsernamePasswordAuthenticationToken.authenticated(actor,"unused",List.of(new SimpleGrantedAuthority(role)))));return s;
@@ -175,12 +149,10 @@ class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
         for(String who:List.of("f016-reviewer","f016-reviewer2"))
             assertThat(reads.listEligibleTasks(who,0,100,t->t.id()==started.task().id()).items()).extracting(t->t.id()).containsExactly(started.task().id());
         membership.replaceMembers(target,java.util.Set.of("f016-reviewer2"));
-        denied(()->runtime.complete(command,actor("f016-reviewer")),io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.NOT_ASSIGNED);
+        denied(()->runtimeCommands.complete(command,actor("f016-reviewer")),io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.NOT_ASSIGNED);
         assertThat(reads.findInstance(started.instance().id()).orElseThrow().lockVersion()).isEqualTo(started.instance().lockVersion());
         membership.replaceMembers(target,java.util.Set.of("f016-reviewer"));
-        failCompletion.set(true);
-        org.assertj.core.api.Assertions.assertThatThrownBy(()->runtime.complete(command,actor("f016-reviewer"))).isInstanceOf(IllegalStateException.class);
-        failCompletion.set(false);
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->runtimeCommands.completeThenFail(command,actor("f016-reviewer"))).isInstanceOf(IllegalStateException.class);
         assertThat(reads.findTaskSubmission(started.task().id())).isEmpty();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf.workflow_command_receipt WHERE command_id=?",Integer.class,command.commandId())).isZero();
         org.mockito.Mockito.doAnswer(invocation->{
@@ -188,18 +160,18 @@ class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
             membership.replaceMembers(target,java.util.Set.of());
             return allowed;
         }).when(membership).isCurrentMember(org.mockito.ArgumentMatchers.any());
-        var accepted=runtime.complete(command,actor("f016-reviewer"));
+        var accepted=runtimeCommands.complete(command,actor("f016-reviewer"));
         org.mockito.Mockito.reset(membership);
         assertThat(accepted.execution().task().closedBy()).isEqualTo("f016-reviewer");
         assertThat(accepted.execution().task().assignment()).isEqualTo(target);
-        assertThat(runtime.replayComplete(command,actor("f016-reviewer")).orElseThrow().replayed()).isTrue();
-        denied(()->runtime.replayComplete(command,actor("f016-reviewer2")),io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.COMMAND_ID_CONFLICT);
+        assertThat(runtimeCommands.replayComplete(command,actor("f016-reviewer")).orElseThrow().replayed()).isTrue();
+        denied(()->runtimeCommands.replayComplete(command,actor("f016-reviewer2")),io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.COMMAND_ID_CONFLICT);
         var detail=reads.listHistory(started.instance().id(),0,100).items().stream().filter(h->h.eventType().equals("TASK_CREATED")).findFirst().orElseThrow();
         assertThat(detail.detailsSchemaVersion()).isEqualTo((short)4);
         assertThat(reads.findHistoryEvent(started.instance().id(),detail.historySequence()).orElseThrow().detailsJson()).contains("assignment","GROUP","sandbox.finance");
         assertThat(jdbc.queryForObject("SELECT result_schema_version FROM wf.workflow_command_receipt WHERE command_id=?",Integer.class,command.commandId())).isEqualTo(5);
         var pending=start();
-        denied(()->runtime.complete(command(pending,"APPROVE"),actor("f016-reviewer")),io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.NOT_ASSIGNED);
+        denied(()->runtimeCommands.complete(command(pending,"APPROVE"),actor("f016-reviewer")),io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.NOT_ASSIGNED);
         membership.removeTarget(target);
         assertThat(reads.findTask(pending.task().id()).orElseThrow().status()).isEqualTo(io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.OPEN);
         denied(()->start(),io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.INVALID_ASSIGNMENT);
@@ -212,8 +184,8 @@ class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
         var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
         try {
             var gate=new java.util.concurrent.CountDownLatch(1);
-            java.util.concurrent.Callable<Object> a=()->{gate.await();try{return runtime.complete(one,actor("f016-reviewer"));}catch(RuntimeException failure){return failure;}};
-            java.util.concurrent.Callable<Object> b=()->{gate.await();try{return runtime.complete(two,actor("f016-reviewer2"));}catch(RuntimeException failure){return failure;}};
+            java.util.concurrent.Callable<Object> a=()->{gate.await();try{return runtimeCommands.complete(one,actor("f016-reviewer"));}catch(RuntimeException failure){return failure;}};
+            java.util.concurrent.Callable<Object> b=()->{gate.await();try{return runtimeCommands.complete(two,actor("f016-reviewer2"));}catch(RuntimeException failure){return failure;}};
             var fa=pool.submit(a);var fb=pool.submit(b);gate.countDown();
             var results=List.of(fa.get(30,TimeUnit.SECONDS),fb.get(30,TimeUnit.SECONDS));
             assertThat(results.stream().filter(r->r instanceof WorkflowCommandResult).count()).isEqualTo(1);
@@ -272,11 +244,11 @@ class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
         prepare("sandbox.singleReviewer", "REQUIRED");
         var current=start();
         assertThat(current.task().assigneeRef()).isEqualTo("f016-reviewer");
-        denied(() -> asActor("f016-reviewer", false, () -> runtime.claim(claim(current), actor("f016-reviewer"))), TASK_NOT_CLAIMABLE);
-        denied(() -> asActor("f016-reviewer", false, () -> runtime.release(release(current), actor("f016-reviewer"))), TASK_NOT_CLAIMABLE);
+        denied(() -> asActor("f016-reviewer", false, () -> runtimeCommands.claim(claim(current), actor("f016-reviewer"))), TASK_NOT_CLAIMABLE);
+        denied(() -> asActor("f016-reviewer", false, () -> runtimeCommands.release(release(current), actor("f016-reviewer"))), TASK_NOT_CLAIMABLE);
         var adminRelease = new AdministrativelyReleaseWorkflowTask(UUID.randomUUID(), current.instance().id(),
                 current.task().id(), current.instance().lockVersion(), "reason");
-        denied(() -> asActor("f016-admin", true, () -> runtime.administrativelyRelease(adminRelease, actor("f016-admin"))), TASK_NOT_CLAIMABLE);
+        denied(() -> asActor("f016-admin", true, () -> runtimeCommands.administrativelyRelease(adminRelease, actor("f016-admin"))), TASK_NOT_CLAIMABLE);
         var currentCreation=reads.listHistory(current.instance().id(),0,100).items().stream().filter(h->h.eventType().equals("TASK_CREATED")).findFirst().orElseThrow();
         String currentEventId=current.instance().id()+":"+currentCreation.historySequence();
         String currentJson=jdbc.queryForObject("SELECT event_json FROM wf_test.workflow_event_outbox WHERE event_id=?",String.class,currentEventId);
@@ -296,11 +268,11 @@ class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT event_json FROM wf_test.workflow_event_inbox WHERE event_id=?",String.class,legacyEventId)).isEqualTo(legacyEventBytes);
         assertThat(jdbc.queryForObject("SELECT event_json FROM wf_test.workflow_event_outbox WHERE event_id=?",String.class,legacyEventId)).isEqualTo(legacyEventBytes);
         jdbc.update("UPDATE wf.workflow_history SET details_schema_version=2,details_json=? WHERE instance_id=? AND sequence_number=?",oldCreation,started.instance().id(),creation.historySequence());
-        var command=command(started,"APPROVE");var accepted=runtime.complete(command,actor("f016-reviewer"));
+        var command=command(started,"APPROVE");var accepted=runtimeCommands.complete(command,actor("f016-reviewer"));
         var legacy=(ObjectNode)json.readTree(jdbc.queryForObject("SELECT result_json FROM wf.workflow_command_receipt WHERE command_id=?",String.class,command.commandId()));
         var task=(ObjectNode)legacy.path("task");task.remove(List.of("assignment", "assigneeRef"));task.put("assignedUserRef","f016-reviewer");
         jdbc.update("UPDATE wf.workflow_command_receipt SET result_schema_version=3,result_json=? WHERE command_id=?",legacy.toString(),command.commandId());
-        var replayed = runtime.replayComplete(command, actor("f016-reviewer")).orElseThrow().execution();
+        var replayed = runtimeCommands.replayComplete(command, actor("f016-reviewer")).orElseThrow().execution();
         assertThat(replayed.task().assigneeRef()).isNull();
         assertThat(replayed.task().closedBy()).isEqualTo(accepted.execution().task().closedBy());
         assertThat(replayed.instance()).isEqualTo(accepted.execution().instance());
@@ -333,7 +305,7 @@ class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
         membership.replaceMembers(target, java.util.Set.of(owner, peer));
         var opened = start();
         long instanceId = opened.instance().id(), taskId = opened.task().id();
-        denied(() -> runtime.complete(command(opened, "APPROVE"), actor(owner)), CLAIM_REQUIRED);
+        denied(() -> runtimeCommands.complete(command(opened, "APPROVE"), actor(owner)), CLAIM_REQUIRED);
         var claim = claim(opened);
         io.github.leontecristian.workflow.core.service.runtime.WorkflowEventBatchWriter recorderTarget = org.springframework.test.util.AopTestUtils.getUltimateTargetObject(recorder);
         org.mockito.Mockito.doAnswer(invocation -> {
@@ -341,7 +313,7 @@ class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
             throw new IllegalStateException("test recorder failure");
         }).when(recorderTarget).write(org.mockito.ArgumentMatchers.argThat(batch ->
                 batch.stream().anyMatch(event -> "TASK_CLAIMED".equals(event.eventType()))));
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> asActor(owner, false, () -> runtime.claim(claim, actor(owner))))
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> asActor(owner, false, () -> runtimeCommands.claim(claim, actor(owner))))
                 .isInstanceOf(RuntimeException.class);
         org.mockito.Mockito.reset(recorderTarget);
         assertThat(reads.findTask(taskId).orElseThrow().assigneeRef()).isNull();
@@ -350,17 +322,17 @@ class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf.workflow_command_receipt WHERE command_id=?", Integer.class, claim.commandId())).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf_test.workflow_event_outbox WHERE instance_id=? AND event_type='TASK_CLAIMED'", Integer.class, instanceId)).isZero();
 
-        var claimed = asActor(owner, false, () -> runtime.claim(claim, actor(owner))).execution();
+        var claimed = asActor(owner, false, () -> runtimeCommands.claim(claim, actor(owner))).execution();
         assertThat(claimed.task().assigneeRef()).isEqualTo(owner);
         assertThat(claimed.task().assignment()).isEqualTo(opened.task().assignment());
         assertThat(claimed.firstHistorySequence()).isEqualTo(claimed.lastHistorySequence());
-        denied(() -> asActor(owner, false, () -> runtime.claim(claim(claimed), actor(owner))), TASK_ALREADY_ASSIGNED);
-        denied(() -> runtime.complete(command(claimed, "APPROVE"), actor(peer)), TASK_ASSIGNED_TO_OTHER);
+        denied(() -> asActor(owner, false, () -> runtimeCommands.claim(claim(claimed), actor(owner))), TASK_ALREADY_ASSIGNED);
+        denied(() -> runtimeCommands.complete(command(claimed, "APPROVE"), actor(peer)), TASK_ASSIGNED_TO_OTHER);
         assertThat(reads.listEligibleTasks(peer, taskId - 1, 1, t -> t.id() == taskId).items())
                 .extracting(t -> t.assigneeRef()).containsExactly(owner);
 
         membership.replaceMembers(target, java.util.Set.of(peer));
-        denied(() -> runtime.complete(command(claimed, "APPROVE"), actor(owner)), NOT_ASSIGNED);
+        denied(() -> runtimeCommands.complete(command(claimed, "APPROVE"), actor(owner)), NOT_ASSIGNED);
         var mvc = MockMvcBuilders.webAppContextSetup(web).addFilters(web.getBean(FilterChainProxy.class)).build();
         var reviewer = session(owner, "ROLE_CONSOLE_REVIEWER");
         var contract = mvc.perform(get("/console/api/tasks/" + taskId + "/contract").session(reviewer)).andReturn().getResponse();
@@ -375,26 +347,26 @@ class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
         denied(() -> asActor(peer, false, () -> execution.findReplay(claim, actor(peer))), COMMAND_ID_CONFLICT);
 
         var release = release(claimed);
-        var released = asActor(owner, false, () -> runtime.release(release, actor(owner))).execution();
+        var released = asActor(owner, false, () -> runtimeCommands.release(release, actor(owner))).execution();
         assertThat(released.task().assigneeRef()).isNull();
         assertThat(released.task().id()).isEqualTo(taskId);
         assertThat(released.task().assignment()).isEqualTo(target);
-        denied(() -> asActor(owner, false, () -> runtime.release(release(released), actor(owner))), TASK_NOT_ASSIGNED);
+        denied(() -> asActor(owner, false, () -> runtimeCommands.release(release(released), actor(owner))), TASK_NOT_ASSIGNED);
         assertThat(mvc.perform(get("/console/api/tasks/" + taskId).session(reviewer))
                 .andReturn().getResponse().getStatus()).isEqualTo(404);
 
         membership.replaceMembers(target, java.util.Set.of(owner, peer));
-        var reclaimed = asActor(owner, false, () -> runtime.claim(claim(released), actor(owner))).execution();
+        var reclaimed = asActor(owner, false, () -> runtimeCommands.claim(claim(released), actor(owner))).execution();
         var stale = new ReleaseWorkflowTask(UUID.randomUUID(), instanceId, taskId, claimed.instance().lockVersion());
-        denied(() -> asActor(owner, false, () -> runtime.release(stale, actor(owner))), STALE_VERSION);
+        denied(() -> asActor(owner, false, () -> runtimeCommands.release(stale, actor(owner))), STALE_VERSION);
         assertThat(asActor(owner, false, () -> execution.findReplay(release, actor(owner)))).contains(released);
         assertThat(reads.findTask(taskId).orElseThrow().assigneeRef()).isEqualTo(owner);
 
         String reason = "  Supervisor approved release  ";
         var adminRelease = new AdministrativelyReleaseWorkflowTask(UUID.randomUUID(), instanceId, taskId,
                 reclaimed.instance().lockVersion(), reason);
-        denied(() -> asActor(peer, false, () -> runtime.administrativelyRelease(adminRelease, actor(peer))), ADMIN_RELEASE_FORBIDDEN);
-        var adminResult = asActor(admin, true, () -> runtime.administrativelyRelease(adminRelease, actor(admin))).execution();
+        denied(() -> asActor(peer, false, () -> runtimeCommands.administrativelyRelease(adminRelease, actor(peer))), ADMIN_RELEASE_FORBIDDEN);
+        var adminResult = asActor(admin, true, () -> runtimeCommands.administrativelyRelease(adminRelease, actor(admin))).execution();
         var detail = reads.findHistoryEvent(instanceId, adminResult.lastHistorySequence()).orElseThrow();
         assertThat(json.readTree(detail.detailsJson()).path("reason").asText()).isEqualTo(reason);
         var event = jdbc.queryForObject("SELECT event_json FROM wf_test.workflow_event_outbox WHERE event_id=?",
@@ -403,8 +375,8 @@ class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
         assertThat(asActor(admin, false, () -> execution.findReplay(adminRelease, actor(admin)))).contains(adminResult);
         denied(() -> execution.findReplay(adminRelease, actor(admin)), NOT_FOUND);
 
-        var finalClaim = asActor(peer, false, () -> runtime.claim(claim(adminResult), actor(peer))).execution();
-        var completed = runtime.complete(command(finalClaim, "APPROVE"), actor(peer)).execution();
+        var finalClaim = asActor(peer, false, () -> runtimeCommands.claim(claim(adminResult), actor(peer))).execution();
+        var completed = runtimeCommands.complete(command(finalClaim, "APPROVE"), actor(peer)).execution();
         assertThat(completed.task().assigneeRef()).isEqualTo(peer);
         assertThat(completed.task().closedBy()).isEqualTo(peer);
         if (Boolean.getBoolean("f017.browserHold")) browserHold(start(), "f017");
@@ -423,10 +395,10 @@ class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
                 var completion = command(opened, "APPROVE");
                 var gate = new java.util.concurrent.CountDownLatch(1);
                 var a = pool.submit(() -> concurrentResult(gate,
-                        () -> asActor(owner, false, () -> runtime.claim(first, actor(owner)))));
+                        () -> asActor(owner, false, () -> runtimeCommands.claim(first, actor(owner)))));
                 var b = pool.submit(() -> concurrentResult(gate, () -> competeWithCompletion
-                        ? runtime.complete(completion, actor(peer))
-                        : asActor(peer, false, () -> runtime.claim(second, actor(peer)))));
+                        ? runtimeCommands.complete(completion, actor(peer))
+                        : asActor(peer, false, () -> runtimeCommands.claim(second, actor(peer)))));
                 gate.countDown();
                 var results = List.of(a.get(30, TimeUnit.SECONDS), b.get(30, TimeUnit.SECONDS));
                 assertThat(results).filteredOn(WorkflowCommandResult.class::isInstance).hasSize(1);
@@ -456,7 +428,6 @@ class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
         assertThat(Files.exists(done)).as("Focused browser completion signal").isTrue();Files.deleteIfExists(done);
     }
     @AfterEach void cleanup() {
-        failCompletion.set(false);
         tx().executeWithoutResult(t->{
             for(long id:instances) {
                 jdbc.update("DELETE FROM wf_test.workflow_event_inbox WHERE event_id IN (SELECT event_id FROM wf_test.workflow_event_outbox WHERE instance_id=?)",id);

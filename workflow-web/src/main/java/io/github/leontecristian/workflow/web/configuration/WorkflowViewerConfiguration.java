@@ -2,6 +2,7 @@ package io.github.leontecristian.workflow.web.configuration;
 
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
+import io.github.leontecristian.workflow.web.integration.WorkflowRequestIdentity;
 import io.github.leontecristian.workflow.web.integration.instance.WorkflowViewerAccess;
 import io.github.leontecristian.workflow.web.controller.instance.WorkflowInstanceViewerController;
 import io.github.leontecristian.workflow.web.service.instance.ViewerWire;
@@ -11,7 +12,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import java.util.Map;
 
-/** Import explicitly and supply WorkflowViewerOptions and WorkflowViewerAccess.
+/** Import explicitly and supply WorkflowViewerOptions, WorkflowRequestIdentity and WorkflowViewerAccess.
  * Deliberately has no component/configuration stereotype: scanning the JAR activates nothing.
  */
 public class WorkflowViewerConfiguration {
@@ -23,8 +24,9 @@ public class WorkflowViewerConfiguration {
         return new WorkflowInstanceGraphService(access, definitions, reads, wire);
     }
     @Bean public WorkflowInstanceViewerController workflowInstanceViewerController(WorkflowInstanceViewerService viewer,
-            WorkflowInstanceGraphService graphs, ViewerWire wire, WorkflowViewerOptions options) {
-        return new WorkflowInstanceViewerController(viewer, graphs, wire, options);
+            WorkflowInstanceGraphService graphs, ViewerWire wire, WorkflowViewerOptions options,
+            WorkflowRequestIdentity identity) {
+        return new WorkflowInstanceViewerController(viewer, graphs, wire, options, identity);
     }
     @Bean public RequestMappingHandlerMapping workflowViewerHandlerMapping(WorkflowViewerOptions options) {
         var mapping = new RequestMappingHandlerMapping() {

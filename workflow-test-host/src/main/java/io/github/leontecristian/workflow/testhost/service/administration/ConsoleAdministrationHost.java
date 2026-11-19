@@ -1,6 +1,5 @@
 package io.github.leontecristian.workflow.testhost.service.administration;
 
-import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationIdentity;
 import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationAuthorization;
 import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationAuditRecorder;
 import io.github.leontecristian.workflow.web.dto.administration.WorkflowAdministrationAudit;
@@ -14,9 +13,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/** Sandbox identity, administration policy and transactional audit storage. */
-public class ConsoleAdministrationHost implements WorkflowAdministrationIdentity,
-        WorkflowAdministrationAuthorization, WorkflowAdministrationAuditRecorder {
+/** Sandbox administration policy and transactional audit storage. */
+public class ConsoleAdministrationHost implements WorkflowAdministrationAuthorization, WorkflowAdministrationAuditRecorder {
     private final ManagementAuditStore audits;
     private final ConsoleWire wire;
     private final ConsoleSettings settings;
@@ -25,14 +23,6 @@ public class ConsoleAdministrationHost implements WorkflowAdministrationIdentity
         this.audits = audits;
         this.wire = wire;
         this.settings = settings;
-    }
-
-    @Override public String requireActorRef() {
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()
-                || authentication instanceof AnonymousAuthenticationToken)
-            throw new WorkflowAdministrationException(401, "UNAUTHENTICATED");
-        return authentication.getName();
     }
 
     @Override public void requireAdministrationAccess(String actorRef) {

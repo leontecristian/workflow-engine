@@ -1,6 +1,6 @@
 # F031 — Shared runtime command coordination
 
-Revision 5 · READY · 2026-11-19 · Owner: workflow maintainer. Design approved by the owner on 2026-11-19 under [constitution 6.6.1](../../constitution.md).
+Revision 5 · IMPLEMENTED · 2026-11-19 · Owner: workflow maintainer. Design approved by the owner on 2026-11-19 under [constitution 6.6.1](../../constitution.md).
 
 ## Purpose and scope
 
@@ -78,4 +78,4 @@ Picker results are advisory. When the reassignment command executes, core valida
 
 8. **A08 (R05, R07).** A read-only host can start without a clock and receives a false hint for a readable instance. An inactive instance or absent policy also gives a false hint. A denied instance read retains its error. With an active readable instance, a fixed clock and configured policy, the policy receives the captured actor, expected time and null correlation. Its grant or denial determines the hint without executing a command.
 
-Implementation awaits separate authorization.
+The owner authorized T03 and T04 on 2026-11-19. See the [implementation record](implementation.md) for delivery and verification.

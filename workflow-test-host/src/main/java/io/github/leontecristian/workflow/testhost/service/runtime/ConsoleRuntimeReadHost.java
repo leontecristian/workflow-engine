@@ -2,33 +2,22 @@ package io.github.leontecristian.workflow.testhost.service.runtime;
 
 import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskEligibilityContext;
-import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
-import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
 import io.github.leontecristian.workflow.web.dto.runtime.WorkflowReassignmentTarget;
 import io.github.leontecristian.workflow.web.dto.runtime.WorkflowReassignmentTargetPage;
 import io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException;
 import io.github.leontecristian.workflow.web.integration.runtime.WorkflowAssignmentDirectory;
-import io.github.leontecristian.workflow.web.integration.runtime.WorkflowCancellationAvailabilityContextHost;
-import io.github.leontecristian.workflow.web.integration.runtime.WorkflowRuntimeReadIdentity;
 
-/** Sandbox identity, fixture directory and lazy cancellation context; core owns authorized reads. */
-public class ConsoleRuntimeReadHost implements WorkflowRuntimeReadIdentity, WorkflowAssignmentDirectory,
-        WorkflowCancellationAvailabilityContextHost {
-    private final ConsoleContext context;
+/** Sandbox fixture directory for runtime task reads. */
+public class ConsoleRuntimeReadHost implements WorkflowAssignmentDirectory {
     private final ConsoleTaskReassignmentAuthorization reassignment;
     private final ConsoleSettings settings;
 
-    public ConsoleRuntimeReadHost(ConsoleContext context, ConsoleTaskReassignmentAuthorization reassignment,
-            ConsoleSettings settings) {
-        this.context = context;
+    public ConsoleRuntimeReadHost(ConsoleTaskReassignmentAuthorization reassignment, ConsoleSettings settings) {
         this.reassignment = reassignment;
         this.settings = settings;
     }
-
-    @Override public String currentActorRef() { return context.actor(); }
-    @Override public WorkflowCommandContext currentCancellationContext() { return context.runtime(null); }
 
     @Override public WorkflowReassignmentTargetPage reassignmentTargets(TaskEligibilityContext task,
             AssignmentTargetKind kind, String query, String cursor, int limit) {

@@ -34,6 +34,7 @@ import io.github.leontecristian.workflow.testhost.configuration.integration.Comp
 import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
 import io.github.leontecristian.workflow.testhost.repository.event.ConsoleEventStore;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
+import io.github.leontecristian.workflow.testhost.configuration.integration.RuntimeCommandFixture;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeTransaction;
 import jakarta.persistence.EntityManager;
 import java.nio.file.Files;
@@ -54,6 +55,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -67,11 +69,13 @@ import org.springframework.transaction.support.TransactionTemplate;
         "workflow.console.admin.username=family.admin", "workflow.console.admin.password=integration-only-admin",
         "workflow.console.reviewer.username=family.reviewer", "workflow.console.reviewer.password=integration-only-reviewer"
 })
+@Import(RuntimeCommandFixture.class)
 class FamilyWorkflowStartIT extends CompletionAdapterIntegrationTest {
     @Autowired WorkflowDefinitionService definitions;
     @Autowired WorkflowRuntimeQueryService reads;
     @Autowired TaskTypeCatalogService catalog;
     @Autowired ConsoleRuntimeTransaction runtime;
+    @Autowired RuntimeCommandFixture runtimeCommands;
     @Autowired JdbcTemplate jdbc;
     @Autowired EntityManager em;
     @Autowired PlatformTransactionManager transactions;
@@ -261,7 +265,7 @@ class FamilyWorkflowStartIT extends CompletionAdapterIntegrationTest {
         reset(target(reader));
         var task = first.execution().task();
         var reviewer = new WorkflowCommandContext(ActorKind.USER, "family.reviewer", Instant.now(), marker);
-        runtime.complete(new CompleteWorkflowTask(UUID.randomUUID(), first.execution().instance().id(), task.id(),
+        runtimeCommands.complete(new CompleteWorkflowTask(UUID.randomUUID(), first.execution().instance().id(), task.id(),
                 first.execution().instance().lockVersion(), "APPROVE", null), reviewer);
         assertThat(reads.findInstance(first.execution().instance().id()).orElseThrow().definitionVersionId()).isEqualTo(original.id());
     }

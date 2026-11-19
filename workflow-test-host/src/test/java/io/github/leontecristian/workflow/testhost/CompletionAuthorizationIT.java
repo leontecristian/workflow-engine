@@ -28,6 +28,7 @@ import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogSe
 import io.github.leontecristian.workflow.testhost.configuration.integration.DatabaseIntegrationTest;
 import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
+import io.github.leontecristian.workflow.testhost.configuration.integration.RuntimeCommandFixture;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeTransaction;
 import io.github.leontecristian.workflow.testhost.service.runtime.SandboxCompletionPermissions;
 import io.github.leontecristian.workflow.testhost.service.runtime.SandboxTaskCompletionValidator;
@@ -43,6 +44,7 @@ import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -57,11 +59,13 @@ import org.springframework.transaction.support.TransactionTemplate;
         properties = {"workflow.console.enabled=true", "workflow.console.capabilities=sample",
                 "workflow.console.admin.username=f028-admin", "workflow.console.admin.password=f028-local-password",
                 "workflow.console.reviewer.username=f028-reviewer", "workflow.console.reviewer.password=f028-local-password"})
+@Import(RuntimeCommandFixture.class)
 class CompletionAuthorizationIT extends DatabaseIntegrationTest {
     @Autowired WorkflowDefinitionService definitions;
     @Autowired TaskTypeCatalogService catalog;
     @Autowired WorkflowRuntimeQueryService reads;
     @Autowired ConsoleRuntimeTransaction runtime;
+    @Autowired RuntimeCommandFixture runtimeCommands;
     @Autowired SandboxRequestStore requests;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactions;
@@ -115,7 +119,7 @@ class CompletionAuthorizationIT extends DatabaseIntegrationTest {
                 "F028-SECONDARY:" + marker, requestId));
         var attempt = command(tasks().stream().filter(t -> "DIRECT".equals(t.taskKey())).findFirst().orElseThrow());
         long version = reads.findInstance(instanceId).orElseThrow().lockVersion();
-        assertThatThrownBy(() -> reviewer(() -> runtime.complete(attempt, actor("f028-reviewer"))))
+        assertThatThrownBy(() -> reviewer(() -> runtimeCommands.complete(attempt, actor("f028-reviewer"))))
                 .isInstanceOfSatisfying(WorkflowExecutionException.class, e -> assertThat(e.category()).isEqualTo(Category.COMPLETION_FORBIDDEN));
         assertThat(reads.findInstance(instanceId).orElseThrow().lockVersion()).isEqualTo(version);
         assertThat(reads.findTask(attempt.taskId()).orElseThrow().status()).isEqualTo(TaskStatus.OPEN);
@@ -125,14 +129,14 @@ class CompletionAuthorizationIT extends DatabaseIntegrationTest {
     @Test void rejectionRollsBackProvisionalVersionAndPreservesPriorAllContributionThenReplaySkipsFreshHooks() throws Exception {
         start();
         var first = command(tasks().get(0));
-        var accepted = reviewer(() -> runtime.complete(first, actor("f028-reviewer")));
+        var accepted = reviewer(() -> runtimeCommands.complete(first, actor("f028-reviewer")));
         assertThat(accepted.replayed()).isFalse();
         var remaining = tasks().stream().filter(t -> t.status() == TaskStatus.OPEN).findFirst().orElseThrow();
         var attempt = command(remaining);
         long version = reads.findInstance(instanceId).orElseThrow().lockVersion();
         int history = count("wf.workflow_history"), receipts = count("wf.workflow_command_receipt"), handoff = count("wf_test.workflow_event_outbox"), effects = count("wf_test.service_effect");
         material(CHANGED);
-        assertThatThrownBy(() -> reviewer(() -> runtime.complete(attempt, actor("f028-reviewer"))))
+        assertThatThrownBy(() -> reviewer(() -> runtimeCommands.complete(attempt, actor("f028-reviewer"))))
                 .isInstanceOfSatisfying(WorkflowExecutionException.class, e -> assertThat(e.category()).isEqualTo(Category.BUSINESS_VALIDATION_REJECTED));
         assertThat(reads.findInstance(instanceId).orElseThrow().lockVersion()).isEqualTo(version);
         assertThat(reads.findTask(remaining.id()).orElseThrow().status()).isEqualTo(TaskStatus.OPEN);
@@ -146,12 +150,12 @@ class CompletionAuthorizationIT extends DatabaseIntegrationTest {
 
         reset(validator);
         doReturn(false).when(permissions).isAllowed(any(), any(), org.mockito.ArgumentMatchers.eq(SandboxCompletionPermissions.Scope.DECIDE), any());
-        var replay = reviewer(() -> runtime.replayComplete(first, actor("f028-reviewer"))).orElseThrow();
+        var replay = reviewer(() -> runtimeCommands.replayComplete(first, actor("f028-reviewer"))).orElseThrow();
         assertThat(replay.execution()).isEqualTo(accepted.execution());
-        assertThat(reviewer(() -> runtime.complete(first, actor("f028-reviewer"))).replayed()).isTrue();
+        assertThat(reviewer(() -> runtimeCommands.complete(first, actor("f028-reviewer"))).replayed()).isTrue();
         org.mockito.Mockito.verifyNoInteractions(validator);
         doReturn(false).when(permissions).isAllowed(any(), any(), org.mockito.ArgumentMatchers.eq(SandboxCompletionPermissions.Scope.VIEW), any());
-        assertThatThrownBy(() -> reviewer(() -> runtime.replayComplete(first, actor("f028-reviewer"))))
+        assertThatThrownBy(() -> reviewer(() -> runtimeCommands.replayComplete(first, actor("f028-reviewer"))))
                 .isInstanceOfSatisfying(WorkflowExecutionException.class, e -> assertThat(e.category()).isEqualTo(Category.NOT_FOUND));
 
         reset(permissions);
@@ -159,7 +163,7 @@ class CompletionAuthorizationIT extends DatabaseIntegrationTest {
         for (var task : tasks().stream().filter(t -> t.status() == TaskStatus.OPEN).toList()) {
             reset(validator);
             var next = command(task);
-            assertThat(reviewer(() -> runtime.complete(next, actor("f028-reviewer"))).replayed()).isFalse();
+            assertThat(reviewer(() -> runtimeCommands.complete(next, actor("f028-reviewer"))).replayed()).isFalse();
             verify(validator).validate(any(), any());
         }
         assertThat(tasks()).allMatch(t -> t.status() == TaskStatus.COMPLETED);
@@ -179,7 +183,7 @@ class CompletionAuthorizationIT extends DatabaseIntegrationTest {
         }).when(validator).validate(any(), any());
         var executor = Executors.newFixedThreadPool(2);
         try {
-            var completion = executor.submit(() -> reviewer(() -> runtime.complete(command, actor("f028-reviewer"))));
+            var completion = executor.submit(() -> reviewer(() -> runtimeCommands.complete(command, actor("f028-reviewer"))));
             assertThat(validated.await(10, TimeUnit.SECONDS)).isTrue();
             var edit = executor.submit(() -> tx().executeWithoutResult(t -> {
                 jdbc.execute("SET LOCK_TIMEOUT 750");

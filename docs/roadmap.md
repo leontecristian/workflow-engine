@@ -1,6 +1,6 @@
 # Workflow engine roadmap
 
-**Updated 2026-11-19. Delivery baseline through F029, administration host simplification (implemented revision 6).**
+**Updated 2026-11-19. Delivery baseline through F031, shared runtime command coordination (implemented revision 5).**
 
 The agreed sequence is working sandbox → first APOLO booking integration → graphical designer. The next milestone depends on owner access to APOLO and selection of one cross-team booking approval scenario.
 
@@ -17,9 +17,9 @@ The agreed sequence is working sandbox → first APOLO booking integration → g
 
 ## 1. Current position
 
-**✅ Sandbox + shared libraries + delivery through F029 → ⏸ APOLO integration → ⏳ Graphical designer**
+**✅ Sandbox + shared libraries + delivery through F031 → ⏸ APOLO integration → ⏳ Graphical designer**
 
-### ✅ Implemented — F001–F029
+### ✅ Implemented — F001–F031
 
 | Features | Capability |
 | --- | --- |
@@ -36,7 +36,9 @@ The agreed sequence is working sandbox → first APOLO booking integration → g
 | ✅ [F026](features/F026-task-administration-reassignment/implementation.md) | **Task administration and reassignment** — cross-instance administration and authorized reassignment of open tasks |
 | ✅ [F027](features/F027-runtime-read-policy-separation/implementation.md) | **Runtime reads** — shared authorized reads with host identity and read policy, separate from operation permissions |
 | ✅ [F028](features/F028-completion-authorization-validation/implementation.md) | **Task completion** — current business access for receipt recovery, fresh permission and business validation for new completions |
-| ✅ [F029](features/F029-administration-host-simplification/implementation.md) | **Administration integration** — shared web calls core, while hosts supply identity, authorization, audit and a clock. Mutations and audit share a REQUIRED transaction. |
+| ✅ [F029](features/F029-administration-host-simplification/implementation.md) | **Administration integration** — shared web calls core. Mutations and opt-in host audit share a REQUIRED transaction. |
+| ✅ [F030](features/F030-workflow-event-batch-writer/implementation.md) | **Transactional handoff** — event batch writer and event catalog. |
+| ✅ [F031](features/F031-shared-runtime-command-coordination/implementation.md) | **Shared runtime command coordination** — shared identity, actor-aware viewer access and transaction-aware core receipt recovery. |
 
 ### ✅ Family-start delivery
 
@@ -80,7 +82,7 @@ Assign feature IDs when specifications begin. Follow the [four-document workflow
 
 ## 4. First APOLO booking integration
 
-**Status:** waiting for owner access to APOLO. With access, select the booking scenario and verify its host dependencies. For the runtime read and completion paths, map APOLO identity, read policy, completion permission and business validation to the delivered F027/F028 contracts. If the host enables definition/catalog administration, follow the [F029 adapter migration](../workflow-web/README.md#f029-java-adapter-migration) and verify its audit participates in the host transaction.
+**Status:** waiting for owner access to APOLO. With access, select the booking scenario and verify its host dependencies. For the runtime read and completion paths, map APOLO identity, read policy, completion permission and business validation to the delivered F027/F028 contracts. If the host enables definition/catalog administration, follow the [F031 adapter migration](../workflow-web/README.md#request-identity-and-java-adapter-migration-f031) and verify that any opted-in audit participates in the host transaction.
 
 - Select one cross-team booking approval from the [booking analysis](integrations/apolo/booking-business-analysis.md) and [approval requirements](integrations/apolo/approval-capability.md). APOLO decides approver sources, access/no-self-approval rules, protected material, review membership, final business effects and required recovery paths. Do not invent unresolved overbooking or alternative-resource policy.
 - Preserve one identified immutable approval basis across all steps of an attempt. Specify protection against material edits, transaction-time membership/material/eligibility checks, durable invalidation and historical retention. Same-instance resubmission remains provisional; a failed completion alone does not persist invalidation.
@@ -124,7 +126,7 @@ At the selected integration/release milestone, reuse applicable evidence and che
 | Business decision engine, decision tables and FIRST/UNIQUE policies | Optional later work requiring a selected need; not a dependency of workflow routing, first integration or the designer. |
 | General delegation, timers/expiration, ANY/QUORUM, inclusive/parallel gateways, subprocesses and active-instance migration | Deferred. ALL is already delivered by F021 and is not part of this deferred scope. |
 | APOLO approval branches and recovery | APOLO selects approver sources, material-change policy and recovery paths. Same-instance resubmission remains provisional. |
-| Durable administration audit recording in `workflow-web` | Deferred. Consider a shared implementation for hosts that need a durable record of definition and task-type changes. [F031](features/F031-shared-runtime-command-coordination/spec.md) proposes an optional host recorder. The storage mechanism and opt-in contract for a shared recorder remain open. |
+| Durable administration audit recording in `workflow-web` | Deferred. Consider a shared implementation for hosts that need a durable record of definition and task-type changes. [F031](features/F031-shared-runtime-command-coordination/spec.md) supports an optional host recorder. The storage mechanism and opt-in contract for a shared recorder remain open. |
 | Source move and release ownership | Timing, coordinates, test-host placement and release responsibilities remain open; section 4 records the agreed boundary. |
 | Future feature IDs, dates and owners | Unassigned until the corresponding specification and scheduling decisions. |
 

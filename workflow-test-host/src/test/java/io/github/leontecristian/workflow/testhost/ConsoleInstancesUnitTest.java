@@ -16,7 +16,6 @@ import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceQuery;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceSummary;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeReadHost;
 import io.github.leontecristian.workflow.web.controller.runtime.WorkflowRuntimeReadController;
 import io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException;
 import io.github.leontecristian.workflow.web.service.runtime.RuntimeWire;
@@ -39,7 +38,7 @@ class ConsoleInstancesUnitTest {
                             mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class),
                             mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess.class)),
                     mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class)),
-            new ConsoleRuntimeReadHost(context, null, null), null, null, new RuntimeWire(), null, false);
+            context::actor, null, null, new RuntimeWire(), null, false);
 
     @BeforeEach
     void administrator() {

@@ -26,6 +26,7 @@ import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogSe
 import io.github.leontecristian.workflow.testhost.configuration.integration.CompletionAdapterIntegrationTest;
 import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
+import io.github.leontecristian.workflow.testhost.configuration.integration.RuntimeCommandFixture;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeTransaction;
 import io.github.leontecristian.workflow.testhost.service.sandbox.SandboxSetRequestStatusAction;
 import java.nio.file.Files;
@@ -41,6 +42,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -52,12 +54,14 @@ import org.springframework.transaction.support.TransactionTemplate;
         "workflow.console.admin.username=status.admin", "workflow.console.admin.password=integration-only-admin",
         "workflow.console.reviewer.username=status.reviewer", "workflow.console.reviewer.password=integration-only-reviewer"
 })
+@Import(RuntimeCommandFixture.class)
 class SandboxStatusWorkflowIT extends CompletionAdapterIntegrationTest {
     @Autowired private WorkflowDefinitionService definitions;
     @Autowired private WorkflowRuntimeQueryService reads;
     @Autowired private TaskTypeCatalogService catalog;
     @Autowired private SandboxRequestStore requests;
     @Autowired private ConsoleRuntimeTransaction runtime;
+    @Autowired RuntimeCommandFixture runtimeCommands;
     @Autowired private SandboxSetRequestStatusAction action;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager transactions;
@@ -196,7 +200,7 @@ class SandboxStatusWorkflowIT extends CompletionAdapterIntegrationTest {
                 Map.of("status", new WorkflowValue(VariableValueType.STRING, new TextLiteral("IN_REVIEW")))));
         assertThat(requests.find(requestId).lockVersion()).isEqualTo(2);
         var completion = complete(started, outcome);
-        var result = runtime.complete(completion, context(true));
+        var result = runtimeCommands.complete(completion, context(true));
         String target = outcome.equals("APPROVE") ? "APPROVED" : "REJECTED";
         assertThat(result.execution().instance().resultKey()).isEqualTo(target);
         assertThat(requests.find(requestId).status()).isEqualTo(target);
@@ -204,7 +208,7 @@ class SandboxStatusWorkflowIT extends CompletionAdapterIntegrationTest {
         assertThat(variableJson(started.instance().id())).isEqualTo(data);
         assertThat(requests.find(requestId).lockVersion()).isEqualTo(3);
         int events = count("wf_test.workflow_event_outbox", started.instance().id());
-        assertThat(runtime.complete(completion, context(true)).replayed()).isTrue();
+        assertThat(runtimeCommands.complete(completion, context(true)).replayed()).isTrue();
         assertThat(requests.find(requestId).lockVersion()).isEqualTo(3);
         assertThat(count("wf_test.workflow_event_outbox", started.instance().id())).isEqualTo(events);
         var history = jdbc.queryForList("SELECT details_json FROM wf.workflow_history WHERE instance_id=? AND event_type='SERVICE_TASK_COMPLETED' ORDER BY sequence_number", String.class, started.instance().id());
@@ -231,7 +235,7 @@ class SandboxStatusWorkflowIT extends CompletionAdapterIntegrationTest {
         long instance = started.instance().id();
         int history = count("wf.workflow_history", instance), events = count("wf_test.workflow_event_outbox", instance);
         var completion = complete(started, "APPROVE");
-        assertThatThrownBy(() -> runtime.complete(completion, context(true)))
+        assertThatThrownBy(() -> runtimeCommands.complete(completion, context(true)))
                 .isInstanceOfSatisfying(WorkflowExecutionException.class,
                         failure -> assertThat(failure.category()).isEqualTo(WorkflowExecutionException.Category.UNINITIALIZED_VARIABLE));
         assertThat(requests.find(requestId).status()).isEqualTo("IN_REVIEW");

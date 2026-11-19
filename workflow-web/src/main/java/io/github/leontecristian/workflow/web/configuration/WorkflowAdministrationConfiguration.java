@@ -2,10 +2,11 @@ package io.github.leontecristian.workflow.web.configuration;
 
 import io.github.leontecristian.workflow.core.service.definition.WorkflowDefinitionService;
 import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
-import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationIdentity;
+import io.github.leontecristian.workflow.web.integration.WorkflowRequestIdentity;
 import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationAuthorization;
 import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationAuditRecorder;
 import io.github.leontecristian.workflow.web.service.administration.WorkflowAdministrationService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.transaction.PlatformTransactionManager;
 import java.time.Clock;
 import io.github.leontecristian.workflow.web.controller.tasktype.WorkflowTaskTypeController;
@@ -23,18 +24,18 @@ public class WorkflowAdministrationConfiguration {
         return new AdministrationErrors(wire, options);
     }
     @Bean public WorkflowAdministrationService workflowAdministrationService(WorkflowDefinitionService definitions,
-            TaskTypeCatalogService catalog, WorkflowAdministrationAuditRecorder audits, Clock clock,
+            TaskTypeCatalogService catalog, ObjectProvider<WorkflowAdministrationAuditRecorder> audits, Clock clock,
             PlatformTransactionManager transactionManager) {
         // Required dependency ensures activation fails without host transaction infrastructure.
-        return new WorkflowAdministrationService(definitions, catalog, audits, clock);
+        return new WorkflowAdministrationService(definitions, catalog, audits.getIfAvailable(), clock);
     }
     @Bean public WorkflowTaskTypeController workflowTaskTypeController(TaskTypeCatalogService catalog,
-            WorkflowAdministrationService management, WorkflowAdministrationIdentity identity,
+            WorkflowAdministrationService management, WorkflowRequestIdentity identity,
             WorkflowAdministrationAuthorization authorization, AdministrationWire wire, AdministrationErrors errors) {
         return new WorkflowTaskTypeController(catalog, management, identity, authorization, wire, errors);
     }
     @Bean public WorkflowDefinitionController workflowDefinitionController(WorkflowDefinitionService definitions,
-            WorkflowAdministrationService management, WorkflowAdministrationIdentity identity,
+            WorkflowAdministrationService management, WorkflowRequestIdentity identity,
             WorkflowAdministrationAuthorization authorization, AdministrationWire wire, AdministrationErrors errors) {
         return new WorkflowDefinitionController(definitions, management, identity, authorization, wire, errors);
     }

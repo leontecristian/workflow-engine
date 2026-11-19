@@ -6,7 +6,6 @@ import static org.mockito.Mockito.*;
 import io.github.leontecristian.workflow.core.dto.runtime.*;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionService;
-import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
 import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
@@ -26,7 +25,7 @@ class SandboxRequestDataUnitTest {
     void startAndReplayPassSelectorAndSavedDataUnchanged(String selector) {
         var engine = mock(WorkflowExecutionService.class);
         var requests = mock(SandboxRequestStore.class);
-        var runtime = new ConsoleRuntimeTransaction(engine, mock(WorkflowRuntimeQueryService.class), requests,
+        var runtime = new ConsoleRuntimeTransaction(engine, requests,
                 new ConsoleSettings(new MockEnvironment()));
         var command = new SandboxStart(UUID.randomUUID(), selector.equals("key") ? "Booking.review" : null,
                 selector.equals("family") ? 9007199254740993L : null,
@@ -61,7 +60,7 @@ class SandboxRequestDataUnitTest {
     @Test void reservedInputCannotOverrideSavedDataOnStartOrReplay() {
         var engine = mock(WorkflowExecutionService.class);
         var requests = mock(SandboxRequestStore.class);
-        var runtime = new ConsoleRuntimeTransaction(engine, mock(WorkflowRuntimeQueryService.class), requests,
+        var runtime = new ConsoleRuntimeTransaction(engine, requests,
                 new ConsoleSettings(new MockEnvironment()));
         var command = new SandboxStart(UUID.randomUUID(), 1, 2, 0,
                 new StartInputs(Map.of("requestData", WorkflowJsonValue.parse("{}"))));

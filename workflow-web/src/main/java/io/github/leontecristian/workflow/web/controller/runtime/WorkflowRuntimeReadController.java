@@ -1,11 +1,13 @@
 package io.github.leontecristian.workflow.web.controller.runtime;
 
+import static io.github.leontecristian.workflow.web.service.WorkflowRequestActors.requireActor;
 import static io.github.leontecristian.workflow.web.service.runtime.RuntimeWire.after;
 import static io.github.leontecristian.workflow.web.service.runtime.RuntimeWire.decimal;
 import static io.github.leontecristian.workflow.web.service.runtime.RuntimeWire.limit;
 import static io.github.leontecristian.workflow.web.service.runtime.RuntimeWire.query;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
 import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
 import io.github.leontecristian.workflow.core.dto.runtime.BooleanLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy;
@@ -14,6 +16,7 @@ import io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmission;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmissionPage;
 import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceQuery;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceSummary;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
@@ -26,12 +29,13 @@ import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogSe
 import io.github.leontecristian.workflow.web.dto.runtime.WorkflowTaskContract;
 import io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowAuthorizedRuntimeReadService;
-import io.github.leontecristian.workflow.web.integration.runtime.WorkflowRuntimeReadIdentity;
+import io.github.leontecristian.workflow.web.integration.WorkflowRequestIdentity;
 import io.github.leontecristian.workflow.web.integration.runtime.WorkflowAssignmentDirectory;
-import io.github.leontecristian.workflow.web.integration.runtime.WorkflowCancellationAvailabilityContextHost;
 import io.github.leontecristian.workflow.web.service.runtime.RuntimeErrors;
 import io.github.leontecristian.workflow.web.service.runtime.RuntimeWire;
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
@@ -47,23 +51,23 @@ public class WorkflowRuntimeReadController {
     private final WorkflowDefinitionService definitions;
     private final TaskTypeCatalogService catalog;
     private final WorkflowAuthorizedRuntimeReadService access;
-    private final WorkflowRuntimeReadIdentity identity;
+    private final WorkflowRequestIdentity identity;
     private final WorkflowAssignmentDirectory directory;
-    private final WorkflowCancellationAvailabilityContextHost cancellationContext;
+    private final Clock clock;
     private final RuntimeWire wire;
     private final RuntimeErrors errors;
     private final boolean commandsAvailable;
     public WorkflowRuntimeReadController(WorkflowRuntimeQueryService reads, WorkflowDefinitionService definitions, TaskTypeCatalogService catalog,
-            WorkflowAuthorizedRuntimeReadService access, WorkflowRuntimeReadIdentity identity,
-            WorkflowAssignmentDirectory directory, WorkflowCancellationAvailabilityContextHost cancellationContext,
+            WorkflowAuthorizedRuntimeReadService access, WorkflowRequestIdentity identity,
+            WorkflowAssignmentDirectory directory, Clock clock,
             RuntimeWire wire, RuntimeErrors errors, boolean commandsAvailable) {
         this.reads = reads; this.definitions = definitions; this.access = access; this.wire = wire; this.errors = errors;
         this.commandsAvailable = commandsAvailable;
-        this.catalog = catalog; this.identity = identity; this.directory = directory; this.cancellationContext = cancellationContext;
+        this.catalog = catalog; this.identity = identity; this.directory = directory; this.clock = clock;
     }
     @GetMapping("/instances/{id}/variables")
     public ResponseEntity<String> variables(@PathVariable String id,HttpServletRequest r) {
-        query(r,"afterKey","limit","expectedLockVersion"); long key=decimal(id,false); access.instance(identity.currentActorRef(), key);
+        query(r,"afterKey","limit","expectedLockVersion"); long key=decimal(id,false); access.instance(requireActor(identity), key);
         var page=reads.listVariables(key,r.getParameter("afterKey"),limit(r.getParameter("limit")),
                 r.getParameter("expectedLockVersion")==null ? null : decimal(r.getParameter("expectedLockVersion"),true));
         var items=new java.util.ArrayList<Map<String,Object>>();
@@ -78,11 +82,15 @@ public class WorkflowRuntimeReadController {
     @GetMapping("/instances/{id}/cancellation-availability")
     public ResponseEntity<String> cancellationAvailability(@PathVariable String id, HttpServletRequest request) {
         query(request);
-        String actorRef = identity.currentActorRef();
+        String actorRef = requireActor(identity);
         var instance = access.instance(actorRef, decimal(id, false));
-        boolean allowed = instance.status() == InstanceStatus.ACTIVE && cancellationContext != null
-                && access.hasCancellationAuthorization()
-                && access.canCancelWorkflow(actorRef, instance, cancellationContext.currentCancellationContext());
+        boolean allowed = false;
+        if (instance.status() == InstanceStatus.ACTIVE && clock != null && access.hasCancellationAuthorization()) {
+            Instant time = clock.instant();
+            var context = new WorkflowCommandContext(ActorKind.USER, actorRef,
+                    Instant.ofEpochSecond(time.getEpochSecond(), time.getNano() / 100 * 100L), null);
+            allowed = access.canCancelWorkflow(actorRef, instance, context);
+        }
         return wire.response(Map.of("allowed", allowed, "lockVersion", instance.lockVersion()));
     }
 
@@ -94,7 +102,8 @@ public class WorkflowRuntimeReadController {
     }
     @GetMapping("/instances")
     public ResponseEntity<String> instances(HttpServletRequest r) {
-        access.requireMonitorAccess(identity.currentActorRef());
+        String actorRef = requireActor(identity);
+        access.requireMonitorAccess(actorRef);
         query(r, "status", "afterId", "limit");
         String requested = r.getParameter("status");
         InstanceStatus status = InstanceStatus.ACTIVE;
@@ -107,7 +116,7 @@ public class WorkflowRuntimeReadController {
             }
         }
         var page =
-                access.listInstances(identity.currentActorRef(),
+                access.listInstances(actorRef,
                         new WorkflowInstanceQuery(
                                 status,
                                 after(r.getParameter("afterId")),
@@ -125,7 +134,7 @@ public class WorkflowRuntimeReadController {
         long key = decimal(id, false);
 
         var page =
-                access.listInstanceTasks(identity.currentActorRef(),
+                access.listInstanceTasks(requireActor(identity),
                         key, after(r.getParameter("afterId")), limit(r.getParameter("limit")));
         return wire.response(
                 taskPage(page));
@@ -134,7 +143,7 @@ public class WorkflowRuntimeReadController {
     public ResponseEntity<String> mine(HttpServletRequest r) {
         query(r, "afterId", "limit");
         var page =
-                access.listMyTasks(identity.currentActorRef(),
+                access.listMyTasks(requireActor(identity),
 
                         after(r.getParameter("afterId")),
                         limit(r.getParameter("limit")));
@@ -143,7 +152,8 @@ public class WorkflowRuntimeReadController {
     }
     @GetMapping("/tasks/administration")
     public ResponseEntity<String> administrationTasks(HttpServletRequest request) {
-        access.requireTaskAdministrationAccess(identity.currentActorRef());
+        String actorRef = requireActor(identity);
+        access.requireTaskAdministrationAccess(actorRef);
         query(request, "status", "taskType", "assignmentKind", "assignmentRef", "assigneeRef", "instanceId", "afterId", "limit", "taskName");
         TaskStatus status = TaskStatus.OPEN;
         String requested = request.getParameter("status");
@@ -156,7 +166,7 @@ public class WorkflowRuntimeReadController {
         AssignmentTargetKind kind = kindValue == null ? null : assignmentKind(kindValue);
         String ref = filter(request, "assignmentRef", 200);
         if (ref != null && kind == null) throw WorkflowRuntimeException.invalid();
-        var page = access.listAdministrationTasks(identity.currentActorRef(), new WorkflowTaskAdministrationQuery(status,
+        var page = access.listAdministrationTasks(actorRef, new WorkflowTaskAdministrationQuery(status,
                 filter(request, "taskType", 100), kind, ref, filter(request, "assigneeRef", 200),
                 request.getParameter("instanceId") == null ? null : decimal(request.getParameter("instanceId"), false),
                 after(request.getParameter("afterId")), limit(request.getParameter("limit")), filter(request, "taskName", 200)));
@@ -176,21 +186,23 @@ public class WorkflowRuntimeReadController {
     public ResponseEntity<String> reassignmentAvailability(@PathVariable String id, HttpServletRequest request) {
         query(request);
         long taskId = decimal(id, false);
-        var first = access.task(identity.currentActorRef(), taskId);
+        String actorRef = requireActor(identity);
+        var first = access.task(actorRef, taskId);
         // Read the aggregate token before the final authorized task snapshot.
         var instance = reads.findInstance(first.instanceId()).orElseThrow();
-        var task = access.task(identity.currentActorRef(), taskId);
+        var task = access.task(actorRef, taskId);
         var activity = reads.findActivity(task.activityId()).orElseThrow();
         boolean allowed = task.status() == TaskStatus.OPEN && instance.status() == InstanceStatus.ACTIVE
-                && activity.nodeKey().equals(instance.currentNodeKey()) && access.canReassignTask(identity.currentActorRef(), task);
+                && activity.nodeKey().equals(instance.currentNodeKey()) && access.canReassignTask(actorRef, task);
         return wire.response(Map.of("allowed", allowed, "instanceLockVersion", instance.lockVersion()));
     }
 
     @GetMapping("/tasks/{id}/reassignment-targets")
     public ResponseEntity<String> reassignmentTargets(@PathVariable String id, HttpServletRequest request) {
         query(request, "kind", "query", "cursor", "limit");
-        var task = access.task(identity.currentActorRef(), decimal(id, false));
-        if (!access.canReassignTask(identity.currentActorRef(), task)) throw new WorkflowRuntimeException(403, "REASSIGNMENT_FORBIDDEN");
+        String actorRef = requireActor(identity);
+        var task = access.task(actorRef, decimal(id, false));
+        if (!access.canReassignTask(actorRef, task)) throw new WorkflowRuntimeException(403, "REASSIGNMENT_FORBIDDEN");
         var kind = assignmentKind(request.getParameter("kind"));
         String search = request.getParameter("query");
         if (search == null) search = "";
@@ -199,7 +211,7 @@ public class WorkflowRuntimeReadController {
         if (cursor != null && (cursor.length() > 1000 || !RuntimeWire.unicode(cursor))) throw WorkflowRuntimeException.invalid();
         long count = request.getParameter("limit") == null ? 20 : decimal(request.getParameter("limit"), false);
         if (count > 50) throw WorkflowRuntimeException.invalid();
-        var page = directory.reassignmentTargets(new io.github.leontecristian.workflow.core.dto.runtime.TaskEligibilityContext(task, identity.currentActorRef()), kind, search, cursor, (int) count);
+        var page = directory.reassignmentTargets(new io.github.leontecristian.workflow.core.dto.runtime.TaskEligibilityContext(task, actorRef), kind, search, cursor, (int) count);
         if (page == null || page.items().size() > count || page.nextCursor() != null
                 && (page.nextCursor().length() > 1000 || !RuntimeWire.unicode(page.nextCursor())))
             throw new WorkflowRuntimeException(500, "HOST_CONFIGURATION");
@@ -225,7 +237,7 @@ public class WorkflowRuntimeReadController {
     }
     @GetMapping("/tasks/{id}")
     public ResponseEntity<String> task(@PathVariable String id) {
-        return wire.response(new TaskLabels().project(access.task(identity.currentActorRef(), decimal(id, false))));
+        return wire.response(new TaskLabels().project(access.task(requireActor(identity), decimal(id, false))));
     }
 
     private Map<String, Object> taskPage(io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage page) {
@@ -267,12 +279,13 @@ public class WorkflowRuntimeReadController {
     @GetMapping("/tasks/{id}/submission")
     public ResponseEntity<String> submission(@PathVariable String id) {
         long key = decimal(id, false);
-        var authorized = access.task(identity.currentActorRef(), key);
+        String actorRef = requireActor(identity);
+        var authorized = access.task(actorRef, key);
         var submission = reads.findTaskSubmission(key).orElse(null);
         // Open-task ownership can grant a read before completion. Authorize the final task if
         // the submission became visible after the initial grant.
         if (submission != null && authorized.status() != TaskStatus.COMPLETED
-                && access.task(identity.currentActorRef(), key).status() != TaskStatus.COMPLETED) {
+                && access.task(actorRef, key).status() != TaskStatus.COMPLETED) {
             throw new WorkflowRuntimeException(404, "NOT_FOUND");
         }
         return wire.response(submission);
@@ -284,17 +297,18 @@ public class WorkflowRuntimeReadController {
         long cursor = after(r.getParameter("afterSequence"));
         long count = r.getParameter("limit") == null ? 20 : decimal(r.getParameter("limit"), false);
         if (count > 50) throw WorkflowRuntimeException.invalid();
-        access.task(identity.currentActorRef(), key);
+        access.task(requireActor(identity), key);
         return wire.previousDecisionPage(reads.listPreviousDecisions(key, cursor, (int) count));
     }
     @GetMapping("/tasks/{id}/contract")
     public ResponseEntity<String> contract(@PathVariable String id) {
         long taskId = decimal(id, false);
-        var authorized = access.task(identity.currentActorRef(), taskId);
+        String actorRef = requireActor(identity);
+        var authorized = access.task(actorRef, taskId);
         // The exact-task grant permits its own pinned contract without general instance access.
         // Read the version before the task snapshot so a stale view cannot carry a newer token.
         var instance = reads.findInstance(authorized.instanceId()).orElseThrow();
-        var task = access.task(identity.currentActorRef(), taskId);
+        var task = access.task(actorRef, taskId);
         var activity = reads.findActivity(task.activityId()).orElseThrow();
         var claimPolicy = reads.taskClaimPolicy(task.instanceId(), task.id());
         var version =
@@ -314,7 +328,7 @@ public class WorkflowRuntimeReadController {
                 boolean shared = task.assignment().kind() != AssignmentTargetKind.USER;
                 boolean assigned = task.assigneeRef() != null;
                 boolean canComplete = open && (!shared || assigned || claimPolicy == TaskClaimPolicy.OPTIONAL)
-                        && access.canCompleteTask(identity.currentActorRef(), task);
+                        && access.canCompleteTask(actorRef, task);
                 var resultContract = node.get("resultContract");
                 if (resultContract == null) resultContract = JsonNodeFactory.instance.objectNode().put("mode", "FORBIDDEN");
                 var inputs = new LinkedHashMap<String, WorkflowTaskContract.Input>();
@@ -323,9 +337,9 @@ public class WorkflowRuntimeReadController {
                 return wire.largeResponse(new WorkflowTaskContract(
                         task.id(), task.instanceId(), instance.lockVersion(), node.get("taskType").textValue(),
                         outcomes, canComplete, assignmentLabel(task), claimPolicy,
-                        commandsAvailable && open && shared && !assigned && access.canClaimTask(identity.currentActorRef(), task),
-                        commandsAvailable && open && shared && assigned && access.canReleaseTask(identity.currentActorRef(), task),
-                        commandsAvailable && open && shared && assigned && access.canAdministrativelyReleaseTask(identity.currentActorRef(), task),
+                        commandsAvailable && open && shared && !assigned && access.canClaimTask(actorRef, task),
+                        commandsAvailable && open && shared && assigned && access.canReleaseTask(actorRef, task),
+                        commandsAvailable && open && shared && assigned && access.canAdministrativelyReleaseTask(actorRef, task),
                         resultContract, inputs, new WorkflowTaskContract.PreviousDecisions(
                                 reads.previousDecisionsPolicy(taskId).mode().name())));
             }
@@ -333,17 +347,18 @@ public class WorkflowRuntimeReadController {
     }
     @GetMapping("/activities/{id}")
     public ResponseEntity<String> activity(@PathVariable String id) {
-        return wire.response(access.activity(identity.currentActorRef(), decimal(id, false)));
+        return wire.response(access.activity(requireActor(identity), decimal(id, false)));
     }
     @GetMapping("/activities/{id}/submissions")
     public ResponseEntity<String> submissions(@PathVariable String id, HttpServletRequest r) {
         query(r, "afterTaskId", "limit");
         long key = decimal(id, false);
-        access.activity(identity.currentActorRef(), key);
-        var page = visibleSubmissions(key, after(r.getParameter("afterTaskId")), limit(r.getParameter("limit")));
+        String actorRef = requireActor(identity);
+        access.activity(actorRef, key);
+        var page = visibleSubmissions(actorRef, key, after(r.getParameter("afterTaskId")), limit(r.getParameter("limit")));
         return wire.submissionPage(page);
     }
-    private TaskSubmissionPage visibleSubmissions(long activityId, long after, int limit) {
+    private TaskSubmissionPage visibleSubmissions(String actorRef, long activityId, long after, int limit) {
         var visible = new java.util.ArrayList<TaskSubmission>();
         long cursor = after;
         int examined = 0;
@@ -354,7 +369,7 @@ public class WorkflowRuntimeReadController {
                 cursor = submission.taskId(); examined++;
                 var task = reads.findTask(submission.taskId())
                         .orElseThrow(() -> new IllegalStateException("Submission task missing"));
-                if (access.canReadTask(identity.currentActorRef(), task)) visible.add(submission);
+                if (access.canReadTask(actorRef, task)) visible.add(submission);
                 if (visible.size() == limit || examined == 500) {
                     boolean more = index + 1 < page.items().size() || page.nextAfterTaskId() != null;
                     return new TaskSubmissionPage(visible, more ? cursor : null);

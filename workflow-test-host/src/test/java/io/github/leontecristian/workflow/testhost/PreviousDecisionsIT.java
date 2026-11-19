@@ -27,6 +27,7 @@ import io.github.leontecristian.workflow.testhost.configuration.integration.Comp
 import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
 import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
+import io.github.leontecristian.workflow.testhost.configuration.integration.RuntimeCommandFixture;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeTransaction;
 import io.github.leontecristian.workflow.testhost.service.runtime.SandboxSharedAssignmentProvider;
 import java.nio.file.Files;
@@ -42,6 +43,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
@@ -70,11 +72,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         properties = {"workflow.console.enabled=true", "workflow.console.capabilities=sample",
                 "workflow.console.admin.username=f022-admin", "workflow.console.admin.password=f022-local-test-password",
                 "workflow.console.reviewer.username=f022-reviewer", "workflow.console.reviewer.password=f022-local-test-password"})
+@Import(RuntimeCommandFixture.class)
 class PreviousDecisionsIT extends CompletionAdapterIntegrationTest {
     @Autowired WorkflowDefinitionService definitions;
     @Autowired TaskTypeCatalogService catalog;
     @Autowired WorkflowRuntimeQueryService reads;
     @Autowired ConsoleRuntimeTransaction runtime;
+    @Autowired RuntimeCommandFixture runtimeCommands;
     @Autowired SandboxRequestStore requests;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactions;
@@ -285,7 +289,7 @@ class PreviousDecisionsIT extends CompletionAdapterIntegrationTest {
         instances.add(instance); return instance;
     }
     private void complete(WorkflowTaskView task, String outcome, String comment, String actor) {
-        runtime.complete(new CompleteWorkflowTask(UUID.randomUUID(), task.instanceId(), task.id(),
+        runtimeCommands.complete(new CompleteWorkflowTask(UUID.randomUUID(), task.instanceId(), task.id(),
                 reads.findInstance(task.instanceId()).orElseThrow().lockVersion(), outcome, comment), actor(actor));
     }
     private WorkflowTaskView open(long instance) {

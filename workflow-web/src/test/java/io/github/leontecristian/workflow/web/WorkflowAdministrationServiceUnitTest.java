@@ -172,7 +172,7 @@ class WorkflowAdministrationServiceUnitTest {
         verify(catalog).update(command);
         verifyAudit("UPDATE_TASK_TYPE", "TASK_TYPE", 8, before, after);
     }
-    @Test void requiredAuditFailuresPropagateUnchanged() {
+    @Test void configuredAuditFailuresPropagateUnchanged() {
         tickingClock();
         when(catalog.create(any())).thenReturn(new TaskTypeChange(Optional.empty(),
                 new TaskTypeView(8, "TYPE", "Name", null, true, 1), true));

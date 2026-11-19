@@ -10,11 +10,11 @@ import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeRea
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskReassignmentAuthorization;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowCancellationAuthorization;
-import io.github.leontecristian.workflow.web.integration.runtime.WorkflowRuntimeReadIdentity;
+import io.github.leontecristian.workflow.web.integration.WorkflowRequestIdentity;
 import io.github.leontecristian.workflow.web.integration.runtime.WorkflowAssignmentDirectory;
-import io.github.leontecristian.workflow.web.integration.runtime.WorkflowCancellationAvailabilityContextHost;
 import io.github.leontecristian.workflow.web.service.runtime.RuntimeErrors;
 import io.github.leontecristian.workflow.web.service.runtime.RuntimeWire;
+import java.time.Clock;
 import java.util.Map;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
@@ -29,14 +29,14 @@ public class WorkflowRuntimeReadConfiguration {
         return new WorkflowAuthorizedRuntimeReadService(reads, policy, eligibility, reassignment, cancellation);
     }
     @Bean public WorkflowRuntimeReadController workflowRuntimeReadController(WorkflowAuthorizedRuntimeReadService readsAccess,
-            WorkflowRuntimeReadIdentity identity, ObjectProvider<WorkflowAssignmentDirectory> directory,
-            ObjectProvider<WorkflowCancellationAvailabilityContextHost> cancellationContext,
+            WorkflowRequestIdentity identity, ObjectProvider<WorkflowAssignmentDirectory> directory,
+            ObjectProvider<Clock> clock,
             WorkflowRuntimeOptions options, WorkflowRuntimeQueryService reads, WorkflowDefinitionService definitions,
             TaskTypeCatalogService catalog,
             ObjectProvider<WorkflowRuntimeCommandController> commands) {
         var wire = new RuntimeWire();
         return new WorkflowRuntimeReadController(reads, definitions, catalog, readsAccess, identity,
-                directory.getIfAvailable(() -> new WorkflowAssignmentDirectory() {}), cancellationContext.getIfAvailable(),
+                directory.getIfAvailable(() -> new WorkflowAssignmentDirectory() {}), clock.getIfAvailable(),
                 wire, new RuntimeErrors(wire, options),
                 commands.getIfAvailable() != null);
     }

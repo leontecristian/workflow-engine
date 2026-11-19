@@ -47,15 +47,14 @@ import io.github.leontecristian.workflow.web.configuration.WorkflowViewerOptions
 import io.github.leontecristian.workflow.web.controller.runtime.WorkflowRuntimeCommandController;
 import io.github.leontecristian.workflow.web.controller.runtime.WorkflowRuntimeReadController;
 import io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException;
-import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationIdentity;
+import io.github.leontecristian.workflow.web.integration.WorkflowRequestIdentity;
 import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationAuthorization;
 import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationAuditRecorder;
 import io.github.leontecristian.workflow.web.integration.instance.WorkflowViewerAccess;
-import io.github.leontecristian.workflow.web.integration.runtime.WorkflowRuntimeCommandHost;
+import io.github.leontecristian.workflow.web.service.runtime.WorkflowRuntimeCommandCoordinator;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowAuthorizedRuntimeReadService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeReadAuthorization;
-import io.github.leontecristian.workflow.web.integration.runtime.WorkflowRuntimeReadIdentity;
 import io.github.leontecristian.workflow.web.integration.runtime.WorkflowAssignmentDirectory;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -83,7 +82,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 class WorkflowRuntimeWebUnitTest {
     @Test void cancellationTransportPreservesExactReasonAndUsesLookupOnlyRecovery() throws Exception {
         try (var c = context(Host.class, Commands.class, WorkflowRuntimeCommandConfiguration.class)) {
-            var host = c.getBean(WorkflowRuntimeCommandHost.class);
+            var host = c.getBean(WorkflowRuntimeCommandCoordinator.class);
             var mvc = mvc(c);
             String base = "{\"commandId\":\"12345678-1234-1234-1234-123456789abc\",\"reason\":\" exact \"}";
             when(host.cancel(any(), eq("corr"))).thenReturn(
@@ -113,23 +112,6 @@ class WorkflowRuntimeWebUnitTest {
         }
     }
 
-    @Test void cancellationAvailabilityUsesAuthorizedSnapshotAndReadOnlyHostDefaults() throws Exception {
-        try (var c = context(Host.class, Reads.class, WorkflowRuntimeReadConfiguration.class)) {
-            var host = c.getBean(WorkflowAuthorizedRuntimeReadService.class);
-            var instance = mock(io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView.class);
-            when(instance.status()).thenReturn(io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus.ACTIVE);
-            when(instance.lockVersion()).thenReturn(9007199254740994L);
-            when(host.instance("actor", 1)).thenReturn(instance);
-            var mvc = mvc(c);
-            mvc.perform(get("/custom/instances/1/cancellation-availability")).andExpect(status().isOk())
-                    .andExpect(content().json("{\"allowed\":false,\"lockVersion\":\"9007199254740994\"}"));
-            verify(host, org.mockito.Mockito.never()).hasCancellationAuthorization();
-            when(instance.status()).thenReturn(io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus.CANCELLED);
-            mvc.perform(get("/custom/instances/1/cancellation-availability")).andExpect(jsonPath("$.allowed").value(false));
-            when(host.instance("actor", 1)).thenThrow(new WorkflowRuntimeException(404, "NOT_FOUND"));
-            mvc.perform(get("/custom/instances/1/cancellation-availability")).andExpect(status().isNotFound());
-        }
-    }
     @Configuration(proxyBeanMethods=false) @EnableWebMvc
     static class Host extends HostBeans {}
     @Configuration(proxyBeanMethods = false)
@@ -144,7 +126,11 @@ class WorkflowRuntimeWebUnitTest {
         @Bean WorkflowViewerOptions viewerOptions() { return new WorkflowViewerOptions("/custom", "trusted"); }
         @Bean WorkflowViewerAccess viewerAccess() { return mock(WorkflowViewerAccess.class); }
         @Bean WorkflowAdministrationOptions administrationOptions() { return new WorkflowAdministrationOptions("/custom", "trusted"); }
-        @Bean WorkflowAdministrationIdentity administrationIdentity() { return () -> "actor"; }
+        @Bean WorkflowRequestIdentity identity() {
+            var identity = mock(WorkflowRequestIdentity.class);
+            when(identity.requireActorRef()).thenReturn("actor");
+            return identity;
+        }
         @Bean WorkflowAdministrationAuthorization administrationAuthorization() { return mock(WorkflowAdministrationAuthorization.class); }
         @Bean WorkflowAdministrationAuditRecorder administrationRecorder() { return mock(WorkflowAdministrationAuditRecorder.class); }
         @Bean java.time.Clock administrationClock() { return java.time.Clock.systemUTC(); }
@@ -155,63 +141,22 @@ class WorkflowRuntimeWebUnitTest {
     @Configuration(proxyBeanMethods=false) static class Reads {
         @Bean @org.springframework.context.annotation.Primary
         WorkflowAuthorizedRuntimeReadService readHost() { return mock(WorkflowAuthorizedRuntimeReadService.class); }
-        @Bean WorkflowRuntimeReadIdentity identity() { return () -> "actor"; }
         @Bean WorkflowRuntimeReadAuthorization readAuthorization() { return mock(WorkflowRuntimeReadAuthorization.class); }
         @Bean WorkflowAssignmentDirectory directory() { return mock(WorkflowAssignmentDirectory.class); }
     }
     @Configuration(proxyBeanMethods=false) static class Commands {
-        @Bean WorkflowRuntimeCommandHost commandHost() { return mock(WorkflowRuntimeCommandHost.class); }
+        @Bean io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionService execution() {
+            return mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionService.class);
+        }
+        @Bean @org.springframework.context.annotation.Primary WorkflowRuntimeCommandCoordinator commandHost() { return mock(WorkflowRuntimeCommandCoordinator.class); }
     }
     @Configuration(proxyBeanMethods=false) static class ReadPolicies {
-        @Bean WorkflowRuntimeReadIdentity identity() { return () -> "actor"; }
         @Bean WorkflowRuntimeReadAuthorization readAuthorization() { return mock(WorkflowRuntimeReadAuthorization.class); }
     }
-    @Configuration(proxyBeanMethods=false) static class CancellationContext {
-        @Bean io.github.leontecristian.workflow.web.integration.runtime.WorkflowCancellationAvailabilityContextHost cancellationContext() {
-            return mock(io.github.leontecristian.workflow.web.integration.runtime.WorkflowCancellationAvailabilityContextHost.class);
-        }
-    }
-    @Test void cancellationFactoryRunsOnlyAfterActiveAuthorizedReadAndConfiguredAuthorization() throws Exception {
-        try (var c = context(Host.class, Reads.class, CancellationContext.class, WorkflowRuntimeReadConfiguration.class)) {
-            var access = c.getBean(WorkflowAuthorizedRuntimeReadService.class);
-            var factory = c.getBean(io.github.leontecristian.workflow.web.integration.runtime.WorkflowCancellationAvailabilityContextHost.class);
-            var instance = mock(io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView.class);
-            var commandContext = new io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext(ActorKind.USER, "actor", Instant.EPOCH, "corr");
-            when(access.instance("actor", 1)).thenReturn(instance);
-            when(instance.status()).thenReturn(io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus.ACTIVE);
-            when(factory.currentCancellationContext()).thenReturn(commandContext);
-            mvc(c).perform(get("/custom/instances/1/cancellation-availability"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("$.allowed").value(false));
-            verifyNoInteractions(factory);
-            when(access.hasCancellationAuthorization()).thenReturn(true);
-            when(access.canCancelWorkflow("actor", instance, commandContext)).thenReturn(true);
-            mvc(c).perform(get("/custom/instances/1/cancellation-availability"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("$.allowed").value(true));
-            var order = org.mockito.Mockito.inOrder(access, factory);
-            order.verify(access).instance("actor", 1);
-            order.verify(access).hasCancellationAuthorization();
-            order.verify(access).instance("actor", 1);
-            order.verify(access).hasCancellationAuthorization();
-            order.verify(factory).currentCancellationContext();
-            order.verify(access).canCancelWorkflow("actor", instance, commandContext);
-            when(factory.currentCancellationContext()).thenThrow(new WorkflowExecutionException(
-                    WorkflowExecutionException.Category.AUTHORIZATION_LOOKUP_FAILED));
-            mvc(c).perform(get("/custom/instances/1/cancellation-availability"))
-                    .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value("AUTHORIZATION_LOOKUP_FAILED"));
-            when(instance.status()).thenReturn(io.github.leontecristian.workflow.core.dto.runtime.InstanceStatus.CANCELLED);
-            mvc(c).perform(get("/custom/instances/1/cancellation-availability"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("$.allowed").value(false));
-            verify(factory, times(2)).currentCancellationContext();
-            when(access.instance("actor", 1)).thenThrow(new WorkflowRuntimeException(404, "NOT_FOUND"));
-            mvc(c).perform(get("/custom/instances/1/cancellation-availability")).andExpect(status().isNotFound());
-            verify(factory, times(2)).currentCancellationContext();
-        }
-    }
-    @Test void explicitReadActivationWiresRealFacadeWithoutCommandsOrCancellationContext() throws Exception {
+    @Test void explicitReadActivationWiresRealFacadeWithoutCommandsOrCancellationPolicy() throws Exception {
         try (var c = context(Host.class, ReadPolicies.class, WorkflowRuntimeReadConfiguration.class)) {
             assertThat(org.mockito.Mockito.mockingDetails(c.getBean(WorkflowAuthorizedRuntimeReadService.class)).isMock()).isFalse();
             assertThat(c.getBeansOfType(WorkflowRuntimeCommandController.class)).isEmpty();
-            assertThat(c.getBeansOfType(io.github.leontecristian.workflow.web.integration.runtime.WorkflowCancellationAvailabilityContextHost.class)).isEmpty();
             var policy = c.getBean(WorkflowRuntimeReadAuthorization.class);
             var reads = c.getBean(WorkflowRuntimeQueryService.class);
             mvc(c).perform(get("/custom/instances").param("unsupported", "x"))
@@ -246,7 +191,7 @@ class WorkflowRuntimeWebUnitTest {
             mvc(c).perform(get("/custom/instances")).andExpect(status().isNotFound());
         }
         assertThatThrownBy(()->context(Host.class, WorkflowRuntimeReadConfiguration.class)).hasMessageContaining("WorkflowRuntimeReadAuthorization");
-        assertThatThrownBy(()->context(Host.class, WorkflowRuntimeCommandConfiguration.class)).hasMessageContaining("WorkflowRuntimeCommandHost");
+        assertThatThrownBy(()->context(Host.class, WorkflowRuntimeCommandConfiguration.class)).hasMessageContaining("WorkflowExecutionService");
     }
     @Test void readsRemainIndependentAndRetainAuthorizedEmptyContinuation() throws Exception {
         try(var c=context(Host.class, Reads.class, WorkflowRuntimeReadConfiguration.class)) {
@@ -441,7 +386,7 @@ class WorkflowRuntimeWebUnitTest {
     @Test void completionAndReplayPreserveRawResultNumbersAndEnforceActualUtf8Boundary() throws Exception {
         try (var c = context(BootHost.class, Commands.class, Reads.class, WorkflowRuntimeCommandConfiguration.class,
                 WorkflowRuntimeReadConfiguration.class)) {
-            var host = c.getBean(WorkflowRuntimeCommandHost.class);
+            var host = c.getBean(WorkflowRuntimeCommandCoordinator.class);
             var readHost = c.getBean(WorkflowAuthorizedRuntimeReadService.class);
             var reads = c.getBean(WorkflowRuntimeQueryService.class);
             var mvc = mvc(c);
@@ -503,7 +448,7 @@ class WorkflowRuntimeWebUnitTest {
 
     @Test void resultFailuresExposeBoundedDiagnosticsAndSanitizedCategories() throws Exception {
         try (var c = context(Host.class, Commands.class, WorkflowRuntimeCommandConfiguration.class)) {
-            var host = c.getBean(WorkflowRuntimeCommandHost.class);
+            var host = c.getBean(WorkflowRuntimeCommandCoordinator.class);
             var mvc = mvc(c);
             var request = post("/custom/instances/1/tasks/5/complete").contentType("application/json")
                     .header("X-Expected-Lock-Version", "0").requestAttr("trusted", "safe")
@@ -619,7 +564,7 @@ class WorkflowRuntimeWebUnitTest {
     @Test void allGroupsCoexistAndCompletionPreservesExactFrozenInputAndLookupOnlyMiss() throws Exception {
         try(var c=context(Host.class,Reads.class,Commands.class,WorkflowRuntimeReadConfiguration.class,
                 WorkflowRuntimeCommandConfiguration.class,WorkflowViewerConfiguration.class,WorkflowAdministrationConfiguration.class)) {
-            var host=c.getBean(WorkflowRuntimeCommandHost.class);var mvc=mvc(c);
+            var host=c.getBean(WorkflowRuntimeCommandCoordinator.class);var mvc=mvc(c);
             when(host.complete(any(),eq("corr"))).thenReturn(new WorkflowCommandResult(false,null));
             String body="{\"commandId\":\"12345678-1234-1234-1234-123456789abc\",\"outcomeKey\":\"APPROVE\",\"comment\":\" exact \"}";
             mvc.perform(post("/custom/instances/9007199254740993/tasks/5/complete").contentType("application/json")
@@ -639,7 +584,7 @@ class WorkflowRuntimeWebUnitTest {
     }
     @Test void ownershipRoutesPreserveExactInputAndReplayNeverMutates() throws Exception {
         try (var c = context(Host.class, Commands.class, WorkflowRuntimeCommandConfiguration.class)) {
-            var host = c.getBean(WorkflowRuntimeCommandHost.class);
+            var host = c.getBean(WorkflowRuntimeCommandCoordinator.class);
             var mvc = mvc(c);
             String uuid = "12345678-1234-1234-1234-123456789abc";
             String body = "{\"commandId\":\"" + uuid + "\",\"reason\":\" exact \"}";
@@ -673,7 +618,7 @@ class WorkflowRuntimeWebUnitTest {
     }
     @Test void commandParsingAndSafeErrorCategoriesArePreserved() throws Exception {
         try(var c=context(Host.class,Commands.class,WorkflowRuntimeCommandConfiguration.class)) {
-            var host=c.getBean(WorkflowRuntimeCommandHost.class);var mvc=mvc(c);
+            var host=c.getBean(WorkflowRuntimeCommandCoordinator.class);var mvc=mvc(c);
             String body="{\"commandId\":\"12345678-1234-1234-1234-123456789abc\",\"outcomeKey\":\"APPROVE\",\"comment\":null}";
             for(String bad:List.of(body.replace("null","3"),body.replace("null","null,\"actor\":\"fake\""),body.replace("APPROVE","APPROVE\",\"outcomeKey\":\"REJECT"),body.replace("12345678-1234-1234-1234-123456789abc","1-1-1-1-1")))
                 mvc.perform(post("/custom/instances/1/tasks/5/complete").contentType("application/json").header("X-Expected-Lock-Version","0").content(bad))

@@ -5,13 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskClosureReason;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
-import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowSharedAssignmentProvider;
@@ -21,14 +18,10 @@ import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBus
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeAccess;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeCommandHost;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeCoordinator;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeTransaction;
 import io.github.leontecristian.workflow.testhost.service.runtime.SandboxSharedAssignmentProvider;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 
@@ -68,7 +61,7 @@ class ConsoleSharedAssignmentUnitTest {
         assertThat(access.canReadTask(completed)).isFalse();
         provider.removeTarget(SandboxSharedAssignmentProvider.FINANCE);
         assertThat(access.canReadTask(open)).isFalse();
-        when(context.admin()).thenReturn(true);
+        when(context.isConsoleAdministrator("second")).thenReturn(true);
         assertThat(access.canReadTask(open)).isTrue();
         assertThat(RuntimeReadFixtures.authorized(reads, access, eligibility(provider)).canCompleteTask(context.actor(), open)).isFalse();
     }
@@ -89,16 +82,16 @@ class ConsoleSharedAssignmentUnitTest {
         when(reads.listTasks(1, 0, 100)).thenReturn(
                 new io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage(java.util.List.of(task), null));
 
-        assertThat(access.task(5)).isSameAs(task);
+        assertThat(access.task("first", 5)).isSameAs(task);
         assertThat(RuntimeReadFixtures.authorized(reads, access, eligibility(provider)).canCompleteTask(context.actor(), task)).isFalse();
         assertThatThrownBy(() -> access.instance(1))
                 .isInstanceOf(io.github.leontecristian.workflow.testhost.exception.console.ConsoleException.class);
         when(context.actor()).thenReturn("second");
-        assertThat(access.task(5)).isSameAs(task);
+        assertThat(access.task("second", 5)).isSameAs(task);
         assertThat(RuntimeReadFixtures.authorized(reads, access, eligibility(provider)).canCompleteTask(context.actor(), task)).isFalse();
         when(context.actor()).thenReturn("first");
         when(businessAccess.canAccess(org.mockito.ArgumentMatchers.any())).thenReturn(false);
-        assertThatThrownBy(() -> access.task(5))
+        assertThatThrownBy(() -> access.task("first", 5))
                 .isInstanceOf(io.github.leontecristian.workflow.testhost.exception.console.ConsoleException.class);
     }
     @Test void siblingCompletionDetailsRequireExactTaskAccessEvenWithInstanceHistoryAccess() {
@@ -108,34 +101,16 @@ class ConsoleSharedAssignmentUnitTest {
         var summary=mock(io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistorySummary.class);
         when(summary.instanceId()).thenReturn(1L);when(summary.eventType()).thenReturn("TASK_COMPLETED");when(summary.taskId()).thenReturn(5L);
         when(reads.findHistoryEvent(eq(1L),eq(9L),any())).thenReturn(Optional.of(new io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistoryEvent(summary,"{}")));
-        when(access.task(5)).thenThrow(io.github.leontecristian.workflow.testhost.exception.console.ConsoleException.missing());
+        when(access.task("second", 5)).thenThrow(io.github.leontecristian.workflow.testhost.exception.console.ConsoleException.missing());
         var viewer=new io.github.leontecristian.workflow.web.service.instance.WorkflowInstanceViewerService(reads,host,
                 new io.github.leontecristian.workflow.web.service.instance.ViewerWire());
-        var previous=org.springframework.security.core.context.SecurityContextHolder.getContext();
-        var security=org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
-        security.setAuthentication(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("second","",java.util.List.of()));
-        org.springframework.security.core.context.SecurityContextHolder.setContext(security);
-        try {
-            assertThatThrownBy(() -> viewer.event(1,9))
-                    .isInstanceOfSatisfying(io.github.leontecristian.workflow.web.exception.instance.WorkflowViewerException.class,
-                            failure -> assertThat(failure.status()).isEqualTo(404));
-            org.mockito.Mockito.verify(access).task(5);
-        } finally { org.springframework.security.core.context.SecurityContextHolder.setContext(previous); }
+        assertThatThrownBy(() -> viewer.event("second", 1, 9))
+                .isInstanceOfSatisfying(io.github.leontecristian.workflow.web.exception.instance.WorkflowViewerException.class,
+                        failure -> assertThat(failure.status()).isEqualTo(404));
+        org.mockito.Mockito.verify(access, org.mockito.Mockito.times(3)).instance("second", 1);
+        org.mockito.Mockito.verify(access).task("second", 5);
     }
-    @Test void postRollbackRecoveryDelegatesCurrentAccessToCoreInFreshTransaction() {
-        var tx = mock(ConsoleRuntimeTransaction.class);
-        var coordinator = new ConsoleRuntimeCoordinator(tx);
-        var command = new CompleteWorkflowTask(UUID.randomUUID(), 1, 5, 0, "APPROVE", null);
-        when(tx.complete(command, null)).thenThrow(new WorkflowExecutionException(WorkflowExecutionException.Category.CONCURRENT_COMMAND));
-        when(tx.replayComplete(command, null)).thenThrow(new WorkflowExecutionException(WorkflowExecutionException.Category.NOT_FOUND));
-        assertThatThrownBy(() -> coordinator.complete(command, null)).isInstanceOfSatisfying(WorkflowExecutionException.class,
-                failure -> assertThat(failure.category()).isEqualTo(WorkflowExecutionException.Category.NOT_FOUND));
-        var order = org.mockito.Mockito.inOrder(tx);
-        order.verify(tx).complete(command, null);
-        order.verify(tx).replayComplete(command, null);
-        org.mockito.Mockito.verifyNoMoreInteractions(tx);
-    }
-    @Test void providerFailureFailsClosedAndOwnReceiptRecoveryDoesNotConsultMembership() {
+    @Test void providerFailureFailsClosed() {
         var provider = mock(WorkflowSharedAssignmentProvider.class);
         when(provider.isCurrentMember(org.mockito.ArgumentMatchers.any())).thenThrow(new IllegalStateException("directory secret"));
         var reads = mock(WorkflowRuntimeQueryService.class);
@@ -147,16 +122,6 @@ class ConsoleSharedAssignmentUnitTest {
         assertThatThrownBy(() -> access.canReadTask(task(TaskStatus.OPEN, null)))
                 .isInstanceOfSatisfying(WorkflowExecutionException.class,
                         failure -> assertThat(failure.category()).isEqualTo(WorkflowExecutionException.Category.ASSIGNMENT_LOOKUP_FAILED));
-        org.mockito.Mockito.clearInvocations(provider);
-        var completed = task(TaskStatus.COMPLETED, "first");
-        when(reads.findTask(5)).thenReturn(Optional.of(completed));
-        var tx = mock(ConsoleRuntimeTransaction.class);
-        var commands = mock(ConsoleRuntimeCoordinator.class);
-        var host = new ConsoleRuntimeCommandHost(commands, tx, context);
-        var command = new CompleteWorkflowTask(UUID.randomUUID(), 1, 5, 0, "APPROVE", null);
-        var result = new WorkflowCommandResult(true, null);
-        when(tx.replayComplete(command, null)).thenReturn(Optional.of(result));
-        assertThat(host.replayComplete(command, null)).containsSame(result);
-        verifyNoInteractions(provider, commands);
+
     }
 }

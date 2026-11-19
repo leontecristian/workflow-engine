@@ -11,7 +11,9 @@ import io.github.leontecristian.workflow.web.configuration.WorkflowViewerConfigu
 import io.github.leontecristian.workflow.web.configuration.WorkflowViewerOptions;
 import io.github.leontecristian.workflow.web.controller.instance.WorkflowInstanceViewerController;
 import io.github.leontecristian.workflow.web.dto.instance.ViewerLinkReference;
+import io.github.leontecristian.workflow.web.exception.WorkflowUnauthenticatedException;
 import io.github.leontecristian.workflow.web.exception.instance.WorkflowViewerException;
+import io.github.leontecristian.workflow.web.integration.WorkflowRequestIdentity;
 import io.github.leontecristian.workflow.web.integration.instance.WorkflowViewerAccess;
 import io.github.leontecristian.workflow.web.service.instance.ViewerWire;
 import io.github.leontecristian.workflow.web.service.instance.WorkflowInstanceViewerService;
@@ -38,10 +40,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -56,6 +62,11 @@ class WorkflowViewerUnitTest {
         @Bean WorkflowRuntimeQueryService reads() { return mock(WorkflowRuntimeQueryService.class); }
         @Bean WorkflowDefinitionService definitions() { return mock(WorkflowDefinitionService.class); }
         @Bean WorkflowViewerAccess access() { return mock(WorkflowViewerAccess.class); }
+        @Bean WorkflowRequestIdentity identity() {
+            var identity = mock(WorkflowRequestIdentity.class);
+            when(identity.requireActorRef()).thenReturn("reader");
+            return identity;
+        }
         @Bean UnrelatedController unrelatedController() { return new UnrelatedController(); }
     }
     @org.springframework.web.bind.annotation.RestController
@@ -86,11 +97,12 @@ class WorkflowViewerUnitTest {
             mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/custom/read/instances/start"))
                     .andExpect(status().isOk()).andExpect(content().string("host-start"));
             verifyNoViewerAccess(context);
+            org.mockito.Mockito.verifyNoInteractions(context.getBean(WorkflowRequestIdentity.class));
         }
     }
     private void verifyNoViewerAccess(AnnotationConfigWebApplicationContext context) {
         org.mockito.Mockito.verifyNoInteractions(context.getBean(WorkflowViewerAccess.class),
-                context.getBean(WorkflowRuntimeQueryService.class));
+                context.getBean(WorkflowRuntimeQueryService.class), context.getBean(WorkflowDefinitionService.class));
     }
     @Test void packageScanningAndDependencyAloneExposeNothing() throws Exception {
         try (var context = new AnnotationConfigWebApplicationContext()) {
@@ -112,6 +124,14 @@ class WorkflowViewerUnitTest {
             context.register(WorkflowViewerConfiguration.class);
             assertThatThrownBy(context::refresh).hasMessageContaining("WorkflowViewerAccess");
         }
+        try (var context = new AnnotationConfigApplicationContext()) {
+            context.registerBean(WorkflowViewerOptions.class, () -> new WorkflowViewerOptions("/read", null));
+            context.registerBean(WorkflowRuntimeQueryService.class, () -> mock(WorkflowRuntimeQueryService.class));
+            context.registerBean(WorkflowDefinitionService.class, () -> mock(WorkflowDefinitionService.class));
+            context.registerBean(WorkflowViewerAccess.class, () -> mock(WorkflowViewerAccess.class));
+            context.register(WorkflowViewerConfiguration.class);
+            assertThatThrownBy(context::refresh).hasMessageContaining("WorkflowRequestIdentity");
+        }
         for (String path : List.of("", "/", "/read/", "/read/{tenant}", "/read/**"))
             assertThatThrownBy(() -> new WorkflowViewerOptions(path, null)).isInstanceOf(IllegalArgumentException.class);
     }
@@ -123,19 +143,76 @@ class WorkflowViewerUnitTest {
             when(reads.listHistory(1, 0, 50)).thenReturn(new WorkflowHistoryPage(List.of(), null));
             mvc.perform(get("/custom/read/instances/1/history")).andExpect(status().isOk())
                     .andExpect(content().json("{\"items\":[],\"nextAfterSequence\":null}"));
-            verify(access).requireInstanceRead(1); verify(access).requireHistoryRead(1);
-            doThrow(new WorkflowViewerException(404, "NOT_FOUND")).when(access).requireHistoryRead(1);
+            verify(access).requireInstanceRead("reader", 1); verify(access).requireHistoryRead("reader", 1);
+            doThrow(new WorkflowViewerException(404, "NOT_FOUND")).when(access).requireHistoryRead("reader", 1);
             mvc.perform(get("/custom/read/instances/1/history").param("afterSequence", "50"))
                     .andExpect(status().isNotFound()).andExpect(jsonPath("$.diagnostics").isEmpty());
             mvc.perform(get("/custom/read/instances/1/history/1")).andExpect(status().isNotFound());
             verify(reads, never()).findHistoryEvent(anyLong(), anyLong(), any());
-            doThrow(new WorkflowViewerException(401, "UNAUTHENTICATED")).when(access).requireInstanceRead(1);
-            for (String suffix : List.of("", "/history", "/history/1", "/graph"))
-                mvc.perform(get("/custom/read/instances/1" + suffix)).andExpect(status().isUnauthorized());
             mvc.perform(get("/custom/read/instances")).andExpect(status().isNotFound());
             mvc.perform(get("/custom/read/tasks/1")).andExpect(status().isNotFound());
         }
     }
+
+    @Test void invalidIdentityUsesViewerEnvelopeAndStopsAllViewerRoutesBeforeAccess() throws Exception {
+        try (var context = context(Host.class, Enabled.class)) {
+            var mvc = MockMvcBuilders.webAppContextSetup(context).build();
+            var identity = context.getBean(WorkflowRequestIdentity.class);
+            for (String suffix : List.of("", "/history", "/history/1", "/graph")) {
+                doThrow(new WorkflowUnauthenticatedException("private identity detail"))
+                        .doReturn(null).doReturn("  ").when(identity).requireActorRef();
+                for (String code : List.of("UNAUTHENTICATED", "HOST_FAILURE", "HOST_FAILURE")) {
+                    clearInvocations(identity);
+                    mvc.perform(get("/custom/read/instances/1" + suffix).requestAttr("trusted.correlation", "safe-id"))
+                            .andExpect(status().is(code.equals("UNAUTHENTICATED") ? 401 : 500))
+                            .andExpect(content().json("{\"code\":\"" + code + "\",\"message\":\"" + code
+                                    + "\",\"diagnostics\":[],\"correlationId\":\"safe-id\"}"));
+                    verify(identity).requireActorRef();
+                }
+            }
+            verifyNoViewerAccess(context);
+        }
+    }
+
+    @Test void defaultHistoryChecksUseTheActorCapturedForEachRequest() throws Exception {
+        try (var context = context(Host.class, Enabled.class)) {
+            var mvc = MockMvcBuilders.webAppContextSetup(context).build();
+            var identity = context.getBean(WorkflowRequestIdentity.class);
+            var access = context.getBean(WorkflowViewerAccess.class);
+            var reads = context.getBean(WorkflowRuntimeQueryService.class);
+            var event = new WorkflowHistorySummary(1, 2, "TASK_CLAIMED", UUID.randomUUID(), null,
+                    ActorKind.USER, "assignee", Instant.EPOCH, 3L, 4L, null, null, null, (short) 1);
+            var exactTask = new ViewerLinkReference(3, 4L);
+            doCallRealMethod().when(access).canReadHistorySummary(any(), eq(event));
+            doCallRealMethod().when(access).requireHistoryEventRead(any(), eq(event));
+            when(access.readableLinks("reader", 1, Set.of(exactTask))).thenReturn(Set.of(new ViewerLinkReference(3, null)));
+            when(access.readableLinks("assignee", 1, Set.of(exactTask))).thenReturn(Set.of(exactTask));
+            when(reads.listHistory(1, 0, 50)).thenReturn(new WorkflowHistoryPage(List.of(event), null));
+            when(reads.findHistoryEvent(eq(1L), eq(2L), any()))
+                    .thenReturn(Optional.of(new WorkflowHistoryEvent(event, "{}")));
+            when(identity.requireActorRef()).thenReturn("reader", "reader", "assignee");
+
+            mvc.perform(get("/custom/read/instances/1/history"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
+            mvc.perform(get("/custom/read/instances/1/history/2"))
+                    .andExpect(status().isNotFound()).andExpect(jsonPath("$.detailsJson").doesNotExist());
+            mvc.perform(get("/custom/read/instances/1/history/2"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.detailsJson").value("{}"));
+
+            verify(identity, times(3)).requireActorRef();
+            verify(access, times(2)).requireInstanceRead("reader", 1);
+            verify(access, times(2)).requireHistoryRead("reader", 1);
+            verify(access, times(2)).canReadHistorySummary("reader", event);
+            verify(access, times(2)).readableLinks("reader", 1, Set.of(exactTask));
+            verify(access).requireInstanceRead("assignee", 1);
+            verify(access, times(2)).requireHistoryRead("assignee", 1);
+            verify(access).canReadHistorySummary("assignee", event);
+            verify(access).readableLinks("assignee", 1, Set.of(exactTask));
+            verify(access).requireHistoryEventRead("assignee", event);
+            verify(access, never()).requireHistoryEventRead(eq("reader"), any());
+        }
+    }
+
     @Test void ownershipHistoryUsesExactTaskGrantEvenWhenHostDetailHookAllowsRead() throws Exception {
         for (String eventType : List.of("TASK_RELEASED", "TASK_CANCELLED", "TASK_REASSIGNED")) {
         try (var context = context(Host.class, Enabled.class)) {
@@ -151,10 +228,10 @@ class WorkflowViewerUnitTest {
                     .andExpect(status().isNotFound()).andExpect(jsonPath("$.detailsJson").doesNotExist());
             mvc.perform(get("/custom/read/instances/1/history").param("afterSequence", "1").param("limit", "1"))
                     .andExpect(status().isOk()).andExpect(content().json("{\"items\":[],\"nextAfterSequence\":\"2\"}"));
-            when(access.canReadHistorySummary(release)).thenReturn(true);
+            when(access.canReadHistorySummary("reader", release)).thenReturn(true);
             mvc.perform(get("/custom/read/instances/1/history/2"))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.detailsJson").value("{\"reason\":\"private\"}"));
-            doThrow(WorkflowViewerException.missing()).when(access).requireHistoryEventRead(release);
+            doThrow(WorkflowViewerException.missing()).when(access).requireHistoryEventRead("reader", release);
             mvc.perform(get("/custom/read/instances/1/history/2")).andExpect(status().isNotFound());
         }
         }
@@ -183,13 +260,13 @@ class WorkflowViewerUnitTest {
             String details = "{\"outcomeKey\":\"APPROVE\",\"comment\":null,\"inputs\":{},\"result\":{\"amount\":123.00}}";
             when(reads.findHistoryEvent(eq(1L), eq(3L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(event, details)));
             var exactTask = new ViewerLinkReference(3, 4L);
-            when(access.readableLinks(1, Set.of(exactTask))).thenReturn(Set.of(new ViewerLinkReference(3, null)));
+            when(access.readableLinks("reader", 1, Set.of(exactTask))).thenReturn(Set.of(new ViewerLinkReference(3, null)));
             mvc.perform(get("/custom/read/instances/1/history/3"))
                     .andExpect(status().isNotFound()).andExpect(jsonPath("$.detailsJson").doesNotExist());
-            when(access.readableLinks(1, Set.of(exactTask))).thenReturn(Set.of(exactTask));
+            when(access.readableLinks("reader", 1, Set.of(exactTask))).thenReturn(Set.of(exactTask));
             mvc.perform(get("/custom/read/instances/1/history/3"))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.detailsJson").value(details));
-            verify(access).requireHistoryEventRead(event);
+            verify(access).requireHistoryEventRead("reader", event);
         }
     }
     @Test void taskInputDetailsRequireReceivingTaskAccess() throws Exception {
@@ -205,13 +282,13 @@ class WorkflowViewerUnitTest {
                 return authorized.test(event) ? Optional.of(new WorkflowHistoryEvent(event, details)) : Optional.empty();
             });
             var receivingTask = new ViewerLinkReference(3, 4L);
-            when(access.readableLinks(1, Set.of(receivingTask))).thenReturn(Set.of(new ViewerLinkReference(3, null)));
+            when(access.readableLinks("reader", 1, Set.of(receivingTask))).thenReturn(Set.of(new ViewerLinkReference(3, null)));
             mvc.perform(get("/custom/read/instances/1/history/3"))
                     .andExpect(status().isNotFound()).andExpect(jsonPath("$.detailsJson").doesNotExist());
-            when(access.readableLinks(1, Set.of(receivingTask))).thenReturn(Set.of(receivingTask));
+            when(access.readableLinks("reader", 1, Set.of(receivingTask))).thenReturn(Set.of(receivingTask));
             mvc.perform(get("/custom/read/instances/1/history/3"))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.detailsJson").value(details));
-            verify(access).requireHistoryEventRead(event);
+            verify(access).requireHistoryEventRead("reader", event);
         }
     }
     @Test void viewerCodecAndErrorsDoNotReplaceHostHandling() throws Exception {
@@ -260,9 +337,9 @@ class WorkflowViewerUnitTest {
         String unicode = "{\"v\":\"" + "漢".repeat(RuntimeJson.HISTORY_UTF16_BYTES / 2 - 8) + "\"}";
         assertThat(unicode.getBytes(java.nio.charset.StandardCharsets.UTF_8).length).isLessThanOrEqualTo(RuntimeJson.HISTORY_UTF8_BYTES);
         when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), unicode)));
-        assertThat(viewer.event(1, 1)).contains("漢");
+        assertThat(viewer.event("reader", 1, 1)).contains("漢");
         when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), unicode.substring(0, unicode.length() - 2) + "漢\"}")));
-        assertThatThrownBy(() -> viewer.event(1, 1)).isInstanceOf(WorkflowViewerException.class);
+        assertThatThrownBy(() -> viewer.event("reader", 1, 1)).isInstanceOf(WorkflowViewerException.class);
     }
     private WorkflowHistorySummary summary(long sequence, String actor) {
         return new WorkflowHistorySummary(9007199254740993L, sequence, "FUTURE_EVENT", new UUID(0, 1), null,
@@ -273,23 +350,23 @@ class WorkflowViewerUnitTest {
         var wire = new ViewerWire(); var viewer = new WorkflowInstanceViewerService(reads, access, wire);
         String exact = "{\"long\":9007199254740993,\"decimal\":12500.00,\"nil\":null}";
         when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), exact)));
-        var json = viewer.event(1, 1);
+        var json = viewer.event("reader", 1, 1);
         assertThat(wire.tree(json).path("detailsJson").textValue()).isEqualTo(exact);
         assertThat(json).contains("\"instanceId\":\"9007199254740993\"", "FUTURE_EVENT");
         // Exactly 24 MiB UTF-16 details, well above the ordinary summary cap.
         String maximum = "{\"v\":\"" + "a".repeat(RuntimeJson.HISTORY_UTF16_BYTES / 2 - 8) + "\"}";
         assertThat(maximum.length()).isEqualTo(RuntimeJson.HISTORY_UTF16_BYTES / 2);
         when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), maximum)));
-        assertThat(viewer.event(1, 1)).contains(maximum.substring(10, 100));
+        assertThat(viewer.event("reader", 1, 1)).contains(maximum.substring(10, 100));
         // Valid stored JSON whose backslashes expand in the final detailsJson envelope.
         String escaping = "{\"v\":\"" + "\\u0001".repeat((RuntimeJson.HISTORY_UTF16_BYTES / 2 - 8) / 6) + "\"}";
         when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), escaping)));
-        assertThat(viewer.event(1, 1).getBytes(java.nio.charset.StandardCharsets.UTF_8).length).isLessThan(RuntimeJson.HISTORY_RESPONSE_UTF8_BYTES);
+        assertThat(viewer.event("reader", 1, 1).getBytes(java.nio.charset.StandardCharsets.UTF_8).length).isLessThan(RuntimeJson.HISTORY_RESPONSE_UTF8_BYTES);
         // Oversized final envelope fails, never returning a partial event.
         when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "\u0001".repeat(RuntimeJson.HISTORY_RESPONSE_UTF8_BYTES / 6 + 1)), exact)));
-        assertThatThrownBy(() -> viewer.event(1, 1)).isInstanceOfSatisfying(WorkflowViewerException.class, e -> assertThat(e.code()).isEqualTo("LIMIT_EXCEEDED"));
+        assertThatThrownBy(() -> viewer.event("reader", 1, 1)).isInstanceOfSatisfying(WorkflowViewerException.class, e -> assertThat(e.code()).isEqualTo("LIMIT_EXCEEDED"));
         when(reads.findHistoryEvent(eq(1L), eq(1L), any())).thenReturn(Optional.of(new WorkflowHistoryEvent(summary(1, "actor"), maximum + " ")));
-        assertThatThrownBy(() -> viewer.event(1, 1)).isInstanceOf(WorkflowViewerException.class);
+        assertThatThrownBy(() -> viewer.event("reader", 1, 1)).isInstanceOf(WorkflowViewerException.class);
     }
     @Test void bytePagingIncludesWholeRowsAndLastReturnedContinuation() {
         var wire = new ViewerWire();

@@ -42,6 +42,7 @@ import io.github.leontecristian.workflow.testhost.configuration.integration.Comp
 import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxServiceEffectStore;
+import io.github.leontecristian.workflow.testhost.configuration.integration.RuntimeCommandFixture;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeTransaction;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -91,12 +92,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         properties = {"workflow.console.enabled=true", "workflow.console.capabilities=sample",
                 "workflow.console.admin.username=f021-admin", "workflow.console.admin.password=f021-local-test-password",
                 "workflow.console.reviewer.username=f021-reviewer", "workflow.console.reviewer.password=f021-local-test-password"})
-@Import(AllCollectiveReviewIT.CapacityAdapters.class)
+@Import({AllCollectiveReviewIT.CapacityAdapters.class, RuntimeCommandFixture.class})
 class AllCollectiveReviewIT extends CompletionAdapterIntegrationTest {
     @Autowired WorkflowDefinitionService definitions;
     @Autowired TaskTypeCatalogService catalog;
     @Autowired WorkflowRuntimeQueryService reads;
     @Autowired ConsoleRuntimeTransaction runtime;
+    @Autowired RuntimeCommandFixture runtimeCommands;
     @Autowired SandboxRequestStore requests;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactions;
@@ -146,7 +148,7 @@ class AllCollectiveReviewIT extends CompletionAdapterIntegrationTest {
         return new CompleteWorkflowTask(UUID.randomUUID(), instance, taskId, reads.findInstance(instance).orElseThrow().lockVersion(),
                 outcome, "REJECT".equals(outcome) ? "independent rejection" : null, CompleteWorkflowTask.parseResult("{\"note\":\"" + taskId + "\"}"));
     }
-    private WorkflowCommandResult complete(CompleteWorkflowTask command) { return runtime.complete(command, actor("f021-reviewer")); }
+    private WorkflowCommandResult complete(CompleteWorkflowTask command) { return runtimeCommands.complete(command, actor("f021-reviewer")); }
     private int count(String table, long instance) { return jdbc.queryForObject("SELECT COUNT(*) FROM " + table + " WHERE instance_id=?", Integer.class, instance); }
     private String output(long instance) { return jdbc.queryForObject("SELECT json_value FROM wf.workflow_variable WHERE instance_id=? AND variable_key='reviewCollection'", String.class, instance); }
     private void failure(Runnable operation, Category category) {
@@ -180,7 +182,7 @@ class AllCollectiveReviewIT extends CompletionAdapterIntegrationTest {
         assertThat(count("wf_test.service_effect", instance)).isZero();
         failure(() -> complete(staleSibling), Category.STALE_VERSION);
         long later = task(instance, "ROLE").id();
-        var claimed = asReviewer(() -> runtime.claim(new ClaimWorkflowTask(UUID.randomUUID(), instance, later, version()), actor("f021-reviewer"))).execution();
+        var claimed = asReviewer(() -> runtimeCommands.claim(new ClaimWorkflowTask(UUID.randomUUID(), instance, later, version()), actor("f021-reviewer"))).execution();
         assertThat(claimed.task().id()).isEqualTo(later);
         assertThat(claimed.task().assigneeRef()).isEqualTo("f021-reviewer");
         complete(command(instance, task(instance, "FINANCE").id(), "APPROVE"));
@@ -195,7 +197,7 @@ class AllCollectiveReviewIT extends CompletionAdapterIntegrationTest {
         assertThat(collection.get(2).path("taskId").asText()).isEqualTo(Long.toString(later));
         assertThat(collection.get(0).path("comment").isNull()).isTrue();
         assertThat(collection.get(2).path("result").path("note").asText()).isEqualTo(Long.toString(later));
-        assertThat(runtime.replayComplete(direct, actor("f021-reviewer")).orElseThrow().execution()).isEqualTo(waiting);
+        assertThat(runtimeCommands.replayComplete(direct, actor("f021-reviewer")).orElseThrow().execution()).isEqualTo(waiting);
         assertThat(complete(direct).execution()).isEqualTo(waiting);
         assertThat(count("wf_test.service_effect", instance)).isEqualTo(1);
         assertThat(count("wf.workflow_command_receipt", instance)).isEqualTo(5); // start, three answers and later-task claim
@@ -237,7 +239,7 @@ class AllCollectiveReviewIT extends CompletionAdapterIntegrationTest {
         assertThat(json.readTree(output(instance)).size()).isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT quantity FROM wf_test.service_effect WHERE instance_id=?", Long.class, instance)).isEqualTo(2L);
         failure(() -> complete(command(instance, cancelled, "APPROVE")), Category.INVALID_STATE);
-        failure(() -> asReviewer(() -> runtime.claim(new ClaimWorkflowTask(UUID.randomUUID(), instance, cancelled, version()), actor("f021-reviewer"))), Category.INVALID_STATE);
+        failure(() -> asReviewer(() -> runtimeCommands.claim(new ClaimWorkflowTask(UUID.randomUUID(), instance, cancelled, version()), actor("f021-reviewer"))), Category.INVALID_STATE);
         if (Boolean.getBoolean("f021.browserHold")) browserHold(resolved, "resolved");
     }
 

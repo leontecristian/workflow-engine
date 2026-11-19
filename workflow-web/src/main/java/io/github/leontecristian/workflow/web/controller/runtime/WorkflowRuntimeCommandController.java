@@ -15,7 +15,7 @@ import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
 import io.github.leontecristian.workflow.core.dto.runtime.CancelWorkflow;
-import io.github.leontecristian.workflow.web.integration.runtime.WorkflowRuntimeCommandHost;
+import io.github.leontecristian.workflow.web.service.runtime.WorkflowRuntimeCommandCoordinator;
 import io.github.leontecristian.workflow.web.service.runtime.RuntimeErrors;
 import io.github.leontecristian.workflow.web.service.runtime.RuntimeWire;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,13 +26,13 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
-/** Runtime command transport. The host owns execution and replay-only recovery. */
+/** Runtime command transport. Shared coordination delegates execution and receipt access to core. */
 @ResponseBody
 public class WorkflowRuntimeCommandController {
-    private final WorkflowRuntimeCommandHost commands;
+    private final WorkflowRuntimeCommandCoordinator commands;
     private final RuntimeWire wire;
     private final RuntimeErrors errors;
-    public WorkflowRuntimeCommandController(WorkflowRuntimeCommandHost commands, RuntimeWire wire, RuntimeErrors errors) {
+    public WorkflowRuntimeCommandController(WorkflowRuntimeCommandCoordinator commands, RuntimeWire wire, RuntimeErrors errors) {
         this.commands = commands; this.wire = wire; this.errors = errors;
     }
     private CompleteWorkflowTask completeBody(HttpServletRequest r, long instance, long task) {

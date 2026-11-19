@@ -12,13 +12,14 @@ import io.github.leontecristian.workflow.core.exception.tasktype.TaskTypeCatalog
 import io.github.leontecristian.workflow.web.configuration.WorkflowAdministrationConfiguration;
 import io.github.leontecristian.workflow.web.configuration.WorkflowAdministrationOptions;
 import io.github.leontecristian.workflow.web.controller.definition.WorkflowDefinitionController;
-import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationIdentity;
+import io.github.leontecristian.workflow.web.integration.WorkflowRequestIdentity;
 import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationAuthorization;
 import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationAuditRecorder;
 import io.github.leontecristian.workflow.web.service.administration.WorkflowAdministrationService;
 import java.time.Clock;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.context.annotation.Primary;
+import io.github.leontecristian.workflow.web.exception.WorkflowUnauthenticatedException;
 import io.github.leontecristian.workflow.web.exception.administration.WorkflowAdministrationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Bean;
@@ -63,8 +64,8 @@ class WorkflowAdministrationUnitTest {
         @Bean WorkflowDefinitionService definitions() { return mock(WorkflowDefinitionService.class); }
         @Bean TaskTypeCatalogService catalog() { return mock(TaskTypeCatalogService.class); }
         @Bean @Primary WorkflowAdministrationService administration() { return mock(WorkflowAdministrationService.class); }
-        @Bean WorkflowAdministrationIdentity identity() {
-            var identity = mock(WorkflowAdministrationIdentity.class);
+        @Bean WorkflowRequestIdentity identity() {
+            var identity = mock(WorkflowRequestIdentity.class);
             when(identity.requireActorRef()).thenReturn("actor");
             return identity;
         }
@@ -127,20 +128,17 @@ class WorkflowAdministrationUnitTest {
         }
     }
     @Test void explicitActivationRequiresEachHostDependencyAndTrustedOptions() {
-        for (Class<?> missing : List.of(WorkflowAdministrationIdentity.class,
-                WorkflowAdministrationAuthorization.class, WorkflowAdministrationAuditRecorder.class,
-                Clock.class, PlatformTransactionManager.class)) {
+        for (Class<?> missing : List.of(WorkflowRequestIdentity.class,
+                WorkflowAdministrationAuthorization.class, Clock.class, PlatformTransactionManager.class)) {
             try (var context = new AnnotationConfigApplicationContext()) {
                 context.registerBean(WorkflowAdministrationOptions.class,
                         () -> new WorkflowAdministrationOptions("/manage", "trusted"));
                 context.registerBean(WorkflowDefinitionService.class, () -> mock(WorkflowDefinitionService.class));
                 context.registerBean(TaskTypeCatalogService.class, () -> mock(TaskTypeCatalogService.class));
-                if (missing != WorkflowAdministrationIdentity.class)
-                    context.registerBean(WorkflowAdministrationIdentity.class, () -> () -> "actor");
+                if (missing != WorkflowRequestIdentity.class)
+                    context.registerBean(WorkflowRequestIdentity.class, () -> () -> "actor");
                 if (missing != WorkflowAdministrationAuthorization.class)
                     context.registerBean(WorkflowAdministrationAuthorization.class, () -> mock(WorkflowAdministrationAuthorization.class));
-                if (missing != WorkflowAdministrationAuditRecorder.class)
-                    context.registerBean(WorkflowAdministrationAuditRecorder.class, () -> mock(WorkflowAdministrationAuditRecorder.class));
                 if (missing != Clock.class) context.registerBean(Clock.class, Clock::systemUTC);
                 if (missing != PlatformTransactionManager.class)
                     context.registerBean(PlatformTransactionManager.class, () -> mock(PlatformTransactionManager.class));
@@ -155,16 +153,29 @@ class WorkflowAdministrationUnitTest {
     @Test void invalidIdentityFailsBeforeAuthorizationParsingOrCoreAndUnauthenticatedStays401() throws Exception {
         try (var context = context(Host.class, Enabled.class)) {
             var mvc = MockMvcBuilders.webAppContextSetup(context).build();
-            var identity = context.getBean(WorkflowAdministrationIdentity.class);
-            for (String actor : new String[] {null, "", "  "}) {
-                when(identity.requireActorRef()).thenReturn(actor);
-                mvc.perform(write("POST", "/versions/import", "invalid"))
-                        .andExpect(status().isInternalServerError()).andExpect(jsonPath("$.code").value("HOST_FAILURE"));
-                mvc.perform(get("/custom/manage/definitions"))
-                        .andExpect(status().isInternalServerError()).andExpect(jsonPath("$.code").value("HOST_FAILURE"));
+            var identity = context.getBean(WorkflowRequestIdentity.class);
+            for (var request : List.of(get("/custom/manage/definitions"), get("/custom/manage/task-types"),
+                    write("POST", "/versions/import", "invalid"), write("POST", "/task-types", "invalid"))) {
+                request.requestAttr("trusted.correlation", "trusted-id");
+                reset(identity);
+                for (String actor : new String[] {null, "", "  "}) {
+                    when(identity.requireActorRef()).thenReturn(actor);
+                    mvc.perform(request)
+                            .andExpect(status().isInternalServerError())
+                            .andExpect(jsonPath("$.code").value("HOST_FAILURE"))
+                            .andExpect(jsonPath("$.message").value("HOST_FAILURE"))
+                            .andExpect(jsonPath("$.diagnostics").isEmpty())
+                            .andExpect(jsonPath("$.correlationId").value("trusted-id"));
+                }
+                when(identity.requireActorRef()).thenThrow(new WorkflowUnauthenticatedException("authentication required"));
+                mvc.perform(request)
+                        .andExpect(status().isUnauthorized())
+                        .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
+                        .andExpect(jsonPath("$.message").value("UNAUTHENTICATED"))
+                        .andExpect(jsonPath("$.diagnostics").isEmpty())
+                        .andExpect(jsonPath("$.correlationId").value("trusted-id"));
+                verify(identity, times(4)).requireActorRef();
             }
-            when(identity.requireActorRef()).thenThrow(new WorkflowAdministrationException(401, "UNAUTHENTICATED"));
-            mvc.perform(get("/custom/manage/definitions")).andExpect(status().isUnauthorized());
             verifyNoInteractions(context.getBean(WorkflowAdministrationAuthorization.class),
                     context.getBean(WorkflowAdministrationService.class), context.getBean(WorkflowDefinitionService.class),
                     context.getBean(TaskTypeCatalogService.class), context.getBean(WorkflowAdministrationAuditRecorder.class));
@@ -208,7 +219,7 @@ class WorkflowAdministrationUnitTest {
             reset(access); doThrow(new WorkflowAdministrationException(403, "FORBIDDEN")).when(access).requireAdministrationAccess("actor");
             mvc.perform(put("/custom/manage/task-types/1")).andExpect(status().isForbidden());
             verify(access).requireAdministrationAccess("actor"); verifyNoMoreInteractions(access);
-            verify(context.getBean(WorkflowAdministrationIdentity.class), times(17)).requireActorRef();
+            verify(context.getBean(WorkflowRequestIdentity.class), times(17)).requireActorRef();
             verifyNoInteractions(definitions, catalog, host, context.getBean(WorkflowAdministrationAuditRecorder.class));
         }
     }
@@ -232,7 +243,7 @@ class WorkflowAdministrationUnitTest {
             verify(host).validate("actor", 42, 9007199254740993L, "trusted-id");
             verify(host).publish("actor", 42, 9007199254740993L, "trusted-id");
             verify(host).retire("actor", 42, 9007199254740993L, "trusted-id");
-            verify(context.getBean(WorkflowAdministrationIdentity.class), times(8)).requireActorRef();
+            verify(context.getBean(WorkflowRequestIdentity.class), times(8)).requireActorRef();
             verify(context.getBean(WorkflowAdministrationAuthorization.class), times(8)).requireAdministrationAccess("actor");
             verifyNoMoreInteractions(host);
         }

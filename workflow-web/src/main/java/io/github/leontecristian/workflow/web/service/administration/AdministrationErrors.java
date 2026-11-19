@@ -2,6 +2,7 @@ package io.github.leontecristian.workflow.web.service.administration;
 
 import io.github.leontecristian.workflow.core.exception.definition.WorkflowDefinitionException;
 import io.github.leontecristian.workflow.core.exception.tasktype.TaskTypeCatalogException;
+import io.github.leontecristian.workflow.web.exception.WorkflowUnauthenticatedException;
 import io.github.leontecristian.workflow.web.exception.administration.WorkflowAdministrationException;
 import io.github.leontecristian.workflow.web.configuration.WorkflowAdministrationOptions;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,7 +31,9 @@ public class AdministrationErrors {
         int status = 500;
         String code = "HOST_FAILURE";
         Object diagnostics = List.of();
-        if (failure instanceof WorkflowAdministrationException e) {
+        if (failure instanceof WorkflowUnauthenticatedException) {
+            status = 401; code = "UNAUTHENTICATED";
+        } else if (failure instanceof WorkflowAdministrationException e) {
             status = e.status(); code = e.code();
         } else if (failure instanceof WorkflowDefinitionException e) {
             code = e.category().name();

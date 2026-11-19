@@ -114,7 +114,7 @@ public class ConsoleErrors {
                 .body(wire.json(new Failure(code, code, diagnostics, correlation(request))));
     }
 
-    private boolean hasSandboxConflict(Throwable failure) {
+    static boolean hasSandboxConflict(Throwable failure) {
         var seen =
                 java.util.Collections.newSetFromMap(
                         new java.util.IdentityHashMap<Throwable, Boolean>());

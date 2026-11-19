@@ -2,6 +2,7 @@ package io.github.leontecristian.workflow.web.service.runtime;
 
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.web.configuration.WorkflowRuntimeOptions;
+import io.github.leontecristian.workflow.web.exception.WorkflowUnauthenticatedException;
 import io.github.leontecristian.workflow.web.exception.instance.WorkflowViewerException;
 import io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,7 +26,8 @@ public class RuntimeErrors {
         int status = 500; String code = "HOST_FAILURE";
         String message = null;
         List<Map<String, Object>> diagnostics = List.of();
-        if (failure instanceof WorkflowRuntimeException e) { status = e.status(); code = e.code(); }
+        if (failure instanceof WorkflowUnauthenticatedException) { status = 401; code = "UNAUTHENTICATED"; }
+        else if (failure instanceof WorkflowRuntimeException e) { status = e.status(); code = e.code(); }
         else if (failure instanceof WorkflowViewerException e) { status = e.status(); code = e.code(); }
         else if (failure instanceof io.github.leontecristian.workflow.core.exception.runtime.WorkflowRuntimeReadAccessException e) {
             status = 403;

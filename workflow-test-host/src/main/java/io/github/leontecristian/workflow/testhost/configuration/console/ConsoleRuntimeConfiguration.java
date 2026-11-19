@@ -1,14 +1,11 @@
 package io.github.leontecristian.workflow.testhost.configuration.console;
 
-import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeCommandHost;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeCoordinator;
+import io.github.leontecristian.workflow.testhost.service.console.ConsoleRuntimeConflictResolver;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeReadHost;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeTransaction;
+import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskReassignmentAuthorization;
 import io.github.leontecristian.workflow.web.configuration.WorkflowRuntimeCommandConfiguration;
 import io.github.leontecristian.workflow.web.configuration.WorkflowRuntimeOptions;
 import io.github.leontecristian.workflow.web.configuration.WorkflowRuntimeReadConfiguration;
-import io.github.leontecristian.workflow.web.integration.runtime.WorkflowRuntimeCommandHost;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,13 +15,11 @@ import org.springframework.context.annotation.Import;
 @Import({WorkflowRuntimeReadConfiguration.class, WorkflowRuntimeCommandConfiguration.class})
 public class ConsoleRuntimeConfiguration {
     @Bean WorkflowRuntimeOptions consoleRuntimeOptions() { return new WorkflowRuntimeOptions("/console/api", "console.correlation"); }
-    @Bean ConsoleRuntimeReadHost consoleRuntimeReadHost(ConsoleContext context,
-            io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskReassignmentAuthorization reassignment,
+    @Bean ConsoleRuntimeReadHost consoleRuntimeReadHost(ConsoleTaskReassignmentAuthorization reassignment,
             ConsoleSettings settings) {
-        return new ConsoleRuntimeReadHost(context, reassignment, settings);
+        return new ConsoleRuntimeReadHost(reassignment, settings);
     }
-    @Bean WorkflowRuntimeCommandHost consoleRuntimeCommandHost(ConsoleRuntimeCoordinator commands,
-            ConsoleRuntimeTransaction transactions, ConsoleContext context) {
-        return new ConsoleRuntimeCommandHost(commands, transactions, context);
+    @Bean ConsoleRuntimeConflictResolver consoleRuntimeConflictResolver(WorkflowRuntimeOptions options) {
+        return new ConsoleRuntimeConflictResolver(options);
     }
 }

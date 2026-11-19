@@ -5,6 +5,7 @@ import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
@@ -24,13 +25,23 @@ public class ConsoleContext {
 
     public boolean isConsoleActor(String actorRef) {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication != null
-                && authentication.isAuthenticated()
-                && !(authentication instanceof AnonymousAuthenticationToken)
-                && authentication.getName().equals(actorRef)
+        return authenticates(authentication, actorRef)
                 && authentication.getAuthorities().stream().anyMatch(authority ->
                         "ROLE_CONSOLE_ADMIN".equals(authority.getAuthority())
                                 || "ROLE_CONSOLE_REVIEWER".equals(authority.getAuthority()));
+    }
+
+    public boolean isConsoleAdministrator(String actorRef) {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authenticates(authentication, actorRef)
+                && authentication.getAuthorities().stream()
+                        .anyMatch(authority -> "ROLE_CONSOLE_ADMIN".equals(authority.getAuthority()));
+    }
+
+    private static boolean authenticates(Authentication authentication, String actorRef) {
+        return authentication != null && authentication.isAuthenticated()
+                && !(authentication instanceof AnonymousAuthenticationToken)
+                && authentication.getName().equals(actorRef);
     }
 
     public boolean admin() {

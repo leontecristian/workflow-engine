@@ -1,19 +1,11 @@
 package io.github.leontecristian.workflow.testhost.service.runtime;
 
-import io.github.leontecristian.workflow.core.dto.runtime.AdministrativelyReleaseWorkflowTask;
-import io.github.leontecristian.workflow.core.dto.runtime.ClaimWorkflowTask;
-import io.github.leontecristian.workflow.core.dto.runtime.ReassignWorkflowTask;
-import io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask;
-import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
-import io.github.leontecristian.workflow.core.dto.runtime.CancelWorkflow;
-import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationCommandResult;
 import io.github.leontecristian.workflow.core.dto.runtime.StartInputs;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionService;
-import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
 import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
@@ -27,17 +19,14 @@ import java.util.Optional;
 @Service
 public class ConsoleRuntimeTransaction {
     private final WorkflowExecutionService execution;
-    private final WorkflowRuntimeQueryService reads;
     private final SandboxRequestStore requests;
     private final ConsoleSettings settings;
 
     public ConsoleRuntimeTransaction(
             WorkflowExecutionService execution,
-            WorkflowRuntimeQueryService reads,
             SandboxRequestStore requests,
             ConsoleSettings settings) {
         this.execution = execution;
-        this.reads = reads;
         this.requests = requests;
         this.settings = settings;
     }
@@ -59,82 +48,6 @@ public class ConsoleRuntimeTransaction {
                                 throw new IllegalStateException("Configured start link failure");
                         });
         return after(result);
-    }
-
-    @Transactional
-    public WorkflowCommandResult complete(
-            CompleteWorkflowTask command, WorkflowCommandContext context) {
-        var result = execution.completeTask(command, context);
-        if (!result.replayed()) {
-            // Real host-side business read in the same transaction, before successful
-            // return/commit.
-            var submission =
-                    reads.findTaskSubmission(command.taskId())
-                            .orElseThrow(
-                                    () ->
-                                            new IllegalStateException(
-                                                    "Accepted submission not visible"));
-            if (!submission.commandId().equals(command.commandId()))
-                throw new IllegalStateException("Submission command mismatch");
-        }
-        return after(result);
-    }
-
-    @Transactional
-    public WorkflowCommandResult claim(ClaimWorkflowTask command, WorkflowCommandContext context) {
-        return after(execution.claimTask(command, context));
-    }
-
-    @Transactional
-    public WorkflowCancellationCommandResult cancel(CancelWorkflow command, WorkflowCommandContext context) {
-        var result = execution.cancelWorkflow(command, context);
-        if (!result.replayed() && settings.failRuntimeAfterResult)
-            throw new IllegalStateException("Configured post-result failure");
-        return result;
-    }
-
-    @Transactional(readOnly = true)
-    public Optional<WorkflowCancellationCommandResult> replayCancellation(
-            CancelWorkflow command, WorkflowCommandContext context) {
-        return execution.findCancellationReplay(command, context)
-                .map(result -> new WorkflowCancellationCommandResult(true, result));
-    }
-
-    @Transactional
-    public WorkflowCommandResult release(ReleaseWorkflowTask command, WorkflowCommandContext context) {
-        return after(execution.releaseTask(command, context));
-    }
-
-    @Transactional
-    public WorkflowCommandResult administrativelyRelease(
-            AdministrativelyReleaseWorkflowTask command, WorkflowCommandContext context) {
-        return after(execution.administrativelyReleaseTask(command, context));
-    }
-
-    @Transactional(readOnly = true)
-    public Optional<WorkflowCommandResult> replayClaim(ClaimWorkflowTask command, WorkflowCommandContext context) {
-        return execution.findReplay(command, context).map(result -> new WorkflowCommandResult(true, result));
-    }
-
-    @Transactional(readOnly = true)
-    public Optional<WorkflowCommandResult> replayRelease(ReleaseWorkflowTask command, WorkflowCommandContext context) {
-        return execution.findReplay(command, context).map(result -> new WorkflowCommandResult(true, result));
-    }
-
-    @Transactional(readOnly = true)
-    public Optional<WorkflowCommandResult> replayAdministrativeRelease(
-            AdministrativelyReleaseWorkflowTask command, WorkflowCommandContext context) {
-        return execution.findReplay(command, context).map(result -> new WorkflowCommandResult(true, result));
-    }
-
-    @Transactional
-    public WorkflowCommandResult reassign(ReassignWorkflowTask command, WorkflowCommandContext context) {
-        return after(execution.reassignTask(command, context));
-    }
-
-    @Transactional(readOnly = true)
-    public Optional<WorkflowCommandResult> replayReassignment(ReassignWorkflowTask command, WorkflowCommandContext context) {
-        return execution.findReplay(command, context).map(result -> new WorkflowCommandResult(true, result));
     }
 
     private WorkflowCommandResult after(WorkflowCommandResult result) {
@@ -161,9 +74,4 @@ public class ConsoleRuntimeTransaction {
         return new StartInputs(values);
     }
 
-    @Transactional(readOnly = true)
-    public Optional<WorkflowCommandResult> replayComplete(
-            CompleteWorkflowTask command, WorkflowCommandContext context) {
-        return execution.findReplay(command, context);
-    }
 }

@@ -84,6 +84,8 @@ Core may use Spring/JPA internally. Public integration contracts MUST use standa
 
 Hosts own endpoint activation, identity, authorization policy, business data/rules and orchestration, navigation, business forms, datasource, transaction infrastructure, connection pooling, runtime configuration and external delivery. Web/UI share generic implementation, not host policy. Required adapters MUST NOT fall back to permissive authorization; generic commands MUST NOT bypass host business validation. The libraries MUST NOT create competing infrastructure, login/bootstrap or security chains, or mutate global host JSON/theme/provider settings. UI consumes host-approved APIs and preserves exact values and safe command handling; backend enforcement remains authoritative. Command recovery screens are sandbox diagnostics, not end-user functionality; backend idempotency and authorized receipt recovery remain required.
 
+[F031 revision 5](features/F031-shared-runtime-command-coordination/spec.md) applies this boundary with one host identity contract across the four web endpoint groups. Shared HTTP runtime commands use the host transaction manager and the existing core authorization and receipt operations. Hosts own transaction completion for their business orchestration. Administration can opt in to same-transaction host audit. Shared durable administration auditing remains deferred.
+
 ## C04 — Prepare for source integration into APOLO
 
 `workflow-core` will become a sibling Maven module inside APOLO alongside backend, frontend and configuration. Backend depends on core. Core retains its library boundary while joining APOLO's build and release lifecycle. Keep one authoritative implementation.

@@ -1,15 +1,19 @@
 package io.github.leontecristian.workflow.web.controller.instance;
 
+import static io.github.leontecristian.workflow.web.service.WorkflowRequestActors.requireActor;
 import static io.github.leontecristian.workflow.web.service.instance.ViewerWire.after;
 import static io.github.leontecristian.workflow.web.service.instance.ViewerWire.decimal;
 import static io.github.leontecristian.workflow.web.service.instance.ViewerWire.limit;
 import static io.github.leontecristian.workflow.web.service.instance.ViewerWire.query;
-import io.github.leontecristian.workflow.web.service.instance.ViewerWire;
-import io.github.leontecristian.workflow.web.service.instance.WorkflowInstanceViewerService;
-import io.github.leontecristian.workflow.web.service.instance.WorkflowInstanceGraphService;
-import io.github.leontecristian.workflow.web.configuration.WorkflowViewerOptions;
-import io.github.leontecristian.workflow.web.exception.instance.WorkflowViewerException;
+
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
+import io.github.leontecristian.workflow.web.configuration.WorkflowViewerOptions;
+import io.github.leontecristian.workflow.web.exception.WorkflowUnauthenticatedException;
+import io.github.leontecristian.workflow.web.exception.instance.WorkflowViewerException;
+import io.github.leontecristian.workflow.web.integration.WorkflowRequestIdentity;
+import io.github.leontecristian.workflow.web.service.instance.ViewerWire;
+import io.github.leontecristian.workflow.web.service.instance.WorkflowInstanceGraphService;
+import io.github.leontecristian.workflow.web.service.instance.WorkflowInstanceViewerService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,30 +32,41 @@ public class WorkflowInstanceViewerController {
     private final WorkflowInstanceGraphService graphs;
     private final ViewerWire wire;
     private final WorkflowViewerOptions options;
+    private final WorkflowRequestIdentity identity;
+
     public WorkflowInstanceViewerController(WorkflowInstanceViewerService viewer, WorkflowInstanceGraphService graphs,
-            ViewerWire wire, WorkflowViewerOptions options) {
+            ViewerWire wire, WorkflowViewerOptions options, WorkflowRequestIdentity identity) {
         this.viewer = viewer; this.graphs = graphs; this.wire = wire; this.options = options;
+        this.identity = identity;
     }
     @GetMapping("/instances/{id}")
-    public ResponseEntity<String> instance(@PathVariable String id) { return wire.response(viewer.instance(decimal(id, false))); }
+    public ResponseEntity<String> instance(@PathVariable String id) {
+        return wire.response(viewer.instance(requireActor(identity), decimal(id, false)));
+    }
     @GetMapping("/instances/{id}/history")
     public ResponseEntity<String> history(@PathVariable String id, HttpServletRequest request) {
+        String actorRef = requireActor(identity);
         query(request, "afterSequence", "limit");
-        return wire.response(viewer.history(decimal(id, false), after(request.getParameter("afterSequence")), limit(request.getParameter("limit"))));
+        return wire.response(viewer.history(actorRef, decimal(id, false),
+                after(request.getParameter("afterSequence")), limit(request.getParameter("limit"))));
     }
     @GetMapping("/instances/{id}/history/{sequence}")
     public ResponseEntity<String> event(@PathVariable String id, @PathVariable String sequence) {
-        return ResponseEntity.ok().header("Content-Type", "application/json").body(viewer.event(decimal(id, false), decimal(sequence, false)));
+        return ResponseEntity.ok().header("Content-Type", "application/json")
+                .body(viewer.event(requireActor(identity), decimal(id, false), decimal(sequence, false)));
     }
     @GetMapping("/instances/{id}/graph")
     public ResponseEntity<String> graph(@PathVariable String id, HttpServletRequest request) {
-        query(request); return wire.response(graphs.find(decimal(id, false)));
+        String actorRef = requireActor(identity);
+        query(request);
+        return wire.response(graphs.find(actorRef, decimal(id, false)));
     }
     public record Failure(String code, String message, List<?> diagnostics, String correlationId) {}
     @ExceptionHandler(Exception.class)
     public ResponseEntity<String> error(Exception failure, HttpServletRequest request) {
         int status = 500; String code = "HOST_FAILURE";
         if (failure instanceof WorkflowViewerException e) { status = e.status(); code = e.code(); }
+        else if (failure instanceof WorkflowUnauthenticatedException) { status = 401; code = "UNAUTHENTICATED"; }
         else if (failure instanceof WorkflowExecutionException e) {
             switch (e.category()) {
                 case INVALID_INPUT -> { status = 400; code = "INVALID_INPUT"; }

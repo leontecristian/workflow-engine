@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
@@ -23,7 +22,6 @@ import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequ
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeAccess;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeCoordinator;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeReadHost;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeTransaction;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskOwnershipAuthorization;
@@ -33,7 +31,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** Host policy and composition only: no database, clock factory or operation adapter required for reads. */
+/** Isolated host policy and composition checks. */
 class ConsoleRuntimePolicyUnitTest {
     private final ConsoleContext context = mock(ConsoleContext.class);
     private final SandboxRequestStore requests = mock(SandboxRequestStore.class);
@@ -68,8 +66,7 @@ class ConsoleRuntimePolicyUnitTest {
     }
 
     @Test void adminReadBypassesBusinessAssociationButOperationAvailabilityStaysDenied() {
-        when(context.actor()).thenReturn("admin");
-        when(context.admin()).thenReturn(true);
+        when(context.isConsoleAdministrator("admin")).thenReturn(true);
         var instance = mock(io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView.class);
         var summary = mock(io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceSummary.class);
         var activity = mock(io.github.leontecristian.workflow.core.dto.runtime.WorkflowActivityView.class);
@@ -99,13 +96,4 @@ class ConsoleRuntimePolicyUnitTest {
                 failure -> assertThat(failure.category()).isEqualTo(WorkflowExecutionException.Category.AUTHORIZATION_LOOKUP_FAILED));
     }
 
-    @Test void identityDoesNotConstructCommandContextUntilCancellationFactoryIsUsed() {
-        when(context.actor()).thenReturn("reviewer");
-        var adapter = new ConsoleRuntimeReadHost(context, null, null);
-        assertThat(adapter.currentActorRef()).isEqualTo("reviewer");
-        verify(context).actor();
-        verifyNoMoreInteractions(context);
-        adapter.currentCancellationContext();
-        verify(context).runtime(null);
-    }
 }

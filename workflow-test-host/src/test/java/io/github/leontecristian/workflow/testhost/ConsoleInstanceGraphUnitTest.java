@@ -29,6 +29,7 @@ import io.github.leontecristian.workflow.web.controller.instance.WorkflowInstanc
 import io.github.leontecristian.workflow.web.configuration.WorkflowViewerOptions;
 import io.github.leontecristian.workflow.web.dto.instance.InstanceGraphView.State;
 import io.github.leontecristian.workflow.web.exception.instance.WorkflowViewerException;
+import io.github.leontecristian.workflow.web.integration.WorkflowRequestIdentity;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
 import io.github.leontecristian.workflow.web.service.instance.ViewerWire;
 import io.github.leontecristian.workflow.web.service.instance.WorkflowInstanceGraphService;
@@ -65,13 +66,9 @@ class ConsoleInstanceGraphUnitTest {
     private final WorkflowRuntimeQueryService reads = mock(WorkflowRuntimeQueryService.class);
     private final WorkflowDefinitionService definitions = mock(WorkflowDefinitionService.class);
     private final ConsoleContext context = mock(ConsoleContext.class);
-    @org.junit.jupiter.api.BeforeEach void authenticated() {
-        when(context.actor()).thenReturn("unit");
-        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
-            org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated("unit", "unused", List.of()));
+    @org.junit.jupiter.api.BeforeEach void emptyTaskPageByDefault() {
         when(reads.listTasks(anyLong(), anyLong(), anyInt())).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage(List.of(), null));
     }
-    @org.junit.jupiter.api.AfterEach void clearSecurity() { org.springframework.security.core.context.SecurityContextHolder.clearContext(); }
     private final ViewerWire wire = new ViewerWire();
     private final WorkflowInstanceGraphService graphs =
             new WorkflowInstanceGraphService(
@@ -99,7 +96,7 @@ class ConsoleInstanceGraphUnitTest {
     }
 
     private void setup(InstanceStatus status, long sequence) {
-        when(context.admin()).thenReturn(true);
+        when(context.isConsoleAdministrator("unit")).thenReturn(true);
         var linkTask = mock(WorkflowTaskView.class); when(linkTask.id()).thenReturn(TASK);
         when(linkTask.activityId()).thenReturn(ACTIVITY);
         when(reads.listTasks(ID, 0, 100)).thenReturn(new WorkflowTaskPage(List.of(linkTask), null));
@@ -149,7 +146,7 @@ class ConsoleInstanceGraphUnitTest {
     @Test
     void pinnedRetiredGraphIsOrderedByEdgesAndLaterCompletionFactsAreExcluded() {
         setup(InstanceStatus.ACTIVE, 4);
-        var graph = graphs.find(ID);
+        var graph = graphs.find("unit", ID);
         assertEquals(
                 List.of("BEGIN", "REVIEW", "DONE"),
                 graph.nodes().stream().map(n -> n.key()).toList());
@@ -167,7 +164,7 @@ class ConsoleInstanceGraphUnitTest {
     @Test
     void completedInstanceHasNoActiveNodeAndEndRequiresItsRecordedFact() {
         setup(InstanceStatus.COMPLETED, 8);
-        var graph = graphs.find(ID);
+        var graph = graphs.find("unit", ID);
         assertTrue(graph.nodes().stream().allMatch(n -> n.state() == State.COMPLETED));
         assertTrue(graph.edges().stream().allMatch(e -> e.traversed()));
         when(reads.listHistory(ID, 0, 100))
@@ -185,15 +182,14 @@ class ConsoleInstanceGraphUnitTest {
                                 null));
         assertEquals(
                 "HOST_CONFIGURATION",
-                assertThrows(WorkflowViewerException.class, () -> graphs.find(ID)).code());
+                assertThrows(WorkflowViewerException.class, () -> graphs.find("unit", ID)).code());
     }
 
     @Test
     void unrelatedReviewerIsDeniedBeforeDefinitionOrHistoryDisclosure() {
         when(reads.findInstance(ID)).thenReturn(Optional.of(instance(InstanceStatus.ACTIVE, 4)));
-        when(context.actor()).thenReturn("other");
         when(reads.listTasks(ID, 0, 100)).thenReturn(new WorkflowTaskPage(List.of(), null));
-        assertEquals(404, assertThrows(WorkflowViewerException.class, () -> graphs.find(ID)).status());
+        assertEquals(404, assertThrows(WorkflowViewerException.class, () -> graphs.find("other", ID)).status());
         verifyNoInteractions(definitions);
         verify(reads, never()).listHistory(anyLong(), anyLong(), anyInt());
     }
@@ -201,27 +197,23 @@ class ConsoleInstanceGraphUnitTest {
     @Test
     void assignedReviewerCanReadProjectionWithoutDefinitionManagementPrivilege() {
         setup(InstanceStatus.ACTIVE, 4);
-        when(context.admin()).thenReturn(false);
-        when(context.actor()).thenReturn("reviewer");
         var task = mock(WorkflowTaskView.class);
         when(task.assignment()).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER, "reviewer"));
         when(task.activityId()).thenReturn(ACTIVITY);
         when(reads.listTasks(ID, 0, 100)).thenReturn(new WorkflowTaskPage(List.of(task), null));
-        assertEquals(State.ACTIVE, graphs.find(ID).nodes().get(1).state());
+        assertEquals(State.ACTIVE, graphs.find("reviewer", ID).nodes().get(1).state());
     }
 
     @Test
     void historicalReviewerDoesNotReceiveLinksToAnotherAssigneesTask() {
         setup(InstanceStatus.ACTIVE, 4);
-        when(context.admin()).thenReturn(false);
-        when(context.actor()).thenReturn("earlier-reviewer");
         var earlier = mock(WorkflowTaskView.class);
         when(earlier.assignment()).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER, "earlier-reviewer"));
         var later = mock(WorkflowTaskView.class);
         when(later.assignment()).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER, "later-reviewer"));
         when(reads.listTasks(ID, 0, 100)).thenReturn(new WorkflowTaskPage(List.of(earlier,later), null));
         when(later.activityId()).thenReturn(ACTIVITY);
-        var node = graphs.find(ID).nodes().get(1);
+        var node = graphs.find("earlier-reviewer", ID).nodes().get(1);
         assertEquals(State.ACTIVE,node.state());
         org.junit.jupiter.api.Assertions.assertNull(node.taskId());
         org.junit.jupiter.api.Assertions.assertNull(node.activityId());
@@ -232,7 +224,7 @@ class ConsoleInstanceGraphUnitTest {
         setup(InstanceStatus.ACTIVE, 4);
         when(reads.listHistory(ID, 0, 100))
                 .thenReturn(new WorkflowHistoryPage(facts().subList(1, 4), null));
-        assertEquals(500, assertThrows(WorkflowViewerException.class, () -> graphs.find(ID)).status());
+        assertEquals(500, assertThrows(WorkflowViewerException.class, () -> graphs.find("unit", ID)).status());
         when(reads.listHistory(ID, 0, 100))
                 .thenReturn(
                         new WorkflowHistoryPage(
@@ -242,29 +234,28 @@ class ConsoleInstanceGraphUnitTest {
                                         facts().get(2),
                                         facts().get(3)),
                                 null));
-        assertEquals(500, assertThrows(WorkflowViewerException.class, () -> graphs.find(ID)).status());
+        assertEquals(500, assertThrows(WorkflowViewerException.class, () -> graphs.find("unit", ID)).status());
     }
 
     @Test
     void activityGrantDoesNotImplyTheRecordedExactTaskGrant() {
         setup(InstanceStatus.ACTIVE, 4);
-        when(context.admin()).thenReturn(false);
-        when(context.actor()).thenReturn("reviewer");
         var assigned = mock(WorkflowTaskView.class);
         when(assigned.id()).thenReturn(TASK + 1);
         when(assigned.activityId()).thenReturn(ACTIVITY);
         when(assigned.assignment()).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER, "reviewer"));
         when(reads.listTasks(ID, 0, 100)).thenReturn(new WorkflowTaskPage(List.of(assigned), null));
-        var node = graphs.find(ID).nodes().get(1);
+        var node = graphs.find("reviewer", ID).nodes().get(1);
         assertEquals(ACTIVITY, node.activityId());
+        verify(context, never()).actor();
         org.junit.jupiter.api.Assertions.assertNull(node.taskId());
     }
 
     @Test
     void historyWorkIsBoundedBeforeDefinitionRead() {
-        when(context.admin()).thenReturn(true);
+        when(context.isConsoleAdministrator("unit")).thenReturn(true);
         when(reads.findInstance(ID)).thenReturn(Optional.of(instance(InstanceStatus.ACTIVE, 12_001)));
-        assertEquals(422, assertThrows(WorkflowViewerException.class, () -> graphs.find(ID)).status());
+        assertEquals(422, assertThrows(WorkflowViewerException.class, () -> graphs.find("unit", ID)).status());
         verifyNoInteractions(definitions);
     }
 
@@ -277,21 +268,25 @@ class ConsoleInstanceGraphUnitTest {
                         Optional.of(
                                 new DefinitionVersionView(
                                         pinned.summary(), "invalid stored JSON", null)));
-        assertEquals(500, assertThrows(WorkflowViewerException.class, () -> graphs.find(ID)).status());
+        assertEquals(500, assertThrows(WorkflowViewerException.class, () -> graphs.find("unit", ID)).status());
         when(definitions.findVersion(7)).thenReturn(Optional.of(new DefinitionVersionView(pinned.summary(), DOCUMENT.replace("SINGLE", "ALL"), null)));
-        assertEquals(State.ACTIVE, graphs.find(ID).nodes().get(1).state());
+        assertEquals(State.ACTIVE, graphs.find("unit", ID).nodes().get(1).state());
         when(definitions.findVersion(7)).thenReturn(Optional.of(pinned));
         when(pinned.summary().contentHash()).thenReturn("different-hash");
         assertEquals(
                 "HOST_CONFIGURATION",
-                assertThrows(WorkflowViewerException.class, () -> graphs.find(ID)).code());
+                assertThrows(WorkflowViewerException.class, () -> graphs.find("unit", ID)).code());
     }
 
     @Test
     void wireKeepsExactIdentifiersAndExcludesPrivateDefinitionContent() {
         setup(InstanceStatus.ACTIVE, 4);
-        var controller = new WorkflowInstanceViewerController(null, graphs, wire, new WorkflowViewerOptions("/console/api", null));
+        var identity = mock(WorkflowRequestIdentity.class);
+        when(identity.requireActorRef()).thenReturn("unit");
+        var controller = new WorkflowInstanceViewerController(null, graphs, wire,
+                new WorkflowViewerOptions("/console/api", null), identity);
         var json = controller.graph(Long.toString(ID), new MockHttpServletRequest()).getBody();
+        verify(identity).requireActorRef();
         assertTrue(json.contains("\"id\":\"9007199254740993\""));
         assertTrue(json.contains("\"taskId\":\"9007199254740995\""));
         assertTrue(json.contains("\"lockVersion\":\"9007199254740999\""));
@@ -320,19 +315,19 @@ class ConsoleInstanceGraphUnitTest {
         setup(InstanceStatus.CANCELLED, 4);
         assertEquals(
                 "HOST_CONFIGURATION",
-                assertThrows(WorkflowViewerException.class, () -> graphs.find(ID)).code());
+                assertThrows(WorkflowViewerException.class, () -> graphs.find("unit", ID)).code());
         var cancelled = new java.util.ArrayList<>(facts().subList(0, 4));
         cancelled.add(fact(5, "TASK_CANCELLED", null, null, null));
         cancelled.add(fact(6, "ACTIVITY_CANCELLED", null, null, null));
         cancelled.add(fact(7, "INSTANCE_CANCELLED", null, null, null));
         when(reads.findInstance(ID)).thenReturn(Optional.of(instance(InstanceStatus.CANCELLED, 7)));
         when(reads.listHistory(ID, 0, 100)).thenReturn(new WorkflowHistoryPage(cancelled, null));
-        var graph = graphs.find(ID);
+        var graph = graphs.find("unit", ID);
         assertEquals(List.of(State.COMPLETED, State.CANCELLED, State.PENDING),
                 graph.nodes().stream().map(n -> n.state()).toList());
         assertFalse(graph.edges().stream().filter(e -> e.key().equals("finish")).findFirst().orElseThrow().traversed());
         assertEquals(
                 InstanceStatus.CANCELLED,
-                new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess.class)).instance(ID).status());
+                new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess.class)).instance("unit", ID).status());
     }
 }

@@ -8,6 +8,7 @@ import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleS
 import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleWire;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleErrors;
+import io.github.leontecristian.workflow.testhost.service.console.ConsoleRequestIdentity;
 import io.github.leontecristian.workflow.web.service.administration.WorkflowAdministrationService;
 import io.github.leontecristian.workflow.testhost.repository.audit.ManagementAuditStore;
 import org.springframework.context.annotation.Primary;
@@ -50,7 +51,7 @@ class ConsoleAdministrationUnitTest {
     @Configuration(proxyBeanMethods = false)
     @EnableWebMvc
     @EnableWebSecurity
-    @Import({ConsoleSecurity.class, ConsoleAdministrationConfiguration.class})
+    @Import({ConsoleSecurity.class, ConsoleAdministrationConfiguration.class, ConsoleRequestIdentity.class})
     static class Host {
         @Bean ConsoleSettings settings(Environment environment) { return new ConsoleSettings(environment); }
         @Bean ConsoleWire wire() { return new ConsoleWire(); }

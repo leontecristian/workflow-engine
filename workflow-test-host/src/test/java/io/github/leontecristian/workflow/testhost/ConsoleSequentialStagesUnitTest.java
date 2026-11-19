@@ -15,7 +15,6 @@ import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQue
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleWire;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeAccess;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeReadHost;
 import io.github.leontecristian.workflow.web.controller.runtime.WorkflowRuntimeReadController;
 import io.github.leontecristian.workflow.web.service.runtime.RuntimeWire;
 import java.util.List;
@@ -32,7 +31,7 @@ class ConsoleSequentialStagesUnitTest {
                 3,"REVIEW","Review",null,false,0)));
         var context=mock(ConsoleContext.class); when(context.actor()).thenReturn("manager");
         var wire=new ConsoleWire(); var access=new ConsoleRuntimeAccess(reads, context, mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class), mock(io.github.leontecristian.workflow.testhost.service.runtime.ConsoleTaskBusinessAccess.class));
-        var controller=new WorkflowRuntimeReadController(reads,definitions,catalog,RuntimeReadFixtures.authorized(reads,access,mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class)),new ConsoleRuntimeReadHost(context,null,null),null,null,new RuntimeWire(),null,false);
+        var controller=new WorkflowRuntimeReadController(reads,definitions,catalog,RuntimeReadFixtures.authorized(reads,access,mock(io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService.class)),context::actor,null,null,new RuntimeWire(),null,false);
         var instance=mock(WorkflowInstanceView.class); when(instance.id()).thenReturn(1L);
         when(instance.definitionVersionId()).thenReturn(2L); when(instance.currentNodeKey()).thenReturn("PARTNER");
         when(reads.findInstance(1)).thenReturn(Optional.of(instance));
@@ -63,7 +62,7 @@ class ConsoleSequentialStagesUnitTest {
         assertThat(page.path("items")).hasSize(1); assertThat(page.path("items").get(0).path("id").asText()).isEqualTo("10");
         assertThat(page.path("nextAfterId").isNull()).isTrue();
         assertThatThrownBy(()->controller.contract("11")).isInstanceOfSatisfying(io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.class,e->assertThat(e.category()).isEqualTo(io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.NOT_FOUND));
-        when(context.admin()).thenReturn(true);
+        when(context.isConsoleAdministrator("manager")).thenReturn(true);
         assertThat(wire.tree(controller.tasks("1",new MockHttpServletRequest()).getBody()).path("items")).hasSize(2);
     }
 }

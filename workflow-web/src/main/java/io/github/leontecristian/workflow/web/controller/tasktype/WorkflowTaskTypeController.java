@@ -17,7 +17,8 @@ import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogSe
 import io.github.leontecristian.workflow.web.exception.administration.WorkflowAdministrationException;
 import io.github.leontecristian.workflow.web.service.administration.AdministrationErrors;
 import io.github.leontecristian.workflow.web.service.administration.AdministrationWire;
-import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationIdentity;
+import io.github.leontecristian.workflow.web.integration.WorkflowRequestIdentity;
+import io.github.leontecristian.workflow.web.service.WorkflowRequestActors;
 import io.github.leontecristian.workflow.web.integration.administration.WorkflowAdministrationAuthorization;
 import io.github.leontecristian.workflow.web.service.administration.WorkflowAdministrationService;
 
@@ -39,14 +40,14 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 public class WorkflowTaskTypeController {
     private final TaskTypeCatalogService catalog;
     private final WorkflowAdministrationService management;
-    private final WorkflowAdministrationIdentity identity;
+    private final WorkflowRequestIdentity identity;
     private final WorkflowAdministrationAuthorization authorization;
     private final AdministrationWire wire;
     private final AdministrationErrors errors;
 
     public WorkflowTaskTypeController(
             TaskTypeCatalogService catalog, WorkflowAdministrationService management,
-            WorkflowAdministrationIdentity identity, WorkflowAdministrationAuthorization authorization,
+            WorkflowRequestIdentity identity, WorkflowAdministrationAuthorization authorization,
             AdministrationWire wire, AdministrationErrors errors) {
         this.catalog = catalog;
         this.management = management;
@@ -107,9 +108,7 @@ public class WorkflowTaskTypeController {
                         errors.mutationCorrelation(r)));
     }
     private String requireAdministrationAccess() {
-        String actorRef = identity.requireActorRef();
-        if (actorRef == null || actorRef.isBlank())
-            throw new WorkflowAdministrationException(500, "HOST_FAILURE");
+        String actorRef = WorkflowRequestActors.requireActor(identity);
         authorization.requireAdministrationAccess(actorRef);
         return actorRef;
     }

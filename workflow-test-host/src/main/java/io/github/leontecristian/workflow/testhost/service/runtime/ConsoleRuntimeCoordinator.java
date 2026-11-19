@@ -1,14 +1,7 @@
 package io.github.leontecristian.workflow.testhost.service.runtime;
 
-import io.github.leontecristian.workflow.core.dto.runtime.AdministrativelyReleaseWorkflowTask;
-import io.github.leontecristian.workflow.core.dto.runtime.ClaimWorkflowTask;
-import io.github.leontecristian.workflow.core.dto.runtime.ReassignWorkflowTask;
-import io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask;
-import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
-import io.github.leontecristian.workflow.core.dto.runtime.CancelWorkflow;
-import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationCommandResult;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
 import io.github.leontecristian.workflow.testhost.exception.console.SandboxRequestConflict;
@@ -17,9 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 import java.util.IdentityHashMap;
-import java.util.Optional;
 import java.util.Set;
-import java.util.function.Supplier;
 
 /** Intentionally nontransactional. The transactional proxy has rolled back before recovery runs. */
 @Service
@@ -47,66 +38,6 @@ public class ConsoleRuntimeCoordinator {
             throw original;
         } finally {
             LOG.info("Console start end command={}", command.commandId());
-        }
-    }
-
-    public WorkflowCommandResult complete(
-            CompleteWorkflowTask command, WorkflowCommandContext context) {
-        LOG.info(
-                "Console complete begin command={} instance={}",
-                command.commandId(),
-                command.instanceId());
-        try {
-            return transactions.complete(command, context);
-        } catch (RuntimeException original) {
-            if (eligible(original)) {
-                var replay = transactions.replayComplete(command, context);
-                if (replay.isPresent()) return replay.get();
-            }
-            throw original;
-        } finally {
-            LOG.info("Console complete end command={}", command.commandId());
-        }
-    }
-
-    public WorkflowCommandResult reassign(ReassignWorkflowTask command, WorkflowCommandContext context) {
-        return executeOwnership(() -> transactions.reassign(command, context),
-                () -> transactions.replayReassignment(command, context));
-    }
-
-    public WorkflowCommandResult claim(ClaimWorkflowTask command, WorkflowCommandContext context) {
-        return executeOwnership(() -> transactions.claim(command, context),
-                () -> transactions.replayClaim(command, context));
-    }
-
-    public WorkflowCancellationCommandResult cancel(CancelWorkflow command, WorkflowCommandContext context) {
-        try {
-            return transactions.cancel(command, context);
-        } catch (RuntimeException original) {
-            if (eligible(original)) return transactions.replayCancellation(command, context).orElseThrow(() -> original);
-            throw original;
-        }
-    }
-
-    public WorkflowCommandResult release(ReleaseWorkflowTask command, WorkflowCommandContext context) {
-        return executeOwnership(() -> transactions.release(command, context),
-                () -> transactions.replayRelease(command, context));
-    }
-
-    public WorkflowCommandResult administrativelyRelease(
-            AdministrativelyReleaseWorkflowTask command, WorkflowCommandContext context) {
-        return executeOwnership(() -> transactions.administrativelyRelease(command, context),
-                () -> transactions.replayAdministrativeRelease(command, context));
-    }
-
-    private WorkflowCommandResult executeOwnership(Supplier<WorkflowCommandResult> execute,
-            Supplier<Optional<WorkflowCommandResult>> replay) {
-        try {
-            return execute.get();
-        } catch (RuntimeException original) {
-            // Core checks business access again in the fresh replay transaction.
-            if (eligible(original)) return replay.get().orElseThrow(() -> original);
-            throw original;
         }
     }
 

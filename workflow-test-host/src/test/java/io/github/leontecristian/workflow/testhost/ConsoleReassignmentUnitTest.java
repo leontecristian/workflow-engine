@@ -38,6 +38,7 @@ class ConsoleReassignmentUnitTest {
     private ConsoleRuntimeAccess access() {
         when(context.actor()).thenReturn("admin");
         when(context.admin()).thenReturn(true);
+        when(context.isConsoleAdministrator("admin")).thenReturn(true);
         when(context.isConsoleActor("admin")).thenReturn(true);
         when(businessAccess.canAccess(any())).thenReturn(true);
         when(reads.findTask(5)).thenReturn(Optional.of(task));
@@ -55,7 +56,7 @@ class ConsoleReassignmentUnitTest {
     }
     @Test void targetLookupPagesFixturesAndRechecksAccessAndPermission() {
         access();
-        var directory = new io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeReadHost(context, authorization, settings);
+        var directory = new io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeReadHost(authorization, settings);
         var request = new TaskEligibilityContext(task, "admin");
         var first = directory.reassignmentTargets(request, AssignmentTargetKind.USER, "review", null, 1);
         assertThat(first.items()).extracting(item -> item.ref()).containsExactly("reviewer");
@@ -89,7 +90,7 @@ class ConsoleReassignmentUnitTest {
     @Test void lookupInfrastructureFailureIsSanitizedAndNeverGrantsPermission() {
         access();
         when(businessAccess.canAccess(any())).thenThrow(new IllegalStateException("private directory detail"));
-        var directory = new io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeReadHost(context, authorization, settings);
+        var directory = new io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeReadHost(authorization, settings);
         assertThatThrownBy(() -> directory.reassignmentTargets(new TaskEligibilityContext(task, "admin"), AssignmentTargetKind.USER, null, null, 20)).isInstanceOfSatisfying(WorkflowExecutionException.class,
                 failure -> assertThat(failure.category()).isEqualTo(WorkflowExecutionException.Category.AUTHORIZATION_LOOKUP_FAILED));
     }

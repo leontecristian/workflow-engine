@@ -47,9 +47,9 @@ public class WorkflowInstanceGraphService {
     }
 
     @Transactional(readOnly = true)
-    public InstanceGraphView find(long id) {
+    public InstanceGraphView find(String actorRef, long id) {
         // Authorize first, before disclosing pinned topology or reading retained evidence.
-        access.requireInstanceRead(id);
+        access.requireInstanceRead(actorRef, id);
         var instance = reads.findInstance(id).orElseThrow(WorkflowViewerException::missing);
         require(instance.status() == InstanceStatus.ACTIVE || instance.status() == InstanceStatus.COMPLETED
                 || instance.status() == InstanceStatus.CANCELLED);
@@ -125,7 +125,7 @@ public class WorkflowInstanceGraphService {
         var candidates = latestLinks.values().stream()
                 .map(links -> new ViewerLinkReference(links.activityId, links.singleTaskId))
                 .collect(java.util.stream.Collectors.toSet());
-        var readable = access.readableLinks(id, Set.copyOf(candidates));
+        var readable = access.readableLinks(actorRef, id, Set.copyOf(candidates));
         require(readable != null && readable.stream().allMatch(grant -> candidates.stream().anyMatch(candidate ->
                 candidate.activityId() == grant.activityId()
                 && (grant.taskId() == null || Objects.equals(candidate.taskId(), grant.taskId())))));

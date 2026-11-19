@@ -31,11 +31,10 @@ import io.github.leontecristian.workflow.web.configuration.WorkflowRuntimeReadCo
 import io.github.leontecristian.workflow.web.dto.runtime.WorkflowReassignmentTarget;
 import io.github.leontecristian.workflow.web.dto.runtime.WorkflowReassignmentTargetPage;
 import io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException;
-import io.github.leontecristian.workflow.web.integration.runtime.WorkflowRuntimeCommandHost;
+import io.github.leontecristian.workflow.web.service.runtime.WorkflowRuntimeCommandCoordinator;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowAuthorizedRuntimeReadService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowTaskEligibilityService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeReadAuthorization;
-import io.github.leontecristian.workflow.web.integration.runtime.WorkflowRuntimeReadIdentity;
 import io.github.leontecristian.workflow.web.integration.runtime.WorkflowAssignmentDirectory;
 import java.time.Instant;
 import java.util.List;
@@ -101,7 +100,7 @@ class WorkflowReassignmentWebUnitTest {
 
     @Test void mutationAndLookupPreserveCompleteFrozenEnvelope() throws Exception {
         try (var context = commands()) {
-            var host = context.getBean(WorkflowRuntimeCommandHost.class);
+            var host = context.getBean(WorkflowRuntimeCommandCoordinator.class);
             var command = new ReassignWorkflowTask(UUID.fromString("12345678-1234-1234-1234-123456789abc"),
                     9007199254740993L, 2, 9007199254740994L,
                     new TaskAssignmentTarget(AssignmentTargetKind.GROUP, "Finance"), " exact \n reason ");
@@ -134,7 +133,7 @@ class WorkflowReassignmentWebUnitTest {
             }
             mvc(context).perform(post("/custom/instances/1/tasks/2/reassign").header("X-Expected-Lock-Version", "0")
                     .contentType("application/json").content(BODY + " ".repeat(16 * 1024))).andExpect(status().is(413));
-            verify(context.getBean(WorkflowRuntimeCommandHost.class), never()).reassign(any(), any());
+            verify(context.getBean(WorkflowRuntimeCommandCoordinator.class), never()).reassign(any(), any());
         }
     }
 
@@ -264,7 +263,7 @@ class WorkflowReassignmentWebUnitTest {
 
     @Test void reassignmentErrorsKeepSpecifiedStatuses() throws Exception {
         try (var context = commands()) {
-            var host = context.getBean(WorkflowRuntimeCommandHost.class);
+            var host = context.getBean(WorkflowRuntimeCommandCoordinator.class);
             for (var category : List.of(WorkflowExecutionException.Category.REASSIGNMENT_FORBIDDEN,
                     WorkflowExecutionException.Category.INVALID_ASSIGNMENT)) {
                 org.mockito.Mockito.doThrow(new WorkflowExecutionException(category)).when(host).reassign(any(), any());

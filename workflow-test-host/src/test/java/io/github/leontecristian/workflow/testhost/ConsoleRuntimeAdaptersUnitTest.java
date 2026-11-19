@@ -2,52 +2,22 @@ package io.github.leontecristian.workflow.testhost;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
-import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.testhost.exception.console.ConsoleException;
 import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeAccess;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeCommandHost;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeCoordinator;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeTransaction;
-import io.github.leontecristian.workflow.web.exception.runtime.WorkflowRuntimeException;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 class ConsoleRuntimeAdaptersUnitTest {
-    @Test void cancellationRecoveryLooksUpAfterRollbackWithoutRepeatingTheMutation() {
-        var tx = mock(ConsoleRuntimeTransaction.class);
-        var access = mock(ConsoleRuntimeAccess.class);
-        var context = mock(ConsoleContext.class);
-        var actor = mock(WorkflowCommandContext.class);
-        when(context.runtime("trusted")).thenReturn(actor);
-        var host = new ConsoleRuntimeCommandHost(new ConsoleRuntimeCoordinator(tx), tx, context);
-        var command = new io.github.leontecristian.workflow.core.dto.runtime.CancelWorkflow(UUID.randomUUID(), 1, 9, "exact");
-        var result = new io.github.leontecristian.workflow.core.dto.runtime.WorkflowCancellationCommandResult(true, null);
-        when(tx.cancel(command, actor)).thenThrow(new io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException(
-                io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.CONCURRENT_COMMAND));
-        when(tx.replayCancellation(command, actor)).thenReturn(Optional.of(result));
-        assertThat(host.cancel(command, "trusted")).isSameAs(result);
-        var order = inOrder(tx);
-        order.verify(tx).cancel(command, actor);
-        order.verify(tx).replayCancellation(command, actor);
-        verifyNoMoreInteractions(tx);
-        verifyNoInteractions(access);
-    }
-
     @Test void cancellationPolicyRequiresBusinessLinkAndAdministratorPermission() {
         var context = mock(ConsoleContext.class);
         var requests = mock(io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore.class);
@@ -65,62 +35,35 @@ class ConsoleRuntimeAdaptersUnitTest {
         when(requests.linkedToInstance(1)).thenReturn(false);
         assertThat(policy.canAccess(authorization)).isFalse();
     }
-    @Test void completionAndReplayDispatchTrustedContextWithoutReadPrechecks() {
-        var commands = mock(ConsoleRuntimeCoordinator.class);
-        var tx = mock(ConsoleRuntimeTransaction.class);
-        var context = mock(ConsoleContext.class);
-        var actor = mock(WorkflowCommandContext.class);
-        when(context.runtime("trusted")).thenReturn(actor);
-        var host = new ConsoleRuntimeCommandHost(commands, tx, context);
-        var command = new CompleteWorkflowTask(UUID.randomUUID(), 1, 5, 9, "APPROVE", null);
-        var result = new WorkflowCommandResult(true, null);
-        when(commands.complete(command, actor)).thenReturn(result);
-        assertThat(host.complete(command, "trusted")).isSameAs(result);
-        when(tx.replayComplete(command, actor)).thenReturn(Optional.empty());
-        assertThat(host.replayComplete(command, "trusted")).isEmpty();
-        verify(commands).complete(command, actor);
-        verify(tx).replayComplete(command, actor);
-        verifyNoMoreInteractions(commands, tx);
+    @Test void runtimeResolverKeepsScopedConsoleFailuresAndRecognizesWrappedConflict() throws Exception {
+        var resolver = new io.github.leontecristian.workflow.testhost.service.console.ConsoleRuntimeConflictResolver(
+                new io.github.leontecristian.workflow.web.configuration.WorkflowRuntimeOptions("/console/api", "trusted"));
+        var controller = mock(io.github.leontecristian.workflow.web.controller.runtime.WorkflowRuntimeCommandController.class);
+        var handler = new org.springframework.web.method.HandlerMethod(controller, "replayComplete",
+                jakarta.servlet.http.HttpServletRequest.class);
+        var request = new org.springframework.mock.web.MockHttpServletRequest();
+        request.setAttribute("trusted", "server-correlation");
+        var conflict = new io.github.leontecristian.workflow.testhost.exception.console.SandboxRequestConflict();
+        var wrapped = new IllegalStateException("private action details", conflict);
+        for (var failure : List.of(conflict, wrapped)) {
+            var response = new org.springframework.mock.web.MockHttpServletResponse();
+            assertThat(resolver.resolveException(request, response, handler, failure)).isNotNull();
+            assertThat(response.getStatus()).isEqualTo(409);
+            assertThat(new com.fasterxml.jackson.databind.ObjectMapper().readTree(response.getContentAsString()))
+                    .isEqualTo(new com.fasterxml.jackson.databind.ObjectMapper().readTree("""
+                            {"code":"SANDBOX_REQUEST_CONFLICT","message":"SANDBOX_REQUEST_CONFLICT",
+                             "diagnostics":[],"correlationId":"server-correlation"}
+                            """));
+        }
+        var response = new org.springframework.mock.web.MockHttpServletResponse();
+        assertThat(resolver.resolveException(request, response, handler, new ConsoleException(422, "HOST_VALIDATION")))
+                .isNotNull();
+        assertThat(response.getStatus()).isEqualTo(422);
+        assertThat(response.getContentAsString()).contains("HOST_VALIDATION");
+        assertThat(resolver.resolveException(request, response, handler, new IllegalStateException())).isNull();
+        assertThat(resolver.resolveException(request, response, null, wrapped)).isNull();
     }
-    @Test void ownershipRecoveryUsesOnlyTheNewTransactionReplayAndNeverTheMembershipGate() {
-        var tx = mock(ConsoleRuntimeTransaction.class);
-        var access = mock(ConsoleRuntimeAccess.class);
-        var context = mock(ConsoleContext.class);
-        var actor = mock(WorkflowCommandContext.class);
-        when(context.runtime("trusted")).thenReturn(actor);
-        var host = new ConsoleRuntimeCommandHost(new ConsoleRuntimeCoordinator(tx), tx, context);
-        var command = new io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask(
-                UUID.randomUUID(), 1, 5, 9);
-        var result = new WorkflowCommandResult(true, null);
-        when(tx.release(command, actor)).thenThrow(
-                new io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException(
-                        io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.CONCURRENT_COMMAND));
-        when(tx.replayRelease(command, actor)).thenReturn(Optional.of(result));
 
-        assertThat(host.release(command, "trusted")).isSameAs(result);
-        var order = inOrder(tx);
-        order.verify(tx).release(command, actor);
-        order.verify(tx).replayRelease(command, actor);
-        verifyNoMoreInteractions(tx);
-        verifyNoInteractions(access);
-    }
-    @Test void hostFailuresKeepExistingConsoleStatusAndWrappedBusinessConflictMapping() {
-        var commands=mock(ConsoleRuntimeCoordinator.class); var tx=mock(ConsoleRuntimeTransaction.class);
-        var access=mock(ConsoleRuntimeAccess.class); var context=mock(ConsoleContext.class);
-        var host=new ConsoleRuntimeCommandHost(commands,tx,context);
-        var command=new CompleteWorkflowTask(UUID.randomUUID(),1,5,9,"APPROVE",null);
-        org.mockito.Mockito.doThrow(new ConsoleException(422,"HOST_VALIDATION")).when(commands).complete(command,null);
-        assertThatThrownBy(()->host.complete(command,"correlation")).isInstanceOfSatisfying(WorkflowRuntimeException.class,
-            e->{assertThat(e.status()).isEqualTo(422);assertThat(e.code()).isEqualTo("HOST_VALIDATION");});
-        var conflict=new io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException(
-            io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category.HOST_CONFIGURATION,
-            new io.github.leontecristian.workflow.testhost.exception.console.SandboxRequestConflict());
-        org.mockito.Mockito.doThrow(conflict).when(commands).complete(command,null);
-        org.mockito.Mockito.doThrow(conflict).when(tx).replayComplete(command,null);
-        for(Runnable operation:List.<Runnable>of(()->host.complete(command,"correlation"),()->host.replayComplete(command,"correlation")))
-            assertThatThrownBy(operation::run).isInstanceOfSatisfying(WorkflowRuntimeException.class,
-                e->{assertThat(e.status()).isEqualTo(409);assertThat(e.code()).isEqualTo("SANDBOX_REQUEST_CONFLICT");});
-    }
     @Test void accessFilteredInstancePagesStopAtBudgetWithWorkingContinuation() {
         var reads=mock(WorkflowRuntimeQueryService.class);var access=mock(ConsoleRuntimeAccess.class);var context=mock(ConsoleContext.class);
         when(reads.listTasks(org.mockito.ArgumentMatchers.eq(1L),org.mockito.ArgumentMatchers.anyLong(),org.mockito.ArgumentMatchers.eq(50)))

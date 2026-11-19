@@ -28,11 +28,8 @@ import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQue
 import io.github.leontecristian.workflow.web.dto.instance.InstanceGraphView;
 import io.github.leontecristian.workflow.web.dto.instance.InstanceGraphView.State;
 import io.github.leontecristian.workflow.web.exception.instance.WorkflowViewerException;
-import io.github.leontecristian.workflow.testhost.service.console.ConsoleContext;
 import io.github.leontecristian.workflow.web.service.instance.ViewerWire;
 import io.github.leontecristian.workflow.web.service.instance.WorkflowInstanceGraphService;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeAccess;
-import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleViewerAccess;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,18 +42,15 @@ class ConsoleGeneralGraphUnitTest {
     private final ObjectMapper json = new ObjectMapper();
     private final WorkflowRuntimeQueryService reads = mock(WorkflowRuntimeQueryService.class);
     private final WorkflowDefinitionService definitions = mock(WorkflowDefinitionService.class);
-    private final ConsoleContext context = mock(ConsoleContext.class);
-    @org.junit.jupiter.api.BeforeEach void authenticated() {
-        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
-            org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated("unit", "unused", List.of()));
+    @org.junit.jupiter.api.BeforeEach void emptyTaskPageByDefault() {
         when(reads.listTasks(anyLong(), anyLong(), anyInt())).thenReturn(new io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage(List.of(), null));
     }
-    @org.junit.jupiter.api.AfterEach void clearSecurity() { org.springframework.security.core.context.SecurityContextHolder.clearContext(); }
     private final ViewerWire wire = new ViewerWire();
     private final WorkflowInstanceGraphService graphs = new WorkflowInstanceGraphService(new io.github.leontecristian.workflow.web.integration.instance.WorkflowViewerAccess() {
-        public void requireInstanceRead(long id) {}
-        public void requireHistoryRead(long id) { throw new AssertionError("Graph must not require HISTORY"); }
-        public java.util.Set<io.github.leontecristian.workflow.web.dto.instance.ViewerLinkReference> readableLinks(long id, java.util.Set<io.github.leontecristian.workflow.web.dto.instance.ViewerLinkReference> candidates) {
+        public void requireInstanceRead(String actorRef, long id) { assertEquals("reviewer", actorRef); }
+        public void requireHistoryRead(String actorRef, long id) { throw new AssertionError("Graph must not require HISTORY"); }
+        public java.util.Set<io.github.leontecristian.workflow.web.dto.instance.ViewerLinkReference> readableLinks(String actorRef, long id, java.util.Set<io.github.leontecristian.workflow.web.dto.instance.ViewerLinkReference> candidates) {
+            assertEquals("reviewer", actorRef);
             var grants = new java.util.HashSet<>(candidates);
             candidates.forEach(c -> grants.add(new io.github.leontecristian.workflow.web.dto.instance.ViewerLinkReference(c.activityId(), null)));
             return grants;
@@ -79,7 +73,6 @@ class ConsoleGeneralGraphUnitTest {
     private WorkflowHistorySummary event(long seq, String type) { return fact(seq, type, null, null, null, null, null); }
     private WorkflowHistorySummary transition(long seq, String key, String from, String to) { return fact(seq, "TRANSITION_TAKEN", null, null, key, from, to); }
     private void setup(ObjectNode document, List<WorkflowHistorySummary> facts, InstanceStatus status, String position, long watermark) {
-        when(context.admin()).thenReturn(true);
         when(reads.findInstance(1)).thenReturn(Optional.of(new WorkflowInstanceView(1, 7, "flow", 1, "hash", null, null,
                 position, status, status == InstanceStatus.COMPLETED ? "DONE" : null, Instant.EPOCH, "admin", null, null, null, watermark, 1)));
         var summary = mock(DefinitionVersionSummary.class);
@@ -105,7 +98,7 @@ class ConsoleGeneralGraphUnitTest {
                 fact(3, "ACTIVITY_ENTERED", 100L, null, null, null, null), fact(4, "TASK_CREATED", 100L, 200L, null, null, null),
                 event(5, "TASK_COMPLETED"), event(6, "ACTIVITY_COMPLETED"), transition(7, "reject", "REVIEW", "REJECTED"), event(8, "INSTANCE_COMPLETED"));
         setup(doc, facts, InstanceStatus.COMPLETED, "REJECTED", 8);
-        var graph = graphs.find(1);
+        var graph = graphs.find("reviewer", 1);
         assertEquals(3, graph.edges().size());
         assertFalse(graph.edges().stream().filter(e -> e.outcome() != null && e.outcome().equals("APPROVE")).findFirst().orElseThrow().traversed());
         assertTrue(graph.edges().stream().filter(e -> e.outcome() != null && e.outcome().equals("REJECT")).findFirst().orElseThrow().traversed());
@@ -123,13 +116,13 @@ class ConsoleGeneralGraphUnitTest {
                 event(10, "TASK_COMPLETED"), event(11, "ACTIVITY_COMPLETED"), transition(12, "finish", "REVIEW", "AFTER"),
                 event(13, "SERVICE_TASK_COMPLETED"), event(14, "VARIABLES_WRITTEN"), transition(15, "end", "AFTER", "DONE"), event(16, "INSTANCE_COMPLETED"));
         setup(doc, facts, InstanceStatus.ACTIVE, "REVIEW", 9);
-        var paused = graphs.find(1);
+        var paused = graphs.find("reviewer", 1);
         assertEquals(List.of("BEGIN", "BEFORE", "REVIEW", "AFTER", "DONE"), paused.nodes().stream().map(InstanceGraphView.Node::key).toList());
         assertEquals(List.of(State.COMPLETED, State.COMPLETED, State.ACTIVE, State.PENDING, State.PENDING), paused.nodes().stream().map(InstanceGraphView.Node::state).toList());
         assertEquals(201L, node(paused, "REVIEW").taskId()); assertNull(node(paused, "BEFORE").activityId());
         assertFalse(wire.json(paused).contains("private-action")); assertFalse(wire.json(paused).contains("never expose"));
         setup(doc, facts, InstanceStatus.COMPLETED, "DONE", 16);
-        assertTrue(graphs.find(1).nodes().stream().allMatch(n -> n.state() == State.COMPLETED));
+        assertTrue(graphs.find("reviewer", 1).nodes().stream().allMatch(n -> n.state() == State.COMPLETED));
     }
 
     @Test void branchesRepeatedTransitionsAndLatestActivationRetainHonestStateAndLinks() {
@@ -141,9 +134,9 @@ class ConsoleGeneralGraphUnitTest {
                 transition(7, "continue", "LEFT", "LOOP"), transition(8, "self", "LOOP", "LOOP"), transition(9, "self", "LOOP", "LOOP"), transition(10, "back", "LOOP", "LEFT"),
                 fact(11, "ACTIVITY_ENTERED", 101L, null, null, null, null), fact(12, "TASK_CREATED", 101L, 202L, null, null, null));
         setup(doc, facts, InstanceStatus.ACTIVE, "LEFT", 6);
-        var multiple = node(graphs.find(1), "LEFT"); assertEquals(100L, multiple.activityId()); assertNull(multiple.taskId());
+        var multiple = node(graphs.find("reviewer", 1), "LEFT"); assertEquals(100L, multiple.activityId()); assertNull(multiple.taskId());
         setup(doc, facts, InstanceStatus.ACTIVE, "LEFT", 12);
-        var revisited = graphs.find(1); var left = node(revisited, "LEFT");
+        var revisited = graphs.find("reviewer", 1); var left = node(revisited, "LEFT");
         assertEquals(State.ACTIVE, left.state()); assertEquals(101L, left.activityId()); assertEquals(202L, left.taskId());
         assertEquals(State.PENDING, node(revisited, "RIGHT").state()); assertEquals("CUSTOM_NODE", node(revisited, "RIGHT").type());
         assertEquals(State.COMPLETED, node(revisited, "LOOP").state());
@@ -158,7 +151,7 @@ class ConsoleGeneralGraphUnitTest {
                 fact(4, "TASK_CREATED", 100L, 200L, null, null, null), event(5, "TASK_COMPLETED"), event(6, "ACTIVITY_COMPLETED"), transition(7, "next", "FIRST", "SECOND"),
                 fact(8, "ACTIVITY_ENTERED", 101L, null, null, null, null), fact(9, "TASK_CREATED", 101L, 201L, null, null, null));
         setup(doc, facts, InstanceStatus.ACTIVE, "SECOND", 9);
-        var graph = graphs.find(1); assertEquals(200L, node(graph, "FIRST").taskId()); assertEquals(State.COMPLETED, node(graph, "FIRST").state());
+        var graph = graphs.find("reviewer", 1); assertEquals(200L, node(graph, "FIRST").taskId()); assertEquals(State.COMPLETED, node(graph, "FIRST").state());
         assertEquals(201L, node(graph, "SECOND").taskId()); assertEquals(State.ACTIVE, node(graph, "SECOND").state());
     }
 
@@ -169,24 +162,24 @@ class ConsoleGeneralGraphUnitTest {
         facts.add(transition(151, "enter", "BEGIN", "REVIEW")); facts.add(fact(152, "ACTIVITY_ENTERED", 100L, null, null, null, null));
         facts.add(fact(153, "TASK_CREATED", 100L, 200L, null, null, null)); facts.add(transition(154, "end", "REVIEW", "DONE")); facts.add(event(155, "INSTANCE_COMPLETED"));
         setup(doc, facts, InstanceStatus.ACTIVE, "REVIEW", 153);
-        assertEquals(State.PENDING, node(graphs.find(1), "DONE").state()); verify(reads).listHistory(1, 100, 100);
+        assertEquals(State.PENDING, node(graphs.find("reviewer", 1), "DONE").state()); verify(reads).listHistory(1, 100, 100);
         when(reads.listHistory(1, 100, 100)).thenReturn(new WorkflowHistoryPage(facts.subList(101, 153), null));
-        assertEquals(500, assertThrows(WorkflowViewerException.class, () -> graphs.find(1)).status());
+        assertEquals(500, assertThrows(WorkflowViewerException.class, () -> graphs.find("reviewer", 1)).status());
         when(reads.listHistory(1, 100, 100)).thenReturn(new WorkflowHistoryPage(List.of(event(154, "OTHER")), 100L));
-        assertEquals(500, assertThrows(WorkflowViewerException.class, () -> graphs.find(1)).status());
+        assertEquals(500, assertThrows(WorkflowViewerException.class, () -> graphs.find("reviewer", 1)).status());
     }
 
     @Test void malformedTopologyAndInconsistentRecordedRouteFailClosed() {
         var doc = document("BEGIN", "START", "REVIEW", "HUMAN_TASK", "DONE", "END"); edge(doc, "enter", "BEGIN", "REVIEW"); edge(doc, "end", "REVIEW", "DONE");
         var facts = List.of(event(1, "INSTANCE_STARTED"), transition(2, "enter", "REVIEW", "BEGIN"));
-        setup(doc, facts, InstanceStatus.ACTIVE, "REVIEW", 2); assertThrows(WorkflowViewerException.class, () -> graphs.find(1));
+        setup(doc, facts, InstanceStatus.ACTIVE, "REVIEW", 2); assertThrows(WorkflowViewerException.class, () -> graphs.find("reviewer", 1));
         ((ObjectNode) doc.path("transitions").get(0)).put("to", "MISSING");
-        setup(doc, List.of(event(1, "INSTANCE_STARTED")), InstanceStatus.ACTIVE, "BEGIN", 1); assertThrows(WorkflowViewerException.class, () -> graphs.find(1));
+        setup(doc, List.of(event(1, "INSTANCE_STARTED")), InstanceStatus.ACTIVE, "BEGIN", 1); assertThrows(WorkflowViewerException.class, () -> graphs.find("reviewer", 1));
         ((ObjectNode) doc.path("transitions").get(0)).put("to", "REVIEW");
         ((ArrayNode) doc.get("nodes")).add(doc.path("nodes").get(0));
-        setup(doc, List.of(event(1, "INSTANCE_STARTED")), InstanceStatus.ACTIVE, "BEGIN", 1); assertThrows(WorkflowViewerException.class, () -> graphs.find(1));
+        setup(doc, List.of(event(1, "INSTANCE_STARTED")), InstanceStatus.ACTIVE, "BEGIN", 1); assertThrows(WorkflowViewerException.class, () -> graphs.find("reviewer", 1));
         var tooMany = document("BEGIN", "START"); for (int i = 0; i < 200; i++) ((ArrayNode) tooMany.get("nodes")).addObject().put("key", "N" + i).put("type", "SERVICE_TASK").put("name", "Node");
-        setup(tooMany, List.of(event(1, "INSTANCE_STARTED")), InstanceStatus.ACTIVE, "BEGIN", 1); assertThrows(WorkflowViewerException.class, () -> graphs.find(1));
+        setup(tooMany, List.of(event(1, "INSTANCE_STARTED")), InstanceStatus.ACTIVE, "BEGIN", 1); assertThrows(WorkflowViewerException.class, () -> graphs.find("reviewer", 1));
     }
 
     @Test void completeResponseByteBudgetIsCheckedAfterAllowlisting() {
@@ -202,6 +195,6 @@ class ConsoleGeneralGraphUnitTest {
             ((ObjectNode) doc.path("transitions").get(i)).put("outcome", "O".repeat(100));
         }
         setup(doc, List.of(event(1, "INSTANCE_STARTED")), InstanceStatus.ACTIVE, keys.get(0), 1);
-        assertEquals(422, assertThrows(WorkflowViewerException.class, () -> graphs.find(1)).status());
+        assertEquals(422, assertThrows(WorkflowViewerException.class, () -> graphs.find("reviewer", 1)).status());
     }
 }

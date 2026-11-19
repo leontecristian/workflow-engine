@@ -2,6 +2,14 @@ package io.github.leontecristian.workflow.testhost;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
@@ -34,11 +42,13 @@ import io.github.leontecristian.workflow.core.service.runtime.WorkflowExecutionS
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowRuntimeQueryService;
 import io.github.leontecristian.workflow.core.service.runtime.WorkflowServiceAction;
 import io.github.leontecristian.workflow.core.service.tasktype.TaskTypeCatalogService;
-import io.github.leontecristian.workflow.testhost.configuration.console.ConsoleSettings;
 import io.github.leontecristian.workflow.testhost.configuration.integration.CompletionAdapterIntegrationTest;
 import io.github.leontecristian.workflow.testhost.dto.runtime.SandboxStart;
 import io.github.leontecristian.workflow.testhost.repository.sandbox.SandboxRequestStore;
+import io.github.leontecristian.workflow.testhost.configuration.integration.RuntimeCommandFixture;
 import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntimeTransaction;
+import io.github.leontecristian.workflow.testhost.service.console.ConsoleRequestIdentity;
+import io.github.leontecristian.workflow.web.integration.WorkflowRequestIdentity;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -46,8 +56,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import org.springframework.test.util.AopTestUtils;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -59,18 +73,16 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mock.env.MockEnvironment;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.web.FilterChainProxy;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -80,14 +92,16 @@ import org.springframework.web.context.WebApplicationContext;
         "workflow.console.admin.username=f015-admin","workflow.console.admin.password=f015-local-test-password",
         "workflow.console.fail-service-node=failRecordAmount",
         "workflow.console.reviewer.username=f015-reviewer","workflow.console.reviewer.password=f015-local-test-password"})
-@Import(SharedRuntimeIT.FailureFixture.class)
+@Import({SharedRuntimeIT.FailureFixture.class, RuntimeCommandFixture.class})
 class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
     @Autowired WorkflowDefinitionService definitions;
     @Autowired WorkflowRuntimeQueryService reads;
     @Autowired TaskTypeCatalogService catalog;
-    @Autowired SandboxRequestStore requests;
+    @MockitoSpyBean SandboxRequestStore requests;
     @Autowired ConsoleRuntimeTransaction runtime;
-    @Autowired AtomicBoolean failCompletion;
+    @Autowired RuntimeCommandFixture runtimeCommands;
+    @MockitoSpyBean WorkflowExecutionService execution;
+    @MockitoSpyBean ConsoleRequestIdentity identity;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactions;
     @Autowired WebApplicationContext web;
@@ -101,13 +115,8 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
     private Path repository() { return Files.isDirectory(Path.of("docs"))?Path.of(""):Path.of(".."); }
     private WorkflowCommandContext context() { return new WorkflowCommandContext(ActorKind.USER,"f015-admin",Instant.now(),marker); }
 
-    /** Test-only selection of the existing post-result failure under the real transaction proxy.
-     * Start and ordinary completion still call the production transaction body unchanged.
-     */
     @TestConfiguration(proxyBeanMethods=false)
     static class FailureFixture {
-        @Bean AtomicBoolean failCompletion() { return new AtomicBoolean(); }
-
         @Bean WorkflowServiceAction replaceReviewAmount(ObjectProvider<WorkflowRuntimeQueryService> reads) {
             return new WorkflowServiceAction() {
                 @Override public ServiceActionDescriptor descriptor() {
@@ -125,19 +134,7 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
                 }
             };
         }
-        @Bean @Primary ConsoleRuntimeTransaction fixtureRuntime(WorkflowExecutionService execution,
-                WorkflowRuntimeQueryService reads,SandboxRequestStore requests,ConsoleSettings settings,AtomicBoolean failCompletion) {
-            var failureSettings=new ConsoleSettings(new MockEnvironment().withProperty("workflow.console.enabled","true")
-                .withProperty("workflow.console.admin.username",settings.admin).withProperty("workflow.console.admin.password",settings.adminPassword)
-                .withProperty("workflow.console.reviewer.username",settings.reviewer).withProperty("workflow.console.reviewer.password",settings.reviewerPassword)
-                .withProperty("workflow.console.fail-runtime-after-result","true"));
-            var failed=new ConsoleRuntimeTransaction(execution,reads,requests,failureSettings);
-            return new ConsoleRuntimeTransaction(execution,reads,requests,settings) {
-                @Override @Transactional public WorkflowCommandResult complete(CompleteWorkflowTask command,WorkflowCommandContext context) {
-                    return failCompletion.get()?failed.complete(command,context):super.complete(command,context);
-                }
-            };
-        }
+
     }
     private MockHttpSession session(String actor,String role) {
         var s=new MockHttpSession();s.setAttribute("SPRING_SECURITY_CONTEXT",new SecurityContextImpl(
@@ -183,11 +180,66 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
         UUID command=UUID.randomUUID();
         assertThat(mvc.perform(post(endpoint).session(reviewer).contentType("application/json").header("X-Expected-Lock-Version",started.instance().lockVersion())
             .content(completion(started,command))).andReturn().getResponse().getStatus()).isEqualTo(403);
+        var core = AopTestUtils.<WorkflowExecutionService>getUltimateTargetObject(execution);
+        var completions = new AtomicInteger();
+        var transaction = new AtomicReference<Map<Object, Object>>();
+        var rollbackStatus = new AtomicInteger(TransactionSynchronization.STATUS_UNKNOWN);
+        doAnswer(invocation -> {
+            var input = invocation.<CompleteWorkflowTask>getArgument(0);
+            var actor = invocation.<WorkflowCommandContext>getArgument(1);
+            assertThat(actor.actorRef()).isEqualTo("f015-reviewer");
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
+            var result = (WorkflowCommandResult) invocation.callRealMethod();
+            if (completions.incrementAndGet() == 1) {
+                // Read the completed submission on the same transaction used by the HTTP command.
+                assertThat(reads.findTaskSubmission(input.taskId()).orElseThrow().commandId()).isEqualTo(command);
+                return result;
+            }
+            assertThat(result.replayed()).isTrue();
+            transaction.set(Map.copyOf(TransactionSynchronizationManager.getResourceMap()));
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void afterCompletion(int status) {
+                    rollbackStatus.set(status);
+                }
+            });
+            throw new WorkflowExecutionException(Category.CONCURRENT_COMMAND);
+        }).when(core).completeTask(argThat(input -> input != null && input.commandId().equals(command)), any());
+        assertThat(web.getBeansOfType(WorkflowRequestIdentity.class).values()).containsExactly(identity);
+        clearInvocations(identity);
         var accepted=mvc.perform(post(endpoint).session(reviewer).contentType("application/json")
             .header(csrf.path("csrfHeaderName").asText(),csrf.path("csrfToken").asText())
             .header("X-Expected-Lock-Version",started.instance().lockVersion()).content(completion(started,command))).andReturn().getResponse();
         assertThat(accepted.getStatus()).withFailMessage(accepted.getContentAsString()).isEqualTo(200);
         assertThat(json.readTree(accepted.getContentAsString()).path("replayed").asBoolean()).isFalse();
+        var recoveries = new AtomicInteger();
+        doAnswer(invocation -> {
+            if (recoveries.getAndIncrement() == 0) {
+                assertThat(rollbackStatus.get()).isEqualTo(TransactionSynchronization.STATUS_ROLLED_BACK);
+                assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
+                assertThat(TransactionSynchronizationManager.isCurrentTransactionReadOnly()).isTrue();
+                assertThat(TransactionSynchronizationManager.getResourceMap()).isNotEmpty()
+                        .isNotEqualTo(transaction.get());
+                assertThat(invocation.<WorkflowCommandContext>getArgument(1).actorRef()).isEqualTo("f015-reviewer");
+            }
+            return invocation.callRealMethod();
+        }).when(core).findReplay(argThat((CompleteWorkflowTask input) -> input != null
+                && input.commandId().equals(command)), any());
+        var recovered = mvc.perform(post(endpoint).session(reviewer).contentType("application/json")
+            .header(csrf.path("csrfHeaderName").asText(),csrf.path("csrfToken").asText())
+            .header("X-Expected-Lock-Version",started.instance().lockVersion())
+            .content(completion(started,command))).andReturn().getResponse();
+        assertThat(recovered.getStatus()).withFailMessage(recovered.getContentAsString()).isEqualTo(200);
+        assertThat(json.readTree(recovered.getContentAsString()).path("replayed").asBoolean()).isTrue();
+        assertThat(completions.get()).isEqualTo(2);
+        assertThat(recoveries.get()).isEqualTo(1);
+        assertThat(mvc.perform(get("/console/api/instances/" + instance + "/history").session(reviewer))
+                .andReturn().getResponse().getStatus()).isEqualTo(200);
+        assertThat(mvc.perform(get("/console/api/instances").session(admin))
+                .andReturn().getResponse().getStatus()).isEqualTo(200);
+        assertThat(mvc.perform(get("/console/api/definitions").session(reviewer)).andReturn().getResponse().getStatus())
+                .isEqualTo(403);
+        verify(identity, times(5)).requireActorRef();
+
         var replay=mvc.perform(post("/console/api/commands/complete/replay").session(reviewer).contentType("application/json")
             .header(csrf.path("csrfHeaderName").asText(),csrf.path("csrfToken").asText()).header("X-Expected-Lock-Version",started.instance().lockVersion())
             .content(replayBody(started,command))).andReturn().getResponse();
@@ -200,13 +252,51 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
             .content(replayBody(pending,UUID.randomUUID()))).andReturn().getResponse();
         assertThat(missing.getStatus()).isEqualTo(200);assertThat(json.readTree(missing.getContentAsString()).path("found").asBoolean()).isFalse();
         assertThat(reads.findInstance(pending.instance().id()).orElseThrow().lockVersion()).isEqualTo(before);
-        failCompletion.set(true);
-        try {
-            var failed=mvc.perform(post("/console/api/instances/"+pending.instance().id()+"/tasks/"+pending.task().id()+"/complete")
-                .session(reviewer).contentType("application/json").header(csrf.path("csrfHeaderName").asText(),csrf.path("csrfToken").asText())
-                .header("X-Expected-Lock-Version",before).content(completion(pending,UUID.randomUUID()))).andReturn().getResponse();
-            assertThat(failed.getStatus()).isEqualTo(500);assertThat(failed.getContentAsString()).doesNotContain("Configured");
-        } finally { failCompletion.set(false); }
+        UUID failedCommand = UUID.randomUUID();
+        doAnswer(invocation -> {
+            invocation.callRealMethod();
+            throw new IllegalStateException("Configured post-result failure");
+        }).when(core).completeTask(argThat(input -> input != null && input.commandId().equals(failedCommand)), any());
+        String pendingEndpoint = "/console/api/instances/" + pending.instance().id() + "/tasks/" + pending.task().id() + "/complete";
+        var failed = mvc.perform(post(pendingEndpoint).session(reviewer).contentType("application/json")
+                .header(csrf.path("csrfHeaderName").asText(), csrf.path("csrfToken").asText())
+                .header("X-Expected-Lock-Version", before).content(completion(pending, failedCommand))).andReturn().getResponse();
+        assertThat(failed.getStatus()).isEqualTo(500);
+        assertThat(failed.getContentAsString()).doesNotContain("Configured");
+
+        var request = requests.findByInstance(pending.instance().id()).orElseThrow();
+        var store = AopTestUtils.<SandboxRequestStore>getUltimateTargetObject(requests);
+        doAnswer(invocation -> {
+            // Make the production conditional write lose after the action read its basis.
+            jdbc.update("UPDATE wf_test.sandbox_request SET lock_version=lock_version+1 WHERE id=?", request.id());
+            return invocation.callRealMethod();
+        }).when(store).updateStatus(eq(request.id()), eq(pending.instance().id()), eq(request.lockVersion()),
+                eq("IN_REVIEW"), eq("APPROVED"));
+        UUID conflictCommand = UUID.randomUUID();
+        var conflict = mvc.perform(post(pendingEndpoint).session(reviewer).contentType("application/json")
+                .header(csrf.path("csrfHeaderName").asText(), csrf.path("csrfToken").asText())
+                .header("X-Expected-Lock-Version", before).content(completion(pending, conflictCommand))).andReturn();
+        assertThat(conflict.getResolvedException()).isInstanceOf(WorkflowExecutionException.class)
+                .hasRootCauseInstanceOf(io.github.leontecristian.workflow.testhost.exception.console.SandboxRequestConflict.class);
+        assertThat(conflict.getResponse().getStatus()).isEqualTo(409);
+        assertThat(json.readTree(conflict.getResponse().getContentAsString())).isEqualTo(json.valueToTree(Map.of(
+                "code", "SANDBOX_REQUEST_CONFLICT", "message", "SANDBOX_REQUEST_CONFLICT", "diagnostics", List.of(),
+                "correlationId", conflict.getRequest().getAttribute("console.correlation"))));
+        verify(core, never()).findReplay(argThat((CompleteWorkflowTask input) -> input != null
+                && input.commandId().equals(conflictCommand)), any());
+        assertThat(requests.find(request.id())).isEqualTo(request);
+        var conflictReplay = mvc.perform(post("/console/api/commands/complete/replay").session(reviewer)
+                .contentType("application/json").header(csrf.path("csrfHeaderName").asText(), csrf.path("csrfToken").asText())
+                .header("X-Expected-Lock-Version", before).content(replayBody(pending, conflictCommand))).andReturn().getResponse();
+        assertThat(conflictReplay.getStatus()).isEqualTo(200);
+        assertThat(json.readTree(conflictReplay.getContentAsString()).path("found").asBoolean()).isFalse();
+
+        var stale = mvc.perform(post(pendingEndpoint).session(reviewer).contentType("application/json")
+                .header(csrf.path("csrfHeaderName").asText(), csrf.path("csrfToken").asText())
+                .header("X-Expected-Lock-Version", before + 1).content(completion(pending, UUID.randomUUID())))
+                .andReturn().getResponse();
+        assertThat(stale.getStatus()).isEqualTo(409);
+        assertThat(json.readTree(stale.getContentAsString()).path("code").asText()).isEqualTo("STALE_VERSION");
         assertThat(reads.findInstance(pending.instance().id()).orElseThrow().lockVersion()).isEqualTo(before);
         assertThat(reads.findTaskSubmission(pending.task().id())).isEmpty();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf.workflow_command_receipt WHERE instance_id=? AND operation_type='COMPLETE_TASK'",Integer.class,pending.instance().id())).isZero();
@@ -236,14 +326,14 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
                     "{\"approvedAmount\":1.001,\"note\":\"Fractional cent\"}", Category.RESULT_REJECTED).entrySet()) {
                 var rejected = new CompleteWorkflowTask(UUID.randomUUID(), instanceId, first.taskId(), first.expectedLockVersion(),
                         "COMPLETE", null, CompleteWorkflowTask.parseResult(invalid.getKey()));
-                assertThatThrownBy(() -> runtime.complete(rejected, reviewer)).isInstanceOfSatisfying(
+                assertThatThrownBy(() -> runtimeCommands.complete(rejected, reviewer)).isInstanceOfSatisfying(
                         WorkflowExecutionException.class, e -> assertThat(e.category()).isEqualTo(invalid.getValue()));
-                assertThat(runtime.replayComplete(rejected, reviewer)).isEmpty();
+                assertThat(runtimeCommands.replayComplete(rejected, reviewer)).isEmpty();
                 assertThat(reads.findTaskSubmission(first.taskId())).isEmpty();
                 assertThat(reads.findInstance(instanceId).orElseThrow().lockVersion()).isEqualTo(first.expectedLockVersion());
             }
         }
-        runtime.complete(first, reviewer);
+        runtimeCommands.complete(first, reviewer);
         assertThat(reads.findTaskSubmission(first.taskId()).orElseThrow().result()).isEqualTo(accepted);
         assertThat(reads.listActivitySubmissions(started.activity().id()).items()).singleElement()
                 .satisfies(submission -> assertThat(submission.result()).isEqualTo(accepted));
@@ -252,12 +342,12 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
             var current = reads.listTasks(instanceId).items().stream().filter(task -> task.id() != first.taskId()).findFirst().orElseThrow();
             long token = reads.findInstance(instanceId).orElseThrow().lockVersion();
             var failing = new CompleteWorkflowTask(UUID.randomUUID(), instanceId, current.id(), token, "COMPLETE", null, accepted);
-            assertThatThrownBy(() -> runtime.complete(failing, reviewer)).isInstanceOfSatisfying(
+            assertThatThrownBy(() -> runtimeCommands.complete(failing, reviewer)).isInstanceOfSatisfying(
                     WorkflowExecutionException.class, e -> {
                         assertThat(e.category()).isEqualTo(Category.SERVICE_ACTION_FAILED);
                         assertThat(e).hasRootCauseMessage("Configured service failure");
                     });
-            assertThat(runtime.replayComplete(failing, reviewer)).isEmpty();
+            assertThat(runtimeCommands.replayComplete(failing, reviewer)).isEmpty();
             assertThat(reads.findTaskSubmission(current.id())).isEmpty();
             assertThat(reads.findTaskSubmission(first.taskId()).orElseThrow().result()).isEqualTo(accepted);
             assertThat(reads.findInstance(instanceId).orElseThrow().lockVersion()).isEqualTo(token);
@@ -266,10 +356,10 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
         } else {
             var reordered = new CompleteWorkflowTask(first.commandId(), instanceId, first.taskId(), first.expectedLockVersion(),
                     "COMPLETE", null, CompleteWorkflowTask.parseResult("{\"note\":\"Approved\",\"approvedAmount\":1250.00}"));
-            assertThat(runtime.replayComplete(reordered, reviewer)).isPresent();
+            assertThat(runtimeCommands.replayComplete(reordered, reviewer)).isPresent();
             var changed = new CompleteWorkflowTask(first.commandId(), instanceId, first.taskId(), first.expectedLockVersion(),
                     "COMPLETE", null, CompleteWorkflowTask.parseResult("{\"approvedAmount\":1250,\"note\":\"Approved\"}"));
-            assertThatThrownBy(() -> runtime.replayComplete(changed, reviewer)).isInstanceOfSatisfying(
+            assertThatThrownBy(() -> runtimeCommands.replayComplete(changed, reviewer)).isInstanceOfSatisfying(
                     WorkflowExecutionException.class, e -> assertThat(e.category()).isEqualTo(Category.COMMAND_ID_CONFLICT));
             assertThat(jdbc.queryForList("SELECT quantity FROM wf_test.service_effect WHERE instance_id=?", Long.class, instanceId))
                     .containsExactly(125000L);
@@ -295,22 +385,22 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
         assertThat(reads.listVariables(instanceId, null, 50, null).items()).isEmpty();
 
         if (failDownstream) {
-            assertThatThrownBy(() -> runtime.complete(command, reviewer)).isInstanceOfSatisfying(
+            assertThatThrownBy(() -> runtimeCommands.complete(command, reviewer)).isInstanceOfSatisfying(
                     WorkflowExecutionException.class, e -> {
                         assertThat(e.category()).isEqualTo(Category.SERVICE_ACTION_FAILED);
                         assertThat(e).hasRootCauseMessage("Configured service failure");
                     });
             assertThat(reads.listVariables(instanceId, null, 50, null).items()).isEmpty();
             assertThat(reads.findTaskSubmission(started.task().id())).isEmpty();
-            assertThat(runtime.replayComplete(command, reviewer)).isEmpty();
+            assertThat(runtimeCommands.replayComplete(command, reviewer)).isEmpty();
             assertThat(reads.findInstance(instanceId).orElseThrow().lockVersion()).isEqualTo(command.expectedLockVersion());
             assertThat(effectQuantities(instanceId)).isEmpty();
             assertThat(reads.listHistory(instanceId).items()).noneMatch(item -> item.commandId().equals(command.commandId()));
             return;
         }
 
-        runtime.complete(command, reviewer);
-        assertThat(runtime.replayComplete(command, reviewer)).isPresent();
+        runtimeCommands.complete(command, reviewer);
+        assertThat(runtimeCommands.replayComplete(command, reviewer)).isPresent();
         assertThat(reads.findTaskSubmission(started.task().id()).orElseThrow().result()).isEqualTo(result);
         assertThat(reads.listVariables(instanceId, null, 50, null).items()).singleElement().satisfies(variable -> {
             assertThat(variable.key()).isEqualTo("reviewResult");
@@ -351,7 +441,7 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
         var original = CompleteWorkflowTask.parseResult("{\"approvedAmount\":1000.00,\"note\":\"Finance\"}");
         var finance = new CompleteWorkflowTask(UUID.randomUUID(), instanceId, started.task().id(),
                 started.instance().lockVersion(), "COMPLETE", null, original);
-        runtime.complete(finance, reviewer);
+        runtimeCommands.complete(finance, reviewer);
         var managerTask = reads.listTasks(instanceId).items().stream()
                 .filter(task -> task.id() != finance.taskId()).findFirst().orElseThrow();
         long token = reads.findInstance(instanceId).orElseThrow().lockVersion();
@@ -360,16 +450,16 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
                 "COMPLETE", null, omitManagerResult ? null : managerResult);
 
         if (omitManagerResult) {
-            assertThatThrownBy(() -> runtime.complete(manager, reviewer)).isInstanceOfSatisfying(
+            assertThatThrownBy(() -> runtimeCommands.complete(manager, reviewer)).isInstanceOfSatisfying(
                     WorkflowExecutionException.class, e -> assertThat(e.category()).isEqualTo(Category.SUBMISSION_UNAVAILABLE));
-            assertThat(runtime.replayComplete(manager, reviewer)).isEmpty();
+            assertThat(runtimeCommands.replayComplete(manager, reviewer)).isEmpty();
             assertThat(reads.findTaskSubmission(manager.taskId())).isEmpty();
             assertThat(reads.findInstance(instanceId).orElseThrow().lockVersion()).isEqualTo(token);
             assertThat(reads.listHistory(instanceId).items()).noneMatch(item -> item.commandId().equals(manager.commandId()));
             assertThat(effectQuantities(instanceId)).isEmpty();
         } else {
-            runtime.complete(manager, reviewer);
-            assertThat(runtime.replayComplete(manager, reviewer)).isPresent();
+            runtimeCommands.complete(manager, reviewer);
+            assertThat(runtimeCommands.replayComplete(manager, reviewer)).isPresent();
             assertThat(effectQuantities(instanceId)).containsExactly(90000L, 100000L, 80000L);
             assertThat(serviceEvidence(instanceId, "recordWorking").detailsJson()).contains("{\"approvedAmount\":900.0}");
             var financeEvent = serviceEvidence(instanceId, "recordFinance");
@@ -421,7 +511,7 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
         assertThat(jdbc.update("""
                 UPDATE wf.workflow_variable SET json_value=? WHERE instance_id=? AND variable_key='reviewResult'
                 """, "{\"approvedAmount\":12.3}", instanceId)).isEqualTo(1);
-        var replay = runtime.complete(entered.command(), reviewerContext("f015-reviewer"));
+        var replay = runtimeCommands.complete(entered.command(), reviewerContext("f015-reviewer"));
         assertThat(replay.replayed()).isTrue();
         assertThat(replay.execution()).isEqualTo(entered.progressed());
         assertThat(reads.listHistory(instanceId).items()).filteredOn(item ->
@@ -458,7 +548,7 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
         var answer = CompleteWorkflowTask.parseResult("{\"approvedAmount\":1250.00,\"note\":\"Receiver answer\"}");
         var complete = new CompleteWorkflowTask(UUID.randomUUID(), instanceId, taskId, reads.findInstance(instanceId).orElseThrow().lockVersion(),
                 "COMPLETE", null, answer);
-        runtime.complete(complete, reviewerContext("f015-reviewer2"));
+        runtimeCommands.complete(complete, reviewerContext("f015-reviewer2"));
         assertThat(reads.findTaskSubmission(taskId).orElseThrow().result()).isEqualTo(answer);
         assertThat(reads.taskInputs(instanceId, taskId)).isEqualTo(inputs);
         var completed = mvc.perform(get(taskContract).session(peer)).andReturn().getResponse();
@@ -486,12 +576,12 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
             case UNINITIALIZED -> Category.UNINITIALIZED_VARIABLE;
             case LIMIT -> Category.LIMIT_EXCEEDED;
         };
-        assertThatThrownBy(() -> runtime.complete(command, reviewer)).isInstanceOfSatisfying(
+        assertThatThrownBy(() -> runtimeCommands.complete(command, reviewer)).isInstanceOfSatisfying(
                 WorkflowExecutionException.class, error -> assertThat(error.category()).isEqualTo(expected));
         assertThat(reads.findInstance(instanceId).orElseThrow()).isEqualTo(started.instance());
         assertThat(reads.listTasks(instanceId).items()).containsExactly(started.task());
         assertThat(reads.findTaskSubmission(command.taskId())).isEmpty();
-        assertThat(runtime.replayComplete(command, reviewer)).isEmpty();
+        assertThat(runtimeCommands.replayComplete(command, reviewer)).isEmpty();
         assertThat(reads.listVariables(instanceId, null, 50, null).items()).noneMatch(item -> item.key().equals("reviewResult"));
         assertThat(reads.listHistory(instanceId).items()).noneMatch(item -> item.commandId().equals(command.commandId()));
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM wf_test.workflow_event_outbox WHERE instance_id=?",
@@ -507,7 +597,7 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
         long instanceId = started.instance().id();
         var command = new CompleteWorkflowTask(UUID.randomUUID(), instanceId, started.task().id(),
                 started.instance().lockVersion(), "COMPLETE", null, inputSourceResult());
-        var progressed = runtime.complete(command, reviewerContext("f015-reviewer")).execution();
+        var progressed = runtimeCommands.complete(command, reviewerContext("f015-reviewer")).execution();
         long taskId = reads.listTasks(instanceId).items().stream().filter(task -> task.status() == TaskStatus.OPEN)
                 .findFirst().orElseThrow().id();
         return new EnteredInputTask(started, command, progressed, taskId);
@@ -692,7 +782,6 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
     }
 
     @AfterEach void cleanup() {
-        failCompletion.set(false);
         tx().executeWithoutResult(t->{
             for(long id:instances) {
                 jdbc.update("DELETE FROM wf_test.service_effect WHERE instance_id=?",id);
