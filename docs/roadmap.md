@@ -1,6 +1,6 @@
 # Workflow engine roadmap
 
-**Updated 2026-11-19. Delivery baseline through F033, optional task completion handlers (implemented revision 1).**
+**Updated 2026-11-19. Delivery baseline through F034, shared Task page (implemented revision 6).**
 
 The agreed sequence is working sandbox → first APOLO booking integration → graphical designer. The next milestone depends on owner access to APOLO and selection of one cross-team booking approval scenario.
 
@@ -17,9 +17,9 @@ The agreed sequence is working sandbox → first APOLO booking integration → g
 
 ## 1. Current position
 
-**✅ Sandbox + shared libraries + delivery through F033 → ⏸ APOLO integration → ⏳ Graphical designer**
+**✅ Sandbox + shared libraries + delivery through F034 → ⏸ APOLO integration → ⏳ Graphical designer**
 
-### ✅ Implemented — F001–F033
+### ✅ Implemented — F001–F034
 
 | Features | Capability |
 | --- | --- |
@@ -41,6 +41,7 @@ The agreed sequence is working sandbox → first APOLO booking integration → g
 | ✅ [F031](features/F031-shared-runtime-command-coordination/implementation.md) | **Shared runtime command coordination** — shared identity, actor-aware viewer access and transaction-aware core receipt recovery. |
 | ✅ [F032](features/F032-host-contract-review/implementation.md) | **Host contract review** — task-type capability beans, separate SINGLE and ALL resolver discovery, and one authorization service with explicit operation support. |
 | ✅ [F033](features/F033-optional-task-handlers/implementation.md) | **Optional task completion handlers** — hosts can register a form by pinned task type. The shared task page uses its generic form by default. Both paths passed the sandbox walkthrough. |
+| ✅ [F034](features/F034-shared-task-page/implementation.md) | **Shared Task page** — reviewers see the business context, complete structured decisions through named fields or a host form, and inspect recorded results. Task commands and receipt lookup use the task reference and its opaque precondition. The sandbox provides separate administrator diagnostics. |
 
 ### ✅ Family-start delivery
 
@@ -180,6 +181,8 @@ This is verification debt owned by the existing features, not a blanket prerequi
 **Exit for the scheduled reconciliation:** relevant scenarios have outcomes or reused evidence with revision/environment references; actual remaining gaps stay explicit. This roadmap update closes no historical task. Independent implementation as well as specification work may proceed unless a stated dependency requires the unresolved evidence. Reconciliation is not a requirement to reproduce every historical run.
 
 ### Dated delivery and architecture notes
+
+**Shared Task page — 2026-11-19.** Commit `bd5b8ac` delivered F034. Its handover records guarded SQL Server and HTTP checks, packaged Chrome walkthroughs and an Angular consumer build. APOLO integration must pair compatible web, Angular and host transport versions. The sandbox subsequently removed the development console banner in `739640c`. Follow-up edits to the reviewer layout and claim wording are in progress. [F034 handover and deployment notes](features/F034-shared-task-page/implementation.md) · [Reviewer experience](features/F034-shared-task-page/spec.md#reviewer-experience)
 
 The entries below retain their original delivery context; the current-position table above is the roadmap summary.
 
