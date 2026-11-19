@@ -8,11 +8,18 @@ import { DefaultTaskHandlerComponent } from './default-task-handler';
 import { WORKFLOW_TASK_EDITORS, type WorkflowEditableTaskContract, type WorkflowTaskDecision, type WorkflowTaskHandlerInputs, type WorkflowTaskRejection } from './task-handler';
 import { isBlankComment, isBlankResult } from './task-decision-validation';
 import { WorkflowTaskValuesComponent } from './task-values';
+import { PreviousDecisionComment } from './previous-decision-comment';
+
+type TimelineDecision = {
+  decision: PreviousDecision;
+  initials: string;
+  outcome: 'approved' | 'rejected' | 'other';
+};
 
 @Component({
   selector: 'workflow-task',
   standalone: true,
-  imports: [...PAGE_IMPORTS, NgComponentOutlet, WorkflowTaskValuesComponent],
+  imports: [...PAGE_IMPORTS, NgComponentOutlet, WorkflowTaskValuesComponent, PreviousDecisionComment],
   styleUrl: './task.scss',
   templateUrl: './task.html',
 })
@@ -31,6 +38,27 @@ export class WorkflowTaskComponent extends RuntimeState {
   readonly previousCursor = signal<string | null>(null);
   readonly previousBusy = signal(false);
   readonly previousError = signal('');
+  readonly newestDecisionsFirst = signal(false);
+  readonly decisionTimeline = computed(() => {
+    const decisions = this.previousDecisions();
+    const ordered = this.newestDecisionsFirst() ? decisions.slice().reverse() : decisions;
+    const groups = new Map<string, TimelineDecision[]>();
+    const counts = { approved: 0, rejected: 0, other: 0 };
+    for (const decision of ordered) {
+      const label = decision.outcomeLabel.trim().toLowerCase();
+      const outcome =
+        label === 'approve' || label === 'approved' ? 'approved' :
+        label === 'reject' || label === 'rejected' ? 'rejected' : 'other';
+      const initials = decision.actorLabel.trim().split(/\s+/).slice(0, 2)
+        .map(word => Array.from(word)[0]).join('').toUpperCase();
+      counts[outcome]++;
+      const entry: TimelineDecision = { decision, initials: initials || '?', outcome };
+      const group = groups.get(decision.nodeName);
+      if (group) group.push(entry);
+      else groups.set(decision.nodeName, [entry]);
+    }
+    return { groups: Array.from(groups), counts, total: decisions.length };
+  });
   readonly recoveryMiss = signal(false);
   readonly reassignmentAllowed = signal(false);
   readonly reassignmentError = signal('');
@@ -62,6 +90,7 @@ export class WorkflowTaskComponent extends RuntimeState {
     this.previousRead?.abort();
     this.previousBusy.set(false);
     this.previousDecisions.set([]);
+    this.newestDecisionsFirst.set(false);
     this.previousCursor.set(null);
     this.previousError.set('');
     this.detail.set(null);

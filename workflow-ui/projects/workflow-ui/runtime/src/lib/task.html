@@ -78,31 +78,78 @@
 
     @if(hasPreviousDecisions) {
       <section aria-labelledby="task-previous">
-        <h2 id="task-previous">Previous decisions</h2>
-        @if(previousDecisions().length){
-          <ol class="previous-decisions">
-            @for(decision of previousDecisions(); track $index){
-              <li>
-                <div class="previous-decision-heading">
-                  <h3>{{decision.nodeName}}</h3>
-                  <span class="previous-decision-outcome">{{decision.outcomeLabel}}</span>
-                </div>
-                <div class="previous-decision-meta">
-                  <span>{{decision.actorLabel}}</span>
-                  <time [attr.datetime]="decision.occurredAt">{{decision.occurredAt | date:'medium'}}</time>
-                </div>
-                @if(noPreviousComment(decision.comment)){<p class="previous-decision-no-comment">No comment provided.</p>}
-                @else{<p class="comment">{{decision.comment}}</p>}
-              </li>
+        @let timeline = decisionTimeline();
+        <div class="previous-decisions-heading">
+          <h2 id="task-previous">Previous decisions</h2>
+          @if(timeline.total){
+            <span class="previous-decision-count">{{timeline.total}}{{previousCursor() ? ' loaded' : ''}}</span>
+            <div class="previous-decision-totals">
+              <span class="approved">{{timeline.counts.approved}} approved</span>
+              <span class="rejected">{{timeline.counts.rejected}} rejected</span>
+              @if(timeline.counts.other){<span>{{timeline.counts.other}} other</span>}
+            </div>
+            @if(timeline.total > 1){
+              <button mat-button type="button" class="previous-decision-sort"
+                      (click)="newestDecisionsFirst.set(!newestDecisionsFirst())">
+                <mat-icon aria-hidden="true">sort</mat-icon>
+                {{newestDecisionsFirst() ? 'Newest first' : 'Oldest first'}}
+              </button>
             }
-          </ol>
+          }
+        </div>
+        @for(group of timeline.groups; track group[0]){
+          <div class="previous-decision-group">
+            <header class="previous-decision-group-heading">
+              <mat-icon aria-hidden="true">account_tree</mat-icon>
+              <h3>{{group[0]}}</h3>
+              <span>{{group[1].length}} {{group[1].length === 1 ? 'decision' : 'decisions'}}</span>
+            </header>
+            <ol class="previous-decisions" role="list">
+              @for(entry of group[1]; track entry.decision){
+                @let decision = entry.decision;
+                @let hasComment = !noPreviousComment(decision.comment);
+                <li>
+                  <span class="previous-decision-avatar" aria-hidden="true">{{entry.initials}}</span>
+                  <div class="previous-decision-content">
+                    <div class="previous-decision-meta">
+                      <span class="previous-decision-reviewer">{{decision.actorLabel}}</span>
+                      <span class="previous-decision-outcome" [class.approved]="entry.outcome === 'approved'"
+                            [class.rejected]="entry.outcome === 'rejected'">
+                        @switch(entry.outcome){
+                          @case('approved'){<mat-icon aria-hidden="true">check</mat-icon>Approved}
+                          @case('rejected'){<mat-icon aria-hidden="true">close</mat-icon>Rejected}
+                          @default{ {{decision.outcomeLabel}} }
+                        }
+                      </span>
+                      @if(!hasComment){<span class="previous-decision-no-comment">No comment</span>}
+                      <time class="previous-decision-time" tabindex="0" [attr.datetime]="decision.occurredAt"
+                            [matTooltip]="(decision.occurredAt | date:'medium') ?? ''">
+                        {{decision.occurredAt | date:'MMM d, h:mm a'}}
+                      </time>
+                    </div>
+                    @if(hasComment){
+                      <div class="previous-decision-comment">
+                        <p class="comment" workflowPreviousDecisionComment #preview="previousDecisionComment">{{decision.comment}}</p>
+                        @if(preview.overflows() || preview.expanded()){
+                          <button mat-button type="button" [attr.aria-expanded]="preview.expanded()"
+                                  (click)="preview.expanded.set(!preview.expanded())">
+                            {{preview.expanded() ? 'Show less' : 'Show more'}}
+                          </button>
+                        }
+                      </div>
+                    }
+                  </div>
+                </li>
+              }
+            </ol>
+          </div>
         }
         @if(previousBusy()){<p role="status">Loading previous decisions…</p>}
         @if(previousError()){
           <p role="alert">{{previousError()}}</p>
           <button mat-button type="button" (click)="loadPreviousDecisions(previousDecisions().length > 0)">Retry</button>
         }@else if(!previousBusy() && !previousDecisions().length){
-          <p>No previous decisions.</p>
+          <p>No decisions yet. Decisions from earlier steps will appear here.</p>
         }
         @if(previousCursor() && !previousError()){
           <button mat-button type="button" (click)="loadPreviousDecisions(true)" [disabled]="previousBusy()">Load more</button>

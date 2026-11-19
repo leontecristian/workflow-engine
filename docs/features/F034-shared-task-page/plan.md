@@ -16,7 +16,7 @@ For the card header refinement, verify the assignment and status grouping, claim
 
 For the Open badge theme update, check the rendered foreground and background against the Material 3 secondary container pair and measure contrast in both color schemes. Confirm equal emphasis for enabled Approve and Reject.
 
-For the Previous decisions layout, check the production task view with sample decisions, including a missing comment, long labels, narrow screens and neutral outcome contrast in light and dark color schemes. Capture the desktop layout for review.
+For the grouped Previous decisions timeline, update the task presentation under `workflow-ui/projects/workflow-ui/runtime/src/lib` and add the sort and close glyphs to the packaged Material Symbols subset. Check grouping, reversed order, loaded counts, comment disclosure, full timestamp, outcome styling and narrow widths using browser fixtures. Capture the desktop layout. Reuse the earlier command, database and visibility evidence.
 
 ## Task HTTP migration
 

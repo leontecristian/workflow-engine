@@ -24,31 +24,135 @@ p { margin: 12px 0 0; }
 .task-actions:empty { display: none; }
 .admin-release { margin-top: 12px; }
 .admin-release mat-form-field { flex: 1 1 16rem; min-width: 0; }
-.previous-decisions { list-style: none; padding: 0; margin: 0; }
-.previous-decisions li { display: grid; gap: 4px; }
-.previous-decisions li + li {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--mat-sys-outline-variant);
-}
-.previous-decision-heading, .previous-decision-meta {
+.previous-decisions-heading, .previous-decision-totals, .previous-decision-group-heading, .previous-decision-meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 10px;
+  gap: 8px;
 }
-.previous-decision-heading h3 { margin: 0; }
-.previous-decision-outcome {
+.previous-decisions-heading { column-gap: 12px; }
+.previous-decisions-heading h2 {
+  margin: 0;
+  font-size: var(--mat-sys-title-large-size, 22px);
+  line-height: var(--mat-sys-title-large-line-height, 28px);
+}
+.previous-decision-count {
   padding: 2px 8px;
-  border-radius: 12px;
-  background-color: var(--mat-sys-surface-container-high, Canvas);
+  border-radius: 999px;
+  background: var(--mat-sys-surface-container-high, Canvas);
   color: var(--mat-sys-on-surface, CanvasText);
-  font-size: 0.875em;
-  font-weight: 600;
+  font: var(--mat-sys-label-medium, 500 12px/16px system-ui);
 }
-.previous-decision-meta, .previous-decision-no-comment {
+.previous-decision-totals, .previous-decision-group-heading > span, .previous-decision-time, .previous-decision-no-comment {
   color: var(--mat-sys-on-surface-variant, CanvasText);
-  font-size: 0.875em;
+  font: var(--mat-sys-body-small, 400 12px/16px system-ui);
 }
-.previous-decisions p { margin: 4px 0 0; }
+.previous-decision-totals { gap: 6px 12px; }
+.previous-decision-totals .approved::before, .previous-decision-totals .rejected::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-inline-end: 6px;
+  border-radius: 50%;
+  background: var(--decision-outcome-ink);
+}
+.previous-decision-sort { margin-inline-start: auto; }
+.previous-decision-group { margin-top: 24px; }
+.previous-decision-group-heading {
+  gap: 8px 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+.previous-decision-group-heading h3 {
+  margin: 0;
+  font: var(--mat-sys-title-medium, 500 16px/24px system-ui);
+}
+.previous-decision-avatar, .previous-decision-group-heading > mat-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: var(--mat-sys-primary-container, Canvas);
+  color: var(--mat-sys-on-primary-container, CanvasText);
+}
+.previous-decision-group-heading > mat-icon {
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+  border-radius: 8px;
+}
+.previous-decisions {
+  display: grid;
+  gap: 24px;
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0;
+}
+.previous-decisions li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  column-gap: 16px;
+}
+.previous-decisions li:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  inset-block: 40px -20px;
+  inset-inline-start: 17px;
+  width: 2px;
+  background: var(--mat-sys-outline-variant);
+}
+.previous-decision-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font: var(--mat-sys-title-small, 500 14px/20px system-ui);
+}
+.previous-decision-content {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+.previous-decision-meta { min-height: 36px; column-gap: 10px; }
+.previous-decision-reviewer { font: var(--mat-sys-title-small, 500 14px/20px system-ui); }
+.previous-decision-time { margin-inline-start: auto; }
+.previous-decision-outcome {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--decision-outcome-fill, var(--mat-sys-surface-container-high, Canvas));
+  color: var(--decision-outcome-ink, var(--mat-sys-on-surface, CanvasText));
+  font: var(--mat-sys-label-medium, 500 12px/16px system-ui);
+}
+.previous-decision-outcome mat-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  font-size: 16px;
+}
+.previous-decision-totals .approved, .previous-decision-outcome.approved {
+  --decision-outcome-fill: light-dark(#d3f0db, #15452a);
+  --decision-outcome-ink: light-dark(#0f5223, #b9efc7);
+}
+.previous-decision-totals .rejected, .previous-decision-outcome.rejected {
+  --decision-outcome-fill: var(--mat-sys-error-container, Canvas);
+  --decision-outcome-ink: var(--mat-sys-on-error-container, CanvasText);
+}
+.previous-decision-comment {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--mat-sys-surface-container-low, Canvas);
+  color: var(--mat-sys-on-surface, CanvasText);
+  font: var(--mat-sys-body-medium, 400 14px/20px system-ui);
+}
+.previous-decision-comment p { margin: 0; }
+.previous-decision-comment button { margin-top: 4px; }
+.comment-clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
 .comment { white-space: pre-wrap; }
