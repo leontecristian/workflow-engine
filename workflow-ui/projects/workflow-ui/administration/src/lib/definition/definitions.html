@@ -1,5 +1,5 @@
 <console-page-header context="Workflow administration" [titleActions]="true" [meta]="{title:messages.definitionsTitle,eyebrow:meta.eyebrow,description:meta.description,icon:meta.icon}">
-<button pageTitleAction mat-flat-button (click)="openImport(importForm)" [disabled]="busy()">
+<button pageTitleAction mat-flat-button color="primary" (click)="openImport(importForm)" [disabled]="busy()">
   <mat-icon aria-hidden="true">upload</mat-icon> Import definition
 </button>
 </console-page-header>
@@ -140,6 +140,7 @@
           saving.</span
         ><button mat-button (click)="closeImport()" [disabled]="busy()">Cancel</button><button
           mat-flat-button
+          color="primary"
           (click)="importDraft()"
           [disabled]="busy() || !document"
         >
