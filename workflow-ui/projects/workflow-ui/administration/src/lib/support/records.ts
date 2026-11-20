@@ -39,23 +39,7 @@ const COLUMNS: Record<string, RecordColumn[]> = {
     "[class.definition-records]": "kind() === 'definitions'",
     "[class.version-records]": "kind() === 'definition'",
   },
-  styles: [":host{display:block;overflow:auto}table{width:100%}.record-id,.date-cell small{display:block}.monospace{font-family:monospace}", `
-    :host(.definition-records) { overflow:visible; min-width:0; }
-    :host(.definition-records) .table-scroll { margin:0; overflow-x:auto; }
-    :host(.definition-records) table { table-layout:fixed; min-width:760px; }
-    :host(.definition-records) th, :host(.definition-records) td { overflow-wrap:anywhere; }
-    :host(.definition-records) .mat-column-actions { width:80px; }
-    :host(.definition-records) .mat-column-id { width:6rem; }
-    :host(.definition-records) .definition-id { color:var(--mat-sys-primary); text-decoration:none; }
-    :host(.version-records) { overflow:visible; min-width:0; }
-    :host(.version-records) .table-scroll { margin:0; overflow-x:auto; }
-    :host(.version-records) table { table-layout:fixed; min-width:760px; }
-    :host(.version-records) th, :host(.version-records) td { overflow-wrap:anywhere; }
-    :host(.version-records) .mat-column-actions { width:80px; }
-    :host(.version-records) .mat-column-id { width:6rem; }
-    :host(.version-records) .mat-column-version { width:8rem; }
-    :host(.version-records) .version-link { color:var(--mat-sys-primary); text-decoration:none; }
-  `],
+  styleUrl: "./records.scss",
   imports: [
     CommonModule,
     MatTableModule,

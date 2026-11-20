@@ -2,7 +2,7 @@
 <workflow-instance-viewer [instanceId]="id" [sessionScope]="session.viewerScope()" />
 <workflow-variables [id]="id" [sessionScope]="session.viewerScope()" />
 @if(api.admin) {
-<mat-card appearance="outlined"><mat-card-header><h2>Sandbox service effects</h2></mat-card-header><mat-card-content>
+<mat-card appearance="outlined" class="sandbox-card"><mat-card-header><h2>Sandbox service effects</h2></mat-card-header><mat-card-content>
   <button mat-stroked-button (click)="loadEffects()">Refresh effects</button>
   @if(effects(); as page) {
     @for(item of page.items; track item.id) { <console-details [value]="item" /> }

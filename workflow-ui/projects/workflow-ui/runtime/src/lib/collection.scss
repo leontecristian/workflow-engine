@@ -1,0 +1,25 @@
+.empty-state {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--mat-sys-on-surface-variant, currentColor);
+}
+
+.empty-icon {
+  display: inline-flex;
+  padding: 12px;
+  border-radius: 50%;
+  background: var(--mat-sys-secondary-container, Canvas);
+  color: var(--mat-sys-on-secondary-container, CanvasText);
+}
+
+h3 {
+  margin: 12px 0 4px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}

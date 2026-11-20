@@ -1,4 +1,116 @@
-:host { display:block; min-width:0; color:var(--mat-sys-on-surface, inherit); } mat-card{margin-bottom:24px} mat-card-content{padding-top:16px} .two-column,.authoring-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}.full-width{width:100%}.actions,.card-heading,.version-strip,.upload-bar,.form-footer{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.card-heading{justify-content:space-between;width:100%}.action-spacer{flex:1}.eyebrow{font-size:12px;letter-spacing:.08em}.muted{opacity:.7}.feedback{padding:12px;margin:12px 0;border:1px solid currentColor;border-radius:8px}.code-field textarea,pre,code{font-family:monospace}pre{white-space:pre-wrap;overflow-wrap:anywhere}.visually-hidden{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0)}.document-actions{margin-top:16px}.hint-box,.empty-inline{display:flex;gap:12px;align-items:center}.version-strip{margin-bottom:16px}.diagnostic{padding:12px 0;border-bottom:1px solid #8885}@media(max-width:760px){.two-column,.authoring-grid{grid-template-columns:minmax(0,1fr)}}
+@use '../../../src/lib/administration/support/count-badge' as badge;
+
+:host {
+  display: block;
+  min-width: 0;
+  color: var(--mat-sys-on-surface, inherit);
+}
+
+mat-card {
+  margin-block-end: 24px;
+}
+
+mat-card > mat-card-header {
+  padding: 20px 20px 0;
+}
+
+mat-card > mat-card-content {
+  padding: 16px 20px 20px;
+}
+
+mat-card-header h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+mat-card-content h3 {
+  margin-block: 20px 8px;
+  font-size: 1rem;
+}
+
+mat-card-content p {
+  line-height: 1.5;
+}
+
+.card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.card-heading p {
+  margin: 4px 0 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--mat-sys-on-surface-variant, currentColor);
+}
+
+.eyebrow {
+  margin-block-end: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--mat-sys-on-surface-variant, currentColor);
+}
+
+.count-badge {
+  @include badge.count-badge;
+}
+
+h2 .count-badge {
+  margin-inline-start: 8px;
+}
+
+.muted {
+  color: var(--mat-sys-on-surface-variant, currentColor);
+}
+
+.filter-row {
+  margin-block-end: 16px;
+}
+
+.compact-field {
+  width: 175px;
+  max-width: 100%;
+}
+
+.action-spacer {
+  flex: 1;
+}
+
+.spaced,
+.evidence-panel {
+  margin-block-start: 20px;
+}
+
+pre {
+  max-height: 28rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 14px;
+  border: 1px solid var(--mat-sys-outline-variant, #aab3c3);
+  border-radius: 6px;
+  background: var(--mat-sys-surface-container-low, Canvas);
+  color: var(--mat-sys-on-surface, CanvasText);
+  font: 0.875rem/1.5 ui-monospace, monospace;
+}
+
+@media (max-width: 720px) {
+  mat-card > mat-card-header {
+    padding-inline: 16px;
+  }
+
+  mat-card > mat-card-content {
+    padding-inline: 16px;
+  }
+}
 .decision-count {
   color: var(--mat-sys-on-surface-variant, #535b70);
   font-size: 12px;

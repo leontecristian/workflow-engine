@@ -5,7 +5,37 @@ import { ConsoleStatus } from "./status";
 @Component({
   selector: "console-details",
   standalone: true,
-  styles: [".metadata-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px}dt{font-size:12px}dd{margin:4px 0;overflow-wrap:anywhere}pre{white-space:pre-wrap;overflow-wrap:anywhere}"],
+  styles: [`
+    .metadata-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+      gap: 16px;
+    }
+    dt, small, .empty-copy { color: var(--mat-sys-on-surface-variant, CanvasText); }
+    dt { font-size: 0.75rem; }
+    dd { margin: 4px 0; overflow-wrap: anywhere; }
+    .monospace, pre { font-family: Consolas, "Cascadia Code", monospace; }
+    .evidence-panel {
+      margin-top: 20px;
+      border: 1px solid var(--mat-sys-outline-variant, #a1a1aa);
+      box-shadow: none;
+    }
+    mat-expansion-panel-header { padding-inline: 14px; }
+    mat-panel-title, mat-panel-description { font-size: 0.875rem; }
+    pre {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      max-height: 28rem;
+      overflow: auto;
+      padding: 12px;
+      font-size: 0.8rem;
+      line-height: 1.6;
+      background: var(--mat-sys-surface-container-low, Canvas);
+      color: var(--mat-sys-on-surface, CanvasText);
+      border: 1px solid var(--mat-sys-outline-variant, #a1a1aa);
+      border-radius: 6px;
+    }
+  `],
   imports: [CommonModule, MatExpansionModule, ConsoleStatus],
   template: `@if (value()) {
       <dl class="metadata-grid">

@@ -5,7 +5,8 @@ import { ConsolePagination } from "./pagination";
 @Component({
   selector: "console-collection",
   standalone: true,
-  styles: [".table-scroll{overflow:auto}"],
+  host: { "data-workflow-list": "runtime" },
+  styleUrl: "./collection.scss",
   imports: [MatIconModule, ConsoleRecords, ConsolePagination],
   templateUrl: "./collection.html",
 })

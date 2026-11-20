@@ -1,20 +1,24 @@
 import 'zone.js';
 import { Component, ENVIRONMENT_INITIALIZER, Injectable, NgModule, inject } from '@angular/core';
 import { MatIconRegistry } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
+import { MatCardModule } from '@angular/material/card';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { BrowserModule, platformBrowser } from '@angular/platform-browser';
 import { provideRouter, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { HttpBackend, HttpClient, HttpErrorResponse, HttpEvent, HttpRequest, HttpResponse, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { Observable, firstValueFrom, fromEvent, takeUntil } from 'rxjs';
 import { WorkflowInstanceViewerComponent, WorkflowHistoryComponent, WorkflowHistoryEventComponent, WORKFLOW_VIEWER_READS, WORKFLOW_VIEWER_NAVIGATION, DEFAULT_VIEWER_MESSAGES, normalizeViewerReadError } from '@workflow-engine/ui';
 import type {WorkflowViewerReads, WorkflowViewerNavigation, ViewerDestination, InstanceView, HistoryPage, HistoryEvent, InstanceGraph} from '@workflow-engine/ui';
-import { WORKFLOW_RUNTIME_READS, WORKFLOW_RUNTIME_COMMANDS, WORKFLOW_CANCELLATION, WORKFLOW_TASK_REASSIGNMENT, CommandRecovery } from '@workflow-engine/ui';
+import { WORKFLOW_RUNTIME_READS, WORKFLOW_RUNTIME_COMMANDS, WORKFLOW_CANCELLATION, WORKFLOW_TASK_REASSIGNMENT, CommandRecovery, ConsoleDetails } from '@workflow-engine/ui';
 import type { WorkflowCancellation, CancellationResult, WorkflowReassignmentTargetPage } from '@workflow-engine/ui';
 import type { WorkflowRuntimeReads, WorkflowRuntimeCommands, TaskView, TaskContract, Envelope, ActivityView, TaskCommandResult, TaskCommandReplay, PreviousDecisionPage } from '@workflow-engine/ui';
-import { WorkflowTaskAdministrationComponent, WorkflowTaskComponent, WorkflowCommandsComponent } from '@workflow-engine/ui/runtime';
+import { WorkflowTaskAdministrationComponent, WorkflowTaskComponent, WorkflowCommandsComponent, WorkflowInstancesComponent } from '@workflow-engine/ui/runtime';
 import { WorkflowDefinitionsComponent } from '@workflow-engine/ui/administration';
 import { provideWorkflowAdministrationHttp } from '@workflow-engine/ui/http';
 const administrationMount = '/host-context/workflow-administration';
 const administrationHttpEvidence = new URLSearchParams(location.search).has('administrationHttpEvidence');
+const styleOwnershipEvidence = new URLSearchParams(location.search).get('styleOwnershipEvidence');
 const id='9007199254740993';
 const instance:InstanceView={id,definitionVersionId:'7',definitionKey:'alternate-consumer',definitionVersion:1,definitionHash:'hash',status:'ACTIVE',currentNodeKey:'REVIEW',resultKey:null,businessType:null,businessId:null,startedAt:'2026-11-07T00:00:00Z',startedBy:'fixture',endedAt:null,endedBy:null,terminationReason:null,lastHistorySequence:'4',lockVersion:'9007199254740993'};
 const graph={instance,nodes:[{key:'BEGIN',name:'Start',type:'START',state:'COMPLETED',activityId:null,taskId:null},{key:'REVIEW',name:'Review <script>as text</script>',type:'HUMAN_TASK',state:'ACTIVE',activityId:'20',taskId:'30'},{key:'DONE',name:'End',type:'END',state:'PENDING',activityId:null,taskId:null}],edges:[{key:'enter',from:'BEGIN',to:'REVIEW',outcome:null,traversed:true},{key:'end',from:'REVIEW',to:'DONE',outcome:'APPROVE',traversed:false}]};
@@ -62,9 +66,13 @@ const evidenceEvents: HistoryEvent[] = [
       if(request.url.startsWith('/host-command/'))this.state.commands++;
       const mode=this.state.mode;
       const timer=setTimeout(()=>{
-        if(mode==='denied' || mode==='failed'){observer.error(new HttpErrorResponse({status:mode==='denied'?404:500}));return;}
+        if(mode==='denied' || mode==='failed' || styleOwnershipEvidence==='error'){observer.error(new HttpErrorResponse({status:mode==='denied'?404:500}));return;}
         let body:unknown=instance;
-        if(request.method==='GET' && new URL(request.urlWithParams,location.origin).pathname===administrationMount+'/definitions')body={items:[{id,key:'alternate-definition',name:'Host administration definition',description:null,createdAt:instance.startedAt,createdBy:'fixture',lockVersion:'9007199254740993'}],nextAfterId:null};
+        if(request.method==='GET' && new URL(request.urlWithParams,location.origin).pathname===administrationMount+'/definitions'){
+          const afterId=new URL(request.urlWithParams,location.origin).searchParams.get('afterId');
+          const row={id,key:'alternate-definition',name:'Host administration definition',description:null,createdAt:instance.startedAt,createdBy:'fixture',lockVersion:'9007199254740993'};
+          body={items:styleOwnershipEvidence==='empty'?[]:[afterId?{...row,id:'9007199254740994',key:'next-definition'}:row],nextAfterId:styleOwnershipEvidence==='populated'&&!afterId?id:null};
+        }
         else if(request.url==='/host-task/30')body=fixtureTask;
         else if(request.url==='/host-task/30/contract')body=fixtureContract();
         else if(request.url==='/host-task/30/submission')body=fixtureSubmission;
@@ -182,7 +190,11 @@ function administrationRow(taskId:string,instanceId:string,name:string,status:st
  previousDecisions(_id:string,cursor:string|undefined,_limit:number,signal:AbortSignal){return this.read<PreviousDecisionPage>('/host-task/30/previous-decisions'+(cursor?'?cursor='+cursor:''),signal);}
  taskSubmission(_id:string,signal:AbortSignal){return this.read<null>('/host-task/30/submission',signal);}
  instanceTasks(_id:string,_cursor:string|undefined,_limit:number,signal:AbortSignal){return this.read<{items:TaskView[];nextCursor:null}>('/host-task/instance-tasks',signal);}
- listInstances():never{throw new Error('Outside fixture');}variables():never{throw new Error('Outside fixture');}assignedTasks():never{throw new Error('Outside fixture');}activity():never{throw new Error('Outside fixture');}submissions():never{throw new Error('Outside fixture');}
+ listInstances(){
+  if(styleOwnershipEvidence!=='runtime')throw new Error('Outside fixture');
+  return Promise.resolve({items:[instance],nextAfterId:null});
+ }
+ variables():never{throw new Error('Outside fixture');}assignedTasks():never{throw new Error('Outside fixture');}activity():never{throw new Error('Outside fixture');}submissions():never{throw new Error('Outside fixture');}
 }
 @Injectable() class RuntimeCommands implements WorkflowRuntimeCommands {
  private http=inject(HttpClient);
@@ -193,7 +205,23 @@ function administrationRow(taskId:string,instanceId:string,name:string,status:st
 class ReadOnlyTask {scope={};}
 
 @Component({selector:'fixture-root',standalone:false,template:`
-  @if(administrationHttpEvidence){
+  @if(styleOwnershipEvidence){
+    <mat-card appearance="outlined" id="host-card">
+      <mat-card-header><h2 id="host-heading">Host controls</h2></mat-card-header>
+      <mat-card-content><button id="host-button" mat-flat-button (click)="dialog.open(hostDialog)">Open host dialog</button></mat-card-content>
+    </mat-card>
+    <ng-template #hostDialog>
+      <h2 mat-dialog-title>Host dialog</h2>
+      <mat-dialog-content>Host content</mat-dialog-content>
+      <mat-dialog-actions><button mat-button mat-dialog-close>Close host dialog</button></mat-dialog-actions>
+    </ng-template>
+    @if(styleOwnershipEvidence==='runtime'){
+      <workflow-instances [sessionScope]="scope"/>
+      <workflow-commands [sessionScope]="scope"/>
+      <console-details [value]="styleOwnershipRecord"/>
+    }
+    @else if(styleOwnershipEvidence!=='host'){<workflow-definitions [sessionScope]="scope" [messages]="administrationMessages"/>}
+  }@else if(administrationHttpEvidence){
     <h1>NgModule administration HTTP consumer</h1>
     <p>Host interceptor reads: {{state.intercepted}}</p>
     <workflow-definitions [sessionScope]="scope" [messages]="administrationMessages"/>
@@ -216,6 +244,7 @@ class ReadOnlyTask {scope={};}
 `}) class App {
   state=inject(FixtureState); id=id; scope:object|null={};messages=DEFAULT_VIEWER_MESSAGES;
   administrationHttpEvidence=administrationHttpEvidence;
+  styleOwnershipEvidence=styleOwnershipEvidence;styleOwnershipRecord=instance;dialog=inject(MatDialog);
   namedOutputEvidence=namedOutputEvidence;reassignmentEvidence=reassignmentEvidence;taskLayoutEvidence=taskLayoutEvidence;layoutView='tasks';
   administrationMessages={definitionsTitle:'Host workflow library'};runtimeMessages={taskTitle:'Host assigned review',commandsTitle:'Host command evidence'};
   constructor(){
@@ -229,7 +258,7 @@ class ReadOnlyTask {scope={};}
   locale(){this.messages={...DEFAULT_VIEWER_MESSAGES,refresh:'Actualiser',current:'Étape actuelle',graph:'Graphe du workflow'};}
   mode(value:string){this.state.mode=value;this.scope={};}
 }
-@NgModule({declarations:[App,Destination,ReadOnlyTask],imports:[BrowserModule,RouterLink,RouterOutlet,WorkflowInstanceViewerComponent,WorkflowHistoryComponent,WorkflowHistoryEventComponent,WorkflowDefinitionsComponent,WorkflowTaskAdministrationComponent,WorkflowTaskComponent,WorkflowCommandsComponent],
+@NgModule({declarations:[App,Destination,ReadOnlyTask],imports:[BrowserModule,RouterLink,RouterOutlet,MatButtonModule,MatCardModule,MatDialogModule,ConsoleDetails,WorkflowInstanceViewerComponent,WorkflowHistoryComponent,WorkflowHistoryEventComponent,WorkflowDefinitionsComponent,WorkflowTaskAdministrationComponent,WorkflowTaskComponent,WorkflowCommandsComponent,WorkflowInstancesComponent],
   providers:[FixtureState,Reads,Navigation,
     ...(administrationHttpEvidence ? [] : [
       RuntimeReads,RuntimeCommands,

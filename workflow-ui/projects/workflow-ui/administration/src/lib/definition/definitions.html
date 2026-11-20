@@ -36,7 +36,7 @@
       [disabled]="busy()"
       (inspect)="open($event)"
     />} @else {
-      <p role="status">{{busy() ? 'Loading the latest records…' : 'No records on this page. Refresh to check again.'}}</p>
+      <p class="empty-copy" role="status">{{busy() ? 'Loading the latest records…' : 'No records on this page. Refresh to check again.'}}</p>
     }
     <nav class="definitions-pagination" aria-label="Definitions pagination">
       <mat-form-field appearance="outline" class="page-size" subscriptSizing="dynamic">
@@ -53,7 +53,7 @@
     </nav>
   </mat-card-content>
 </mat-card>
-<div class="authoring-grid">
+<div class="lookup">
   <mat-card appearance="outlined" class="lookup-card">
     <mat-card-header
       ><div class="card-heading">

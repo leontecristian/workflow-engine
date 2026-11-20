@@ -3,7 +3,7 @@ import { Component, input } from "@angular/core";
   selector: "console-status",
   standalone: true,
   styles: [`
-    .status-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:12px;background:#8882;white-space:nowrap}
+    .status-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:12px;background:#8882;white-space:nowrap;font-size:0.75rem;font-weight:650;line-height:1.5;letter-spacing:0.02em}
     .status-success{color:#236b35}
     .status-danger{color:#a02626}
     .status-info{color:#24528a}

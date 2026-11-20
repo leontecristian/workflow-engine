@@ -1,9 +1,79 @@
-.lookup-card { grid-column: 2; }
-.definitions-pagination { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-top:24px; }
-.definitions-pagination .page-size { width:168px; flex:0 0 168px; }
-mat-dialog-content { min-height: 0; }
-mat-dialog-actions { gap: 8px; }
-mat-dialog-actions .muted { flex: 1 1 15rem; }
-@media (max-width: 760px) {
-  .lookup-card { grid-column: 1; }
+@use "../../../../src/lib/administration/support/count-badge" as badge;
+
+.library-card .card-heading h2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.count-badge {
+  @include badge.count-badge;
+}
+
+.lookup {
+  max-inline-size: 34rem;
+}
+
+.empty-copy {
+  padding-block: 12px;
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant, currentColor);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.definitions-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.definitions-pagination .page-size {
+  width: 168px;
+  max-width: 100%;
+}
+
+mat-dialog-content {
+  min-height: 0;
+}
+
+mat-dialog-content > p {
+  margin: 0 0 16px;
+}
+
+.upload-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.upload-bar > span,
+mat-dialog-actions .muted {
+  color: var(--mat-sys-on-surface-variant, currentColor);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+mat-dialog-actions {
+  gap: 8px;
+}
+
+mat-dialog-actions .muted {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 15rem;
+  min-width: 0;
+}
+
+mat-dialog-actions .muted mat-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
 }

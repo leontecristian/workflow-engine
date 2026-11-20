@@ -1,0 +1,90 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.table-scroll {
+  position: relative;
+  overflow-x: auto;
+  border-block-start: 1px solid var(--mat-sys-outline-variant, #828282);
+}
+
+table {
+  width: 100%;
+}
+
+th {
+  font-weight: 650;
+  background: var(--mat-sys-surface-container, Canvas);
+  color: var(--mat-sys-on-surface-variant, CanvasText);
+}
+
+th,
+td {
+  padding-inline: 16px;
+  overflow-wrap: anywhere;
+}
+
+td {
+  padding-block: 8px;
+}
+
+.mat-column-actions {
+  width: 80px;
+  text-align: end;
+}
+
+.record-link {
+  min-width: 0;
+  min-height: 24px;
+  height: auto;
+  padding-inline: 0;
+  text-align: start;
+}
+
+.record-id,
+.date-cell small {
+  display: block;
+  margin-block-start: 4px;
+  color: var(--mat-sys-on-surface-variant, currentColor);
+}
+
+.date-cell {
+  white-space: nowrap;
+}
+
+.monospace,
+.record-id {
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+:host(.definition-records) table,
+:host(.version-records) table {
+  table-layout: fixed;
+  min-width: 760px;
+}
+
+:host(.definition-records) .mat-column-id,
+:host(.version-records) .mat-column-id {
+  width: 6rem;
+}
+
+:host(.version-records) .mat-column-version {
+  width: 8rem;
+}
+
+.definition-id,
+.version-link {
+  color: var(--mat-sys-primary, LinkText);
+  text-decoration: none;
+}

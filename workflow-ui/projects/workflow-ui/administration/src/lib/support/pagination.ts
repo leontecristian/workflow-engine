@@ -8,6 +8,7 @@ import { MatIconModule } from "@angular/material/icon";
 @Component({
   selector: "console-pagination",
   standalone: true,
+  host: { "data-workflow-list": "administration" },
   imports: [
     FormsModule,
     MatButtonModule,
@@ -17,6 +18,7 @@ import { MatIconModule } from "@angular/material/icon";
     MatIconModule,
   ],
   templateUrl: "./pagination.html",
+  styleUrl: "./pagination.scss",
 })
 export class ConsolePagination {
   size = input(50);

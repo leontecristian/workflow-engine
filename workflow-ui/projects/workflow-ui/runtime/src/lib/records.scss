@@ -1,0 +1,62 @@
+.table-scroll {
+  position: relative;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+}
+
+th {
+  background: var(--mat-sys-surface-container-low, transparent);
+  color: var(--mat-sys-on-surface-variant, currentColor);
+  white-space: nowrap;
+}
+
+.record-link {
+  height: auto;
+  min-height: var(--mdc-text-button-container-height, 36px);
+  text-align: start;
+  white-space: normal;
+}
+
+.task-link[href] {
+  color: var(--mat-sys-primary, LinkText);
+  text-decoration: none;
+}
+
+.task-link[href]:hover {
+  text-decoration: underline;
+}
+
+.monospace,
+.record-id {
+  font-family: ui-monospace, monospace;
+  overflow-wrap: anywhere;
+}
+
+.record-id,
+.date-cell small {
+  display: block;
+  margin-block-start: 4px;
+  color: var(--mat-sys-on-surface-variant, currentColor);
+}
+
+.date-cell,
+.mat-column-actions {
+  white-space: nowrap;
+}
+
+.mat-column-actions {
+  text-align: end;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

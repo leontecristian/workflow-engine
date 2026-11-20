@@ -1,0 +1,104 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+.page-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.eyebrow, .description, .page-context {
+  color: var(--mat-sys-on-surface-variant, CanvasText);
+}
+.eyebrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  line-height: 1.5;
+}
+h1 {
+  margin: 6px 0 9px;
+  font-size: 1.875rem;
+  font-weight: 650;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.description {
+  max-inline-size: 710px;
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+.page-context {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.75rem;
+}
+.page-context mat-icon {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  font-size: 17px;
+  color: var(--mat-sys-primary, currentColor);
+}
+.page-actions {
+  display: none;
+}
+@media (max-width: 760px) {
+  .page-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  h1 {
+    font-size: 1.625rem;
+  }
+}
+
+.with-title-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "eyebrow eyebrow eyebrow"
+    "title context actions"
+    "description description description";
+  gap: 0 16px;
+}
+.with-title-actions .heading-copy {
+  display: contents;
+}
+.eyebrow { grid-area: eyebrow; }
+h1 { grid-area: title; }
+.page-context { grid-area: context; }
+.description { grid-area: description; }
+.with-title-actions .page-actions {
+  display: flex;
+  grid-area: actions;
+  align-items: center;
+}
+.page-actions:empty {
+  display: none;
+}
+@media (min-width: 761px) {
+  .with-title-actions:has(.page-actions:empty) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "eyebrow eyebrow" "title context" "description description";
+  }
+}
+@media (max-width: 760px) {
+  .with-title-actions {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "eyebrow eyebrow" "title actions" "context context" "description description";
+  }
+}
+@media (max-width: 480px) {
+  .with-title-actions {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "eyebrow" "title" "context" "actions" "description";
+  }
+  .page-actions {
+    margin-top: 12px;
+  }
+}

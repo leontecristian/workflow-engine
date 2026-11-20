@@ -46,25 +46,14 @@ const COLUMNS: Record<string, RecordColumn[]> = {
     ConsoleStatus,
     MatIconModule,
   ],
-  template: `<div
-    class="table-scroll"
-    [class.instances-table]="kind() === 'instances'"
-  >
+  styleUrl: "./records.scss",
+  template: `<div class="table-scroll">
     <table mat-table [dataSource]="rows()" [attr.aria-label]="label()">
       @for (column of columns(); track column.key) {
         <ng-container [matColumnDef]="column.key"
           ><th mat-header-cell *matHeaderCellDef>{{ column.label }}</th>
           <td mat-cell *matCellDef="let row">
-            @if (kind() === "instances" && column.key === "id") {
-              <button
-                mat-button
-                class="record-link monospace"
-                (click)="inspect.emit(row)"
-                [disabled]="disabled()"
-              >
-                #{{ row.id }}
-              </button>
-            } @else if (
+            @if (
               kind() === "instances" && column.key === "definitionKey"
             ) {
               <span class="monospace">{{ row.definitionKey }}</span
@@ -83,15 +72,20 @@ const COLUMNS: Record<string, RecordColumn[]> = {
                   UTC</small
                 ></span
               >
+            } @else if (kind() === "my-tasks" && column.key === "nodeName") {
+              <a class="task-link" [routerLink]="disabled() ? null : link({ kind: 'task', id: row.id })">
+                {{ cell(row, column.key) }}
+              </a>
             } @else if (column === columns()[0]) {
               <button
                 mat-button
                 class="record-link"
+                [class.monospace]="column.key === 'id'"
                 (click)="inspect.emit(row)"
                 [disabled]="disabled()"
               >
-                {{ cell(row, column.key) ?? "—" }}</button
-              >
+                {{ column.key === "id" ? "#" + row.id : (cell(row, column.key) ?? "—") }}
+              </button>
             } @else {
               <span [class.monospace]="isExact(column.key)">{{
                 cell(row, column.key) ?? "—"

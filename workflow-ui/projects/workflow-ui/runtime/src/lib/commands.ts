@@ -4,7 +4,7 @@ import { RuntimeState } from './runtime-state';
 import { PAGE_IMPORTS } from './page-imports';
 import { download } from './variables';
 import { currentWork } from './current-work';
-@Component({selector:'workflow-commands',standalone:true,imports:[...PAGE_IMPORTS],styleUrl:'./runtime.scss',templateUrl:'./commands.html'})
+@Component({selector:'workflow-commands',standalone:true,imports:[...PAGE_IMPORTS],styleUrls:['./runtime.scss','./commands.scss'],templateUrl:'./commands.html'})
 export class WorkflowCommandsComponent extends RuntimeState {
  readonly commands=inject(CommandRecovery);readonly commandProvider=inject(WORKFLOW_RUNTIME_COMMANDS,{optional:true});
  readonly viewer=inject(WORKFLOW_VIEWER_READS);

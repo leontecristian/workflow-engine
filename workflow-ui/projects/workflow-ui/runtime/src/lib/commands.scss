@@ -1,0 +1,103 @@
+@use '@angular/material' as mat;
+
+.hint-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-block-end: 24px;
+  padding: 14px;
+  border: 1px solid var(--mat-sys-outline-variant, #aab3c3);
+  border-radius: 8px;
+  background: var(--mat-sys-surface-container-low, Canvas);
+  color: var(--mat-sys-on-surface-variant, CanvasText);
+}
+
+.hint-box mat-icon {
+  flex: none;
+}
+
+.hint-box p,
+.empty-state p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.two-column {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.field-note {
+  margin: 16px 0 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--mat-sys-on-surface-variant, currentColor);
+  overflow-wrap: anywhere;
+}
+
+.empty-state {
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--mat-sys-on-surface-variant, currentColor);
+}
+
+.empty-state h3 {
+  margin: 12px 0 4px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.secondary-actions {
+  margin-block-start: 12px;
+}
+
+.danger-action {
+  @include mat.button-overrides((
+    text-label-text-color: var(--mat-sys-error, #a22323),
+    text-state-layer-color: var(--mat-sys-error, #a22323),
+  ));
+}
+
+.restore-panel {
+  border: 1px solid var(--mat-sys-outline-variant, #aab3c3);
+  box-shadow: none;
+}
+
+.restore-panel mat-panel-title {
+  gap: 8px;
+}
+
+.restore-panel mat-icon {
+  flex: none;
+}
+
+.code-field textarea {
+  font-family: ui-monospace, monospace;
+  line-height: 1.5;
+  resize: vertical;
+  tab-size: 2;
+}
+
+@media (max-width: 760px) {
+  .two-column {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .restore-panel mat-panel-description {
+    display: none;
+  }
+}

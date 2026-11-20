@@ -4,6 +4,8 @@ Follow the [frontend style guide](../docs/frontend-style-guide.md) for the agree
 
 `@workflow-engine/ui` is an Angular 19.2 partial-compiled library. It owns read-only instance metadata, pinned graphs, ordered history, exact events, definition/catalog administration, runtime inspection and optional task/recovery components. Hosts control application bootstrap, authentication, HTTP configuration, routes, translation and theme. Angular (including Forms), Router, Material, CDK, RxJS and jsonc-parser are peers.
 
+The built components include their layout and presentation, including workflow-owned dialog content. Import the components normally and provide your supported Angular Material theme and the icon setup below. Component styles use host typography and semantic Material colors where available, with readable fallbacks. Hosts own theme, global typography, density, shell, tabs and navigation. An existing host such as APOLO needs no new CSS configuration to adopt these component styles. The sandbox stylesheet is specific to the sandbox application.
+
 Icons use direct native `<mat-icon>refresh</mat-icon>` markup and Google Material Symbols names, including page metadata/collection icon inputs. The former `ConsoleIcon` wrapper, semantic aliases and custom SVG registry are removed. The library packages an opt-in local Material Symbols Outlined font stylesheet, selected at weight 400, fill 0, grade 0 and optical size 24; no external runtime font request is needed. Graph visualizations remain separate.
 
 Each host must add `node_modules/@workflow-engine/ui/styles/material-symbols.css` to its Angular build `styles` list and configure the default icon font once before views render, for example in its own environment initializer:
