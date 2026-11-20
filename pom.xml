@@ -10,7 +10,7 @@
     </parent>
     <groupId>io.github.leontecristian</groupId>
     <artifactId>workflow-engine</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.1.0</version>
     <packaging>pom</packaging>
     <name>workflow-engine</name>
     <description>Parent build for the workflow library and its standalone test host</description>
