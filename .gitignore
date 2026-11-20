@@ -43,3 +43,4 @@ workflow-test-host/frontend/dist/
 workflow-ui/**/node_modules/
 workflow-ui/**/dist/
 workflow-ui/**/.angular/
+workflow-ui/**/*.tgz

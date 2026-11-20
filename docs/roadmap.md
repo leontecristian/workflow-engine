@@ -1,6 +1,6 @@
 # Workflow engine roadmap
 
-**Updated 2026-11-19. Delivery baseline through F034, shared Task page (implemented revision 6).**
+**Updated 2026-11-20. Delivery baseline through F034, shared Task page (implemented revision 6).**
 
 The agreed sequence is working sandbox → first APOLO booking integration → graphical designer. APOLO source access is available. The next deliverable is a specification for one cross-team booking approval.
 
@@ -74,6 +74,8 @@ The agreed sequence is working sandbox → first APOLO booking integration → g
 Production readiness applies before any deployment, regardless of designer timing. Historical verification debt is reconciled when relevant to a selected dependency or integration/release gate, rather than becoming a blanket prerequisite for new work.
 
 ## 3. Remaining engine capabilities
+
+**Planned for the next library release — optional administration clock.** In `workflow-web` 0.1.0, enabling definition and task-type administration requires the host to register a `java.time.Clock` bean. Use the host-provided clock when present and default to `Clock.systemUTC()` when absent. This lets hosts enable administration without extra configuration and preserves timestamp behavior for hosts that supply their own clock.
 
 | Capability | Scope and dependencies | Exit condition |
 | --- | --- | --- |
