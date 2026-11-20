@@ -7,6 +7,8 @@ import java.io.Serializable;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import lombok.Getter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /** Owner-aware internal persistence key; comparisons preserve case and content. */
 @Embeddable
@@ -20,6 +22,7 @@ public class WorkflowVariableId implements Serializable {
     @Column(name = "instance_id", nullable = false)
     private Long instanceId;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "variable_key", nullable = false, length = 100)
     private String variableKey;
 

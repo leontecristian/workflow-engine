@@ -13,7 +13,9 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.Getter;
 import org.hibernate.annotations.FractionalSeconds;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Nationalized;
+import org.hibernate.type.SqlTypes;
 
 /** Internal runtime persistence; controlled changes belong to the host-coordinated execution service. */
 @Entity
@@ -29,6 +31,7 @@ public class WorkflowActivityEntity {
     @Column(name = "instance_id", nullable = false)
     private Long instanceId;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "node_key", nullable = false, length = 100)
     private String nodeKey;
 
@@ -39,9 +42,11 @@ public class WorkflowActivityEntity {
     private Long taskTypeId;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "completion_policy", nullable = false, length = 12)
     private CompletionPolicy completionPolicy;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "contribution_outcome_key", length = 100)
     private String contributionOutcomeKey;
 
@@ -53,9 +58,11 @@ public class WorkflowActivityEntity {
     private String reviewRevisionRef;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "status", nullable = false, length = 12)
     private ActivityStatus status;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "outcome_key", length = 100)
     private String outcomeKey;
 
@@ -73,6 +80,7 @@ public class WorkflowActivityEntity {
     @Column(name = "closed_by", length = 200)
     private String closedBy;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "closure_reason", length = 40)
     private String closureReason;
 

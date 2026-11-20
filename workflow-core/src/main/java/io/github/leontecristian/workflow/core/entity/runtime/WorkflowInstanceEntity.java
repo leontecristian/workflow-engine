@@ -13,7 +13,9 @@ import jakarta.persistence.Version;
 import java.time.LocalDateTime;
 import lombok.Getter;
 import org.hibernate.annotations.FractionalSeconds;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Nationalized;
+import org.hibernate.type.SqlTypes;
 
 /** Internal runtime persistence; controlled changes belong to the host-coordinated execution service. */
 @Entity
@@ -29,6 +31,7 @@ public class WorkflowInstanceEntity {
     @Column(name = "definition_version_id", nullable = false)
     private Long definitionVersionId;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "business_type", length = 100)
     private String businessType;
 
@@ -36,13 +39,16 @@ public class WorkflowInstanceEntity {
     @Column(name = "business_id", length = 200)
     private String businessId;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "current_node_key", nullable = false, length = 100)
     private String currentNodeKey;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "status", nullable = false, length = 12)
     private InstanceStatus status;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "result_key", length = 100)
     private String resultKey;
 

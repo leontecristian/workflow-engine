@@ -8,7 +8,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Nationalized;
+import org.hibernate.type.SqlTypes;
 
 /**
  * Internal persistence model; catalog callers use detached TaskTypeView snapshots.
@@ -24,6 +26,7 @@ public class TaskTypeEntity {
     @Column(name = "id", nullable = false)
     private Long id;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "code", nullable = false, length = 100, updatable = false)
     private String code;
 

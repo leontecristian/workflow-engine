@@ -15,7 +15,9 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.Getter;
 import org.hibernate.annotations.FractionalSeconds;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Nationalized;
+import org.hibernate.type.SqlTypes;
 
 /** Internal runtime persistence; controlled changes belong to the host-coordinated execution service. */
 @Entity
@@ -31,10 +33,12 @@ public class WorkflowTaskEntity {
     @Column(name = "activity_id", nullable = false)
     private Long activityId;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "task_key", nullable = false, length = 100)
     private String taskKey;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "assignment_kind", nullable = false, length = 5)
     private AssignmentTargetKind assignmentKind;
 
@@ -47,9 +51,11 @@ public class WorkflowTaskEntity {
     private String assigneeRef;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "status", nullable = false, length = 12)
     private TaskStatus status;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "outcome_key", length = 100)
     private String outcomeKey;
 
@@ -73,6 +79,7 @@ public class WorkflowTaskEntity {
     private String closedBy;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "closure_reason", length = 40)
     private TaskClosureReason closureReason;
 

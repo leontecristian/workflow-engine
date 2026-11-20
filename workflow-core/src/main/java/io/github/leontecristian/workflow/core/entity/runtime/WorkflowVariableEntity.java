@@ -33,6 +33,7 @@ public class WorkflowVariableEntity {
     private WorkflowVariableId id;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "value_type", nullable = false, length = 12)
     private VariableValueType valueType;
 

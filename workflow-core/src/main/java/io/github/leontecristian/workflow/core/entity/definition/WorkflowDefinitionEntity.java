@@ -10,7 +10,9 @@ import jakarta.persistence.Version;
 import java.time.LocalDateTime;
 import lombok.Getter;
 import org.hibernate.annotations.FractionalSeconds;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.Nationalized;
+import org.hibernate.type.SqlTypes;
 
 /** Internal definition-family persistence state; mutations are coordinated by the administration service. */
 @Entity
@@ -23,6 +25,7 @@ public class WorkflowDefinitionEntity {
     @Column(name = "id", nullable = false)
     private Long id;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "workflow_key", nullable = false, length = 100)
     private String workflowKey;
 

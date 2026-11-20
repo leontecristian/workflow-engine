@@ -45,6 +45,7 @@ public class WorkflowDefinitionVersionEntity {
     private String definitionJson;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "status", nullable = false, length = 12)
     private DefinitionStatus status;
 
@@ -56,6 +57,7 @@ public class WorkflowDefinitionVersionEntity {
     @Column(name = "content_hash", nullable = false, length = 32)
     private byte[] contentHash;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "canonicalization_version", nullable = false, length = 40)
     private String canonicalizationVersion;
 
@@ -78,6 +80,7 @@ public class WorkflowDefinitionVersionEntity {
     private String updatedBy;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "validation_status", length = 12)
     private DefinitionValidationStatus validationStatus;
 

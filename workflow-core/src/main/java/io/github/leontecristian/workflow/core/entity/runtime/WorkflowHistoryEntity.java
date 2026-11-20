@@ -24,6 +24,7 @@ public class WorkflowHistoryEntity {
     @EmbeddedId
     private WorkflowHistoryId id;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "event_type", nullable = false, length = 60)
     private String eventType;
 
@@ -36,6 +37,7 @@ public class WorkflowHistoryEntity {
     private String correlationId;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "actor_kind", nullable = false, length = 12)
     private ActorKind actorKind;
 
@@ -54,12 +56,15 @@ public class WorkflowHistoryEntity {
     @Column(name = "task_id")
     private Long taskId;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "source_node_key", length = 100)
     private String sourceNodeKey;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "target_node_key", length = 100)
     private String targetNodeKey;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "transition_key", length = 100)
     private String transitionKey;
 

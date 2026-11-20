@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "key": "booking-approval",
+  "version": 1,
+  "name": "Booking approval",
+  "startPolicy": {
+    "inputContract": [
+      {"key": "bookingReference", "type": "STRING", "required": true, "nullable": false}
+    ],
+    "initialize": {"bookingReference": {"source": "startInput", "key": "bookingReference"}}
+  },
+  "variables": [
+    {"key": "bookingReference", "type": "STRING", "nullable": false}
+  ],
+  "nodes": [
+    {"key": "BEGIN", "type": "START", "name": "Start"},
+    {
+      "key": "review", "type": "HUMAN_TASK", "name": "Review booking",
+      "taskType": "BOOKING_REVIEW",
+      "assignment": {"resolver": "apolo.reviewer", "inputs": {}},
+      "completion": {"policy": "SINGLE"},
+      "inputs": {"bookingReference": {"source": "variable", "key": "bookingReference"}},
+      "resultContract": {"mode": "FORBIDDEN"},
+      "outcomes": [
+        {"key": "APPROVE", "label": "Approve", "requiresComment": false},
+        {"key": "REJECT", "label": "Reject", "requiresComment": true}
+      ]
+    },
+    {"key": "APPROVED", "type": "END", "name": "Approved", "result": "APPROVED"},
+    {"key": "REJECTED", "type": "END", "name": "Rejected", "result": "REJECTED"}
+  ],
+  "transitions": [
+    {"key": "submit", "from": "BEGIN", "to": "review"},
+    {"key": "approve", "from": "review", "outcome": "APPROVE", "to": "APPROVED"},
+    {"key": "reject", "from": "review", "outcome": "REJECT", "to": "REJECTED"}
+  ]
+}

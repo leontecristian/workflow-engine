@@ -30,10 +30,12 @@ public class WorkflowCommandReceiptEntity {
     @Column(name = "instance_id", nullable = false)
     private Long instanceId;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "operation_type", nullable = false, length = 40)
     private String operationType;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "actor_kind", nullable = false, length = 12)
     private ActorKind actorKind;
 
@@ -46,6 +48,7 @@ public class WorkflowCommandReceiptEntity {
     @Column(name = "request_fingerprint", nullable = false, length = 32)
     private byte[] requestFingerprint;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "fingerprint_version", nullable = false, length = 40)
     private String fingerprintVersion;
 
