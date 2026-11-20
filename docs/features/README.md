@@ -1,5 +1,7 @@
 # Feature specifications
 
+[F035 — Optional Angular HTTP adapters for workflow-web](F035-workflow-ui-http-adapter/spec.md) is **IMPLEMENTED revision 1 — 2026-11-20**. It supplies opt-in host HttpClient adapters for administration, viewer, runtime reads, task commands and receipt lookup, cancellation and reassignment. See the [plan](F035-workflow-ui-http-adapter/plan.md), [tasks](F035-workflow-ui-http-adapter/tasks.md) and [implementation record](F035-workflow-ui-http-adapter/implementation.md).
+
 [F034 — Shared Task page](F034-shared-task-page/spec.md) implements **READY revision 6 — 2026-11-19**. It delivers the reviewer page, task-scoped commands, named result fields and the sandbox's administrator-protected diagnostics route. See the [plan](F034-shared-task-page/plan.md), [tasks](F034-shared-task-page/tasks.md) and [implementation record](F034-shared-task-page/implementation.md).
 
 [F033 — Optional task completion handlers](F033-optional-task-handlers/spec.md) is **IMPLEMENTED revision 1 — 2026-11-19**. Hosts can register an Angular component by pinned task type. The shared task page supplies the default handler and coordinates completion for either form. The verified sandbox walkthrough pairs a custom booking review with a generic follow-up. See the [plan](F033-optional-task-handlers/plan.md), [tasks](F033-optional-task-handlers/tasks.md) and [implementation record](F033-optional-task-handlers/implementation.md).

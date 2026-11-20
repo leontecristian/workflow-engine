@@ -5,7 +5,7 @@ import { MatButton } from '@angular/material/button';
 import { CommandRecovery, prettyDocument, type TaskContract } from '@workflow-engine/ui';
 import { WorkflowTaskComponent } from '@workflow-engine/ui/runtime';
 import { ConsoleSession } from '../../data/console-session';
-import { ConsoleRuntimeReads, type TaskDiagnostics } from '../../data/runtime-read-adapters';
+import { ConsoleTaskDiagnostics, type TaskDiagnostics } from '../../data/task-diagnostics';
 import { downloadJson } from '../../ui/download-json';
 
 interface InspectionState {
@@ -30,7 +30,7 @@ export class TaskPage {
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
-  private readonly reads = inject(ConsoleRuntimeReads);
+  private readonly reads = inject(ConsoleTaskDiagnostics);
   private readonly commands = inject(CommandRecovery);
   readonly inspectionScope = computed(() => {
     const session = this.session.viewerScope();

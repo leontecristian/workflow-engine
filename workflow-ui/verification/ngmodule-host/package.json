@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "ng build",
+    "test:http": "node --test http-adapter.test.mjs",
     "start": "ng serve --host 127.0.0.1 --port 4300"
   },
   "dependencies": {

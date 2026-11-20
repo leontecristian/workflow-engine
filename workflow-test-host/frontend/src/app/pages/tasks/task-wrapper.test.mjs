@@ -5,7 +5,7 @@ import { CommandRecovery } from '@workflow-engine/ui';
 import { component, ConsoleSession, core, loadTs, routeAt, router, rxjs, tick } from '../../../../unit/component-loader.mjs';
 
 const { TaskPage } = loadTs(new URL('./task.ts', import.meta.url));
-const { ConsoleRuntimeReads } = loadTs(new URL('../../data/runtime-read-adapters.ts', import.meta.url));
+const { ConsoleTaskDiagnostics } = loadTs(new URL('../../data/task-diagnostics.ts', import.meta.url));
 
 function setup(t) {
   const session = { admin: true, viewerScope: core.signal({}), identityChanges: new rxjs.Subject() };
@@ -13,7 +13,7 @@ function setup(t) {
   const { page, route } = component(t, TaskPage, {}, routeAt({ id: '7' }), undefined, [
     { provide: ConsoleSession, useValue: session },
     { provide: CommandRecovery, useValue: { buffer: {} } },
-    { provide: ConsoleRuntimeReads, useValue: { readTaskDiagnostics(id, signal) {
+    { provide: ConsoleTaskDiagnostics, useValue: { readTaskDiagnostics(id, signal) {
       return new Promise((resolve, reject) => reads.push({ id, signal, resolve, reject }));
     } } },
   ]);

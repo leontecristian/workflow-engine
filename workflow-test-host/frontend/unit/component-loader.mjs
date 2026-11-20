@@ -9,6 +9,7 @@ import * as core from "@angular/core";
 import * as router from "@angular/router";
 import * as interop from "@angular/core/rxjs-interop";
 import * as common from "@angular/common";
+import * as http from "@angular/common/http";
 import * as forms from "@angular/forms";
 import * as rxjs from "rxjs";
 
@@ -23,6 +24,7 @@ const modules = new Map(
     "@angular/router": router,
     "@angular/core/rxjs-interop": interop,
     "@angular/common": common,
+    "@angular/common/http": http,
     "@angular/forms": forms,
     rxjs,
     "jsonc-parser": jsonc,
@@ -56,6 +58,7 @@ modules.set("@angular/cdk/layout", await import("@angular/cdk/layout"));
 modules.set('@workflow-engine/ui', await import('@workflow-engine/ui'));
 modules.set('@workflow-engine/ui/administration', await import('@workflow-engine/ui/administration'));
 modules.set('@workflow-engine/ui/runtime', await import('@workflow-engine/ui/runtime'));
+modules.set('@workflow-engine/ui/http', await import('@workflow-engine/ui/http'));
 const cache = new Map();
 export function loadTs(url) {
   const file = typeof url === "string" ? resolve(url) : fileURLToPath(url);
@@ -88,6 +91,7 @@ export function loadTs(url) {
       },
       console,
       AbortController,
+      DOMException,
       URL,
       URLSearchParams,
       Blob,
@@ -169,4 +173,50 @@ export function services(t, providers = []) {
   return injector;
 }
 export const tick = () => new Promise(setImmediate);
-export { core, router, rxjs };
+export { core, http, router, rxjs };
+
+export function workflowVersionSummary(id, lockVersion) {
+  return {
+    id, lockVersion, definitionId: '1', key: 'fixture', version: 1, schemaVersion: 1,
+    status: 'DRAFT', contentRevision: '1', contentHash: 'fixture', canonicalizationVersion: '1',
+    createdAt: '2026-11-20T00:00:00Z', createdBy: 'admin', updatedAt: '2026-11-20T00:00:00Z', updatedBy: 'admin',
+    publishedAt: null, publishedBy: null, retiredAt: null, retiredBy: null, validation: null,
+  };
+}
+
+export function consoleWorkflowProviders() {
+  const { consoleWorkflowSessionInterceptor } = loadTs(
+    new URL('../src/app/data/workflow-http-session.ts', import.meta.url),
+  );
+  return [
+    { provide: core.ɵINJECTOR_SCOPE, useValue: 'root' },
+    { provide: core.PLATFORM_ID, useValue: 'browser' },
+    http.provideHttpClient(http.withNoXsrfProtection(), http.withInterceptors([consoleWorkflowSessionInterceptor])),
+    { provide: http.HttpBackend, useValue: {
+      handle(request) {
+        return new rxjs.Observable(observer => {
+          const controller = new AbortController();
+          const headers = Object.fromEntries(request.headers.keys().map(key => [key, request.headers.get(key)]));
+          void (async () => {
+            try {
+              const response = await fetch(request.urlWithParams, {
+                method: request.method, headers, body: request.body, signal: controller.signal,
+              });
+              const body = await response.text();
+              const status = response.status ?? 200;
+              if (response.ok) {
+                observer.next(new http.HttpResponse({ status, body }));
+                observer.complete();
+              } else {
+                observer.error(new http.HttpErrorResponse({ status, error: body }));
+              }
+            } catch (error) {
+              observer.error(new http.HttpErrorResponse({ status: 0, error }));
+            }
+          })();
+          return () => controller.abort();
+        });
+      },
+    } },
+  ];
+}

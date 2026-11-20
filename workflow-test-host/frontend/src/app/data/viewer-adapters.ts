@@ -1,22 +1,23 @@
+import { HttpClient } from '@angular/common/http';
+import { createWorkflowViewerHttp } from '@workflow-engine/ui/http';
+import { CONSOLE_WORKFLOW_API } from './workflow-http-session';
 import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ConsoleSession } from './console-session';
 import { normalizeViewerReadError } from '@workflow-engine/ui';
-import type { BusinessHistoryEvent, BusinessHistoryPage, WorkflowViewerReads, WorkflowViewerNavigation, ViewerDestination, InstanceView, HistoryPage, HistoryEvent, InstanceGraph } from '@workflow-engine/ui';
+import type { BusinessHistoryEvent, BusinessHistoryPage, WorkflowViewerReads, WorkflowViewerNavigation, ViewerDestination } from '@workflow-engine/ui';
 @Injectable({providedIn:'root'})
 export class ConsoleViewerReads implements WorkflowViewerReads {
   private readonly session = inject(ConsoleSession);
+  private readonly standard = createWorkflowViewerHttp(inject(HttpClient), CONSOLE_WORKFLOW_API);
   private async read<T>(path:string, signal:AbortSignal):Promise<T> {
     try { return await this.session.viewerRead<T>(path, signal); }
     catch(error) { throw normalizeViewerReadError(error); }
   }
-  instance(id:string,signal:AbortSignal) { return this.read<InstanceView>('/instances/'+encodeURIComponent(id),signal); }
+  instance(id:string,signal:AbortSignal) { return this.standard.instance(id, signal); }
   history(id:string,cursor:string,limit:number,signal:AbortSignal) {
     const path = '/instances/' + encodeURIComponent(id);
-    if (this.session.admin) {
-      const query = new URLSearchParams({afterSequence:cursor,limit:String(limit)});
-      return this.read<HistoryPage>(path+'/history?'+query,signal);
-    }
+    if (this.session.admin) return this.standard.history(id, cursor, limit, signal);
     const query = new URLSearchParams({limit:String(limit)});
     if (cursor !== '0') query.set('cursor', cursor);
     return this.read<BusinessHistoryPage>(path+'/business-history?'+query,signal);
@@ -25,10 +26,10 @@ export class ConsoleViewerReads implements WorkflowViewerReads {
     const path = '/instances/' + encodeURIComponent(id);
     const ref = encodeURIComponent(sequence);
     return this.session.admin && /^[1-9][0-9]*$/.test(sequence)
-      ? this.read<HistoryEvent>(path+'/history/'+ref,signal)
+      ? this.standard.historyEvent(id, sequence, signal)
       : this.read<BusinessHistoryEvent>(path+'/business-history/'+ref,signal);
   }
-  graph(id:string,signal:AbortSignal) { return this.read<InstanceGraph>('/instances/'+encodeURIComponent(id)+'/graph',signal); }
+  graph(id:string,signal:AbortSignal) { return this.standard.graph(id, signal); }
 }
 @Injectable({providedIn:'root'})
 export class ConsoleViewerNavigation implements WorkflowViewerNavigation {

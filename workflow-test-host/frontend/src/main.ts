@@ -1,3 +1,4 @@
+import { provideHttpClient, withInterceptors, withNoXsrfProtection } from '@angular/common/http';
 import "zone.js";
 import { ENVIRONMENT_INITIALIZER, inject, provideZoneChangeDetection } from "@angular/core";
 import { bootstrapApplication } from "@angular/platform-browser";
@@ -5,23 +6,29 @@ import { provideRouter } from "@angular/router";
 import { MatIconRegistry } from '@angular/material/icon';
 import { AppShell } from "./app/shell/app-shell";
 import { APP_ROUTES } from "./app/app.routes";
-import { WORKFLOW_VIEWER_READS, WORKFLOW_VIEWER_NAVIGATION, WORKFLOW_ADMINISTRATION_API, WORKFLOW_RUNTIME_READS, WORKFLOW_RUNTIME_COMMANDS, WORKFLOW_CANCELLATION, WORKFLOW_TASK_REASSIGNMENT } from '@workflow-engine/ui';
+import { WORKFLOW_VIEWER_READS, WORKFLOW_VIEWER_NAVIGATION, WORKFLOW_RUNTIME_COMMANDS } from '@workflow-engine/ui';
+import {
+  provideWorkflowAdministrationHttp,
+  provideWorkflowRuntimeReadsHttp,
+  provideWorkflowCancellationHttp,
+  provideWorkflowTaskReassignmentHttp,
+} from '@workflow-engine/ui/http';
+import { CONSOLE_WORKFLOW_API, consoleWorkflowSessionInterceptor } from './app/data/workflow-http-session';
 import { provideWorkflowTaskEditors } from '@workflow-engine/ui/runtime';
 import { ConsoleViewerReads, ConsoleViewerNavigation } from './app/data/viewer-adapters';
-import { ConsoleAdministrationApi } from './app/data/administration-adapters';
-import { ConsoleRuntimeReads } from './app/data/runtime-read-adapters';
-import { ConsoleRuntimeCommands, ConsoleRuntimeSessionBridge } from './app/data/runtime-command-adapters';
+import { consoleRuntimeCommands, ConsoleRuntimeSessionBridge } from './app/data/runtime-command-adapters';
 import { BookingReviewComponent } from './app/pages/tasks/booking-review';
 bootstrapApplication(AppShell, {
   providers: [
     {provide:ENVIRONMENT_INITIALIZER,multi:true,useValue:()=>inject(MatIconRegistry).setDefaultFontSetClass('material-symbols-outlined','mat-ligature-font')},
-    {provide:WORKFLOW_RUNTIME_READS,useExisting:ConsoleRuntimeReads},
-    {provide:WORKFLOW_RUNTIME_COMMANDS,useExisting:ConsoleRuntimeCommands},
+    provideHttpClient(withNoXsrfProtection(), withInterceptors([consoleWorkflowSessionInterceptor])),
+    provideWorkflowRuntimeReadsHttp(CONSOLE_WORKFLOW_API),
+    {provide:WORKFLOW_RUNTIME_COMMANDS,useFactory:consoleRuntimeCommands},
     provideWorkflowTaskEditors({ BOOKING_REVIEW: BookingReviewComponent }),
-    {provide:WORKFLOW_CANCELLATION,useExisting:ConsoleRuntimeCommands},
-    {provide:WORKFLOW_TASK_REASSIGNMENT,useFactory:(commands:ConsoleRuntimeCommands)=>({availability:commands.reassignmentAvailability.bind(commands),targets:commands.targets.bind(commands),reassign:commands.reassign.bind(commands)}),deps:[ConsoleRuntimeCommands]},
+    provideWorkflowCancellationHttp(CONSOLE_WORKFLOW_API),
+    provideWorkflowTaskReassignmentHttp(CONSOLE_WORKFLOW_API),
     {provide:ENVIRONMENT_INITIALIZER,multi:true,useValue:()=>inject(ConsoleRuntimeSessionBridge)},
-    {provide:WORKFLOW_ADMINISTRATION_API,useExisting:ConsoleAdministrationApi},
+    provideWorkflowAdministrationHttp(CONSOLE_WORKFLOW_API),
     {provide:WORKFLOW_VIEWER_READS,useExisting:ConsoleViewerReads},
     {provide:WORKFLOW_VIEWER_NAVIGATION,useExisting:ConsoleViewerNavigation},
     provideZoneChangeDetection(),

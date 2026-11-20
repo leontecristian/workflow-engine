@@ -2,7 +2,7 @@
 
 Follow the [frontend style guide](../docs/frontend-style-guide.md) for the agreed Material 3, icon, layout and visual-review conventions. This README describes the library's consumer setup and contracts.
 
-`@workflow-engine/ui` is an Angular 19.2 partial-compiled library. It owns read-only instance metadata, pinned graphs, ordered history, exact events, definition/catalog administration, runtime inspection and optional task/recovery components. It has no application bootstrap, authentication, HTTP providers, routes, translation service or global theme. Angular (including Forms), Router, Material, CDK, RxJS and jsonc-parser are peers.
+`@workflow-engine/ui` is an Angular 19.2 partial-compiled library. It owns read-only instance metadata, pinned graphs, ordered history, exact events, definition/catalog administration, runtime inspection and optional task/recovery components. Hosts control application bootstrap, authentication, HTTP configuration, routes, translation and theme. Angular (including Forms), Router, Material, CDK, RxJS and jsonc-parser are peers.
 
 Icons use direct native `<mat-icon>refresh</mat-icon>` markup and Google Material Symbols names, including page metadata/collection icon inputs. The former `ConsoleIcon` wrapper, semantic aliases and custom SVG registry are removed. The library packages an opt-in local Material Symbols Outlined font stylesheet, selected at weight 400, fill 0, grade 0 and optical size 24; no external runtime font request is needed. Graph visualizations remain separate.
 
@@ -36,6 +36,7 @@ The isolated tests exercise methods/signals with real Angular DI and doubles for
 cd workflow-ui/verification/ngmodule-host
 npm ci
 npm run build
+npm run test:http
 npm start
 ```
 
@@ -58,6 +59,50 @@ Optionally supply `WORKFLOW_VIEWER_NAVIGATION` with `destination(intent): UrlTre
 Exact event downloads use the original `detailsJson` string. Derived routing presentation does not replace retained evidence. Render labels and details as text.
 
 The definition graph/fragment editor is part of the shared administration implementation. The exported pure `layoutGraph` function/layout types and `@workflow-engine/ui/styles/graph.scss` Sass asset remain available.
+
+## Optional workflow-web HTTP adapters
+
+Register the capabilities your host uses. Each provider injects the host's existing Angular `HttpClient`, including its interceptors and backend. Keep the host's current HTTP configuration. The mount includes any context prefix and must match the corresponding [workflow-web endpoint group](../workflow-web/README.md).
+
+For Definitions and Task types at `/api/workflow`, add this provider to your existing application configuration.
+
+```typescript
+import { provideWorkflowAdministrationHttp } from '@workflow-engine/ui/http';
+
+export const workflowAdministrationProviders = [
+  provideWorkflowAdministrationHttp('/api/workflow'),
+];
+```
+
+Spread `workflowAdministrationProviders` into the standalone application's or NgModule's `providers` array. Import `WorkflowDefinitionsComponent` from `@workflow-engine/ui/administration` and mount `<workflow-definitions [sessionScope]="sessionScope" />` with the host's current session scope. The page requests `GET /api/workflow/definitions` with bounded descending pagination. The backend needs `WorkflowAdministrationConfiguration` with that mount and a host administration grant.
+
+For the other groups, select the providers you need.
+
+```typescript
+import {
+  provideWorkflowViewerHttp,
+  provideWorkflowRuntimeReadsHttp,
+  provideWorkflowRuntimeCommandsHttp,
+  provideWorkflowCancellationHttp,
+  provideWorkflowTaskReassignmentHttp,
+} from '@workflow-engine/ui/http';
+
+export const workflowRuntimeProviders = [
+  provideWorkflowViewerHttp('/api/workflow'),
+  provideWorkflowRuntimeReadsHttp('/api/workflow'),
+  provideWorkflowRuntimeCommandsHttp('/api/workflow'),
+  provideWorkflowCancellationHttp('/api/workflow'),
+  provideWorkflowTaskReassignmentHttp('/api/workflow'),
+];
+```
+
+- Viewer reads require `WorkflowViewerConfiguration`. Runtime inspection, My tasks and task administration require `WorkflowRuntimeReadConfiguration`.
+- Task completion, ownership and their receipt lookups require `WorkflowRuntimeCommandConfiguration` and the host's supported operation policies. Cancellation and reassignment also use runtime reads for availability and target lookup. With separate mounts, pass the read mount first and the command mount second to either provider.
+- For read-only runtime pages, register only the viewer and runtime read providers. Register command providers at application scope when using the root-scoped `CommandRecovery`. The server authorizes every request independently.
+
+Custom providers can coexist with these bindings. Register one implementation per token. In your provider factory, use `createWorkflowViewerHttp(inject(HttpClient), basePath)` to build the standard viewer methods and replace the history methods with business-history reads. Use `createWorkflowRuntimeCommandsHttp(inject(HttpClient), basePath)` to supply standard task commands alongside a host-defined `start` adapter.
+
+The host owns authentication, CSRF, credentials, routing, navigation and session lifetime. Give the pages a new opaque scope for each session, including same-user sign-in, and use null on logout. If the host handles a 401 by invalidating the session, associate the request with its original scope so a late response cannot clear a replacement session. Business starts, business-history policy, task editors and diagnostics stay with the host. The adapters preserve exact command input, support abortable requests and leave uncertain mutations available for inspection or explicit recovery.
 
 ## Administration components
 

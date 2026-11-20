@@ -1,11 +1,12 @@
 import "@angular/compiler";
-import {CommandBuffer,freezeEnvelope} from '@workflow-engine/ui';
+import {CommandBuffer,freezeEnvelope,WORKFLOW_RUNTIME_COMMANDS} from '@workflow-engine/ui';
+import {provideWorkflowRuntimeCommandsHttp} from '@workflow-engine/ui/http';
+import {consoleWorkflowProviders,services} from './component-loader.mjs';
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   exactDecimal,
   rawDocument,
-  commandRequest,
 } from "../src/app/command-buffer.ts";
 const command = {
   kind: "complete",
@@ -67,16 +68,39 @@ test("pasted commands cannot introduce arbitrary fields or endpoints", () => {
   );
   assert.throws(() => freezeEnvelope({ ...command, expectedToken: 1 }));
 });
-test("lost response retry and replay-only recovery keep original UUID, input and token", () => {
+function runtimeCommands(t, respond) {
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (path, options) => {
+    calls.push({path, body: JSON.parse(options.body), token: new Headers(options.headers).get('X-Task-Precondition')});
+    return new Response(JSON.stringify(respond(calls.length, path)));
+  });
+  const commands = services(t, [
+    ...consoleWorkflowProviders(), provideWorkflowRuntimeCommandsHttp('/console/api'),
+  ]).get(WORKFLOW_RUNTIME_COMMANDS);
+  return { calls, commands };
+}
+
+const taskResult = {replayed:false,status:'ACTIVE',taskStatus:'OPEN'};
+
+test("lost response retry and replay-only recovery keep original UUID, input and token", async t => {
   const original = freezeEnvelope(command);
-  const first = commandRequest(original, false);
-  const afterTransportFailure = commandRequest(original, false);
-  const replay = commandRequest(original, true);
+  const signal = new AbortController().signal;
+  const { calls, commands } = runtimeCommands(t, (count, path) => {
+    if (count === 1) throw new Error('Connection lost');
+    return path.endsWith('/replay') ? {found:true,result:taskResult} : taskResult;
+  });
+  await assert.rejects(commands.complete(original, signal), /outcome unknown/);
+  assert.equal(calls.length, 1);
+  await commands.complete(original, signal);
+  await commands.replayComplete(original, signal);
+  const [first, afterTransportFailure, replay] = calls;
   assert.deepEqual(first, afterTransportFailure);
-  assert.equal(replay.path, "/commands/complete/replay");
+  assert.equal(first.path, '/console/api/tasks/9223372036854775807/complete');
+  assert.equal(replay.path, "/console/api/commands/complete/replay");
   assert.equal(replay.token, first.token);
   assert.equal(replay.body.commandId, first.body.commandId);
   assert.equal(replay.body.comment, "original");
+  assert.equal(replay.body.taskId, original.body.taskId);
 });
 test("new actions retain earlier commands and conflicting pasted UUIDs cannot overwrite them", () => {
   const b = new CommandBuffer();
@@ -105,14 +129,19 @@ test("new actions retain earlier commands and conflicting pasted UUIDs cannot ov
   assert.equal(b.entries.length, 0);
 });
 
-test('ownership envelopes preserve exact inputs and map mutation and replay routes', () => {
+test('ownership envelopes preserve exact inputs and map mutation and replay routes', async t => {
+ const { calls, commands } = runtimeCommands(t, (_count,path)=>path.endsWith('/replay')?{found:false,result:null}:taskResult);
+ const signal = new AbortController().signal;
  for(const kind of ['claim','release','admin-release']) {
   const body={commandId:command.body.commandId,taskId:'3',...(kind==='admin-release'?{reason:'  exact reason  '}: {})};
   const envelope=freezeEnvelope({kind,body,expectedToken:'8'});
-  assert.equal(commandRequest(envelope,false).path,`/tasks/3/${kind}`);
-  assert.deepEqual(commandRequest(envelope,false).body,kind==='admin-release'?{commandId:body.commandId,reason:body.reason}:{commandId:body.commandId});
-  assert.deepEqual(commandRequest(envelope,true).body,body);
-  assert.equal(commandRequest(envelope,true).path,`/commands/${kind}/replay`);
+  await commands.ownership(envelope,false,signal);
+  await commands.ownership(envelope,true,signal);
+  const [mutation,replay]=calls.splice(0);
+  assert.equal(mutation.path,`/console/api/tasks/3/${kind}`);
+  assert.deepEqual(mutation.body,kind==='admin-release'?{commandId:body.commandId,reason:body.reason}:{commandId:body.commandId});
+  assert.deepEqual(replay.body,body);
+  assert.equal(replay.path,`/console/api/commands/${kind}/replay`);
  }
  assert.throws(()=>freezeEnvelope({kind:'admin-release',body:{commandId:command.body.commandId,taskId:'2',reason:' '},expectedToken:'0'}));
 });

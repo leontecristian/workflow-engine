@@ -7,13 +7,14 @@ import { HttpBackend, HttpClient, HttpErrorResponse, HttpEvent, HttpRequest, Htt
 import { Observable, firstValueFrom, fromEvent, takeUntil } from 'rxjs';
 import { WorkflowInstanceViewerComponent, WorkflowHistoryComponent, WorkflowHistoryEventComponent, WORKFLOW_VIEWER_READS, WORKFLOW_VIEWER_NAVIGATION, DEFAULT_VIEWER_MESSAGES, normalizeViewerReadError } from '@workflow-engine/ui';
 import type {WorkflowViewerReads, WorkflowViewerNavigation, ViewerDestination, InstanceView, HistoryPage, HistoryEvent, InstanceGraph} from '@workflow-engine/ui';
-import { WORKFLOW_ADMINISTRATION_API } from '@workflow-engine/ui';
 import { WORKFLOW_RUNTIME_READS, WORKFLOW_RUNTIME_COMMANDS, WORKFLOW_CANCELLATION, WORKFLOW_TASK_REASSIGNMENT, CommandRecovery } from '@workflow-engine/ui';
 import type { WorkflowCancellation, CancellationResult, WorkflowReassignmentTargetPage } from '@workflow-engine/ui';
 import type { WorkflowRuntimeReads, WorkflowRuntimeCommands, TaskView, TaskContract, Envelope, ActivityView, TaskCommandResult, TaskCommandReplay, PreviousDecisionPage } from '@workflow-engine/ui';
 import { WorkflowTaskAdministrationComponent, WorkflowTaskComponent, WorkflowCommandsComponent } from '@workflow-engine/ui/runtime';
 import { WorkflowDefinitionsComponent } from '@workflow-engine/ui/administration';
-import type { WorkflowAdministrationApi, AdministrationPage, DefinitionView } from '@workflow-engine/ui';
+import { provideWorkflowAdministrationHttp } from '@workflow-engine/ui/http';
+const administrationMount = '/host-context/workflow-administration';
+const administrationHttpEvidence = new URLSearchParams(location.search).has('administrationHttpEvidence');
 const id='9007199254740993';
 const instance:InstanceView={id,definitionVersionId:'7',definitionKey:'alternate-consumer',definitionVersion:1,definitionHash:'hash',status:'ACTIVE',currentNodeKey:'REVIEW',resultKey:null,businessType:null,businessId:null,startedAt:'2026-11-07T00:00:00Z',startedBy:'fixture',endedAt:null,endedBy:null,terminationReason:null,lastHistorySequence:'4',lockVersion:'9007199254740993'};
 const graph={instance,nodes:[{key:'BEGIN',name:'Start',type:'START',state:'COMPLETED',activityId:null,taskId:null},{key:'REVIEW',name:'Review <script>as text</script>',type:'HUMAN_TASK',state:'ACTIVE',activityId:'20',taskId:'30'},{key:'DONE',name:'End',type:'END',state:'PENDING',activityId:null,taskId:null}],edges:[{key:'enter',from:'BEGIN',to:'REVIEW',outcome:null,traversed:true},{key:'end',from:'REVIEW',to:'DONE',outcome:'APPROVE',traversed:false}]};
@@ -63,7 +64,7 @@ const evidenceEvents: HistoryEvent[] = [
       const timer=setTimeout(()=>{
         if(mode==='denied' || mode==='failed'){observer.error(new HttpErrorResponse({status:mode==='denied'?404:500}));return;}
         let body:unknown=instance;
-        if(request.url==='/host-administration/definitions')body={items:[{id,key:'alternate-definition',name:'Host administration definition',description:null,createdAt:instance.startedAt,createdBy:'fixture',lockVersion:'9007199254740993'}],nextAfterId:null};
+        if(request.method==='GET' && new URL(request.urlWithParams,location.origin).pathname===administrationMount+'/definitions')body={items:[{id,key:'alternate-definition',name:'Host administration definition',description:null,createdAt:instance.startedAt,createdBy:'fixture',lockVersion:'9007199254740993'}],nextAfterId:null};
         else if(request.url==='/host-task/30')body=fixtureTask;
         else if(request.url==='/host-task/30/contract')body=fixtureContract();
         else if(request.url==='/host-task/30/submission')body=fixtureSubmission;
@@ -80,7 +81,7 @@ const evidenceEvents: HistoryEvent[] = [
           ? evidenceEvents.find(event=>request.url.endsWith('/'+event.summary.historySequence))
           : {summary,detailsJson:'{"n":9007199254740993,"d":12500.00,"nil":null}'};
         else if(request.url.endsWith('/history'))body={items:namedOutputEvidence ? evidenceEvents.map(event=>event.summary) : [summary],nextAfterSequence:null};
-        observer.next(new HttpResponse({status:200,body}));observer.complete();
+        observer.next(new HttpResponse({status:200,body:request.responseType==='text'?JSON.stringify(body):body}));observer.complete();
       },mode==='delayed'?1500:50);
       return ()=>clearTimeout(timer);
     });
@@ -102,18 +103,6 @@ const evidenceEvents: HistoryEvent[] = [
   destination(intent:ViewerDestination){return this.router.createUrlTree(['/alternate',intent.kind,'id' in intent?intent.id:'instanceId' in intent?intent.instanceId:'recovery']);}
 }
 @Component({selector:'fixture-destination',standalone:false,template:'<p>Alternate host destination</p>'}) class Destination {}
-/** This existing consumer mounts the definition list; other administration operations fail explicitly. */
-function administrationFixture(): WorkflowAdministrationApi {
-  const http=inject(HttpClient);
-  const unused=():never=>{throw new Error('Operation outside the consumer fixture');};
-  return {
-    listDefinitions:(_cursor,_limit,signal)=>firstValueFrom(http.get<AdministrationPage<DefinitionView>>('/host-administration/definitions').pipe(takeUntil(fromEvent(signal,'abort')))),
-    listTaskTypes:unused,createTaskType:unused,updateTaskType:unused,definition:unused,
-    saveMetadata:unused,listVersions:unused,version:unused,lookupVersion:unused,
-    importDraft:unused,saveDocument:unused,checkVersion:unused,retireVersion:unused,createDraftFromVersion:unused,deleteDraft:unused,exportVersion:unused,
-  };
-}
-
 function reassignmentFixture(){
  if(!reassignmentEvidence)return null;
  let committed:TaskCommandResult|null=null;
@@ -204,7 +193,11 @@ function administrationRow(taskId:string,instanceId:string,name:string,status:st
 class ReadOnlyTask {scope={};}
 
 @Component({selector:'fixture-root',standalone:false,template:`
-  @if(taskLayoutEvidence){<div class="layout-evidence">
+  @if(administrationHttpEvidence){
+    <h1>NgModule administration HTTP consumer</h1>
+    <p>Host interceptor reads: {{state.intercepted}}</p>
+    <workflow-definitions [sessionScope]="scope" [messages]="administrationMessages"/>
+  }@else if(taskLayoutEvidence){<div class="layout-evidence">
    <h1>F026 revision 2 layout verification</h1>
    <nav class="fixture-controls" aria-label="Fixture views"><button (click)="layoutView='tasks'">Task administration view</button><button (click)="layoutView='definitions'">Definitions reference view</button><button (click)="layoutView='task'">Reassignment dialog view</button></nav>
    <nav class="fixture-controls" aria-label="Fixture response modes"><button (click)="mode('success')">Normal responses</button><button (click)="mode('delayed')">Delayed responses</button><button (click)="mode('layout-empty')">Empty page with continuation</button></nav>
@@ -222,20 +215,32 @@ class ReadOnlyTask {scope={};}
   <p>Custom host command calls: {{state.commands}}</p><workflow-task id="30" [sessionScope]="scope" [messages]="runtimeMessages"/><workflow-commands [sessionScope]="scope" [messages]="runtimeMessages"/><fixture-read-only-task/>}<router-outlet/>
 `}) class App {
   state=inject(FixtureState); id=id; scope:object|null={};messages=DEFAULT_VIEWER_MESSAGES;
+  administrationHttpEvidence=administrationHttpEvidence;
   namedOutputEvidence=namedOutputEvidence;reassignmentEvidence=reassignmentEvidence;taskLayoutEvidence=taskLayoutEvidence;layoutView='tasks';
   administrationMessages={definitionsTitle:'Host workflow library'};runtimeMessages={taskTitle:'Host assigned review',commandsTitle:'Host command evidence'};
+  constructor(){
+    if (administrationHttpEvidence && (
+      inject(WORKFLOW_VIEWER_READS) !== inject(Reads)
+      || inject(WORKFLOW_RUNTIME_COMMANDS, {optional:true}) !== null
+      || inject(WORKFLOW_CANCELLATION, {optional:true}) !== null
+      || inject(WORKFLOW_TASK_REASSIGNMENT, {optional:true}) !== null
+    )) throw new Error('Administration fixture requires host viewer and no command providers');
+  }
   locale(){this.messages={...DEFAULT_VIEWER_MESSAGES,refresh:'Actualiser',current:'Étape actuelle',graph:'Graphe du workflow'};}
   mode(value:string){this.state.mode=value;this.scope={};}
 }
 @NgModule({declarations:[App,Destination,ReadOnlyTask],imports:[BrowserModule,RouterLink,RouterOutlet,WorkflowInstanceViewerComponent,WorkflowHistoryComponent,WorkflowHistoryEventComponent,WorkflowDefinitionsComponent,WorkflowTaskAdministrationComponent,WorkflowTaskComponent,WorkflowCommandsComponent],
-  providers:[FixtureState,Reads,RuntimeReads,RuntimeCommands,Navigation,
-    {provide:WORKFLOW_CANCELLATION,useFactory:cancellationFixture},
-    {provide:WORKFLOW_TASK_REASSIGNMENT,useFactory:reassignmentFixture},
+  providers:[FixtureState,Reads,Navigation,
+    ...(administrationHttpEvidence ? [] : [
+      RuntimeReads,RuntimeCommands,
+      {provide:WORKFLOW_CANCELLATION,useFactory:cancellationFixture},
+      {provide:WORKFLOW_TASK_REASSIGNMENT,useFactory:reassignmentFixture},
+      {provide:WORKFLOW_RUNTIME_READS,useExisting:RuntimeReads},{provide:WORKFLOW_RUNTIME_COMMANDS,useExisting:RuntimeCommands},
+    ]),
     {provide:ENVIRONMENT_INITIALIZER,multi:true,useValue:()=>inject(MatIconRegistry).setDefaultFontSetClass('material-symbols-outlined','mat-ligature-font')},
     provideRouter([{path:'alternate/:kind/:id',component:Destination}]),
     provideHttpClient(withInterceptors([(request,next)=>next(request.clone({setHeaders:{'X-Consumer':'NgModule'}}))])),
-    {provide:WORKFLOW_ADMINISTRATION_API,useFactory:administrationFixture},
-    {provide:WORKFLOW_RUNTIME_READS,useExisting:RuntimeReads},{provide:WORKFLOW_RUNTIME_COMMANDS,useExisting:RuntimeCommands},
+    provideWorkflowAdministrationHttp(administrationMount+'/'),
     {provide:HttpBackend,useClass:FixtureBackend},{provide:WORKFLOW_VIEWER_READS,useExisting:Reads},{provide:WORKFLOW_VIEWER_NAVIGATION,useExisting:Navigation}],bootstrap:[App]})
 class AppModule {}
 platformBrowser().bootstrapModule(AppModule).catch(console.error);

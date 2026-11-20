@@ -7,10 +7,12 @@ import {
   CommandRecovery,
   loadTs,
   core,
+  consoleWorkflowProviders,
+  workflowVersionSummary,
 } from "../../../unit/component-loader.mjs";
-const {ConsoleRuntimeReads}=loadTs(new URL("./runtime-read-adapters.ts",import.meta.url));
-const {ConsoleRuntimeCommands,ConsoleRuntimeSessionBridge}=loadTs(new URL('./runtime-command-adapters.ts',import.meta.url));
-const {ConsoleAdministrationApi}=loadTs(new URL('./administration-adapters.ts',import.meta.url));
+import { WORKFLOW_ADMINISTRATION_API, WORKFLOW_RUNTIME_COMMANDS, WORKFLOW_RUNTIME_READS } from '@workflow-engine/ui';
+import { provideWorkflowAdministrationHttp, provideWorkflowRuntimeReadsHttp } from '@workflow-engine/ui/http';
+const {consoleRuntimeCommands,ConsoleRuntimeSessionBridge}=loadTs(new URL('./runtime-command-adapters.ts',import.meta.url));
 const identity = {
   actorRef: "admin",
   roles: ["CONSOLE_ADMIN"],
@@ -36,15 +38,15 @@ test("JSON start transport and variable inspection retain exact numeric text", a
   t.mock.method(globalThis,"fetch",async(url,options)=>{
     calls.push({url,options}); return {ok:true,text:async()=>url.includes("/variables?") ? exact : '{}'};
   });
-  const injector=services(t,[ConsoleRuntimeReads,ConsoleRuntimeCommands]); injector.get(ConsoleSession).session.set(identity); injector.get(ConsoleSession).viewerScope.set({});
-  const api=injector.get(ConsoleApi);
+  const injector=services(t,[...consoleWorkflowProviders(), provideWorkflowRuntimeReadsHttp('/console/api'), {provide:WORKFLOW_RUNTIME_COMMANDS,useFactory:consoleRuntimeCommands}]); injector.get(ConsoleSession).session.set(identity); injector.get(ConsoleSession).viewerScope.set({});
+
   const inputs='{"booking":{"amount":9007199254740993.00,"exponent":1E+2}}';
   const envelope={kind:'start',body:{commandId:'12345678-1234-1234-1234-123456789abc',definitionVersionId:'42',requestId:'1',expectedRequestVersion:'0',inputs},expectedToken:null};
-  const commands=injector.get(ConsoleRuntimeCommands),signal=new AbortController().signal;
+  const commands=injector.get(WORKFLOW_RUNTIME_COMMANDS),signal=new AbortController().signal;
   await commands.start.execute(envelope,signal); await commands.start.replay(envelope,signal);
   assert.ok(calls[0].options.body.includes(inputs)); assert.equal(calls[0].options.body,calls[1].options.body);
   assert.equal(calls[0].options.headers['X-CSRF-TOKEN'],'server-token');
-  const page=await injector.get(ConsoleRuntimeReads).variables('1',undefined,undefined,signal); assert.equal(page.exactJson,exact);
+  const page=await injector.get(WORKFLOW_RUNTIME_READS).variables('1',undefined,undefined,signal); assert.equal(page.exactJson,exact);
 });
 test("typed API keeps document text and exact expected token while adding CSRF", async (t) => {
   const calls = [];
@@ -52,13 +54,13 @@ test("typed API keeps document text and exact expected token while adding CSRF",
     calls.push({ url, options });
     return {
       ok: true,
-      text: async () => '{"after":{"id":"9007199254740993"}}',
+      text: async () => JSON.stringify({ changed: true, after: workflowVersionSummary("9007199254740993", "2") }),
     };
   });
-  const injector = services(t, [ConsoleAdministrationApi]),
+  const injector = services(t, [...consoleWorkflowProviders(), provideWorkflowAdministrationHttp('/console/api')]),
     session = injector.get(ConsoleSession);
   session.session.set(identity);
-  const api = injector.get(ConsoleAdministrationApi);
+  const api = injector.get(WORKFLOW_ADMINISTRATION_API);
   const raw = ' {"a":1,"a":900719925474099312345} ';
   const result = await api.saveDocument(
     "9007199254740993",
@@ -73,7 +75,6 @@ test("typed API keeps document text and exact expected token while adding CSRF",
     "9007199254740999",
   );
   assert.equal(calls[0].options.headers["X-CSRF-TOKEN"], "server-token");
-  assert.equal(calls[0].options.credentials, "same-origin");
   assert.equal(result.after.id, "9007199254740993");
 });
 test("query methods use explicit bounded cursors and encode identity segments", async (t) => {
@@ -82,12 +83,12 @@ test("query methods use explicit bounded cursors and encode identity segments", 
     calls.push(url);
     return { ok: true, text: async () => '{"items":[],"nextAfterId":null}' };
   });
-  const injector = services(t, [ConsoleAdministrationApi,ConsoleRuntimeReads]);
+  const injector = services(t, [...consoleWorkflowProviders(), provideWorkflowAdministrationHttp('/console/api'), provideWorkflowRuntimeReadsHttp('/console/api')]);
   injector.get(ConsoleSession).session.set(identity);
   const api = injector.get(ConsoleApi);
   await api.history("9007199254740993", "9007199254740995", 10);
-  await injector.get(ConsoleRuntimeReads).submissions("2", "9223372036854775807", 1,new AbortController().signal);
-  await injector.get(ConsoleAdministrationApi).lookupVersion("key with/&", "3", new AbortController().signal);
+  await injector.get(WORKFLOW_RUNTIME_READS).submissions("2", "9223372036854775807", 1,new AbortController().signal);
+  await injector.get(WORKFLOW_ADMINISTRATION_API).lookupVersion("key with/&", "3", new AbortController().signal);
   await api.outboxEvent("15:4");
   await api.instanceGraph("9007199254740993");
   assert.match(calls[0], /afterSequence=9007199254740995/);
@@ -114,7 +115,7 @@ test("concurrent initialization shares one session request and 401 clears privat
   core.runInInjectionContext(injector,()=>new ConsoleRuntimeSessionBridge());
   await Promise.all([session.initialize(), session.initialize()]);
   assert.equal(sessionReads, 1);
-  commands.buffer.remember({kind:'complete',body:{commandId:'12345678-1234-1234-1234-123456789abc',instanceId:'1',taskId:'2',outcomeKey:'COMPLETE',comment:null},expectedToken:'1'});
+  commands.buffer.remember({kind:'complete',body:{commandId:'12345678-1234-1234-1234-123456789abc',taskId:'2',outcomeKey:'COMPLETE',comment:null},expectedToken:'1'});
   assert.equal(commands.buffer.entries.length,1);
   t.mock.method(globalThis, "fetch", async () => ({
     ok: false,

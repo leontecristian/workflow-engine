@@ -1,4 +1,4 @@
-import { exactDecimal, freezeResultJson, parseExactJson } from '@workflow-engine/ui';
+import { exactDecimal, parseExactJson } from '@workflow-engine/ui';
 import type { Envelope, CommandBody } from '@workflow-engine/ui';
 export type { Envelope, CommandBody } from '@workflow-engine/ui';
 export { exactDecimal, rawDocument, prettyDocument } from '@workflow-engine/ui';
@@ -23,24 +23,9 @@ export function freezeInputs(value:unknown):ScalarInputs {
  return value;
 }
 export function parseScalarInputs(text:string):ScalarInputs{return freezeInputs(text);}
-export function commandRequest(envelope:Envelope,replay:boolean):{path:string;body:Readonly<Record<string,unknown>>|string;token:string|null} {
- if(envelope.kind==='start')return {path:replay?'/commands/start/replay':'/instances/start',body:startRequest(envelope.body),token:null};
- if(envelope.kind==='cancel'){
-  const {instanceId,...body}=envelope.body;
-  return {path:replay?'/commands/cancel/replay':`/instances/${instanceId}/cancel`,body:replay?envelope.body:body,token:envelope.expectedToken};
- }
- const {taskId,...body}=envelope.body;
- const path=replay?`/commands/${envelope.kind}/replay`:`/tasks/${taskId}/${envelope.kind}`;
- const requestBody=replay?envelope.body:body;
- if(envelope.kind==='reassign') {
-  const {assignmentKind,assignmentRef,...fields}=requestBody;
-  return {path,body:{...fields,assignment:{kind:assignmentKind,ref:assignmentRef}},token:envelope.expectedToken};
- }
- if(envelope.kind==='complete'&&Object.hasOwn(requestBody,'resultJson')) {
-  const {resultJson,...fields}=requestBody;
-  return {path,body:JSON.stringify(fields).slice(0,-1)+',"result":'+freezeResultJson(resultJson)+'}',token:envelope.expectedToken};
- }
- return {path,body:requestBody,token:envelope.expectedToken};
+export function commandRequest(envelope:Envelope,replay:boolean):{path:string;body:string} {
+ if(envelope.kind!=='start')throw new Error('Expected a sandbox start command');
+ return {path:replay?'/commands/start/replay':'/instances/start',body:startRequest(envelope.body)};
 }
 function startRequest(body:CommandBody):string {
  const {inputs,...fields}=body;

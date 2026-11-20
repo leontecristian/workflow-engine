@@ -33,6 +33,7 @@ export class ConsoleSession {
     raw = false,
   ): Promise<T> {
     if (!this.session() && path !== "/session") await this.initialize();
+    const scope = this.viewerScope();
     const headers: Record<string, string> = {};
     if (method !== "GET") {
       headers[this.session()?.csrfHeaderName || "X-CSRF-TOKEN"] =
@@ -69,7 +70,7 @@ export class ConsoleSession {
       );
     }
     if (!response.ok) {
-      if (response.status === 401) this.clear();
+      if (response.status === 401 && this.viewerScope() === scope) this.clear();
       const v = value as {
         code?: string;
         diagnostics?: unknown[];
@@ -86,8 +87,9 @@ export class ConsoleSession {
     return value;
   }
   async viewerRead<T>(path: string, signal: AbortSignal): Promise<T> {
+    const scope = this.viewerScope();
     const response = await fetch('/console/api'+path, {credentials:'same-origin',signal});
-    if(response.status === 401) this.clear();
+    if(response.status === 401 && this.viewerScope() === scope) this.clear();
     let value: unknown;
     try { value = await response.json(); } catch { throw new Error('Invalid read response'); }
     if(!response.ok) {
@@ -97,75 +99,38 @@ export class ConsoleSession {
     if(value === null || typeof value !== 'object') throw new Error('Invalid read response');
     return value as T;
   }
-  /** Administration transport retains HTTP diagnostics without runtime-command retry advice. */
-  async administrationCall<T>(
-    path: string, signal: AbortSignal, method = "GET", body?: unknown,
-    token?: string | null, raw = false, textResponse = false,
-  ): Promise<T> {
-    const scope = this.viewerScope();
-    const session = this.session();
-    const headers: Record<string, string> = {};
-    if (method !== "GET") {
-      headers[session?.csrfHeaderName || "X-CSRF-TOKEN"] = session?.csrfToken || "";
-      if (body !== undefined) headers["Content-Type"] = "application/json";
-    }
-    if (token !== undefined && token !== null) headers["X-Expected-Lock-Version"] = token;
-    let response: Response;
-    let text: string;
+  /** Sandbox business start and receipt lookup share the original frozen body. */
+  async startCommand<T>(path: string, body: string, signal: AbortSignal): Promise<T> {
+    const scope = this.viewerScope(), session = this.session();
+    if (!scope || !session) throw new Error('No current session');
+    const headers = {'Content-Type':'application/json', [session.csrfHeaderName]:session.csrfToken};
+    let response: Response, text: string;
     try {
-      response = await fetch("/console/api" + path, {
-        method, signal, credentials: "same-origin", headers,
-        body: body === undefined ? undefined : raw ? body as string : JSON.stringify(body),
-      });
+      response = await fetch('/console/api' + path, {method:'POST', credentials:'same-origin', headers, signal, body});
       text = await response.text();
-    } catch (error) {
-      if (signal.aborted) throw error;
-      throw new Error(method === "GET" ? "Read failed. Refresh to try again."
-        : "Write outcome unknown. Keep your text and inspect stored state before another write.");
+    } catch {
+      throw new Error('Transport outcome unknown. Keep the original command and use Find result or Retry.');
     }
     if (response.status === 401 && this.viewerScope() === scope) this.clear();
     let value: unknown;
-    try { value = response.ok && textResponse ? text : text ? JSON.parse(text) : null; }
-    catch {
-      throw new Error(method === "GET" ? "Invalid read response."
-        : "Write response unavailable. Inspect stored state before another write.");
+    try {
+      value = JSON.parse(text);
+    } catch {
+      if (response.ok) throw new Error('Response unavailable. Command outcome may be unknown; use Find result.');
     }
     if (!response.ok) {
-      const failure = value as { code?: string; diagnostics?: unknown[]; correlationId?: string } | null;
-      throw Object.assign(new Error(`${response.status} ${failure?.code || "REQUEST_FAILED"} ${JSON.stringify(failure?.diagnostics || [])} [${failure?.correlationId || ""}]`), {
-        httpStatus: response.status, code: failure?.code,
-        diagnostics: failure?.diagnostics || [], correlationId: failure?.correlationId,
-      });
-    }
-    return value as T;
-  }
-  /** Runtime commands preserve exact frozen text and classify uncertain transport outcomes. */
-  async runtimeCommand<T>(path:string,body:unknown,token:string|null,raw:boolean,signal:AbortSignal,taskCommand=false):Promise<T> {
-    const scope=this.viewerScope(),session=this.session();
-    if(!scope||!session)throw new Error('No current session');
-    const headers:Record<string,string>={'Content-Type':'application/json',[session.csrfHeaderName]:session.csrfToken};
-    if(token!==null)headers[taskCommand?'X-Task-Precondition':'X-Expected-Lock-Version']=token;
-    let response:Response,text:string;
-    try {
-      response=await fetch('/console/api'+path,{method:'POST',credentials:'same-origin',headers,signal,body:raw?body as string:JSON.stringify(body)});
-      text=await response.text();
-    } catch {throw new Error('Transport outcome unknown. Keep the original command and use Find result or Retry.');}
-    if(response.status===401&&this.viewerScope()===scope)this.clear();
-    let value:unknown;
-    try {value=text?JSON.parse(text):null;}catch {throw new Error('Response unavailable. Command outcome may be unknown; use Find result.');}
-    if(!response.ok){
-      const v=value as {code?:string;message?:string;fieldErrors?:{path:string;message:string}[];diagnostics?:{path?:string;message?:string}[];correlationId?:string}|null;
-      const diagnostic=v?.diagnostics?.[0];
-      const resultFailure=v?.code?.startsWith('RESULT_');
-      const description=diagnostic?.message||v?.message;
-      const fieldErrors=v?.fieldErrors??v?.diagnostics?.flatMap(item=>
-        typeof item.path==='string'&&item.message?[{path:item.path,message:item.message}]:[]);
-      const taskMessage=v?.message&&v.message!==v.code?v.message
-        : resultFailure?'Check the result and try again.':'The task action could not be completed.';
-      const message=taskCommand ? taskMessage : resultFailure&&description
-        ? (diagnostic?.path?diagnostic.path+' — ':'')+description
-        : `${response.status} ${v?.code||'REQUEST_FAILED'} ${JSON.stringify(v?.diagnostics||[])} [${v?.correlationId||''}]`;
-      throw Object.assign(new Error(message),{httpStatus:response.status,code:v?.code,fieldErrors});
+      const failure = value as {
+        code?: string; message?: string; diagnostics?: { path?: string; message?: string }[];
+        fieldErrors?: { path: string; message: string }[]; correlationId?: string;
+      } | undefined;
+      const diagnostic = failure?.diagnostics?.[0];
+      const description = diagnostic?.message || failure?.message;
+      const message = failure?.code?.startsWith('RESULT_') && description
+        ? (diagnostic?.path ? diagnostic.path + ' — ' : '') + description
+        : `${response.status} ${failure?.code || 'REQUEST_FAILED'} ${JSON.stringify(failure?.diagnostics || [])} [${failure?.correlationId || ''}]`;
+      const fieldErrors = failure?.fieldErrors ?? failure?.diagnostics?.flatMap(item =>
+        typeof item.path === 'string' && item.message ? [{path:item.path, message:item.message}] : []);
+      throw Object.assign(new Error(message), {httpStatus:response.status, code:failure?.code, fieldErrors});
     }
     return value as T;
   }
