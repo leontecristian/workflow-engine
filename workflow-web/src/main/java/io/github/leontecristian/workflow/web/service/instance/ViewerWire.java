@@ -28,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.ToLongFunction;
 
 /** Private HTTP/evidence codec; never replaces the application's or core's ObjectMapper. */
@@ -132,24 +133,30 @@ public class ViewerWire {
 
     public <T> Map<String, Object> page(
             List<T> rows, Long sourceNext, String cursorName, ToLongFunction<T> cursor) {
+        return page(rows, sourceNext, cursorName, cursor::applyAsLong, Function.identity());
+    }
+
+    public <T, C> Map<String, Object> page(List<T> rows, C sourceNext, String cursorName,
+            Function<T, C> cursor, Function<C, ?> encodeCursor) {
         List<T> items = new ArrayList<>();
-        Long next = sourceNext;
+        Object next = sourceNext == null ? null : encodeCursor.apply(sourceNext);
+        Object previous = null;
         for (int i = 0; i < rows.size(); i++) {
             T item = rows.get(i);
             items.add(item);
-            Long candidateNext =
-                    i + 1 < rows.size() ? Long.valueOf(cursor.applyAsLong(item)) : sourceNext;
+            Object candidateNext = i + 1 < rows.size() ? encodeCursor.apply(cursor.apply(item)) : next;
             if (!fits(json(pageMap(items, candidateNext, cursorName)), 1024 * 1024)) {
                 items.remove(items.size() - 1);
                 if (items.isEmpty()) throw new WorkflowViewerException(422, "LIMIT_EXCEEDED");
-                next = cursor.applyAsLong(items.get(items.size() - 1));
+                next = previous;
                 break;
             }
+            previous = candidateNext;
         }
         return pageMap(items, next, cursorName);
     }
 
-    private Map<String, Object> pageMap(List<?> items, Long next, String name) {
+    private Map<String, Object> pageMap(List<?> items, Object next, String name) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("items", items);
         result.put(name, next);

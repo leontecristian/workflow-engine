@@ -67,8 +67,8 @@ export function createWorkflowRuntimeReadsHttp(transport: WorkflowHttpTransport,
     administrationTasks: (filters, cursor, limit, signal) =>
       runtimeRead(transport.json(workflowUrl(basePath, '/tasks/administration', { ...filters, cursor, limit }), { signal })),
 
-    assignedTasks: (cursor, limit, signal) =>
-      runtimeRead(transport.json(workflowUrl(basePath, '/tasks/mine', { cursor, limit }), { signal })),
+    assignedTasks: (filters, cursor, limit, signal) =>
+      runtimeRead(transport.json(workflowUrl(basePath, '/tasks/mine', { ...filters, cursor, limit }), { signal })),
 
     instanceTasks: (id, cursor, limit, signal) =>
       runtimeRead(transport.json(workflowUrl(basePath, `${instance(id)}/tasks`, { cursor, limit }), { signal })),

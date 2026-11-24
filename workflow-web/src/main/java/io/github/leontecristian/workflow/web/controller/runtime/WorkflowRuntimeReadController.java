@@ -20,6 +20,8 @@ import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceQuery;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceSummary;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowPersonalTaskCursor;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowPersonalTaskQuery;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationQuery;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
@@ -154,19 +156,39 @@ public class WorkflowRuntimeReadController {
         return taskPage(items, page.nextAfterId(), "instance", actorRef, instanceId);
     }
     @GetMapping("/tasks/mine")
-    public ResponseEntity<String> mine(HttpServletRequest r) {
-        query(r, "cursor", "limit");
+    public ResponseEntity<String> mine(HttpServletRequest request) {
         String actorRef = requireActor(identity);
-        long afterId = tokens.taskPageAfter("mine", r.getParameter("cursor"), actorRef, 0);
-        var page = access.listMyTasks(actorRef, afterId, limit(r.getParameter("limit")));
+        var filters = taskFilters(request);
+        String criteria = wire.json(filters);
+        var after = tokens.personalTaskPageAfter(request.getParameter("cursor"), actorRef, criteria);
+        var page = access.listMyTasks(actorRef, new WorkflowPersonalTaskQuery(filters.status(), filters.taskType(),
+                filters.assignmentKind(), filters.assignmentRef(), filters.assigneeRef(), filters.instanceId(),
+                after, limit(request.getParameter("limit")), filters.taskName()));
         var projection = projection(actorRef);
-        var items = page.items().stream().map(task -> projection.task(task, true)).toList();
-        return taskPage(items, page.nextAfterId(), "mine", actorRef, 0);
+        var items = page.items().stream().map(projection::personalTask).toList();
+        return wire.response(wire.page(items, page.next(), "nextCursor",
+                row -> new WorkflowPersonalTaskCursor((Instant) row.get("createdAt"), (Long) row.get("id")),
+                cursor -> tokens.personalTaskPageCursor(actorRef, criteria, cursor)));
     }
     @GetMapping("/tasks/administration")
     public ResponseEntity<String> administrationTasks(HttpServletRequest request) {
         String actorRef = requireActor(identity);
         access.requireTaskAdministrationAccess(actorRef);
+        var filters = taskFilters(request);
+        long scopeId = filters.instanceId() == null ? 0 : filters.instanceId();
+        long afterId = tokens.taskPageAfter("administration", request.getParameter("cursor"), actorRef, scopeId);
+        var page = access.listAdministrationTasks(actorRef, new WorkflowTaskAdministrationQuery(filters.status(),
+                filters.taskType(), filters.assignmentKind(), filters.assignmentRef(), filters.assigneeRef(),
+                filters.instanceId(), afterId, limit(request.getParameter("limit")), filters.taskName()));
+        var projection = projection(actorRef);
+        var items = page.items().stream().map(projection::administrationTask).toList();
+        return taskPage(items, page.nextAfterId(), "administration", actorRef, scopeId);
+    }
+
+    private record TaskFilters(TaskStatus status, String taskType, AssignmentTargetKind assignmentKind,
+            String assignmentRef, String assigneeRef, Long instanceId, String taskName) {}
+
+    private static TaskFilters taskFilters(HttpServletRequest request) {
         query(request, "status", "taskType", "assignmentKind", "assignmentRef", "assigneeRef", "instanceId", "cursor", "limit", "taskName");
         TaskStatus status = TaskStatus.OPEN;
         String requested = request.getParameter("status");
@@ -181,14 +203,8 @@ public class WorkflowRuntimeReadController {
         if (ref != null && kind == null) throw WorkflowRuntimeException.invalid();
         Long instanceId = request.getParameter("instanceId") == null
                 ? null : decimal(request.getParameter("instanceId"), false);
-        long scopeId = instanceId == null ? 0 : instanceId;
-        long afterId = tokens.taskPageAfter("administration", request.getParameter("cursor"), actorRef, scopeId);
-        var page = access.listAdministrationTasks(actorRef, new WorkflowTaskAdministrationQuery(status,
-                filter(request, "taskType", 100), kind, ref, filter(request, "assigneeRef", 200), instanceId,
-                afterId, limit(request.getParameter("limit")), filter(request, "taskName", 200)));
-        var projection = projection(actorRef);
-        var items = page.items().stream().map(item -> projection.administrationTask(item)).toList();
-        return taskPage(items, page.nextAfterId(), "administration", actorRef, scopeId);
+        return new TaskFilters(status, filter(request, "taskType", 100), kind, ref,
+                filter(request, "assigneeRef", 200), instanceId, filter(request, "taskName", 200));
     }
 
     @GetMapping("/tasks/{id}/reassignment-availability")

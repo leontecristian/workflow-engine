@@ -98,6 +98,12 @@ public final class WorkflowTaskProjection {
         return result;
     }
 
+    public Map<String, Object> personalTask(WorkflowTaskView task) {
+        var result = task(task, true);
+        result.put("createdAt", task.createdAt());
+        return result;
+    }
+
     private Map<String, Object> task(WorkflowTaskView task, String nodeName, String typeName, String outcomeLabel,
             boolean navigation) {
         Map<String, Object> result = new LinkedHashMap<>();
@@ -152,6 +158,7 @@ public final class WorkflowTaskProjection {
     private String ownershipLabel(WorkflowTaskView task) {
         String owner = task.assigneeRef();
         if (task.assignment().kind() == AssignmentTargetKind.USER) {
+            if (owner == null && task.status() != TaskStatus.OPEN) owner = task.assignment().ref();
             if (actorRef.equals(owner)) return "Assigned to you";
             String name = owner != null && owner.equals(task.assignment().ref()) ? directoryLabel(task) : null;
             return name == null ? "Assigned to another user" : "Assigned to " + name;

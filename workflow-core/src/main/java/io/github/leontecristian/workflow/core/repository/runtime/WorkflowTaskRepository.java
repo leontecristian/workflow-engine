@@ -1,6 +1,9 @@
 package io.github.leontecristian.workflow.core.repository.runtime;
 
+import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
+import io.github.leontecristian.workflow.core.dto.runtime.TaskStatus;
 import io.github.leontecristian.workflow.core.entity.runtime.WorkflowTaskEntity;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
@@ -18,13 +21,29 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true, propagation = Propagation.REQUIRED)
 public interface WorkflowTaskRepository extends Repository<WorkflowTaskEntity, Long> {
 
-    String TASK_PAGE_SELECT = """
+    String TASK_PAGE_COLUMNS = """
             select t.id as id, t.activityId as activityId, a.instanceId as instanceId,
                 a.taskTypeId as taskTypeId, t.taskKey as taskKey, t.assignmentKind as assignmentKind, t.assignmentRef as assignmentRef, t.assigneeRef as assigneeRef,
                 t.status as status, t.outcomeKey as outcomeKey, t.createdAt as createdAt,
                 t.dueAt as dueAt, t.closedAt as closedAt, t.closedBy as closedBy,
                 t.closureReason as closureReason
+            """;
+    String TASK_PAGE_FROM = """
             from WorkflowTaskEntity t join WorkflowActivityEntity a on a.id = t.activityId
+            """;
+    String TASK_PAGE_SELECT = TASK_PAGE_COLUMNS + TASK_PAGE_FROM;
+    String TASK_METADATA_PAGE_SELECT = TASK_PAGE_COLUMNS + """
+            , a.nodeKey as nodeKey, tt.code as taskTypeCode, tt.name as taskTypeName, i.definitionVersionId as definitionVersionId
+            """ + TASK_PAGE_FROM + """
+            join TaskTypeEntity tt on tt.id = a.taskTypeId join WorkflowInstanceEntity i on i.id = a.instanceId
+            """;
+    String TASK_FILTERS = """
+              and (:status is null or t.status = :status)
+              and (:taskType is null or (tt.code = :taskType and function('datalength', tt.code) = :taskTypeBytes))
+              and (:kind is null or t.assignmentKind = :kind)
+              and (:ref is null or (t.assignmentRef = :ref and function('datalength', t.assignmentRef) = :refBytes))
+              and (:assignee is null or (t.assigneeRef = :assignee and function('datalength', t.assigneeRef) = :assigneeBytes))
+              and (:instanceId is null or a.instanceId = :instanceId)
             """;
 
     @Query(TASK_PAGE_SELECT + """
@@ -55,6 +74,32 @@ public interface WorkflowTaskRepository extends Repository<WorkflowTaskEntity, L
     List<RuntimeTaskRow> findEligibleCandidatesPage(@Param("actorRef") String actorRef,
             @Param("actorRefBytes") int actorRefBytes, @Param("afterId") long afterId, Pageable pageable);
 
+    @Query(TASK_METADATA_PAGE_SELECT + """
+            where (:afterId = 0 or t.createdAt < :afterCreatedAt
+                  or (t.createdAt = :afterCreatedAt and t.id < :afterId))
+              and (
+                (t.status = io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.OPEN
+                  and (t.assignmentKind <> io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER
+                    or (t.assignmentRef = :actorRef and function('datalength', t.assignmentRef) = :actorRefBytes)))
+                or (t.status in (io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.COMPLETED,
+                                 io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.CANCELLED)
+                  and ((t.assigneeRef = :actorRef and function('datalength', t.assigneeRef) = :actorRefBytes)
+                    or (t.assignmentKind = io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.USER
+                      and t.assignmentRef = :actorRef and function('datalength', t.assignmentRef) = :actorRefBytes)
+                    or (t.status = io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.COMPLETED
+                      and t.closedBy = :actorRef and function('datalength', t.closedBy) = :actorRefBytes)))
+              )
+            """ + TASK_FILTERS + """
+            order by t.createdAt desc, t.id desc
+            """)
+    List<RuntimeTaskAdministrationRow> findPersonalCandidatesPage(
+            @Param("actorRef") String actorRef, @Param("actorRefBytes") int actorRefBytes,
+            @Param("status") TaskStatus status, @Param("taskType") String taskType, @Param("taskTypeBytes") int taskTypeBytes,
+            @Param("kind") AssignmentTargetKind kind, @Param("ref") String ref, @Param("refBytes") int refBytes,
+            @Param("assignee") String assignee, @Param("assigneeBytes") int assigneeBytes,
+            @Param("instanceId") Long instanceId, @Param("afterCreatedAt") LocalDateTime afterCreatedAt,
+            @Param("afterId") long afterId, Pageable pageable);
+
     @Query("""
             select t from WorkflowTaskEntity t where t.activityId = :activityId
               and t.status = io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.COMPLETED
@@ -63,27 +108,15 @@ public interface WorkflowTaskRepository extends Repository<WorkflowTaskEntity, L
     List<WorkflowTaskEntity> findCompletedPage(@Param("activityId") Long activityId,
                                               @Param("afterId") long afterId, Pageable pageable);
 
-    @Query("""
-            select t.id as id, t.activityId as activityId, a.instanceId as instanceId,
-                a.taskTypeId as taskTypeId, t.taskKey as taskKey, t.assignmentKind as assignmentKind, t.assignmentRef as assignmentRef, t.assigneeRef as assigneeRef,
-                t.status as status, t.outcomeKey as outcomeKey, t.createdAt as createdAt,
-                t.dueAt as dueAt, t.closedAt as closedAt, t.closedBy as closedBy,
-                t.closureReason as closureReason, a.nodeKey as nodeKey, tt.code as taskTypeCode, tt.name as taskTypeName, i.definitionVersionId as definitionVersionId
-            from WorkflowTaskEntity t join WorkflowActivityEntity a on a.id = t.activityId
-            join TaskTypeEntity tt on tt.id = a.taskTypeId join WorkflowInstanceEntity i on i.id = a.instanceId
+    @Query(TASK_METADATA_PAGE_SELECT + """
             where t.id > :afterId
-              and (:status is null or t.status = :status)
-              and (:taskType is null or (tt.code = :taskType and function('datalength', tt.code) = :taskTypeBytes))
-              and (:kind is null or t.assignmentKind = :kind)
-              and (:ref is null or (t.assignmentRef = :ref and function('datalength', t.assignmentRef) = :refBytes))
-              and (:assignee is null or (t.assigneeRef = :assignee and function('datalength', t.assigneeRef) = :assigneeBytes))
-              and (:instanceId is null or a.instanceId = :instanceId)
+            """ + TASK_FILTERS + """
             order by t.id asc
             """)
     List<RuntimeTaskAdministrationRow> findAdministrationPage(
-            @Param("status") io.github.leontecristian.workflow.core.dto.runtime.TaskStatus status,
+            @Param("status") TaskStatus status,
             @Param("taskType") String taskType, @Param("taskTypeBytes") int taskTypeBytes,
-            @Param("kind") io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind kind,
+            @Param("kind") AssignmentTargetKind kind,
             @Param("ref") String ref, @Param("refBytes") int refBytes,
             @Param("assignee") String assignee, @Param("assigneeBytes") int assigneeBytes,
             @Param("instanceId") Long instanceId, @Param("afterId") long afterId, Pageable pageable);

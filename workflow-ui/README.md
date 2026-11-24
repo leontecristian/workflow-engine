@@ -126,6 +126,10 @@ Import runtime components lazily from `@workflow-engine/ui/runtime`: `WorkflowIn
 
 Task inspection needs no command provider. To enable completion controls, provide `WORKFLOW_RUNTIME_COMMANDS` with `complete(envelope, signal)` and replay-only `replayComplete(envelope, signal)`. Host transport may use business endpoints and owns credentials/CSRF. Shared controls validate the pinned choice/comment and freeze the UUID, IDs, comment and expected token before dispatch. No command is automatically retried. The exact-task contract supplies the display label and current `canComplete` hint. The host must still authorize completion.
 
+For My Tasks, custom providers implement `assignedTasks(filters: TaskAdministrationFilters, cursor, limit, signal)` and return `TaskPage<AssignedTaskRow>`. Include the ISO-8601 `createdAt` string and exact decimal-string ID on each row. Apply the filters with current personal task-read authorization and return the page in creation-time descending, numeric-ID descending order. Pass opaque continuation tokens through unchanged, including when a page has no visible rows. The standard HTTP provider uses the F039 runtime-read endpoint. Keep the host navigation mapping for the task detail intent to open task names from the inbox.
+
+When the host renders the My Tasks title in its own shell, set `[externalPageHeader]="true"` on `workflow-assigned-tasks`. The visible count stays in the inbox toolbar on the Refresh row.
+
 ### Optional task completion forms
 
 The shared task page uses its generic form when the host omits the editor provider or the pinned `TaskContract.taskType` has no exact match. To customize a type, register a standalone Angular component with the page's injector. Pass all of that injector's registrations in one call.

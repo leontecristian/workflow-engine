@@ -1,28 +1,95 @@
-<console-page-header [meta]="meta" /><console-feedback
-  [busy]="busy()"
-  [error]="error()"
-  [notice]="notice()"
-/>
-<mat-card appearance="outlined"
-  ><mat-card-header
-    ><div class="card-heading">
-      <div>
-        <h2>{{meta.listTitle}}</h2>
-        <p>{{meta.listDescription}}</p>
+@if (!externalPageHeader()) {
+  <console-page-header [meta]="meta" [titleActions]="true" [multilineDescription]="true" />
+}
+<console-feedback [busy]="busy()" [error]="error()" [notice]="notice()" />
+<mat-card appearance="outlined">
+  <mat-card-content class="task-list-content">
+    <form (ngSubmit)="load()">
+      <div class="task-filter-toolbar">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Status</mat-label>
+          <mat-select [(ngModel)]="filters.status" (ngModelChange)="filtersChanged()" name="status">
+            @for (status of ['OPEN', 'COMPLETED', 'CANCELLED', 'ALL']; track status) {
+              <mat-option [value]="status">{{ status }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <button mat-button type="button" (click)="filtersExpanded = !filtersExpanded"
+            [attr.aria-expanded]="filtersExpanded" [attr.aria-controls]="filterPanelId">
+          Filters@if (appliedChips().length) { ({{ appliedChips().length }})}
+        </button>
+        <button mat-button type="submit" [disabled]="busy()">Apply filters</button>
+        <div class="task-refresh-row">
+          <button mat-button type="button" (click)="load()" [disabled]="busy()"><mat-icon>refresh</mat-icon>Refresh</button>
+          @if (page()) {
+            <span class="count-badge">{{ rows().length }} on this page</span>
+          }
+        </div>
       </div>
-      <span class="count-badge">{{rows().length}} on this page</span>
-    </div></mat-card-header
-  ><mat-card-content
-    ><console-collection
-      [rows]="rows()"
-      kind="my-tasks"
-      label="Assigned to you"
-      icon="assignment_turned_in"
-      [busy]="busy()"
-      [size]="pageSize"
-      [next]="next"
-      (sizeChange)="pageSize=$event;load()"
-      (reload)="load()"
-      (advance)="nextPage()"
-      (inspect)="open($event)" /></mat-card-content
-></mat-card>
+      <div [id]="filterPanelId" [hidden]="!filtersExpanded" class="task-filter-panel"
+          role="group" aria-label="Additional task filters">
+        <div class="task-filter-grid">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Task name</mat-label>
+            <input matInput [(ngModel)]="filters.taskName" (ngModelChange)="filtersChanged()" name="taskName" maxlength="200">
+          </mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Task type code</mat-label>
+            <input matInput [(ngModel)]="filters.taskType" (ngModelChange)="filtersChanged()" name="taskType">
+          </mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Assignment kind</mat-label>
+            <mat-select [(ngModel)]="filters.assignmentKind" (ngModelChange)="filtersChanged()" name="assignmentKind">
+              <mat-option>All kinds</mat-option>
+              @for (kind of ['USER', 'GROUP', 'ROLE']; track kind) {
+                <mat-option [value]="kind">{{ kind }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Assignment reference</mat-label>
+            <input matInput [(ngModel)]="filters.assignmentRef" (ngModelChange)="filtersChanged()" name="assignmentRef">
+          </mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Assignee reference</mat-label>
+            <input matInput [(ngModel)]="filters.assigneeRef" (ngModelChange)="filtersChanged()" name="assigneeRef">
+          </mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Instance ID</mat-label>
+            <input matInput [(ngModel)]="filters.instanceId" (ngModelChange)="filtersChanged()" name="instanceId">
+          </mat-form-field>
+        </div>
+      </div>
+    </form>
+    @if (appliedChips().length) {
+      <mat-chip-set class="task-filter-chips" aria-label="Applied task filters">
+        @for (chip of appliedChips(); track chip.key) {
+          <mat-chip [disabled]="busy()" (removed)="removeFilter(chip.key)">
+            {{ chip.label }}: {{ chip.value }}
+            <button matChipRemove [attr.aria-label]="'Remove ' + chip.label + ' filter'" [disabled]="busy()">×</button>
+          </mat-chip>
+        }
+      </mat-chip-set>
+    }
+    <console-records [rows]="rows()" kind="my-tasks" [label]="messages.assignedTitle" [disabled]="busy()" (inspect)="open($event)" />
+    @if (page() && !rows().length) {
+      <p class="task-empty">No tasks on this page.</p>
+    }
+    <nav class="task-pagination" aria-label="My Tasks pagination">
+      <mat-form-field appearance="outline" class="page-size" subscriptSizing="dynamic">
+        <mat-label>Rows per page</mat-label>
+        <mat-select [ngModel]="pageSize" (ngModelChange)="changePageSize($event)" [disabled]="busy()">
+          @for (size of pageSizes; track size) { <mat-option [value]="size">{{ size }}</mat-option> }
+        </mat-select>
+      </mat-form-field>
+      <span class="task-page-info" aria-live="polite">
+        @if (page(); as loaded) { Page {{ loaded.index + 1 }} · {{ rows().length }} tasks on this page }
+      </span>
+      <span class="action-spacer"></span>
+      <button mat-button type="button" (click)="previousPage()" [disabled]="busy() || !page()?.index">Previous page</button>
+      <button mat-button type="button" (click)="nextPage()" [disabled]="busy() || !page()?.nextCursor">
+        Next page <mat-icon aria-hidden="true" iconPositionEnd>chevron_right</mat-icon>
+      </button>
+    </nav>
+  </mat-card-content>
+</mat-card>

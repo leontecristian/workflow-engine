@@ -11,6 +11,13 @@ export interface RecordColumn {
   key: string;
   label: string;
 }
+const TASK_COLUMNS: RecordColumn[] = [
+  { key: "nodeName", label: "Task" },
+  { key: "taskTypeName", label: "Task type" },
+  { key: "assignmentLabel", label: "Assignment" },
+  { key: "ownershipLabel", label: "Ownership" },
+  { key: "status", label: "Status" },
+];
 const COLUMNS: Record<string, RecordColumn[]> = {
   instances: [
     { key: "id", label: "Instance" },
@@ -26,13 +33,8 @@ const COLUMNS: Record<string, RecordColumn[]> = {
     { key: "actorLabel", label: "Submitted by" },
     { key: "occurredAt", label: "Submitted" },
   ],
-  tasks: [
-    { key: "nodeName", label: "Task" },
-    { key: "taskTypeName", label: "Task type" },
-    { key: "assignmentLabel", label: "Assignment" },
-    { key: "ownershipLabel", label: "Ownership" },
-    { key: "status", label: "Status" },
-  ],
+  tasks: TASK_COLUMNS,
+  "my-tasks": [...TASK_COLUMNS, { key: "createdAt", label: "Created" }],
 };
 @Component({
   selector: "console-records",
@@ -47,8 +49,11 @@ const COLUMNS: Record<string, RecordColumn[]> = {
     MatIconModule,
   ],
   styleUrl: "./records.scss",
-  template: `<div class="table-scroll">
-    <table mat-table [dataSource]="rows()" [attr.aria-label]="label()">
+  template: `<div class="table-scroll"
+    [attr.tabindex]="kind() === 'my-tasks' ? 0 : null"
+    [attr.role]="kind() === 'my-tasks' ? 'region' : null"
+    [attr.aria-label]="kind() === 'my-tasks' ? label() + ' table' : null">
+    <table mat-table [dataSource]="rows()" [attr.aria-label]="label()" [class.my-tasks-table]="kind() === 'my-tasks'">
       @for (column of columns(); track column.key) {
         <ng-container [matColumnDef]="column.key"
           ><th mat-header-cell *matHeaderCellDef>{{ column.label }}</th>
@@ -62,6 +67,8 @@ const COLUMNS: Record<string, RecordColumn[]> = {
               >
             } @else if (isStatus(column.key)) {
               <console-status [value]="cell(row, column.key)" />
+            } @else if (column.key === "createdAt") {
+              <time class="date-cell" [attr.datetime]="row.createdAt">{{ row.createdAt | date: "medium" }}</time>
             } @else if (isDate(column.key, cell(row, column.key))) {
               <span class="date-cell"
                 >{{ cell(row, column.key) | date: "MMM d, y" : "UTC"

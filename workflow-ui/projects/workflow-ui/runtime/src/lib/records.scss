@@ -7,6 +7,26 @@ table {
   width: 100%;
 }
 
+.my-tasks-table {
+  min-width: 720px;
+  table-layout: fixed;
+}
+
+.my-tasks-table th,
+.my-tasks-table td {
+  padding-inline: 12px;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.my-tasks-table .mat-column-assignmentLabel,
+.my-tasks-table .mat-column-ownershipLabel { width: 16%; }
+.my-tasks-table .mat-column-status { width: 14%; }
+.my-tasks-table .mat-column-taskTypeName { width: 14%; }
+.my-tasks-table .mat-column-createdAt { width: 21%; }
+.my-tasks-table .mat-column-actions { width: 52px; }
+.my-tasks-table .date-cell { white-space: normal; }
+
 th {
   background: var(--mat-sys-surface-container-low, transparent);
   color: var(--mat-sys-on-surface-variant, currentColor);

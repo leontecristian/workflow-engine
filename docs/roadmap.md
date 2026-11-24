@@ -62,7 +62,7 @@ The APOLO pilot demonstrates booking submission, manager review, a recorded appr
 | Order | Work | Completion condition |
 | --- | --- | --- |
 | 1 | Finish [F037 — Compact task business context](features/F037-task-business-context-renderer/spec.md) | Record renderer verification and confirm the updated booking detail in APOLO. |
-| 2 | Refine the shared **My tasks** list in workflow-ui | Review the current list from the perspective of everyday APOLO users. Specify and deliver a layout that makes tasks easy to identify, scan and open on desktop and narrow screens. Account for closed-task discovery (section 3) when designing the list. |
+| 2 | [F039 — My Tasks inbox](features/F039-my-tasks-inbox/spec.md) | Deliver the task-style header and page count, Task Administration filters and bottom pagination, and a Created column ordered newest first. Open work is the default. Reviewers can select closed personal tasks as described in section 3. |
 | Later | Graphical workflow designer | Confirm the first integration exit and deliver the authoring scope in section 5. |
 
 Production readiness applies before any deployment, regardless of designer timing. Historical verification debt is reconciled when relevant to a selected dependency or integration/release gate, rather than becoming a blanket prerequisite for new work.
@@ -73,7 +73,7 @@ Production readiness applies before any deployment, regardless of designer timin
 
 | Capability | Scope and dependencies | Exit condition |
 | --- | --- | --- |
-| **Closed tasks in My tasks** | Give reviewers a way to find their closed tasks from the shared My tasks list. Keep open work as the default and apply the host’s task-read permissions to closed tasks. | After completing a task, the reviewer can return to My tasks, select closed tasks, and reopen the read-only detail to see the recorded decision and any comment. |
+| **Closed tasks in My tasks** | Specified with the Status filter in [F039](features/F039-my-tasks-inbox/spec.md). Keep open work as the default and apply the host’s task-read permissions to closed tasks. | After completing a task, the reviewer can return to My tasks, select closed tasks, and reopen the read-only detail to see the recorded decision and any comment. |
 | **External variable-update command** — conditional scope | F009 supports start/service replacements, not a standalone external update command. Specify one only when a selected scenario requires it. | Authorized updates follow the agreed whole-value and aggregate concurrency contracts, with focused verification. |
 
 A shared GROUP/ROLE SINGLE task is one shared obligation; it cannot substitute for ALL contributions. Claim/release already exists in F017 and ALL is delivered in F021. The pilot uses SINGLE for its manager review.

@@ -1,6 +1,6 @@
 <console-page-header [meta]="meta" />
 <console-feedback [busy]="busy()" [error]="error()" [notice]="notice()" />
-<mat-card appearance="outlined"><mat-card-content class="administration-content">
+<mat-card appearance="outlined"><mat-card-content class="task-list-content">
  <form (ngSubmit)="load()">
  <div class="task-filter-toolbar">
   <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Status</mat-label><mat-select [(ngModel)]="filters.status" (ngModelChange)="filtersChanged()" name="status">@for(s of ['OPEN','COMPLETED','CANCELLED','ALL'];track s){<mat-option [value]="s">{{s}}</mat-option>}</mat-select></mat-form-field>

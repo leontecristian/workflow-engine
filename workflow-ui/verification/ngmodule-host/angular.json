@@ -37,6 +37,10 @@
             ]
           },
           "configurations": {
+            "myTasks": {
+              "browser": "src/my-tasks-fixture.ts",
+              "tsConfig": "tsconfig.my-tasks.json"
+            },
             "development": {
               "optimization": false,
               "sourceMap": true,

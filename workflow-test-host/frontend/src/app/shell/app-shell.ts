@@ -42,7 +42,7 @@ export class AppShell {
     void this.api.initialize().catch(() => (location.href = "/console/login"));
   }
   protected activatePage(page: object) {
-    this.detailPage.set('pageHeader' in page && typeof page.pageHeader === 'function' && 'pageHeaderParent' in page
+    this.detailPage.set('pageHeader' in page && typeof page.pageHeader === 'function'
       ? page as PageHeaderSource : null);
   }
   flags(): string {

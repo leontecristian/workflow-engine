@@ -11,6 +11,13 @@ import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistorySummary;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistoryEvent;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationItem;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationPage;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationQuery;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowPersonalTaskCursor;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowPersonalTaskPage;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowPersonalTaskQuery;
+import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowHistoryPage;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmissionPage;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmission;
@@ -32,10 +39,16 @@ import io.github.leontecristian.workflow.core.repository.runtime.WorkflowInstanc
 import io.github.leontecristian.workflow.core.repository.runtime.WorkflowActivityRepository;
 import io.github.leontecristian.workflow.core.repository.runtime.WorkflowTaskRepository;
 import io.github.leontecristian.workflow.core.repository.runtime.WorkflowHistoryRepository;
+import io.github.leontecristian.workflow.core.repository.runtime.RuntimeTaskAdministrationRow;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException;
 import io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -57,6 +70,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional(readOnly = true)
 public class WorkflowRuntimeQueryService {
+    private static final int TASK_SCAN_LIMIT = 500;
+    private static final int TASK_SCAN_CHUNK = 100;
+    private static final int TASK_PAGE_UTF8_BYTES = 1024 * 1024;
+    private static final Instant MIN_TASK_CREATION_TIME = Instant.parse("0001-01-01T00:00:00Z");
+    private static final Instant MAX_TASK_CREATION_TIME = Instant.parse("9999-12-31T23:59:59.999999900Z");
+    private static final WorkflowPersonalTaskCursor LARGEST_ENCODED_TASK_CURSOR =
+            new WorkflowPersonalTaskCursor(MAX_TASK_CREATION_TIME, Long.MAX_VALUE);
+
     private final WorkflowInstanceRepository instances;
     private final WorkflowActivityRepository activities;
     private final WorkflowTaskRepository tasks;
@@ -177,36 +198,125 @@ public class WorkflowRuntimeQueryService {
     }
 
     /** One bounded candidate page; denied candidates still advance the continuation. */
-    public io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationPage listAdministrationTasks(
-            io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationQuery query,
-            Predicate<io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationItem> hostAccess) {
+    public WorkflowTaskAdministrationPage listAdministrationTasks(WorkflowTaskAdministrationQuery query,
+            Predicate<WorkflowTaskAdministrationItem> hostAccess) {
         RuntimeInputs.require(query != null && hostAccess != null, Category.INVALID_INPUT);
         RuntimeInputs.validatePageRequest(query.afterId(), query.limit());
-        RuntimeInputs.require((query.taskTypeCode() == null || RuntimeInputs.isValidKey(query.taskTypeCode()))
-                && (query.taskName() == null || RuntimeInputs.isValidText(query.taskName(),200,200,true))
-                && (query.assignmentRef() == null || query.assignmentKind() != null && RuntimeInputs.isValidText(query.assignmentRef(),200,200,true))
-                && (query.assigneeRef() == null || RuntimeInputs.isValidText(query.assigneeRef(),200,200,true))
-                && (query.instanceId() == null || query.instanceId() > 0), Category.INVALID_INPUT);
+        validateTaskFilters(query.taskTypeCode(), query.taskName(), query.assignmentKind(), query.assignmentRef(),
+                query.assigneeRef(), query.instanceId());
         return RuntimePersistenceErrors.call(() -> {
             var rows = tasks.findAdministrationPage(query.status(), query.taskTypeCode(), query.taskTypeCode() == null ? 0 : query.taskTypeCode().length(),
                     query.assignmentKind(), query.assignmentRef(), query.assignmentRef() == null ? 0 : query.assignmentRef().length()*2,
                     query.assigneeRef(), query.assigneeRef() == null ? 0 : query.assigneeRef().length()*2,
                     query.instanceId(), query.afterId(), PageRequest.of(0,query.limit()+1));
-            var items = new ArrayList<io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationItem>();
-            var definitions = new java.util.HashMap<Long,Map<String, String>>();
+            var items = new ArrayList<WorkflowTaskAdministrationItem>();
+            var definitions = new HashMap<Long, Map<String, String>>();
             int count = Math.min(rows.size(),query.limit());
-            String taskName = query.taskName() == null ? null : query.taskName().toLowerCase(java.util.Locale.ROOT);
+            String taskName = normalizedTaskName(query.taskName());
             for (var row : rows.subList(0,count)) {
-                var names = definitions.computeIfAbsent(row.getDefinitionVersionId(), pins::nodeNames);
-                String name = names.get(row.getNodeKey());
-                RuntimeInputs.require(name != null, Category.HOST_CONFIGURATION);
-                var item = new io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationItem(RuntimeViews.task(row),row.getNodeKey(),
+                String name = pinnedTaskName(definitions, row);
+                var item = new WorkflowTaskAdministrationItem(RuntimeViews.task(row),row.getNodeKey(),
                         name,row.getTaskTypeCode(),row.getTaskTypeName());
-                if (hostAccess.test(item) && (taskName == null || name.toLowerCase(java.util.Locale.ROOT).contains(taskName))) items.add(item);
+                if (hostAccess.test(item) && matchesTaskName(name, taskName)) items.add(item);
             }
-            return new io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationPage(items,
-                    rows.size() > count ? rows.get(count-1).getId() : null);
+            return new WorkflowTaskAdministrationPage(items, rows.size() > count ? rows.get(count-1).getId() : null);
         });
+    }
+
+    /** Bounded personal scan in creation order. Each candidate requires the current host read grant. */
+    public WorkflowPersonalTaskPage listPersonalTasks(String actorRef, WorkflowPersonalTaskQuery query,
+            Predicate<WorkflowTaskView> hostAccess) {
+        RuntimeInputs.require(RuntimeInputs.isValidText(actorRef, 200, 200, true)
+                && query != null && hostAccess != null, Category.INVALID_INPUT);
+        var after = query.after();
+        RuntimeInputs.validatePageRequest(after == null ? 0 : after.taskId(), query.limit());
+        if (after != null) {
+            var createdAt = after.createdAt();
+            RuntimeInputs.require(after.taskId() > 0 && createdAt != null && createdAt.getNano() % 100 == 0
+                    && !createdAt.isBefore(MIN_TASK_CREATION_TIME) && !createdAt.isAfter(MAX_TASK_CREATION_TIME),
+                    Category.INVALID_INPUT);
+        }
+        validateTaskFilters(query.taskTypeCode(), query.taskName(), query.assignmentKind(), query.assignmentRef(),
+                query.assigneeRef(), query.instanceId());
+        return RuntimePersistenceErrors.call(() -> scanPersonalTasks(actorRef, query, hostAccess));
+    }
+
+    private WorkflowPersonalTaskPage scanPersonalTasks(String actorRef, WorkflowPersonalTaskQuery query,
+            Predicate<WorkflowTaskView> hostAccess) {
+        var items = new ArrayList<WorkflowTaskView>();
+        var definitions = new HashMap<Long, Map<String, String>>();
+        String taskName = normalizedTaskName(query.taskName());
+        var cursor = query.after();
+        int examined = 0;
+        while (examined < TASK_SCAN_LIMIT) {
+            // Reserve one lookahead without exceeding the repository chunk bound.
+            int chunk = Math.min(TASK_SCAN_CHUNK - 1, TASK_SCAN_LIMIT - examined);
+            var rows = findPersonalCandidates(actorRef, query, cursor, chunk + 1);
+            int count = Math.min(chunk, rows.size());
+            for (int index = 0; index < count; index++) {
+                var row = rows.get(index);
+                var task = RuntimeViews.task(row);
+                if (hostAccess.test(task) && (task.status() != TaskStatus.OPEN || isOpenTaskEligible(task, actorRef))
+                        && (taskName == null || matchesTaskName(pinnedTaskName(definitions, row), taskName))) {
+                    items.add(task);
+                    // Denied candidates may advance the cursor to a longer encoded position.
+                    if (!RuntimeJson.utf8Fits(json.encode(new WorkflowPersonalTaskPage(items,
+                            LARGEST_ENCODED_TASK_CURSOR)), TASK_PAGE_UTF8_BYTES)) {
+                        items.remove(items.size() - 1);
+                        RuntimeInputs.require(!items.isEmpty(), Category.LIMIT_EXCEEDED);
+                        return new WorkflowPersonalTaskPage(items, cursor);
+                    }
+                }
+                cursor = new WorkflowPersonalTaskCursor(task.createdAt(), task.id());
+                examined++;
+                if (items.size() == query.limit() || examined == TASK_SCAN_LIMIT) {
+                    return new WorkflowPersonalTaskPage(items, index + 1 < rows.size() ? cursor : null);
+                }
+            }
+            if (rows.size() <= chunk) return new WorkflowPersonalTaskPage(items, null);
+        }
+        return new WorkflowPersonalTaskPage(items, cursor);
+    }
+
+    private List<RuntimeTaskAdministrationRow> findPersonalCandidates(String actorRef, WorkflowPersonalTaskQuery query,
+            WorkflowPersonalTaskCursor cursor, int fetchCount) {
+        var taskTypeCode = query.taskTypeCode();
+        var assignmentRef = query.assignmentRef();
+        var assigneeRef = query.assigneeRef();
+        var createdAt = cursor == null ? null : LocalDateTime.ofInstant(cursor.createdAt(), ZoneOffset.UTC);
+        return tasks.findPersonalCandidatesPage(actorRef, actorRef.length() * 2,
+                query.status(), taskTypeCode, taskTypeCode == null ? 0 : taskTypeCode.length(),
+                query.assignmentKind(), assignmentRef, assignmentRef == null ? 0 : assignmentRef.length() * 2,
+                assigneeRef, assigneeRef == null ? 0 : assigneeRef.length() * 2,
+                query.instanceId(), createdAt, cursor == null ? 0 : cursor.taskId(), PageRequest.of(0, fetchCount));
+    }
+
+    private static void validateTaskFilters(String taskTypeCode, String taskName, AssignmentTargetKind assignmentKind,
+            String assignmentRef, String assigneeRef, Long instanceId) {
+        RuntimeInputs.require((taskTypeCode == null || RuntimeInputs.isValidKey(taskTypeCode))
+                && (taskName == null || RuntimeInputs.isValidText(taskName, 200, 200, true))
+                && (assignmentRef == null || assignmentKind != null && RuntimeInputs.isValidText(assignmentRef, 200, 200, true))
+                && (assigneeRef == null || RuntimeInputs.isValidText(assigneeRef, 200, 200, true))
+                && (instanceId == null || instanceId > 0), Category.INVALID_INPUT);
+    }
+
+    private String pinnedTaskName(Map<Long, Map<String, String>> definitions, RuntimeTaskAdministrationRow row) {
+        var names = definitions.computeIfAbsent(row.getDefinitionVersionId(), pins::nodeNames);
+        String name = names.get(row.getNodeKey());
+        RuntimeInputs.require(name != null, Category.HOST_CONFIGURATION);
+        return name;
+    }
+
+    private static String normalizedTaskName(String name) {
+        return name == null ? null : name.toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean matchesTaskName(String name, String normalizedFilter) {
+        return normalizedFilter == null || name.toLowerCase(Locale.ROOT).contains(normalizedFilter);
+    }
+
+    private boolean isOpenTaskEligible(WorkflowTaskView task, String actorRef) {
+        return actorRef.equals(task.assigneeRef()) || eligibility.isEligible(task, actorRef);
     }
 
     public WorkflowTaskPage listTasks(long instanceId) { return listTasks(instanceId, 0, 50); }
@@ -230,22 +340,22 @@ public class WorkflowRuntimeQueryService {
             var items = new ArrayList<WorkflowTaskView>();
             long cursor = afterId;
             int examined = 0;
-            while (examined < 500 && items.size() < limit) {
-                int chunk = Math.min(100, 500-examined);
+            while (examined < TASK_SCAN_LIMIT && items.size() < limit) {
+                int chunk = Math.min(TASK_SCAN_CHUNK, TASK_SCAN_LIMIT - examined);
                 var rows = tasks.findEligibleCandidatesPage(actorRef, actorRef.length()*2, cursor, PageRequest.of(0,chunk+1));
                 int count = Math.min(chunk,rows.size());
                 for (int i=0;i<count;i++) {
                     var task = RuntimeViews.task(rows.get(i));
-                    if (hostAccess.test(task) && (actorRef.equals(task.assigneeRef()) || eligibility.isEligible(task, actorRef))) {
+                    if (hostAccess.test(task) && isOpenTaskEligible(task, actorRef)) {
                         items.add(task);
-                        if (!RuntimeJson.utf8Fits(json.encode(new WorkflowTaskPage(items,task.id())),1024*1024)) {
+                        if (!RuntimeJson.utf8Fits(json.encode(new WorkflowTaskPage(items,task.id())), TASK_PAGE_UTF8_BYTES)) {
                             items.remove(items.size()-1);
                             RuntimeInputs.require(!items.isEmpty(),Category.LIMIT_EXCEEDED);
                             return new WorkflowTaskPage(items,cursor);
                         }
                     }
                     cursor=task.id(); examined++;
-                    if (items.size()==limit || examined==500) {
+                    if (items.size()==limit || examined==TASK_SCAN_LIMIT) {
                         boolean more = i+1<rows.size();
                         return new WorkflowTaskPage(items,more ? cursor : null);
                     }

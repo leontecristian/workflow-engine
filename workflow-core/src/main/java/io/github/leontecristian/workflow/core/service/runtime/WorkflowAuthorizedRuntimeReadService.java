@@ -12,6 +12,8 @@ import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstancePage;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceQuery;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowOperation;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowPersonalTaskPage;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowPersonalTaskQuery;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowScope;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationPage;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskAdministrationQuery;
@@ -67,6 +69,12 @@ public class WorkflowAuthorizedRuntimeReadService {
     public WorkflowTaskPage listMyTasks(String actorRef, long afterId, int limit) {
         validateActorRef(actorRef);
         return reads.listEligibleTasks(actorRef, afterId, limit, task -> canReadTask(actorRef, task));
+    }
+
+    /** Personal inbox, including explicitly selected closed work, newest creation first. */
+    public WorkflowPersonalTaskPage listMyTasks(String actorRef, WorkflowPersonalTaskQuery query) {
+        validateActorRef(actorRef);
+        return reads.listPersonalTasks(actorRef, query, task -> canReadTask(actorRef, task));
     }
 
     public WorkflowTaskPage listInstanceTasks(String actorRef, long instanceId, long afterId, int limit) {

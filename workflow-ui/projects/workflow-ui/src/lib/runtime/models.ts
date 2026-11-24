@@ -133,7 +133,10 @@ export interface TaskAdministrationFilters {
  assignmentKind?:'USER'|'GROUP'|'ROLE'; assignmentRef?:string; assigneeRef?:string; instanceId?:string;
 }
 
-export interface TaskAdministrationRow extends TaskView {
- instanceId: Decimal;
+export interface AssignedTaskRow extends TaskView {
  createdAt: string;
+}
+
+export interface TaskAdministrationRow extends AssignedTaskRow {
+ instanceId: Decimal;
 }

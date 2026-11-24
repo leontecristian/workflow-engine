@@ -259,6 +259,14 @@ public class RuntimeWire {
         }
     }
 
+    public <T, C> Map<String, Object> page(List<T> rows, C sourceNext, String cursorName,
+            Function<T, C> cursor, Function<C, ?> encodeCursor) {
+        try { return codec.page(rows, sourceNext, cursorName, cursor, encodeCursor); }
+        catch (io.github.leontecristian.workflow.web.exception.instance.WorkflowViewerException failure) {
+            throw new WorkflowRuntimeException(failure.status(), failure.code());
+        }
+    }
+
     public static boolean unicode(String value) {
         if (value == null) return false;
         for (int index = 0; index < value.length(); index++) {

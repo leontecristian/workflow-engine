@@ -1,5 +1,7 @@
 # Feature specifications
 
+[F039 — My Tasks inbox](F039-my-tasks-inbox/spec.md) is **IMPLEMENTED revision 1 — 2026-11-24**. It adds a task-style header, a visible page count on the table toolbar, Task Administration filters and pagination, and a Created column with newest-first ordering. Closed personal tasks include work assigned to the reviewer at closure or completed by them, subject to current read permission. See the [implementation record](F039-my-tasks-inbox/implementation.md).
+
 [F038 — Record tables and path headings for task inputs](F038-record-tables-and-path-headings/spec.md) is **IMPLEMENTED revision 1 — 2026-11-24**. It renders uniform record arrays as tables and deeper task input groups as flat sections with path headings. See the [implementation record](F038-record-tables-and-path-headings/implementation.md).
 
 [F037 — Compact task business context](F037-task-business-context-renderer/spec.md) is **IMPLEMENTED revision 2 — 2026-11-24**. Revision 2 shows optional pinned assignee instructions beneath the task title. Revision 1 implemented responsive frozen task inputs and exact-token decimal formatting. See the [implementation record](F037-task-business-context-renderer/implementation.md).

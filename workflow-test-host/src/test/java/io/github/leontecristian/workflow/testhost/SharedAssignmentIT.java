@@ -17,6 +17,8 @@ import io.github.leontecristian.workflow.core.dto.runtime.ClaimWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.ReleaseWorkflowTask;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -24,6 +26,7 @@ import io.github.leontecristian.workflow.core.dto.definition.CheckWorkflowDefini
 import io.github.leontecristian.workflow.core.dto.definition.DefinitionManagementContext;
 import io.github.leontecristian.workflow.core.dto.definition.ImportWorkflowDraft;
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
+import io.github.leontecristian.workflow.core.dto.runtime.CancelWorkflow;
 import io.github.leontecristian.workflow.core.dto.runtime.CompleteWorkflowTask;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandContext;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
@@ -41,6 +44,7 @@ import io.github.leontecristian.workflow.testhost.service.runtime.ConsoleRuntime
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -102,8 +106,11 @@ class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
             UsernamePasswordAuthenticationToken.authenticated(actor,"unused",List.of(new SimpleGrantedAuthority(role)))));return s;
     }
     private WorkflowExecutionResult start() {
-        long request=tx().execute(t->requests.create(marker,"{\"amount\":9007199254740993.00}",marker,Instant.now())).id();
-        var result=runtime.start(new SandboxStart(UUID.randomUUID(),versionId,request,0),context()).execution();
+        return start(context());
+    }
+    private WorkflowExecutionResult start(WorkflowCommandContext startContext) {
+        long request=tx().execute(t->requests.create(marker,"{\"amount\":9007199254740993.00}",marker,startContext.occurredAt())).id();
+        var result=runtime.start(new SandboxStart(UUID.randomUUID(),versionId,request,0),startContext).execution();
         instances.add(result.instance().id());return result;
     }
     private String completion(WorkflowExecutionResult started,UUID command) throws Exception {
@@ -117,6 +124,9 @@ class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
         prepare(resolver, null);
     }
     private void prepare(String resolver, String policy) throws Exception {
+        prepare(resolver, policy, null);
+    }
+    private void prepare(String resolver, String policy, String taskName) throws Exception {
         if(catalog.findByCode("SANDBOX_REVIEW").isEmpty()) ownedTaskType=tx().execute(t->catalog.create(new CreateTaskType("SANDBOX_REVIEW",marker,null,true)).after().id());
         var document=(ObjectNode)json.readTree(Files.readString(repository().resolve("docs/features/F006-test-host-definition-console/request-status-review.json")));
         document.put("key",marker);
@@ -124,6 +134,7 @@ class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
             if ("HUMAN_TASK".equals(node.path("type").asText())) {
                 ((ObjectNode) node.path("assignment")).put("resolver", resolver);
                 if (policy != null) ((ObjectNode) node).put("claimPolicy", policy);
+                if (taskName != null) ((ObjectNode) node).put("name", taskName);
             }
         }
         tx().executeWithoutResult(t->{
@@ -140,6 +151,98 @@ class SharedAssignmentIT extends CompletionAdapterIntegrationTest {
     private void denied(Runnable action,io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.Category category) {
         org.assertj.core.api.Assertions.assertThatThrownBy(action::run).isInstanceOfSatisfying(
             io.github.leontecristian.workflow.core.exception.runtime.WorkflowExecutionException.class,e->assertThat(e.category()).isEqualTo(category));
+    }
+
+    @Test void personalInboxPagesByFullCreationTimeAndFindsAnUnclaimedCompletion() throws Exception {
+        prepare("sandbox.sharedGroupReviewer", null, marker);
+        String reviewer = "f016-reviewer";
+        String peer = "f016-reviewer2";
+        var reviewerSession = session(reviewer, "ROLE_CONSOLE_REVIEWER");
+        var mvc = MockMvcBuilders.webAppContextSetup(web).addFilters(web.getBean(FilterChainProxy.class)).build();
+        var second = Instant.now().minusSeconds(60).truncatedTo(ChronoUnit.SECONDS);
+        var newestAt = second.plusNanos(123_456_800);
+        var tiedAt = second.plusNanos(123_456_700);
+        var oldestAt = second.plusNanos(123_456_600);
+        var completed = startAt(oldestAt);
+        var newest = startAt(newestAt);
+        var firstTie = startAt(tiedAt);
+        var secondTie = startAt(tiedAt);
+        var result = runtimeCommands.complete(command(completed, "APPROVE"), actor(reviewer));
+        assertThat(result.execution().task().assigneeRef()).isNull();
+        assertThat(result.execution().task().closedAt()).isAfter(newestAt);
+
+        String route = "/console/api/tasks/mine";
+        var first = mvc.perform(get(route).session(reviewerSession)
+                        .param("status", "ALL").param("taskName", marker).param("limit", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.items[0].id").value(Long.toString(newest.task().id())))
+                .andExpect(jsonPath("$.items[0].createdAt").value(newestAt.toString()))
+                .andExpect(jsonPath("$.items[1].id").value(Long.toString(secondTie.task().id())))
+                .andExpect(jsonPath("$.items[1].createdAt").value(tiedAt.toString()))
+                .andExpect(jsonPath("$.nextCursor").isString()).andReturn();
+        String cursor = json.readTree(first.getResponse().getContentAsString()).path("nextCursor").asText();
+        mvc.perform(get(route).session(reviewerSession)
+                        .param("status", "ALL").param("taskName", marker).param("limit", "2").param("cursor", cursor))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.items[0].id").value(Long.toString(firstTie.task().id())))
+                .andExpect(jsonPath("$.items[1].id").value(Long.toString(completed.task().id())))
+                .andExpect(jsonPath("$.items[1].status").value("COMPLETED"))
+                .andExpect(jsonPath("$.items[1].createdAt").value(oldestAt.toString()));
+        String instance = Long.toString(completed.instance().id());
+        mvc.perform(get(route).session(reviewerSession)
+                        .param("status", "COMPLETED").param("instanceId", instance))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(Long.toString(completed.task().id())));
+        mvc.perform(get(route).session(session(peer, "ROLE_CONSOLE_REVIEWER"))
+                        .param("status", "COMPLETED").param("instanceId", instance))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
+        mvc.perform(get("/console/api/tasks/{id}/submission", completed.task().id())
+                        .session(reviewerSession))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.comment").value("test"))
+                .andExpect(jsonPath("$.outcomeLabel").value("Approve"));
+    }
+
+    private WorkflowExecutionResult startAt(Instant createdAt) {
+        return start(new WorkflowCommandContext(ActorKind.USER, "f016-admin", createdAt, marker));
+    }
+
+    @Test void personalInboxFindsTheCancelledAssigneesTaskButExcludesItsAdministratorCloser() throws Exception {
+        prepare("sandbox.singleReviewer");
+        var started = start();
+        String reviewer = "f016-reviewer";
+        String admin = "f016-admin";
+        assertThat(started.task().assigneeRef()).isEqualTo(reviewer);
+        var cancel = new CancelWorkflow(UUID.randomUUID(), started.instance().id(),
+                started.instance().lockVersion(), marker);
+        asActor(admin, true, () -> tx().execute(t -> execution.cancelWorkflow(cancel, actor(admin))));
+
+        var mvc = MockMvcBuilders.webAppContextSetup(web).addFilters(web.getBean(FilterChainProxy.class)).build();
+        String route = "/console/api/tasks/mine";
+        String instance = Long.toString(started.instance().id());
+        var reviewerSession = session(reviewer, "ROLE_CONSOLE_REVIEWER");
+        for (String filter : List.of("CANCELLED", "ALL")) {
+            mvc.perform(get(route).session(reviewerSession).param("status", filter).param("instanceId", instance))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items[0].id").value(Long.toString(started.task().id())))
+                    .andExpect(jsonPath("$.items[0].status").value("CANCELLED"));
+        }
+        mvc.perform(get(route).session(session(admin, "ROLE_CONSOLE_ADMIN"))
+                        .param("status", "CANCELLED").param("instanceId", instance))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
+        mvc.perform(get(route).session(reviewerSession).param("instanceId", instance))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
+
+        // Older closed USER tasks retained their direct target without an assignee column value.
+        assertThat(jdbc.update("UPDATE wf.workflow_task SET assignee_ref=NULL WHERE id=?", started.task().id())).isOne();
+        mvc.perform(get(route).session(reviewerSession).param("status", "CANCELLED").param("instanceId", instance))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(Long.toString(started.task().id())))
+                .andExpect(jsonPath("$.items[0].ownershipLabel").value("Assigned to you"));
+        mvc.perform(get("/console/api/tasks/{id}", started.task().id()).session(reviewerSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ownershipLabel").value("Assigned to you"));
     }
     @Test void currentMembershipRollbackReplayAndEvidence() throws Exception {
         prepare("sandbox.sharedGroupReviewer");

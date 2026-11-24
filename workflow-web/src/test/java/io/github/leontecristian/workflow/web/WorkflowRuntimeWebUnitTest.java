@@ -35,6 +35,9 @@ import io.github.leontecristian.workflow.core.dto.runtime.WorkflowActivityView;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowPersonalTaskCursor;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowPersonalTaskPage;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowPersonalTaskQuery;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowValue;
@@ -223,13 +226,25 @@ class WorkflowRuntimeWebUnitTest {
             when(identity.requireActorRef()).thenReturn("other");
             mvc.perform(get("/custom/instances/1/tasks").param("cursor", cursor)).andExpect(status().isBadRequest());
             when(identity.requireActorRef()).thenReturn("actor");
-            when(host.listMyTasks("actor", 0, 50)).thenReturn(new WorkflowTaskPage(List.of(), 17L));
+            var position = new WorkflowPersonalTaskCursor(Instant.parse("2026-11-24T09:00:00.1234567Z"), 17);
+            when(host.listMyTasks("actor", personalQuery(null))).thenReturn(new WorkflowPersonalTaskPage(List.of(), position));
             String mineBody = mvc.perform(get("/custom/tasks/mine")).andExpect(status().isOk())
                     .andExpect(jsonPath("$.nextCursor").isString()).andReturn().getResponse().getContentAsString();
             String mineCursor = new RuntimeWire().tree(mineBody).path("nextCursor").textValue();
-            when(host.listMyTasks("actor", 17, 50)).thenReturn(new WorkflowTaskPage(List.of(), null));
+            when(host.listMyTasks("actor", personalQuery(position))).thenReturn(new WorkflowPersonalTaskPage(List.of(), null));
             mvc.perform(get("/custom/tasks/mine").param("cursor", mineCursor))
                     .andExpect(status().isOk()).andExpect(content().json("{\"items\":[],\"nextCursor\":null}"));
+            mvc.perform(get("/custom/tasks/mine").param("cursor", mineCursor).param("status", "ALL"))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+            mvc.perform(get("/custom/tasks/mine").param("cursor", mineCursor).param("taskName", "Review"))
+                    .andExpect(status().isBadRequest());
+            mvc.perform(get("/custom/instances/1/tasks").param("cursor", mineCursor))
+                    .andExpect(status().isBadRequest());
+            String oldCursor = c.getBean(WorkflowTaskTokens.class).taskPageCursor("mine", "actor", 0, 17);
+            mvc.perform(get("/custom/tasks/mine").param("cursor", oldCursor)).andExpect(status().isBadRequest());
+            when(identity.requireActorRef()).thenReturn("other");
+            mvc.perform(get("/custom/tasks/mine").param("cursor", mineCursor)).andExpect(status().isBadRequest());
+            when(identity.requireActorRef()).thenReturn("actor");
             mvc.perform(post("/custom/commands/complete/replay")).andExpect(status().isNotFound());
             for(String q:List.of("unknown=1","limit=0","limit=2&limit=3","afterId=01"))
                 mvc.perform(get("/custom/instances/1/tasks?"+q)).andExpect(status().isBadRequest());
@@ -241,6 +256,33 @@ class WorkflowRuntimeWebUnitTest {
             verifyNoInteractions(c.getBean(WorkflowRuntimeQueryService.class));
         }
     }
+
+    @Test void personalReadParsesAdministrationFiltersWithoutGrantingAdministrationAccess() throws Exception {
+        try (var c = context(Host.class, Reads.class, WorkflowRuntimeReadConfiguration.class)) {
+            var host = c.getBean(WorkflowAuthorizedRuntimeReadService.class);
+            var mvc = mvc(c);
+            var query = new WorkflowPersonalTaskQuery(null, "REVIEW", AssignmentTargetKind.GROUP,
+                    "Finance & legal", "reviewer + one", 9007199254740993L, null, 20, " Review 100% ");
+            when(host.listMyTasks("actor", query)).thenReturn(new WorkflowPersonalTaskPage(List.of(), null));
+            mvc.perform(get("/custom/tasks/mine").param("status", "ALL").param("taskType", "REVIEW")
+                            .param("assignmentKind", "GROUP").param("assignmentRef", "Finance & legal")
+                            .param("assigneeRef", "reviewer + one").param("instanceId", "9007199254740993")
+                            .param("taskName", " Review 100% ").param("limit", "20"))
+                    .andExpect(status().isOk()).andExpect(content().json("{\"items\":[],\"nextCursor\":null}"));
+            for (String invalid : List.of("status=open", "assignmentRef=finance", "instanceId=01", "limit=0",
+                    "cursor=", "afterId=2", "status=OPEN&status=ALL")) {
+                mvc.perform(get("/custom/tasks/mine?" + invalid)).andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+            }
+            verify(host).listMyTasks("actor", query);
+            org.mockito.Mockito.verifyNoMoreInteractions(host);
+        }
+    }
+
+    private static WorkflowPersonalTaskQuery personalQuery(WorkflowPersonalTaskCursor after) {
+        return new WorkflowPersonalTaskQuery(TaskStatus.OPEN, null, null, null, null, null, after, 50, null);
+    }
+
     @Test void sharedAssignmentProjectionAndExactSubmissionFilterPreserveSourceContinuation() throws Exception {
         try(var c=context(Host.class,Reads.class,WorkflowRuntimeReadConfiguration.class)) {
             var reads=c.getBean(WorkflowRuntimeQueryService.class); var host=c.getBean(WorkflowAuthorizedRuntimeReadService.class); var mvc=mvc(c);
@@ -273,7 +315,7 @@ class WorkflowRuntimeWebUnitTest {
                     .andExpect(jsonPath("$.id").doesNotExist())
                     .andExpect(jsonPath("$.assignedUserRef").doesNotExist());
             when(host.listInstanceTasks("actor", 1, 0, 50)).thenReturn(new WorkflowTaskPage(List.of(task, task), 42L));
-            when(host.listMyTasks("actor", 0, 50)).thenReturn(new WorkflowTaskPage(List.of(task), null));
+            when(host.listMyTasks("actor", personalQuery(null))).thenReturn(new WorkflowPersonalTaskPage(List.of(task), null));
             mvc.perform(get("/custom/instances/1/tasks")).andExpect(status().isOk())
                     .andExpect(jsonPath("$.items[1].nodeName").value("Collect reviews"))
                     .andExpect(jsonPath("$.items[1].taskType").doesNotExist())
@@ -287,7 +329,8 @@ class WorkflowRuntimeWebUnitTest {
             verify(catalog, times(2)).findById(3);
             mvc.perform(get("/custom/tasks/mine")).andExpect(status().isOk())
                     .andExpect(jsonPath("$.items[0].nodeName").value("Collect reviews"))
-                    .andExpect(jsonPath("$.items[0].taskTypeName").value("Sandbox review"));
+                    .andExpect(jsonPath("$.items[0].taskTypeName").value("Sandbox review"))
+                    .andExpect(jsonPath("$.items[0].createdAt").value("1970-01-01T00:00:00Z"));
             verify(host, org.mockito.Mockito.never()).instance("actor", 1);
             verify(host, org.mockito.Mockito.never()).activity("actor", 2);
             var submission=new io.github.leontecristian.workflow.core.dto.runtime.TaskSubmission(5,2,1,9,
@@ -420,7 +463,7 @@ class WorkflowRuntimeWebUnitTest {
             mvc.perform(get("/custom/tasks/5/contract")).andExpect(status().isOk())
                     .andExpect(jsonPath("$.task.status").value("COMPLETED"))
                     .andExpect(jsonPath("$.task.description").value(olderText));
-            when(access.listMyTasks("actor", 0, 50)).thenReturn(new WorkflowTaskPage(List.of(open), null));
+            when(access.listMyTasks("actor", personalQuery(null))).thenReturn(new WorkflowPersonalTaskPage(List.of(open), null));
             mvc.perform(get("/custom/tasks/mine")).andExpect(status().isOk())
                     .andExpect(jsonPath("$.items[0].description").doesNotExist());
 

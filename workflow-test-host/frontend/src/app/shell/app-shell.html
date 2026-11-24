@@ -139,9 +139,12 @@
       @if(detailPage(); as page){
         <nav class="detail-breadcrumb">
           <ol class="breadcrumbs" aria-label="Breadcrumb">
-            <li><a [routerLink]="page.pageHeaderParent.path">{{page.pageHeaderParent.label}}</a></li>
+            @if(page.pageHeaderParent; as parent){
+              <li><a [routerLink]="parent.path">{{parent.label}}</a></li>
+            }
             @if(header){
-              <li class="breadcrumb-current"><mat-icon aria-hidden="true">chevron_right</mat-icon>
+              <li class="breadcrumb-current">
+                @if(page.pageHeaderParent){<mat-icon aria-hidden="true">chevron_right</mat-icon>}
                 <span aria-current="page">{{header.title}}</span></li>
             }
           </ol>
@@ -161,9 +164,7 @@
       </div></mat-toolbar
     >
     @if(header){
-      <console-detail-header [title]="header.title" [description]="header.description">
-        <ng-container meta [ngTemplateOutlet]="header.meta" />
-      </console-detail-header>
+      <console-detail-header [title]="header.title" [description]="header.description" [meta]="header.meta" />
     }
     <main class="workspace">
       @if(failing()){

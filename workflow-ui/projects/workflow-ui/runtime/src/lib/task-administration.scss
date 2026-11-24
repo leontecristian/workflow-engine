@@ -1,25 +1,5 @@
-.administration-content { container-type: inline-size; }
-.task-filter-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: start;
-  gap: 16px;
-}
-.task-filter-grid mat-form-field { width: 100%; min-width: 0; }
-.task-filter-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-}
-.task-filter-toolbar mat-form-field { width: 168px; }
-.task-filter-panel { margin-top: 16px; }
-form { margin-bottom: 24px; }
-.task-filter-chips { display: block; margin: 0 0 24px; }
-.task-filter-chips mat-chip { height: auto; min-height: 32px; max-width: 100%; }
-.task-filter-chips ::ng-deep .mdc-evolution-chip__text-label { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
-.task-filter-chips ::ng-deep .mdc-evolution-chip__cell--primary,
-.task-filter-chips ::ng-deep .mdc-evolution-chip__action--primary { min-width: 0; }
+@use './task-list';
+
 .task-table-scroll { width: 100%; overflow-x: auto; }
 .task-table { width: 100%; min-width: 900px; table-layout: fixed; }
 .task-table th, .task-table td {
@@ -36,22 +16,3 @@ form { margin-bottom: 24px; }
 .task-table .mat-column-assignment { width: 17%; }
 .task-table .mat-column-assignee { width: 14%; }
 .task-table .mat-column-created { width: 12%; }
-.task-empty { margin: 16px 0 0; }
-.task-pagination {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin-top: 24px;
-}
-.task-pagination .page-size { width: 168px; flex: 0 0 168px; }
-@container (min-width: 600px) {
-  .task-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@container (min-width: 960px) {
-  .task-filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-@container (max-width: 599px) {
-  .task-pagination .action-spacer { display: none; }
-  .task-page-info { flex-basis: 100%; }
-}

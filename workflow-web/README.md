@@ -108,4 +108,10 @@ Map monitor/admin collection grants to `canMonitor`/`canAdministerTasks`, monito
 
 Optional `WorkflowAssignmentDirectory` owns `assignmentLabel(task)` and `reassignmentTargets(context, kind, query, cursor, limit)`. Label-only implementations work: inherited search denies with 403 REASSIGNMENT_FORBIDDEN after normal exact-task/permission checks. Missing, blank, invalid, overlong, failing or raw-reference labels fall back to approved neutral display text; explicit search overrides retain bounded opaque-cursor behavior.
 
-My Tasks combines host task visibility with core current-assignee OR assignment eligibility, without ownership authorization. It remains personal even for administrators. Instance-task lists retain bounded refill (500 candidates); monitor and administration retain one candidate page without refill. HTTP/UI contracts and optional command activation are unchanged. See [F027 revision 6](../docs/features/F027-runtime-read-policy-separation/spec.md).
+Open work in My Tasks combines host task visibility with core current-assignee or assignment eligibility. The inbox requires no ownership authorization adapter and remains personal for administrators. Instance-task lists retain bounded refill (500 candidates). Monitor and administration retain one candidate page without refill. See [F027 revision 6](../docs/features/F027-runtime-read-policy-separation/spec.md).
+
+### F039 personal inbox
+
+`GET /tasks/mine` accepts the Task Administration filters `status`, `taskName`, `taskType`, `assignmentKind`, `assignmentRef`, `assigneeRef` and `instanceId`, plus `cursor` and `limit`. Status defaults to OPEN. COMPLETED, CANCELLED and ALL use the same personal read, including closed tasks assigned to the actor at closure and tasks they completed. Every row requires current `canReadTask`. The `{items, nextCursor}` response includes ISO-8601 `createdAt` and exact decimal-string task IDs. Rows are ordered by full creation instant descending, then numeric ID descending.
+
+Pass a continuation with the same applied criteria and actor. An empty page may still have a continuation. Refresh the inbox to discard a previous ascending cursor. Java hosts can use `WorkflowAuthorizedRuntimeReadService.listMyTasks(actorRef, WorkflowPersonalTaskQuery)` for this order. Its ID-ascending overload remains available to existing Java callers.

@@ -330,6 +330,33 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
         }
     }
 
+    @Test void amountReviewReadProjectionsExposeCreatedOnlyInThePersonalInbox() throws Exception {
+        prepareStructuredDefinition(false);
+        var started = startStructured();
+        long taskId = started.task().id();
+        String taskUrl = "/console/api/tasks/" + taskId;
+        String instanceId = Long.toString(started.instance().id());
+        var mvc = MockMvcBuilders.webAppContextSetup(web).addFilters(web.getBean(FilterChainProxy.class)).build();
+        var reviewer = session("f015-reviewer", "ROLE_CONSOLE_REVIEWER");
+
+        for (String url : List.of(taskUrl, "/console/api/instances/" + instanceId + "/tasks", "/console/api/tasks/mine")) {
+            boolean inbox = url.endsWith("/mine");
+            var request = get(url).session(reviewer);
+            if (inbox) request.param("instanceId", instanceId);
+            var response = mvc.perform(request).andReturn().getResponse();
+            assertThat(response.getStatus()).isEqualTo(200);
+            assertThat(response.getContentAsString()).contains("Review approved amount").doesNotContain("taskKey", "instanceId",
+                    "activityId", "assigneeRef", "taskTypeId", "f015-reviewer");
+            if (inbox) {
+                var row = json.readTree(response.getContentAsString()).path("items").get(0);
+                assertThat(row.path("id").textValue()).isEqualTo(Long.toString(taskId));
+                assertThat(Instant.parse(row.path("createdAt").textValue())).isEqualTo(reads.findTask(taskId).orElseThrow().createdAt());
+            } else {
+                assertThat(response.getContentAsString()).doesNotContain("createdAt");
+            }
+        }
+    }
+
     @Test void amountReviewHttpProjectsAuthorizedFieldsAndReplaysFrozenExactResult() throws Exception {
         prepareStructuredDefinition(false);
         var started = startStructured();
@@ -369,12 +396,6 @@ class SharedRuntimeIT extends CompletionAdapterIntegrationTest {
         assertThat(denied.getStatus()).isEqualTo(404);
         assertThat(denied.getContentAsString()).doesNotContain("Approved amount", "precondition", "resultContract", "instanceLockVersion");
 
-        for (String url : List.of(taskUrl, "/console/api/instances/" + started.instance().id() + "/tasks", "/console/api/tasks/mine")) {
-            var response = mvc.perform(get(url).session(reviewer)).andReturn().getResponse();
-            assertThat(response.getStatus()).isEqualTo(200);
-            assertThat(response.getContentAsString()).contains("Review approved amount").doesNotContain("taskKey", "instanceId",
-                    "createdAt", "activityId", "assigneeRef", "taskTypeId", "f015-reviewer");
-        }
         String instanceId = Long.toString(started.instance().id());
         var adminList = get("/console/api/tasks/administration").param("instanceId", instanceId);
         var taskAdministration = mvc.perform(adminList.session(admin)).andReturn().getResponse();
