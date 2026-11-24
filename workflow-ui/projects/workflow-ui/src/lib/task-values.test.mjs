@@ -5,7 +5,7 @@ import { ɵSIGNAL } from '@angular/core';
 import { component, loadTs } from '../../../../unit/component-loader.mjs';
 
 const { WorkflowTaskValuesComponent } = loadTs(new URL('../../runtime/src/lib/task-values.ts', import.meta.url));
-const { bookingExample, businessContextInputs } = loadTs(new URL(
+const { bookingExample, businessContextInputs, orderExample } = loadTs(new URL(
   '../../../../verification/ngmodule-host/src/business-context-fixture.ts', import.meta.url,
 ));
 
@@ -109,4 +109,111 @@ test('input placeholders have a kind distinct from literal text with the same co
     assert.equal(placeholder.text, text);
     assert.equal(placeholder.kind, kind);
   }
+});
+
+test('the raw F038 fixture maps reordered properties and preserves source formatting', t => {
+  const spec = readFileSync(new URL(
+    '../../../../../docs/features/F038-record-tables-and-path-headings/spec.md', import.meta.url,
+  ), 'utf8');
+  assert.equal(orderExample, spec.match(/```json\s+([\s\S]+?)\s+```/)[1].replaceAll('\r\n', '\n'));
+
+  const { page } = component(t, WorkflowTaskValuesComponent);
+  setInput(page.inputs, businessContextInputs('records'));
+  const { columns } = page.inputGroups()[0];
+  const table = columns[0].sections[0].value.table;
+  assert.deepEqual(Array.from(table.columns, column => column.label), ['Sku', 'Quantity', 'Unit price', 'Description']);
+  assert.deepEqual(Array.from(table.columns, column => column.numeric), [false, true, true, false]);
+  assert.deepEqual(Array.from(table.rows, row => Array.from(row, cell => cell.text)), [
+    ['A-100', '2', '300.25', 'Annual licence'],
+    ['B-220', '1', '649', 'Empty text'],
+  ]);
+  assert.equal(table.rows[1][3].kind, 'empty-text');
+  assert.deepEqual(Array.from(columns, column => column.table), [true, false, false, false]);
+
+  setInput(page.inputs, businessContextInputs('records-root'));
+  assert.equal(page.inputGroups()[0].sections[0].value.table.rows[0][2].text, '300.25');
+  setInput(page.inputs, businessContextInputs('records-deep'));
+  const [deepColumn] = page.inputGroups()[0].columns;
+  assert.equal(deepColumn.table, false);
+  assert.equal(deepColumn.sections[1].value.table.rows[1][2].text, '649');
+});
+
+test('record table eligibility uses distinct decoded keys and scalar syntax nodes', t => {
+  const { page } = component(t, WorkflowTaskValuesComponent);
+  const cases = {
+    oneKey: ['[{"a":1},{"a":null}]', true],
+    sixKeys: ['[{"a":1,"b":2,"c":3,"d":4,"e":5,"f":6},{"f":1,"e":2,"d":3,"c":4,"b":5,"a":6}]', true],
+    sevenKeys: ['[{"a":1,"b":2,"c":3,"d":4,"e":5,"f":6,"g":7},{"a":1,"b":2,"c":3,"d":4,"e":5,"f":6,"g":7}]', false],
+    emptyRecords: ['[{},{}]', false],
+    emptyArray: ['[]', false],
+    oneRecord: ['[{"a":1}]', false],
+    omittedKey: ['[{"a":1,"b":null},{"a":2}]', false],
+    changedKey: ['[{"a":1},{"b":2}]', false],
+    duplicate: [String.raw`[{"a":1,"\u0061":2},{"a":3,"b":4}]`, false],
+    laterDuplicate: ['[{"a":1,"b":2},{"a":3,"a":4}]', false],
+    nestedObject: ['[{"a":1},{"a":{}}]', false],
+    nestedArray: ['[{"a":1},{"a":[]}]', false],
+    nonRecord: ['[{"a":1},null]', false],
+    collision: [String.raw`[{"a_b":1,"a-b":2},{"a-b":3,"\u0061_b":4}]`, true],
+  };
+  setInput(page.inputs, Object.fromEntries(Object.entries(cases).map(([key, [valueJson]]) => [
+    key, { type: 'JSON', valueJson },
+  ])));
+  const { groups } = page.inputFields();
+  for (const [index, [key, [, eligible]]] of Object.entries(cases).entries()) {
+    assert.equal(!!groups[index].table, eligible, key);
+  }
+  const collision = groups.at(-1).table;
+  assert.deepEqual(Array.from(collision.columns, column => column.label), ['A b', 'A b']);
+  assert.deepEqual(Array.from(collision.rows[1], cell => cell.text), ['4', '3']);
+});
+
+test('record table alignment and value display distinguish null, zero and literal text', t => {
+  const { page } = component(t, WorkflowTaskValuesComponent);
+  setInput(page.inputs, { records: { type: 'JSON', valueJson: String.raw`[
+    {"quantity":0,"empty":null,"mixed":1,"note":"No value","exact":9007199254740993.0100,"other":false},
+    {"quantity":null,"empty":null,"mixed":"2","note":"first\nsecond","exact":1.2300E+05,"other":""}
+  ]` } });
+  const { table } = page.inputFields().groups[0];
+  assert.deepEqual(Array.from(table.columns, column => column.numeric), [true, false, false, false, true, false]);
+  assert.deepEqual(Array.from(table.rows[0], cell => cell.text), ['0', 'No value', '1', 'No value', '9007199254740993.01', 'No']);
+  assert.deepEqual(Array.from(table.rows[1], cell => cell.text), ['No value', 'No value', '2', 'first\nsecond', '1.2300E+05', 'Empty text']);
+  assert.deepEqual(Array.from(table.rows[0], cell => cell.kind), [undefined, 'null', undefined, undefined, undefined, undefined]);
+  assert.deepEqual(Array.from(table.rows[1], cell => cell.kind), ['null', 'null', undefined, undefined, undefined, 'empty-text']);
+});
+
+test('flat sections retain source order, per-object scalar rows and logical depth', t => {
+  const { page } = component(t, WorkflowTaskValuesComponent);
+  setInput(page.inputs, businessContextInputs('records'));
+  const [, routing, contacts, shipments] = page.inputGroups()[0].columns;
+  const describe = sections => Array.from(sections).flatMap(section => [
+    [section.path.join(' › '), section.level, Array.from(section.value.fields?.rows ?? [], row => row.label)],
+    ...Array.from(section.items ?? []).flatMap(describe),
+  ]);
+  assert.deepEqual(describe(routing.sections), [
+    ['Routing', 4, ['Queue']],
+    ['Escalation', 5, ['Level']],
+    ['Escalation › Window', 6, ['Start', 'End']],
+  ]);
+  assert.deepEqual(describe(contacts.sections), [
+    ['Contacts', 4, []],
+    ['Item 1', 5, ['Name', 'Role']],
+    ['Item 2', 5, ['Name']],
+  ]);
+  assert.deepEqual(describe(shipments.sections), [
+    ['Shipments', 4, []],
+    ['Item 1', 5, ['Carrier']],
+    ['Item 1 › Dimensions', 6, ['Weight kg']],
+    ['Item 2', 5, ['Carrier']],
+    ['Item 2 › Dimensions', 6, ['Weight kg']],
+  ]);
+
+  setInput(page.inputs, { records: { type: 'JSON', valueJson: '[{},false,{"a":{"b":{"c":{"d":1}}}}]' } });
+  const { items } = page.inputGroups()[0].sections[0];
+  assert.equal(items.length, 3);
+  assert.equal(items[0][0].value.kind, 'empty-object');
+  assert.equal(items[1][0].value.text, 'No');
+  assert.deepEqual(describe(items[2]), [
+    ['Item 3', 4, []], ['Item 3 › A', 5, []], ['Item 3 › A › B', 6, []], ['Item 3 › A › B › C', 7, ['D']],
+  ]);
 });

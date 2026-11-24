@@ -75,10 +75,50 @@ const genericInputs = Object.freeze({
   limits: Object.freeze({ type: 'JSON', valueJson: '{"maximum":5.00}' }),
 } satisfies Record<string, TaskInput>);
 
+// F038 revision 1. Keep the reference JSON verbatim, including fractional zeros.
+export const orderExample = String.raw`{
+  "lineItems": [
+    { "sku": "A-100", "quantity": 2, "unitPrice": 300.250, "description": "Annual licence" },
+    { "description": "", "sku": "B-220", "unitPrice": 649.00, "quantity": 1 }
+  ],
+  "routing": {
+    "queue": "finance-l2",
+    "escalation": {
+      "level": 0,
+      "window": { "start": "08:00", "end": "18:00" }
+    }
+  },
+  "contacts": [
+    { "name": "Team A", "role": "Primary" },
+    { "name": "Team B" }
+  ],
+  "shipments": [
+    { "carrier": "DHL", "dimensions": { "weightKg": 1.50 } },
+    { "carrier": "UPS", "dimensions": { "weightKg": 2 } }
+  ]
+}`;
+
+const order = parseTree(orderExample)!;
+const lineItems = findNodeAtLocation(order, ['lineItems'])!;
+const lineItemsSource = orderExample.slice(lineItems.offset, lineItems.offset + lineItems.length);
+const routing = findNodeAtLocation(order, ['routing'])!;
+const routingStart = routing.offset + 1;
+const deepOrder = '{' + orderExample.slice(lineItems.offset + lineItems.length + 1, routingStart)
+  + `"lineItems": ${lineItemsSource},`
+  + orderExample.slice(routingStart).replace('"window"', '"preferredEscalationWindowForInternationalOrderReview"');
+
+function orderInputs(valueJson: string): Readonly<Record<string, TaskInput>> {
+  return Object.freeze({ orderAtSubmission: Object.freeze({ type: 'JSON', valueJson }) });
+}
+
 export function businessContextInputs(mode: string): Readonly<Record<string, TaskInput>> {
   switch (mode) {
     case 'scalar': return scalarInputs;
     case 'generic': return genericInputs;
+    case 'records':
+    case 'records-completed': return orderInputs(orderExample);
+    case 'records-root': return orderInputs(lineItemsSource);
+    case 'records-deep': return orderInputs(deepOrder);
     default: return bookingInputs;
   }
 }

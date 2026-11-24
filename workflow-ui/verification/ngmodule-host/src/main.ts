@@ -1,5 +1,5 @@
 import 'zone.js';
-import { Component, ENVIRONMENT_INITIALIZER, Injectable, NgModule, inject } from '@angular/core';
+import { Component, ENVIRONMENT_INITIALIZER, Injectable, NgModule, inject, input } from '@angular/core';
 import { MatIconRegistry } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -130,12 +130,13 @@ function reassignmentFixture(){
   }
  };
 }
-const completedInputFixture = businessContextEvidence === 'completed' || taskInputEvidence === 'completed' || previousDecisionEvidence === 'completed';
+const completedBusinessContext = businessContextEvidence === 'completed' || businessContextEvidence === 'records-completed';
+const completedInputFixture = completedBusinessContext || taskInputEvidence === 'completed' || previousDecisionEvidence === 'completed';
 const fixtureTask:TaskView={id:'30',nodeName:'Host assigned review',taskTypeName:'Review task',ownershipLabel:'Assigned to you',
  status:completedInputFixture?'COMPLETED':'OPEN',closedAt:completedInputFixture?instance.startedAt:null};
 let fixtureVersion=1;
 let fixtureTarget={kind:'USER' as 'USER'|'GROUP'|'ROLE',ref:taskLayoutEvidence?'reviewer.'+'longreference'.repeat(14):'fixture'};
-let fixtureSubmission: TaskSubmission | null = businessContextEvidence === 'completed' ? {
+let fixtureSubmission: TaskSubmission | null = completedBusinessContext ? {
   outcomeLabel: 'Host approve',
   actorLabel: 'Fixture reviewer',
   occurredAt: instance.startedAt,
@@ -216,6 +217,17 @@ function administrationRow(taskId:string,instanceId:string,name:string,status:st
 @Component({selector:'fixture-read-only-task',standalone:false,providers:[{provide:WORKFLOW_TASK_REASSIGNMENT,useValue:null},{provide:WORKFLOW_RUNTIME_COMMANDS,useValue:null},CommandRecovery],template:'<h2>Read-only consumer without commands</h2><workflow-task id="30" [sessionScope]="scope"/>'})
 class ReadOnlyTask {scope={};}
 
+@Component({
+  selector: 'fixture-definitions',
+  imports: [WorkflowDefinitionsComponent],
+  template: `@defer (on immediate) { <workflow-definitions [sessionScope]="sessionScope()" [messages]="messages()" /> }`,
+  styles: ':host { display: block; }',
+})
+class FixtureDefinitions {
+  readonly sessionScope = input<object | null>(null);
+  readonly messages = input.required<{ definitionsTitle: string }>();
+}
+
 @Component({selector:'fixture-root',standalone:false,template:`
   @if(styleOwnershipEvidence){
     <mat-card appearance="outlined" id="host-card">
@@ -232,18 +244,18 @@ class ReadOnlyTask {scope={};}
       <workflow-commands [sessionScope]="scope"/>
       <console-details [value]="styleOwnershipRecord"/>
     }
-    @else if(styleOwnershipEvidence!=='host'){<workflow-definitions [sessionScope]="scope" [messages]="administrationMessages"/>}
+    @else if(styleOwnershipEvidence!=='host'){<fixture-definitions [sessionScope]="scope" [messages]="administrationMessages"/>}
   }@else if(administrationHttpEvidence){
     <h1>NgModule administration HTTP consumer</h1>
     <p>Host interceptor reads: {{state.intercepted}}</p>
-    <workflow-definitions [sessionScope]="scope" [messages]="administrationMessages"/>
+    <fixture-definitions [sessionScope]="scope" [messages]="administrationMessages"/>
   }@else if(businessContextEvidence){<workflow-task id="30" [sessionScope]="scope"/>}
   @else if(taskLayoutEvidence){<div class="layout-evidence">
    <h1>F026 revision 2 layout verification</h1>
    <nav class="fixture-controls" aria-label="Fixture views"><button (click)="layoutView='tasks'">Task administration view</button><button (click)="layoutView='definitions'">Definitions reference view</button><button (click)="layoutView='task'">Reassignment dialog view</button></nav>
    <nav class="fixture-controls" aria-label="Fixture response modes"><button (click)="mode('success')">Normal responses</button><button (click)="mode('delayed')">Delayed responses</button><button (click)="mode('layout-empty')">Empty page with continuation</button></nav>
    @if(layoutView==='tasks'){<workflow-task-administration [sessionScope]="scope"/>}
-   @if(layoutView==='definitions'){<workflow-definitions [sessionScope]="scope" [messages]="administrationMessages"/>}
+   @if(layoutView==='definitions'){<fixture-definitions [sessionScope]="scope" [messages]="administrationMessages"/>}
    @if(layoutView==='task'){<workflow-task id="30" [sessionScope]="scope"/>}
   </div>}@else if(reassignmentEvidence){<h1>Task administration fixture</h1><workflow-task-administration [sessionScope]="scope"/><workflow-task id="30" [sessionScope]="scope"/><fixture-read-only-task/>}@else{
   <h1>NgModule viewer consumer</h1><p>Host interceptor reads: {{state.intercepted}}</p>
@@ -252,7 +264,7 @@ class ReadOnlyTask {scope={};}
   <div class="viewers"><workflow-instance-viewer [instanceId]="id" [sessionScope]="scope" [messages]="messages"/><workflow-instance-viewer [instanceId]="id" [sessionScope]="scope" [messages]="messages"/></div>
   <workflow-history [instanceId]="id" [sessionScope]="scope" [messages]="messages"/><workflow-history-event [instanceId]="id" sequence="4" [sessionScope]="scope" [messages]="messages"/>
   @if(namedOutputEvidence){<workflow-history-event [instanceId]="id" sequence="3" [sessionScope]="scope" [messages]="messages"/>}
-  <workflow-definitions [sessionScope]="scope" [messages]="administrationMessages"/>
+  <fixture-definitions [sessionScope]="scope" [messages]="administrationMessages"/>
   <p>Custom host command calls: {{state.commands}}</p><workflow-task id="30" [sessionScope]="scope" [messages]="runtimeMessages"/><workflow-commands [sessionScope]="scope" [messages]="runtimeMessages"/><fixture-read-only-task/>}<router-outlet/>
 `}) class App {
   state=inject(FixtureState); id=id; scope:object|null={};messages=DEFAULT_VIEWER_MESSAGES;
@@ -272,7 +284,7 @@ class ReadOnlyTask {scope={};}
   locale(){this.messages={...DEFAULT_VIEWER_MESSAGES,refresh:'Actualiser',current:'Étape actuelle',graph:'Graphe du workflow'};}
   mode(value:string){this.state.mode=value;this.scope={};}
 }
-@NgModule({declarations:[App,Destination,ReadOnlyTask],imports:[BrowserModule,RouterLink,RouterOutlet,MatButtonModule,MatCardModule,MatDialogModule,ConsoleDetails,WorkflowInstanceViewerComponent,WorkflowHistoryComponent,WorkflowHistoryEventComponent,WorkflowDefinitionsComponent,WorkflowTaskAdministrationComponent,WorkflowTaskComponent,WorkflowCommandsComponent,WorkflowInstancesComponent],
+@NgModule({declarations:[App,Destination,ReadOnlyTask],imports:[BrowserModule,RouterLink,RouterOutlet,MatButtonModule,MatCardModule,MatDialogModule,ConsoleDetails,WorkflowInstanceViewerComponent,WorkflowHistoryComponent,WorkflowHistoryEventComponent,FixtureDefinitions,WorkflowTaskAdministrationComponent,WorkflowTaskComponent,WorkflowCommandsComponent,WorkflowInstancesComponent],
   providers:[FixtureState,Reads,Navigation,
     ...(administrationHttpEvidence ? [] : [
       RuntimeReads,RuntimeCommands,

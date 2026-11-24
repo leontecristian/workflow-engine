@@ -59,7 +59,7 @@
   font-weight: 550;
 }
 
-.input-rows, .input-row dd, .input-items {
+.input-rows, .input-row dd {
   margin: 0;
 }
 
@@ -91,20 +91,54 @@
   margin-block-start: 12px;
 }
 
-.input-items {
-  display: grid;
-  gap: 8px;
-  padding: 0;
-  list-style: none;
-}
-
+.input-items,
 .input-items > li {
-  min-inline-size: 0;
+  // Keep list semantics while every section uses the same column for layout.
+  display: contents;
 }
 
-.input-items > li + li {
+.input-items > li + li > .input-group:first-child {
   border-block-start: 1px solid var(--task-value-outline);
+  margin-block-start: 4px;
   padding-block-start: 8px;
+}
+
+.input-table-column {
+  grid-column: 1 / -1;
+}
+
+.input-table-region {
+  min-inline-size: 0;
+  overflow-x: auto;
+}
+
+.input-table-region:focus-visible {
+  outline: 2px solid var(--mat-sys-primary, currentColor);
+  outline-offset: -2px;
+}
+
+.input-table {
+  inline-size: 100%;
+  min-inline-size: calc(6rem * var(--task-table-columns));
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.input-table th,
+.input-table td {
+  padding: 8px;
+  border-block-end: 1px solid var(--task-value-outline);
+  text-align: start;
+  vertical-align: top;
+}
+
+.input-table th {
+  font-weight: 500;
+}
+
+.input-table .input-number {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
 }
 
 @container (max-width: 24rem) {

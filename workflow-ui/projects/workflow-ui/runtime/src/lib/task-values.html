@@ -1,8 +1,28 @@
 @if (inputs() !== undefined) {
   @let fields = inputFields();
   <ng-container [ngTemplateOutlet]="rows" [ngTemplateOutletContext]="{ $implicit: fields.rows }" />
-  @for (group of fields.groups; track $index) {
-    <ng-container [ngTemplateOutlet]="groupContent" [ngTemplateOutletContext]="{ $implicit: group, level: 3 }" />
+  @for (entry of inputGroups(); track $index) {
+    <div class="input-group">
+      @if (entry.group.fields; as fields) {
+        <div class="input-heading" role="heading" aria-level="3">{{entry.group.label}}</div>
+        @if (entry.group.text !== undefined) {
+          <div class="value-text" [class.value-placeholder]="!!entry.group.kind">{{entry.group.text}}</div>
+        } @else {
+          <ng-container [ngTemplateOutlet]="rows" [ngTemplateOutletContext]="{ $implicit: fields.rows }" />
+          @if (entry.columns.length) {
+            <div class="input-groups">
+              @for (column of entry.columns; track $index) {
+                <div class="input-group" [class.input-table-column]="column.table">
+                  <ng-container [ngTemplateOutlet]="sections" [ngTemplateOutletContext]="{ $implicit: column.sections }" />
+                </div>
+              }
+            </div>
+          }
+        }
+      } @else {
+        <ng-container [ngTemplateOutlet]="sections" [ngTemplateOutletContext]="{ $implicit: entry.sections }" />
+      }
+    </div>
   }
 } @else {
   @for (value of resultValues(); track $index) {
@@ -27,33 +47,56 @@
   }
 </ng-template>
 
-<ng-template #groupContent let-group let-level="level">
-  <div class="input-group">
-    @let fields = group.fields;
-    <div class="input-heading" role="heading" [attr.aria-level]="level">{{group.label}}</div>
-    @if (group.text !== undefined) {
-      <div class="value-text" [class.value-placeholder]="!!group.kind">{{group.text}}</div>
-    } @else if (fields) {
-      <ng-container [ngTemplateOutlet]="rows" [ngTemplateOutletContext]="{ $implicit: fields.rows }" />
-      @if (fields.groups.length) {
-        <div class="input-groups">
-          @for (child of fields.groups; track $index) {
-            <ng-container [ngTemplateOutlet]="groupContent" [ngTemplateOutletContext]="{ $implicit: child, level: level + 1 }" />
-          }
+<ng-template #sections let-entries>
+  @for (section of entries; track $index) {
+    @let value = section.value;
+    <section class="input-group">
+      @if (section.path.length) {
+        <div class="input-heading" role="heading" [attr.aria-level]="section.level > 6 ? 6 : section.level"
+             [attr.aria-label]="section.path.length > 1 ? section.path.join(' ') : null">
+          {{section.path.join(' › ')}}
         </div>
+        @if (value.table; as table) {
+          <div class="input-table-region" role="region" tabindex="0" [attr.aria-label]="section.path.join(' ')">
+            <table class="input-table" [style.--task-table-columns]="table.columns.length + 1">
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  @for (column of table.columns; track $index) {
+                    <th scope="col" [class.input-number]="column.numeric">{{column.label}}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of table.rows; track $index; let index = $index) {
+                  <tr>
+                    <th scope="row">{{index + 1}}</th>
+                    @for (cell of row; track $index) {
+                      <td class="value-text" [class.input-number]="table.columns[$index].numeric"
+                          [class.value-placeholder]="!!cell.kind">{{cell.text}}</td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else if (value.text !== undefined) {
+          <div class="value-text" [class.value-placeholder]="!!value.kind">{{value.text}}</div>
+        } @else if (value.fields) {
+          <ng-container [ngTemplateOutlet]="rows" [ngTemplateOutletContext]="{ $implicit: value.fields.rows }" />
+        }
+      } @else {
+        <ng-container [ngTemplateOutlet]="rows" [ngTemplateOutletContext]="{ $implicit: [value] }" />
       }
-    } @else {
+    </section>
+    @if (section.items?.length) {
       <ol class="input-items" role="list">
-        @for (item of group.children; track $index) {
-          <li>
-            @if (item.fields || item.children) {
-              <ng-container [ngTemplateOutlet]="groupContent" [ngTemplateOutletContext]="{ $implicit: item, level: level + 1 }" />
-            } @else {
-              <ng-container [ngTemplateOutlet]="rows" [ngTemplateOutletContext]="{ $implicit: [item] }" />
-            }
+        @for (item of section.items; track $index) {
+          <li role="listitem">
+            <ng-container [ngTemplateOutlet]="sections" [ngTemplateOutletContext]="{ $implicit: item }" />
           </li>
         }
       </ol>
     }
-  </div>
+  }
 </ng-template>
