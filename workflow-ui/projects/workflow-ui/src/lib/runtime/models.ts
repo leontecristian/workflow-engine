@@ -24,6 +24,8 @@ export interface TaskInput {
 
 export interface TaskDetail {
   nodeName?: string;
+  /** Plain-text instructions from the pinned human node, supplied on the exact task contract. */
+  description?: string;
   taskTypeName?: string;
   status: string;
   dueAt?: string | null;

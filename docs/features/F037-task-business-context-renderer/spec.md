@@ -1,6 +1,14 @@
 # F037 — Compact task business context
 
-Revision 1 · IMPLEMENTED · 2026-11-24 · Owner: workflow maintainer. [Constitution v6.6.1](../../constitution.md), [CON-03/08/10/13](../../constraints.md), [ASM-05/10](../../assumptions.md).
+Revision 2 · IMPLEMENTED · 2026-11-24 · Owner: workflow maintainer. Revision 1 is IMPLEMENTED. [Constitution v6.6.1](../../constitution.md), [CON-03/08/10/13](../../constraints.md), [ASM-05/10](../../assumptions.md).
+
+## Revision 2 — Assignee instructions under the task title
+
+On a `HUMAN_TASK`, the existing optional [node description](../../architecture/workflow-definition-language-design.md#12115-human-task-type-and-assembled-structure) is plain-text guidance for anyone authorized to view that task. This applies to existing published versions as well as newly authored ones. Authors should consider descriptions in host-imported definitions user-visible when adopting this revision.
+
+- **With instructions.** Show the pinned human node’s description once, immediately below the task title and before task metadata or Business context. Preserve line breaks, wrap long text and display markup literally. The same placement applies to the shared task header and the sandbox-owned header, including when viewing a closed task.
+- **Without instructions.** If the description is absent, empty or whitespace-only, show no subtitle or reserved instructions space. Omit the generic review/view sentence. A description on the workflow family or task type supplies no fallback.
+- **Version and scope.** Given two published versions with different instructions on the same step, opening a task from each shows its own version’s wording. The existing authorized task-detail read supplies the text. The change is confined to task detail.
 
 ## Reviewer experience
 

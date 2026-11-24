@@ -1,8 +1,10 @@
-<header class="page-heading" [class.with-title-actions]="titleActions()">
+<header class="page-heading" [class.with-title-actions]="titleActions()" [class.multiline-description]="multilineDescription()">
   <div class="heading-copy">
     <div class="eyebrow">{{ meta().eyebrow }}</div>
     <h1>{{ meta().title }}</h1>
-    <p class="description">{{ meta().description }}</p>
+    @if (meta().description; as description) {
+      <p class="description">{{ description }}</p>
+    }
   </div>
   <div class="page-context">
     <mat-icon aria-hidden="true">{{meta().icon}}</mat-icon><span

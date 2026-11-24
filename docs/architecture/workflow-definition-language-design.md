@@ -1628,7 +1628,7 @@ The assembled human-node fields are:
 | Field | Required? | Contract |
 | --- | --- | --- |
 | `key`, `type`, `name` | Yes | Common node fields; type is HUMAN_TASK (section 12.1.7). |
-| `description` | No | Common optional description. |
+| `description` | No | Plain-text instructions for the assignee on this human step. [F037 revision 2](../features/F037-task-business-context-renderer/spec.md#revision-2--assignee-instructions-under-the-task-title) specifies display on authorized task detail. |
 | `taskType` | Yes | Existing stable catalog code, as above. |
 | `assignment` | Yes | Registered resolver and empty `inputs` object (section 12.1.10). |
 | `claimPolicy` | No | OPTIONAL (default) or REQUIRED, subject to USER/shared-target rules (section 9.2). |

@@ -33,7 +33,9 @@ export class TaskPage implements PageHeaderSource {
   readonly pageHeader = computed(() => {
     const task = this.headerContract()?.task;
     const meta = this.headerMeta();
-    return task && meta ? { title: task.nodeName || task.taskTypeName || 'Task', meta } : null;
+    return task && meta
+      ? { title: task.nodeName || task.taskTypeName || 'Task', description: task.description, meta }
+      : null;
   });
   readonly session = inject(ConsoleSession);
   readonly id = signal('');

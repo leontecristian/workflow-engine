@@ -336,7 +336,12 @@ public class WorkflowRuntimeReadController {
                 inputs.put(key, new WorkflowTaskContract.Input(value.type(), wireValue(value))));
         String previousMode = reads.previousDecisionsPolicy(taskId).mode().name();
         Map<String, Object> contract = new LinkedHashMap<>();
-        contract.put("task", projection.task(task, node, false));
+        var detail = projection.task(task, node, false);
+        String description = node.path("description").textValue();
+        if (description != null && !description.isBlank()) {
+            detail.put("description", description);
+        }
+        contract.put("task", detail);
         String workflowName = projection.workflowName(instance.definitionVersionId());
         if (workflowName != null) {
             contract.put("workflow", Map.of("name", workflowName, "instanceId", instance.id()));

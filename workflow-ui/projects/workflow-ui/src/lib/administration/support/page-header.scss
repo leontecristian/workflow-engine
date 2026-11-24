@@ -31,6 +31,14 @@ h1 {
   font-size: 0.875rem;
   line-height: 1.6;
 }
+.multiline-description h1 {
+  margin-block-end: 0;
+}
+.multiline-description .description {
+  margin-block-start: 9px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .page-context {
   display: flex;
   gap: 8px;
@@ -92,11 +100,17 @@ h1 { grid-area: title; }
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas: "eyebrow eyebrow" "title actions" "context context" "description description";
   }
+  .with-title-actions.multiline-description {
+    grid-template-areas: "eyebrow eyebrow" "title actions" "description description" "context context";
+  }
 }
 @media (max-width: 480px) {
   .with-title-actions {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "eyebrow" "title" "context" "actions" "description";
+  }
+  .with-title-actions.multiline-description {
+    grid-template-areas: "eyebrow" "title" "description" "context" "actions";
   }
   .page-actions {
     margin-top: 12px;

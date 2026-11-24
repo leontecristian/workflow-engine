@@ -1,5 +1,19 @@
 # F037 implementation record
 
+## Revision 2 — Assignee instructions
+
+2026-11-24 · The authorized task contract now includes optional `task.description` from the instance's pinned human node. The existing HTTP adapter carries the field through. The shared task header and the sandbox shell each render the description as plain text when they own the title. Blank descriptions omit the subtitle. The generic review and view sentences were removed from task detail.
+
+- **Web unit PASS.** With Corretto 21.0.13, ran `./mvnw.cmd -o -B -ntp -pl workflow-web -am` with the two selected `WorkflowRuntimeWebUnitTest` methods `taskContractShowsOnlyThePinnedHumanNodeInstructions` and `readOnlyContractExposesBusinessContextWithoutCommandMetadata`, the offline resolver override and the cached Mockito 5.14.2 agent. Both passed. The checks covered two instance pins for the same step, including the older closed task, exact multiline text, omission for absent or blank values, and absence from task lists.
+- **Angular package PASS.** With Node 22.22.0 and npm 10.9.4, ran `npm run build` in `workflow-ui`.
+- **HTTP adapter PASS.** Ran `node --test --test-name-pattern 'A3:' http-adapter.test.mjs` in the NgModule fixture with the rebuilt package. One selected test passed. The adapter retained multiline markup as text and preserved omission in an older response.
+- **Consumer builds and browser PASS.** Used Node 22.22.0 to run `node ../../node_modules/@angular/cli/bin/ng.js build` from the isolated NgModule fixture at `workflow-ui/verification/ngmodule-host/dist/f037r2` and `node node_modules/@angular/cli/bin/ng.js build` from `workflow-test-host/frontend/.angular/option-a-workspace`. Both builds passed with budget and Sass warnings. From the isolated NgModule fixture, ran `node make-probe.mjs` followed by `node probe-runtime.mjs` with both consumer browser output directories. Chrome 157.0.8103.79 passed 32 combinations of header owner, open or completed task, present, blank, empty or absent description, and 320- or 1280-pixel viewport. Present instructions followed the H1 once, before status. Line breaks were preserved, markup stayed literal and the long token wrapped without horizontal overflow. Empty cases rendered no subtitle or generic copy. The initial sandboxed Chrome launch failed at Crashpad startup. The approved isolated retry passed and cleaned up its Chrome process and loopback listener.
+- **REUSED.** Revision 1's renderer evidence below still applies to the unchanged business input and result sections.
+- **Review and static checks PASS.** Independent focused review found no actionable issues. The final diff and `git diff --check` passed. F038 files and the F038 index entry were preserved.
+- **NOT RUN.** Live sandbox, database and APOLO verification. The browser used prepared responses. Pinned-version selection was verified in the web unit test.
+
+## Revision 1 — Business context
+
 Revision 1 · 2026-11-24 · Code baseline `11365a3`. HEAD advanced to the unrelated roadmap-only commit `2534f78` during verification. The implementation request approved the behavior in the draft and moved revision 1 to READY before code changes.
 
 ## Implementation

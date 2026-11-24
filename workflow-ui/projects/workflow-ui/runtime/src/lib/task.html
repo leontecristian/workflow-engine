@@ -2,10 +2,10 @@
 
 @if(detail(); as task) {
   @if(!externalPageHeader()){
-    <console-page-header [titleActions]="true" [meta]="{
+    <console-page-header [titleActions]="true" [multilineDescription]="true" [meta]="{
       title: task.nodeName || task.taskTypeName || 'Task',
       eyebrow: 'YOUR WORKSPACE',
-      description: handler() ? 'Review the request and record your decision.' : 'View the task details and any recorded decision.',
+      description: task.description?.trim() ? task.description : undefined,
       icon: 'assignment_turned_in'
     }" />
   }

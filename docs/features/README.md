@@ -2,7 +2,7 @@
 
 [F038 — Record tables and path headings for task inputs](F038-record-tables-and-path-headings/spec.md) is **IMPLEMENTED revision 1 — 2026-11-24**. It renders uniform record arrays as tables and deeper task input groups as flat sections with path headings. See the [implementation record](F038-record-tables-and-path-headings/implementation.md).
 
-[F037 — Compact task business context](F037-task-business-context-renderer/spec.md) is **IMPLEMENTED revision 1 — 2026-11-24**. It gives frozen task inputs a responsive layout and formats decimals from their exact source tokens. See the [implementation record](F037-task-business-context-renderer/implementation.md).
+[F037 — Compact task business context](F037-task-business-context-renderer/spec.md) is **IMPLEMENTED revision 2 — 2026-11-24**. Revision 2 shows optional pinned assignee instructions beneath the task title. Revision 1 implemented responsive frozen task inputs and exact-token decimal formatting. See the [implementation record](F037-task-business-context-renderer/implementation.md).
 
 [F036 — Workflow UI style ownership](F036-workflow-ui-style-ownership/spec.md) is **IMPLEMENTED revision 1 — 2026-11-20**. It packages shared component styles and aligns Definitions lookup below the list. See the [plan](F036-workflow-ui-style-ownership/plan.md), [tasks](F036-workflow-ui-style-ownership/tasks.md) and [implementation record](F036-workflow-ui-style-ownership/implementation.md).
 

@@ -17,6 +17,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.leontecristian.workflow.core.dto.definition.DefinitionVersionView;
+import io.github.leontecristian.workflow.core.dto.definition.document.PreviousDecisionsPolicy;
 import io.github.leontecristian.workflow.core.dto.runtime.ActorKind;
 import io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind;
 import io.github.leontecristian.workflow.core.dto.runtime.BooleanLiteral;
@@ -29,7 +31,9 @@ import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmission;
 import io.github.leontecristian.workflow.core.dto.runtime.TaskSubmissionPage;
 import io.github.leontecristian.workflow.core.dto.runtime.TextLiteral;
 import io.github.leontecristian.workflow.core.dto.runtime.VariableValueType;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowActivityView;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowCommandResult;
+import io.github.leontecristian.workflow.core.dto.runtime.WorkflowInstanceView;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowJsonValue;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskPage;
 import io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView;
@@ -367,6 +371,69 @@ class WorkflowRuntimeWebUnitTest {
                     .andExpect(jsonPath("$.resultContract.form").doesNotExist());
             verify(host, org.mockito.Mockito.never()).instance("actor", instanceId);
             verify(host, org.mockito.Mockito.never()).activity("actor", 2);
+        }
+    }
+
+    @Test void taskContractShowsOnlyThePinnedHumanNodeInstructions() throws Exception {
+        try (var c = context(Host.class, Reads.class, WorkflowRuntimeReadConfiguration.class)) {
+            var reads = c.getBean(WorkflowRuntimeQueryService.class);
+            var access = c.getBean(WorkflowAuthorizedRuntimeReadService.class);
+            var definitions = c.getBean(WorkflowDefinitionService.class);
+            var closed = task(5);
+            var open = new WorkflowTaskView(6, 9, 7, 3, "REVIEW", closed.assignment(), TaskStatus.OPEN,
+                    null, Instant.EPOCH, null, null, null, null, null);
+            var olderInstance = mock(WorkflowInstanceView.class);
+            var newerInstance = mock(WorkflowInstanceView.class);
+            var olderActivity = mock(WorkflowActivityView.class);
+            var newerActivity = mock(WorkflowActivityView.class);
+            when(olderInstance.definitionVersionId()).thenReturn(4L);
+            when(newerInstance.definitionVersionId()).thenReturn(8L);
+            when(reads.findInstance(1)).thenReturn(Optional.of(olderInstance));
+            when(reads.findInstance(7)).thenReturn(Optional.of(newerInstance));
+            when(olderActivity.nodeKey()).thenReturn("REVIEW");
+            when(newerActivity.nodeKey()).thenReturn("REVIEW");
+            when(reads.findActivity(2)).thenReturn(Optional.of(olderActivity));
+            when(reads.findActivity(9)).thenReturn(Optional.of(newerActivity));
+            when(access.task("actor", 5)).thenReturn(closed);
+            when(access.task("actor", 6)).thenReturn(open);
+            when(reads.previousDecisionsPolicy(5)).thenReturn(PreviousDecisionsPolicy.NONE);
+            when(reads.previousDecisionsPolicy(6)).thenReturn(PreviousDecisionsPolicy.NONE);
+
+            String olderText = "Check the original booking.\nUse <b>literal</b> text.";
+            String newerText = "Check the revised booking.";
+            var mapper = new ObjectMapper();
+            var olderVersion = mock(DefinitionVersionView.class);
+            var newerVersion = mock(DefinitionVersionView.class);
+            when(definitions.findVersion(4)).thenReturn(Optional.of(olderVersion));
+            when(definitions.findVersion(8)).thenReturn(Optional.of(newerVersion));
+            var olderDocument = mapper.createObjectNode().put("description", "Family instructions");
+            olderDocument.putArray("nodes").addObject().put("key", "REVIEW").put("description", olderText);
+            var newerDocument = mapper.createObjectNode().put("description", "Family instructions");
+            var newerNode = newerDocument.putArray("nodes").addObject().put("key", "REVIEW").put("description", newerText);
+            when(olderVersion.documentJson()).thenReturn(olderDocument.toString());
+            when(newerVersion.documentJson()).thenReturn(newerDocument.toString());
+
+            var mvc = mvc(c);
+            mvc.perform(get("/custom/tasks/6/contract")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.task.status").value("OPEN"))
+                    .andExpect(jsonPath("$.task.description").value(newerText));
+            mvc.perform(get("/custom/tasks/5/contract")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.task.status").value("COMPLETED"))
+                    .andExpect(jsonPath("$.task.description").value(olderText));
+            when(access.listMyTasks("actor", 0, 50)).thenReturn(new WorkflowTaskPage(List.of(open), null));
+            mvc.perform(get("/custom/tasks/mine")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items[0].description").doesNotExist());
+
+            for (String description : List.of("", " \n\t ")) {
+                newerNode.put("description", description);
+                when(newerVersion.documentJson()).thenReturn(newerDocument.toString());
+                mvc.perform(get("/custom/tasks/6/contract")).andExpect(status().isOk())
+                        .andExpect(jsonPath("$.task.description").doesNotExist());
+            }
+            newerNode.remove("description");
+            when(newerVersion.documentJson()).thenReturn(newerDocument.toString());
+            mvc.perform(get("/custom/tasks/6/contract")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.task.description").doesNotExist());
         }
     }
 

@@ -23,15 +23,21 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+.page-header-description, .page-header-meta {
+  font-size: 14px;
+  line-height: 20px;
+  color: #44474e;
+  overflow-wrap: anywhere;
+}
+.page-header-description {
+  margin: 0;
+  white-space: pre-wrap;
+}
 .page-header-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
   align-items: center;
-  font-size: 14px;
-  line-height: 20px;
-  color: #44474e;
-  overflow-wrap: anywhere;
 }
 
 @media (max-width: 599px) {

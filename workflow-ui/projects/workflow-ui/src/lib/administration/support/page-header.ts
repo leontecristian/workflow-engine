@@ -3,7 +3,7 @@ import { MatIconModule } from "@angular/material/icon";
 export interface PageMeta {
   title: string;
   eyebrow: string;
-  description: string;
+  description?: string;
   icon: string;
   listTitle?: string;
   listDescription?: string;
@@ -20,4 +20,5 @@ export class ConsolePageHeader {
   admin = input(false);
   context = input("");
   titleActions = input(false);
+  multilineDescription = input(false);
 }

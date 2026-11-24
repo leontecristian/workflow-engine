@@ -161,7 +161,7 @@
       </div></mat-toolbar
     >
     @if(header){
-      <console-detail-header [title]="header.title">
+      <console-detail-header [title]="header.title" [description]="header.description">
         <ng-container meta [ngTemplateOutlet]="header.meta" />
       </console-detail-header>
     }

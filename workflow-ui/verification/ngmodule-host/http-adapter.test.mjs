@@ -207,12 +207,20 @@ test('A3: standard reads keep route separation, exact values, form references an
     ]}}
   }`);
   const hydrated = await contract;
+  assert.equal(Object.hasOwn(hydrated.task, 'description'), false);
   assert.equal(hydrated.precondition, precondition);
   assert.deepEqual(hydrated.inputs.payload, { type: 'JSON', valueJson: raw.trim() });
   assert.equal(hydrated.inputs.note.valueJson, 'null');
   const [first, repeated, other] = hydrated.resultContract.form.fields;
   assert.equal(first, repeated);
   assert.equal(other.help, 'Shared help');
+
+  const description = '  Check the booking.\nKeep <b>literal markup</b>.  ';
+  const described = reads.taskContract(id, abort);
+  request('GET', task + '/contract').flush(JSON.stringify({
+    task: { status: 'COMPLETED', description },
+  }));
+  assert.equal((await described).task.description, description);
 
   const accepted = reads.taskSubmission(id, abort);
   const submissionText = `{"taskId":"${id}","result":${raw}}`;
