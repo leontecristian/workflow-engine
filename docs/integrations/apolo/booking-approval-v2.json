@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 1,
+  "key": "booking-approval",
+  "version": 2,
+  "name": "Booking approval",
+  "startPolicy": {
+    "inputContract": [
+      {
+        "key": "bookingReference",
+        "type": "STRING",
+        "required": true,
+        "nullable": false
+      }
+    ],
+    "initialize": {
+      "bookingReference": {
+        "source": "startInput",
+        "key": "bookingReference"
+      },
+      "statusSent": {
+        "source": "literal",
+        "value": "Sent"
+      },
+      "statusApproved": {
+        "source": "literal",
+        "value": "Approved"
+      },
+      "statusRejected": {
+        "source": "literal",
+        "value": "Rejected"
+      }
+    }
+  },
+  "variables": [
+    {
+      "key": "bookingReference",
+      "type": "STRING",
+      "nullable": false
+    },
+    {
+      "key": "statusSent",
+      "type": "STRING",
+      "nullable": false
+    },
+    {
+      "key": "statusApproved",
+      "type": "STRING",
+      "nullable": false
+    },
+    {
+      "key": "statusRejected",
+      "type": "STRING",
+      "nullable": false
+    }
+  ],
+  "nodes": [
+    {
+      "key": "BEGIN",
+      "type": "START",
+      "name": "Start"
+    },
+    {
+      "inputs": {
+        "status": {
+          "source": "variable",
+          "key": "statusSent"
+        }
+      },
+      "key": "markSent",
+      "outputs": {},
+      "type": "SERVICE_TASK",
+      "action": "apolo.setBookingStatus",
+      "name": "Mark booking sent"
+    },
+    {
+      "key": "review",
+      "type": "HUMAN_TASK",
+      "name": "Review booking",
+      "taskType": "BOOKING_REVIEW",
+      "assignment": {
+        "resolver": "apolo.reviewer",
+        "inputs": {}
+      },
+      "completion": {
+        "policy": "SINGLE"
+      },
+      "inputs": {
+        "bookingReference": {
+          "source": "variable",
+          "key": "bookingReference"
+        }
+      },
+      "resultContract": {
+        "mode": "FORBIDDEN"
+      },
+      "outcomes": [
+        {
+          "key": "APPROVE",
+          "label": "Approve",
+          "requiresComment": false
+        },
+        {
+          "key": "REJECT",
+          "label": "Reject",
+          "requiresComment": true
+        }
+      ]
+    },
+    {
+      "inputs": {
+        "status": {
+          "source": "variable",
+          "key": "statusApproved"
+        }
+      },
+      "key": "markApproved",
+      "outputs": {},
+      "type": "SERVICE_TASK",
+      "action": "apolo.setBookingStatus",
+      "name": "Mark booking approved"
+    },
+    {
+      "inputs": {
+        "status": {
+          "source": "variable",
+          "key": "statusRejected"
+        }
+      },
+      "key": "markRejected",
+      "outputs": {},
+      "type": "SERVICE_TASK",
+      "action": "apolo.setBookingStatus",
+      "name": "Mark booking rejected"
+    },
+    {
+      "key": "APPROVED",
+      "type": "END",
+      "name": "Approved",
+      "result": "APPROVED"
+    },
+    {
+      "key": "REJECTED",
+      "type": "END",
+      "name": "Rejected",
+      "result": "REJECTED"
+    }
+  ],
+  "transitions": [
+    {
+      "key": "submit",
+      "from": "BEGIN",
+      "to": "markSent"
+    },
+    {
+      "key": "approve",
+      "from": "review",
+      "outcome": "APPROVE",
+      "to": "markApproved"
+    },
+    {
+      "key": "reject",
+      "from": "review",
+      "outcome": "REJECT",
+      "to": "markRejected"
+    },
+    {
+      "key": "requestReview",
+      "from": "markSent",
+      "to": "review"
+    },
+    {
+      "key": "approvedEnd",
+      "from": "markApproved",
+      "to": "APPROVED"
+    },
+    {
+      "key": "rejectedEnd",
+      "from": "markRejected",
+      "to": "REJECTED"
+    }
+  ]
+}

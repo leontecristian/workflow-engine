@@ -1,0 +1,121 @@
+:host {
+  display: grid;
+  gap: 10px;
+  min-inline-size: 0;
+}
+
+:host(.input-presentation) {
+  --task-value-outline: var(--mat-sys-outline-variant, var(--mdc-outlined-card-outline-color, currentColor));
+  --task-value-label-width: 10rem;
+  container-type: inline-size;
+  gap: 20px;
+}
+
+.value-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.input-group, .input-row {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.input-group {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.input-heading {
+  font-weight: 500;
+  color: var(--mat-sys-on-surface, inherit);
+}
+
+.input-heading[aria-level="3"] {
+  font-size: 16px;
+  line-height: 24px;
+  margin-block-end: 8px;
+}
+
+.input-heading[aria-level="4"] {
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--mat-sys-on-surface-variant, inherit);
+  padding-block-end: 8px;
+  margin-block-end: 4px;
+  border-block-end: 1px solid var(--task-value-outline);
+}
+
+.input-heading:not([aria-level="3"]):not([aria-level="4"]) {
+  font-size: 14px;
+  line-height: 20px;
+  margin-block: 8px 2px;
+}
+
+.result-label {
+  font-weight: 550;
+}
+
+.input-rows, .input-row dd, .input-items {
+  margin: 0;
+}
+
+.input-row {
+  display: grid;
+  grid-template-columns: minmax(0, var(--task-value-label-width)) minmax(0, 1fr);
+  gap: 16px;
+  padding-block: 4px;
+}
+
+.input-row dt,
+:host(.input-presentation) .value-placeholder {
+  color: var(--mat-sys-on-surface-variant, inherit);
+}
+
+:host(.input-presentation) .value-placeholder {
+  font-style: italic;
+}
+
+:host > * + .input-group {
+  border-block-start: 1px solid var(--task-value-outline);
+  padding-block-start: 20px;
+}
+
+.input-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: 28px 40px;
+  margin-block-start: 12px;
+}
+
+.input-items {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.input-items > li {
+  min-inline-size: 0;
+}
+
+.input-items > li + li {
+  border-block-start: 1px solid var(--task-value-outline);
+  padding-block-start: 8px;
+}
+
+@container (max-width: 24rem) {
+  .input-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+}
+
+workflow-task-values {
+  margin: .4rem 0 0 .75rem;
+  padding-left: .75rem;
+  border-left: 1px solid var(--mat-sys-outline-variant);
+}

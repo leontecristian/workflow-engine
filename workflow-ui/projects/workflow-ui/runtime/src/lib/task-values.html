@@ -1,0 +1,59 @@
+@if (inputs() !== undefined) {
+  @let fields = inputFields();
+  <ng-container [ngTemplateOutlet]="rows" [ngTemplateOutletContext]="{ $implicit: fields.rows }" />
+  @for (group of fields.groups; track $index) {
+    <ng-container [ngTemplateOutlet]="groupContent" [ngTemplateOutletContext]="{ $implicit: group, level: 3 }" />
+  }
+} @else {
+  @for (value of resultValues(); track $index) {
+    <div>
+      @if (value.label) { <div class="result-label">{{value.label}}</div> }
+      @if (value.children; as children) { <workflow-task-values [nested]="children" /> }
+      @else { <div class="value-text" [class.value-placeholder]="!!value.kind">{{value.text}}</div> }
+    </div>
+  }
+}
+
+<ng-template #rows let-fields>
+  @if (fields.length) {
+    <dl class="input-rows">
+      @for (field of fields; track $index) {
+        <div class="input-row">
+          <dt>{{field.label}}</dt>
+          <dd class="value-text" [class.value-placeholder]="!!field.kind">{{field.text}}</dd>
+        </div>
+      }
+    </dl>
+  }
+</ng-template>
+
+<ng-template #groupContent let-group let-level="level">
+  <div class="input-group">
+    @let fields = group.fields;
+    <div class="input-heading" role="heading" [attr.aria-level]="level">{{group.label}}</div>
+    @if (group.text !== undefined) {
+      <div class="value-text" [class.value-placeholder]="!!group.kind">{{group.text}}</div>
+    } @else if (fields) {
+      <ng-container [ngTemplateOutlet]="rows" [ngTemplateOutletContext]="{ $implicit: fields.rows }" />
+      @if (fields.groups.length) {
+        <div class="input-groups">
+          @for (child of fields.groups; track $index) {
+            <ng-container [ngTemplateOutlet]="groupContent" [ngTemplateOutletContext]="{ $implicit: child, level: level + 1 }" />
+          }
+        </div>
+      }
+    } @else {
+      <ol class="input-items" role="list">
+        @for (item of group.children; track $index) {
+          <li>
+            @if (item.fields || item.children) {
+              <ng-container [ngTemplateOutlet]="groupContent" [ngTemplateOutletContext]="{ $implicit: item, level: level + 1 }" />
+            } @else {
+              <ng-container [ngTemplateOutlet]="rows" [ngTemplateOutletContext]="{ $implicit: [item] }" />
+            }
+          </li>
+        }
+      </ol>
+    }
+  </div>
+</ng-template>

@@ -1,30 +1,36 @@
 <console-feedback [busy]="busy()" [error]="error()" [notice]="notice()" />
 
 @if(detail(); as task) {
-  <console-page-header [titleActions]="true" [meta]="{
-    title: task.nodeName || task.taskTypeName || 'Task',
-    eyebrow: 'YOUR WORKSPACE',
-    description: handler() ? 'Review the request and record your decision.' : 'View the task details and any recorded decision.',
-    icon: 'assignment_turned_in'
-  }" />
+  @if(!externalPageHeader()){
+    <console-page-header [titleActions]="true" [meta]="{
+      title: task.nodeName || task.taskTypeName || 'Task',
+      eyebrow: 'YOUR WORKSPACE',
+      description: handler() ? 'Review the request and record your decision.' : 'View the task details and any recorded decision.',
+      icon: 'assignment_turned_in'
+    }" />
+  }
 
   <mat-card appearance="outlined" class="task-card">
-    <header>
+    <header [class.external-summary]="externalPageHeader()">
       @let rules = contract();
       @let canClaim = commandProvider?.ownership && rules?.canClaim;
       <div class="task-summary">
         <div class="task-summary-copy">
-          <div class="task-meta">
-            @if(task.assignmentLabel && task.assignmentLabel !== task.ownershipLabel){
-              <span>@if(task.assignmentLabel !== 'Shared task'){Assigned to: }{{task.assignmentLabel}}</span>
-            }
-            @if(task.ownershipLabel){<span>{{task.ownershipLabel}}</span>}
-            <console-status [value]="task.status" />
-            @if(task.dueAt){<span>Due <time [attr.datetime]="task.dueAt">{{task.dueAt | date:'medium'}}</time></span>}
-            @if(task.closedAt && task.status !== 'OPEN'){
-              <span>Closed <time [attr.datetime]="task.closedAt">{{task.closedAt | date:'medium'}}</time></span>
-            }
-          </div>
+          @if(!externalPageHeader() || (task.closedAt && task.status !== 'OPEN')){
+            <div class="task-meta">
+              @if(!externalPageHeader()){
+                @if(task.assignmentLabel && task.assignmentLabel !== task.ownershipLabel){
+                  <span>@if(task.assignmentLabel !== 'Shared task'){Assigned to: }{{task.assignmentLabel}}</span>
+                }
+                @if(task.ownershipLabel){<span>{{task.ownershipLabel}}</span>}
+                <console-status [value]="task.status" />
+                @if(task.dueAt){<span>Due <time [attr.datetime]="task.dueAt">{{task.dueAt | date:'medium'}}</time></span>}
+              }
+              @if(task.closedAt && task.status !== 'OPEN'){
+                <span>Closed <time [attr.datetime]="task.closedAt">{{task.closedAt | date:'medium'}}</time></span>
+              }
+            </div>
+          }
           @if(canClaim && rules?.claimRequired){
             <p class="task-claim-guidance">Claim this task before completing it.</p>
           } @else if(canClaim && rules?.canComplete){
@@ -65,15 +71,11 @@
       @if(reassignmentError()){<p role="alert">{{reassignmentError()}}</p>}
     </header>
 
-    @if(contract()?.inputs; as inputs){
-      @if(inputs | keyvalue; as entries){
-        @if(entries.length){
-          <section aria-labelledby="task-inputs">
-            <h2 id="task-inputs">Business context</h2>
-            <workflow-task-values [inputs]="inputs" />
-          </section>
-        }
-      }
+    @if(businessInputs(); as inputs){
+      <section aria-labelledby="task-inputs">
+        <h2 id="task-inputs">Business context</h2>
+        <workflow-task-values [inputs]="inputs" />
+      </section>
     }
 
     @if(hasPreviousDecisions) {
@@ -207,5 +209,7 @@
 
   </mat-card>
 } @else if(error() && sessionScope) {
-  <button mat-button type="button" (click)="load()" [disabled]="busy()">Retry</button>
+  <div [class.external-retry]="externalPageHeader()">
+    <button mat-button type="button" (click)="load()" [disabled]="busy()">Retry</button>
+  </div>
 }

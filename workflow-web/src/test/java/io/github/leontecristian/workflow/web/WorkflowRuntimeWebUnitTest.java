@@ -301,7 +301,8 @@ class WorkflowRuntimeWebUnitTest {
             var host = c.getBean(WorkflowAuthorizedRuntimeReadService.class);
             var reads = c.getBean(WorkflowRuntimeQueryService.class);
             var definitions = c.getBean(WorkflowDefinitionService.class);
-            var task = new io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView(5, 2, 1, 3, "REVIEW",
+            long instanceId = 9007199254740993L;
+            var task = new io.github.leontecristian.workflow.core.dto.runtime.WorkflowTaskView(5, 2, instanceId, 3, "REVIEW",
                     new io.github.leontecristian.workflow.core.dto.runtime.TaskAssignmentTarget(
                             io.github.leontecristian.workflow.core.dto.runtime.AssignmentTargetKind.GROUP, "finance"),
                     io.github.leontecristian.workflow.core.dto.runtime.TaskStatus.OPEN,
@@ -313,21 +314,23 @@ class WorkflowRuntimeWebUnitTest {
             when(host.canCompleteTask("actor", task)).thenReturn(true);
             when(host.canReleaseTask("actor", task)).thenReturn(true);
             when(host.canAdministrativelyReleaseTask("actor", task)).thenReturn(true);
-            when(reads.findInstance(1)).thenReturn(Optional.of(instance));
+            when(reads.findInstance(instanceId)).thenReturn(Optional.of(instance));
+            when(instance.id()).thenReturn(instanceId);
             when(instance.definitionVersionId()).thenReturn(4L);
             when(instance.lockVersion()).thenReturn(9L);
             when(reads.findActivity(2)).thenReturn(Optional.of(activity));
             when(activity.nodeKey()).thenReturn("REVIEW");
-            when(reads.taskClaimPolicy(1, 5))
+            when(reads.taskClaimPolicy(instanceId, 5))
                     .thenReturn(io.github.leontecristian.workflow.core.dto.runtime.TaskClaimPolicy.REQUIRED);
             when(reads.previousDecisionsPolicy(5)).thenReturn(
                     io.github.leontecristian.workflow.core.dto.definition.document.PreviousDecisionsPolicy.ALL_PREVIOUS);
             when(definitions.findVersion(4)).thenReturn(Optional.of(version));
             when(version.documentJson()).thenReturn("""
-                    {"nodes":[{"key":"REVIEW","taskType":"REVIEW","outcomes":[]}]}
+                    {"name":"Pinned booking review","nodes":[{"key":"REVIEW","taskType":"REVIEW","outcomes":[]}]}
                     """);
-
             mvc(c).perform(get("/custom/tasks/5/contract")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.workflow.name").value("Pinned booking review"))
+                    .andExpect(jsonPath("$.workflow.instanceId").value("9007199254740993"))
                     .andExpect(jsonPath("$.claimPolicy").doesNotExist())
                     .andExpect(jsonPath("$.previousDecisions").doesNotExist())
                     .andExpect(jsonPath("$.previousDecisionsAvailable").value(true))
@@ -340,14 +343,14 @@ class WorkflowRuntimeWebUnitTest {
                     .andExpect(jsonPath("$.canAdminRelease").doesNotExist());
             var snapshotOrder = org.mockito.Mockito.inOrder(host, reads);
             snapshotOrder.verify(host).task("actor", 5);
-            snapshotOrder.verify(reads).findInstance(1);
+            snapshotOrder.verify(reads).findInstance(instanceId);
             snapshotOrder.verify(host).task("actor", 5);
             verify(host, org.mockito.Mockito.never()).canCompleteTask("actor", task);
             when(version.documentJson()).thenReturn("""
                     {"nodes":[{"key":"REVIEW","taskType":"REVIEW","outcomes":[],"resultContract":
                       {"mode":"REQUIRED","schema":{"type":"object","properties":{"amount":{"minimum":9007199254740993.00}}}}}]}
                     """);
-            when(reads.taskInputs(1, 5)).thenReturn(Map.of(
+            when(reads.taskInputs(instanceId, 5)).thenReturn(Map.of(
                     "booking", new WorkflowValue(VariableValueType.JSON, WorkflowJsonValue.parse("{\"amount\":9007199254740995.00}")),
                     "date", new WorkflowValue(VariableValueType.DATE, new TextLiteral("2026-11-10")),
                     "eligible", new WorkflowValue(VariableValueType.BOOLEAN, new BooleanLiteral(false)),
@@ -362,7 +365,7 @@ class WorkflowRuntimeWebUnitTest {
                     .andExpect(content().string(org.hamcrest.Matchers.containsString("\"amount\":9007199254740995.00")))
                     .andExpect(jsonPath("$.resultContract.schema").doesNotExist())
                     .andExpect(jsonPath("$.resultContract.form").doesNotExist());
-            verify(host, org.mockito.Mockito.never()).instance("actor", 1);
+            verify(host, org.mockito.Mockito.never()).instance("actor", instanceId);
             verify(host, org.mockito.Mockito.never()).activity("actor", 2);
         }
     }

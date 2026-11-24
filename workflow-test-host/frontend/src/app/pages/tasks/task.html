@@ -1,4 +1,21 @@
-<workflow-task [sessionScope]="session.viewerScope()" [id]="id()" />
+<ng-template #headerMeta>
+  @if(headerContract(); as contract){
+    @let task = contract.task;
+    <span class="task-header-status">{{task.status}}</span>
+    @if(task.assignmentLabel && task.assignmentLabel !== task.ownershipLabel){
+      <span>@if(task.assignmentLabel !== 'Shared task'){Assigned to: }{{task.assignmentLabel}}</span>
+    }
+    @if(task.ownershipLabel){<span>{{task.ownershipLabel}}</span>}
+    @if(contract.workflow; as workflow){
+      <span><span aria-hidden="true">· </span>{{workflow.name}} <span aria-hidden="true">·</span> #{{workflow.instanceId}}</span>
+    }
+    @if(task.dueAt){
+      <span><span aria-hidden="true">· </span>Due <time [attr.datetime]="task.dueAt">{{task.dueAt | date:'medium'}}</time></span>
+    }
+  }
+</ng-template>
+
+<workflow-task [sessionScope]="session.viewerScope()" [id]="id()" [externalPageHeader]="true" />
 
 @if(inspectionScope()){
   @let state = inspection();

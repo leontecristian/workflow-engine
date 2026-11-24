@@ -12,7 +12,7 @@ import { WorkflowInstanceViewerComponent, WorkflowHistoryComponent, WorkflowHist
 import type {WorkflowViewerReads, WorkflowViewerNavigation, ViewerDestination, InstanceView, HistoryPage, HistoryEvent, InstanceGraph} from '@workflow-engine/ui';
 import { WORKFLOW_RUNTIME_READS, WORKFLOW_RUNTIME_COMMANDS, WORKFLOW_CANCELLATION, WORKFLOW_TASK_REASSIGNMENT, CommandRecovery, ConsoleDetails } from '@workflow-engine/ui';
 import type { WorkflowCancellation, CancellationResult, WorkflowReassignmentTargetPage } from '@workflow-engine/ui';
-import type { WorkflowRuntimeReads, WorkflowRuntimeCommands, TaskView, TaskContract, Envelope, ActivityView, TaskCommandResult, TaskCommandReplay, PreviousDecisionPage } from '@workflow-engine/ui';
+import type { WorkflowRuntimeReads, WorkflowRuntimeCommands, TaskView, TaskContract, TaskSubmission, Envelope, ActivityView, TaskCommandResult, TaskCommandReplay, PreviousDecisionPage } from '@workflow-engine/ui';
 import { WorkflowTaskAdministrationComponent, WorkflowTaskComponent, WorkflowCommandsComponent, WorkflowInstancesComponent } from '@workflow-engine/ui/runtime';
 import { WorkflowDefinitionsComponent } from '@workflow-engine/ui/administration';
 import { provideWorkflowAdministrationHttp } from '@workflow-engine/ui/http';
@@ -25,6 +25,7 @@ const graph={instance,nodes:[{key:'BEGIN',name:'Start',type:'START',state:'COMPL
 const summary={instanceId:id,historySequence:'4',eventType:'UNKNOWN_FUTURE',commandId:'00000000-0000-0000-0000-000000000001',correlationId:'fixture',actorKind:'USER',actorRef:'fixture',occurredAt:instance.startedAt,activityId:null,taskId:null,sourceNodeKey:null,targetNodeKey:null,transitionKey:null,detailsSchemaVersion:1};
 const namedOutputEvidence = new URLSearchParams(location.search).has('namedOutputEvidence');
 const taskInputEvidence = new URLSearchParams(location.search).get('taskInputEvidence');
+const businessContextEvidence = new URLSearchParams(location.search).get('businessContextEvidence');
 const previousDecisionEvidence = new URLSearchParams(location.search).get('previousDecisionEvidence');
 const taskLayoutEvidence = new URLSearchParams(location.search).has('taskLayoutEvidence');
 const reassignmentEvidence = new URLSearchParams(location.search).has('reassignmentEvidence') || taskLayoutEvidence;
@@ -129,12 +130,18 @@ function reassignmentFixture(){
   }
  };
 }
-const completedInputFixture = taskInputEvidence === 'completed' || previousDecisionEvidence === 'completed';
+const completedInputFixture = businessContextEvidence === 'completed' || taskInputEvidence === 'completed' || previousDecisionEvidence === 'completed';
 const fixtureTask:TaskView={id:'30',nodeName:'Host assigned review',taskTypeName:'Review task',ownershipLabel:'Assigned to you',
  status:completedInputFixture?'COMPLETED':'OPEN',closedAt:completedInputFixture?instance.startedAt:null};
 let fixtureVersion=1;
 let fixtureTarget={kind:'USER' as 'USER'|'GROUP'|'ROLE',ref:taskLayoutEvidence?'reviewer.'+'longreference'.repeat(14):'fixture'};
-let fixtureSubmission:{outcomeLabel:string;actorLabel:string;occurredAt:string;comment:string|null}|null=null;
+let fixtureSubmission: TaskSubmission | null = businessContextEvidence === 'completed' ? {
+  outcomeLabel: 'Host approve',
+  actorLabel: 'Fixture reviewer',
+  occurredAt: instance.startedAt,
+  comment: 'Reviewed the frozen inputs.',
+  resultJson: '{"approvedAmount":12.00,"evidence":{"verified":true}}',
+} : null;
 const fixtureActivity:ActivityView={id:'20',instanceId:id,nodeKey:'REVIEW',activationSequence:'1',taskTypeId:'1',completionPolicy:'SINGLE',contributionOutcomeKey:null,requiredTaskCount:1,reviewRevisionRef:null,status:'ACTIVE',outcomeKey:null,enteredAt:instance.startedAt,closedAt:null,closedBy:null,closureReason:null};
 function fixtureContract():TaskContract{
  const {id:taskId,...task}=fixtureTask;
@@ -186,9 +193,14 @@ function administrationRow(taskId:string,instanceId:string,name:string,status:st
  private http=inject(HttpClient);
  private read<T>(path:string,signal:AbortSignal){return firstValueFrom(this.http.get<T>(path).pipe(takeUntil(fromEvent(signal,'abort'))));}
  task(_id:string,signal:AbortSignal){return this.read<TaskView>('/host-task/30',signal);}
- taskContract(_id:string,signal:AbortSignal){return this.read<TaskContract>('/host-task/30/contract',signal);}
+ async taskContract(_id:string,signal:AbortSignal):Promise<TaskContract>{
+  const contract=await this.read<TaskContract>('/host-task/30/contract',signal);
+  if (!businessContextEvidence || taskInputEvidence) return contract;
+  const { businessContextInputs } = await import('./business-context-fixture');
+  return { ...contract, inputs: businessContextInputs(businessContextEvidence) };
+ }
  previousDecisions(_id:string,cursor:string|undefined,_limit:number,signal:AbortSignal){return this.read<PreviousDecisionPage>('/host-task/30/previous-decisions'+(cursor?'?cursor='+cursor:''),signal);}
- taskSubmission(_id:string,signal:AbortSignal){return this.read<null>('/host-task/30/submission',signal);}
+ taskSubmission(_id:string,signal:AbortSignal){return this.read<TaskSubmission|null>('/host-task/30/submission',signal);}
  instanceTasks(_id:string,_cursor:string|undefined,_limit:number,signal:AbortSignal){return this.read<{items:TaskView[];nextCursor:null}>('/host-task/instance-tasks',signal);}
  listInstances(){
   if(styleOwnershipEvidence!=='runtime')throw new Error('Outside fixture');
@@ -225,7 +237,8 @@ class ReadOnlyTask {scope={};}
     <h1>NgModule administration HTTP consumer</h1>
     <p>Host interceptor reads: {{state.intercepted}}</p>
     <workflow-definitions [sessionScope]="scope" [messages]="administrationMessages"/>
-  }@else if(taskLayoutEvidence){<div class="layout-evidence">
+  }@else if(businessContextEvidence){<workflow-task id="30" [sessionScope]="scope"/>}
+  @else if(taskLayoutEvidence){<div class="layout-evidence">
    <h1>F026 revision 2 layout verification</h1>
    <nav class="fixture-controls" aria-label="Fixture views"><button (click)="layoutView='tasks'">Task administration view</button><button (click)="layoutView='definitions'">Definitions reference view</button><button (click)="layoutView='task'">Reassignment dialog view</button></nav>
    <nav class="fixture-controls" aria-label="Fixture response modes"><button (click)="mode('success')">Normal responses</button><button (click)="mode('delayed')">Delayed responses</button><button (click)="mode('layout-empty')">Empty page with continuation</button></nav>
@@ -244,6 +257,7 @@ class ReadOnlyTask {scope={};}
 `}) class App {
   state=inject(FixtureState); id=id; scope:object|null={};messages=DEFAULT_VIEWER_MESSAGES;
   administrationHttpEvidence=administrationHttpEvidence;
+  businessContextEvidence=businessContextEvidence;
   styleOwnershipEvidence=styleOwnershipEvidence;styleOwnershipRecord=instance;dialog=inject(MatDialog);
   namedOutputEvidence=namedOutputEvidence;reassignmentEvidence=reassignmentEvidence;taskLayoutEvidence=taskLayoutEvidence;layoutView='tasks';
   administrationMessages={definitionsTitle:'Host workflow library'};runtimeMessages={taskTitle:'Host assigned review',commandsTitle:'Host command evidence'};

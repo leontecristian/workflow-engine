@@ -1,0 +1,40 @@
+# F037 implementation record
+
+Revision 1 · 2026-11-24 · Code baseline `11365a3`. HEAD advanced to the unrelated roadmap-only commit `2534f78` during verification. The implementation request approved the behavior in the draft and moved revision 1 to READY before code changes.
+
+## Implementation
+
+- `@workflow-engine/ui/runtime` renders authorized task inputs once in Business context. It puts scalar rows first, then structured input headings. Object siblings use a responsive grid, deeper groups retain headings and separators, and arrays use ordered item boundaries. Native description-list terms and definitions associate each label with its value. Styles are local to the renderer.
+- The renderer derives input text from the supplied JSON syntax tree and raw token offsets. The input-only decimal formatting trims fractional zeros and keeps the source string intact. Malformed JSON shows Value unavailable. Task results and Submissions still invoke the existing result layout and retain the original number spelling.
+- The NgModule fixture mounts the actual runtime task and slices the specification's raw booking JSON into `valueJson` strings. It supplies the booking in open and completed states and provides additional scalar-only and generic fixtures.
+
+## Verification
+
+- **Build PASS.** Node 22.22.0 and npm 10.9.4 from the repository-managed frontend toolchain. Ran `npm run build` in `workflow-ui`, refreshed the verification host's local copy from the built `fesm2022` and `runtime` directories, and ran `npm run build` in `workflow-ui/verification/ngmodule-host`. An initial compile detected an unsupported Angular template alias, which was corrected. The final host build emitted its 900 kB initial-bundle warning and stayed below its existing hard limit.
+- **Unit PASS.** From `workflow-ui`, ran `node --experimental-strip-types --test projects/workflow-ui/src/lib/task-values.test.mjs`. All three checks passed, including byte-for-byte fixture text after newline normalization, the original frozen tokens, exact decimal trimming, exponent and literal-string preservation, unreadable input, and existing result formatting. Fixed an initial missing Angular injection context in the isolated test setup.
+- **HTTP adapter PASS.** From the NgModule fixture, ran `node --test --test-name-pattern 'A3:' http-adapter.test.mjs`. The existing targeted test confirmed exact value extraction through the shipped read adapter. The fixture browser uses its prepared reads for presentation.
+- **Browser PASS.** From the NgModule fixture, ran the local DevTools probe with `node dist/check-f037.mjs` against the production fixture build in Chrome 157.0.8103.79. The fixture query is `?businessContextEvidence=booking`, `completed`, `generic` or `scalar`. The ignored `dist/` directory holds the probe and its screenshots.
+  - At 1280 × 760 CSS pixels, Booking and Personnel shared the first row on an 832-pixel task card. At 320 × 760, all three groups stacked on a 273-pixel card. Both widths showed one booking reference and all twelve labeled values in Business context before the decision. The Chrome accessibility tree exposed terms, definitions and group headings.
+  - At 320 CSS pixels, the open approval control and the completed task's recorded decision were reachable by scrolling the page. The recorded result displayed its nested `Yes` and decimal `12.00`. Neither task produced horizontal page overflow.
+  - The generic fixture showed scalar-first order, deeper groups and two array records in order. Its long identifier wrapped onto nine lines within its value column, and the approval control was reachable below it. Precision, literal strings, escaped markup, line breaks and distinct empty or unreadable values matched the expected text. The scalar-only task showed both rows in source order.
+  - An in-sandbox browser launch did not start. The loopback-only probe then ran with approved execution. Its assertions were adjusted to compare page scroll width with client width and account for fractional scroll positioning. The final browser run had no uncaught exceptions. The browser and temporary listener exited and the browser profile was removed.
+- **REUSED.** [F020 revision 3](../F020-human-task-input-bindings/implementation.md#verification) supplies the frozen-input and snapshot evidence. [F034 revision 6](../F034-shared-task-page/implementation.md#task-page-appearance-follow-up--2026-11-19) supplies task authorization and command evidence. F037 uses those existing boundaries.
+- **Review and static checks PASS.** Independent review found no actionable issues in ordering, exact display, accessible grouping, responsiveness or the recorded-result path. Valid result payloads keep their display. Malformed JSON in the shared renderer now shows the unavailable state. `git diff --check`, new-file whitespace and relative feature links passed.
+
+**NOT RUN.** The browser covered the recorded-result path in the task page. The separate Submissions screen shares that renderer invocation. Live backend, database and APOLO checks were outside this presentation change.
+
+## Flat-group visual follow-up
+
+2026-11-24 · Revision 1. Flat input groups use the existing H3, H4 and deeper heading levels beneath the task's Business context H2. The input-specific container controls dividers, shared label widths and narrow stacking. Placeholder kinds distinguish empty or unavailable values from identical literal strings. Italic styling applies in input mode so recorded results keep their original presentation. Acronym-aware labels are pending owner approval.
+
+- **Build and unit PASS.** On Node 22.22.0 and npm 10.9.4, ran `npm run build` in the library and fixture and `ng build` in the isolated sandbox workspace with the updated package. Both consumers passed their existing hard limits and emitted bundle warnings. `node --experimental-strip-types --test projects/workflow-ui/src/lib/task-values.test.mjs` passed all four cases, including three literal/placeholder pairs.
+- **Browser PASS.** Ran the adapted F037 Chromium probe with `node .angular/check-f037-flat.mjs before` and `after` from the sandbox frontend. At 1280 × 760, the thirteen rows shared one label-to-value offset within each column, the group boxes were absent, and Booking and Personnel sat above Schedule. At 320 × 760, labels stacked, the page had no horizontal overflow and the approval control was reachable. The generic case retained deeper headings, ordered array items with a separator, and italic placeholders. `node dist/check-f037-placeholder.mjs` in the NgModule fixture confirmed that malformed input shows italic Value unavailable.
+- **Results PASS.** Captured the recorded result and expanded Submissions result against the prior and updated sandbox builds. Rendered text, computed typography and geometry matched. Both final before/after screenshot pairs had identical SHA-256 hashes. An initial clipped screenshot comparison shifted the viewport during capture. The final comparison used ordinary viewport screenshots. The temporary browser processes and listeners exited.
+- **Static PASS.** The scoped diff and whitespace check passed. Chromium used prepared data. The live sandbox was outside this verification.
+
+## Acronym-aware labels
+
+2026-11-24 · Owner approved Part 3 for Business context. The compact formatter preserves uppercase acronym tokens in standalone and nested input labels. Recorded decisions and Submissions still use the original result formatter.
+
+- **PASS.** With Node 22.22.0 and npm 10.9.4, ran `npm run build` and `node --experimental-strip-types --test projects/workflow-ui/src/lib/task-values.test.mjs` in `workflow-ui`. All six tests passed, including the six approved labels at both input levels, empty-key fallbacks, and the original result labels.
+- **REUSED.** The flat-group follow-up's result screenshot comparison applies to the unchanged result path. The acronym change did not alter markup or styles. No fresh browser check was run.

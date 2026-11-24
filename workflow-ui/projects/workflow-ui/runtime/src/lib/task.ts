@@ -1,4 +1,4 @@
-import { Component, Injector, computed, inject, signal } from '@angular/core';
+import { Component, Injector, computed, inject, input, signal } from '@angular/core';
 import { NgComponentOutlet } from '@angular/common';
 import { CommandRecovery, WORKFLOW_RUNTIME_COMMANDS, WORKFLOW_TASK_REASSIGNMENT } from '@workflow-engine/ui';
 import type { Envelope, TaskDetail, TaskContract, TaskSubmission, PreviousDecision } from '@workflow-engine/ui';
@@ -24,6 +24,7 @@ type TimelineDecision = {
   templateUrl: './task.html',
 })
 export class WorkflowTaskComponent extends RuntimeState {
+  readonly externalPageHeader = input(false);
   private readonly injector = inject(Injector);
   private readonly reassignment = inject(WORKFLOW_TASK_REASSIGNMENT, { optional: true });
   private readonly taskEditors = inject(WORKFLOW_TASK_EDITORS, { optional: true });
@@ -32,6 +33,10 @@ export class WorkflowTaskComponent extends RuntimeState {
 
   readonly detail = signal<TaskDetail | null>(null);
   readonly contract = signal<TaskContract | null>(null);
+  protected readonly businessInputs = computed(() => {
+    const inputs = this.contract()?.inputs;
+    return inputs && Object.keys(inputs).length ? inputs : undefined;
+  });
   readonly submission = signal<TaskSubmission | null>(null);
   readonly nextTaskId = signal<string | null>(null);
   readonly previousDecisions = signal<PreviousDecision[]>([]);

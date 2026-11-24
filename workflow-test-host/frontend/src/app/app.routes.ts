@@ -1,6 +1,4 @@
 import { Routes } from "@angular/router";
-import { RequestsPage } from "./pages/sandbox/requests";
-import { RequestPage } from "./pages/sandbox/request";
 import { HistoryPage } from "./pages/runtime/history";
 import { HistoryEventPage } from "./pages/runtime/history-event";
 import { OutboxPage } from "./pages/events/outbox";
@@ -17,8 +15,8 @@ export const APP_ROUTES: Routes = [
   { path: "definition/:id", loadComponent: () => import("./pages/definitions/family").then(m => m.FamilyPage) },
   { path: "version/:id", loadComponent: () => import("./pages/definitions/version").then(m => m.VersionPage) },
   { path: "catalog", loadComponent: () => import("./pages/catalog/catalog").then(m => m.CatalogPage) },
-  { path: "requests", component: RequestsPage },
-  { path: "request/:id", component: RequestPage },
+  { path: "requests", loadComponent: () => import("./pages/sandbox/requests").then(m => m.RequestsPage) },
+  { path: "request/:id", loadComponent: () => import("./pages/sandbox/request").then(m => m.RequestPage) },
   { path: "instances", loadComponent: () => import("./pages/runtime/instances").then(m => m.InstancesPage) },
   { path: "task-administration", loadComponent: () => import("./pages/tasks/task-administration").then(m => m.TaskAdministrationPage) },
   { path: "my-tasks", loadComponent: () => import("./pages/tasks/assigned-tasks").then(m => m.AssignedTasksPage) },

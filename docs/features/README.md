@@ -1,5 +1,7 @@
 # Feature specifications
 
+[F037 — Compact task business context](F037-task-business-context-renderer/spec.md) is **IMPLEMENTED revision 1 — 2026-11-24**. It gives frozen task inputs a responsive layout and formats decimals from their exact source tokens. See the [implementation record](F037-task-business-context-renderer/implementation.md).
+
 [F036 — Workflow UI style ownership](F036-workflow-ui-style-ownership/spec.md) is **IMPLEMENTED revision 1 — 2026-11-20**. It packages shared component styles and aligns Definitions lookup below the list. See the [plan](F036-workflow-ui-style-ownership/plan.md), [tasks](F036-workflow-ui-style-ownership/tasks.md) and [implementation record](F036-workflow-ui-style-ownership/implementation.md).
 
 [F035 — Optional Angular HTTP adapters for workflow-web](F035-workflow-ui-http-adapter/spec.md) is **IMPLEMENTED revision 1 — 2026-11-20**. It supplies opt-in host HttpClient adapters for administration, viewer, runtime reads, task commands and receipt lookup, cancellation and reassignment. See the [plan](F035-workflow-ui-http-adapter/plan.md), [tasks](F035-workflow-ui-http-adapter/tasks.md) and [implementation record](F035-workflow-ui-http-adapter/implementation.md).

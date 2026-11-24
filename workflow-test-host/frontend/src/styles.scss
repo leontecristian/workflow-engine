@@ -231,6 +231,38 @@ mat-sidenav-container.console-shell {
   padding: 23px 38px 60px;
   margin: auto;
 }
+.detail-layout {
+  --detail-max-width: 1240px;
+  --detail-gutter: 24px;
+  background: #f5f6fa;
+}
+.detail-layout .workspace-toolbar {
+  border: 0;
+  box-shadow: none;
+}
+.detail-layout .workspace {
+  max-width: var(--detail-max-width);
+  padding: 24px var(--detail-gutter) 60px;
+}
+.detail-breadcrumb {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.detail-breadcrumb ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  gap: 6px;
+}
+.detail-breadcrumb li:first-child { flex: none; }
+.detail-breadcrumb .breadcrumb-current {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #44474e;
+}
+.detail-breadcrumb mat-icon { flex: none; }
 console-not-found .page-heading {
   display: flex;
   justify-content: space-between;
@@ -638,4 +670,13 @@ console-capabilities .settings-grid > div {
   .sandbox-card .page-size {
     width: 117px;
   }
+}
+@media (max-width: 599px) {
+  .detail-layout { --detail-gutter: 16px; }
+  .detail-layout .workspace-toolbar.mat-toolbar {
+    height: auto;
+    min-height: 65px;
+    padding-block: 8px;
+  }
+  .detail-layout .account div { display: none; }
 }

@@ -42,3 +42,7 @@ Use the original `WorkflowAssignmentDirectory.assignmentLabel(task)` for authori
 ## Sandbox history reference correction
 
 Keep random references in a bounded process-local lookup under `io.github.leontecristian.workflow.testhost.service.runtime`. Scope a lookup to the actor, instance and event or page purpose. Retain direct numeric lookup and current authorization. Test pagination and direct reads at the normal HTTP routes, including denial, and validate the upgrade and restart behavior against the same guarded fixtures. Reuse earlier evidence for the unchanged viewer, diagnostics, administration, task preconditions and replay.
+
+## Sandbox task header follow-up
+
+Mount the reusable band in the Angular sandbox shell. The active task page supplies the authorized title and projected metadata while the shared runtime supports an opt-in external heading. Extend only the exact contract in `io.github.leontecristian.workflow.web.controller.runtime`, reusing the pinned definition lookup in `io.github.leontecristian.workflow.web.service.runtime`. Keep the initial bundle within the existing hard budget by loading the sandbox request routes on demand. Check those routes, the exact display fields and grant boundary, and the rendered task header at desktop and narrow widths.

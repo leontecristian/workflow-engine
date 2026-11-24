@@ -126,7 +126,8 @@
       </button>
     </div>
   </mat-sidenav>
-  <mat-sidenav-content>
+  <mat-sidenav-content [class.detail-layout]="detailPage()">
+    @let header = pageHeader();
     <mat-toolbar class="workspace-toolbar"
       ><button
         mat-icon-button
@@ -135,11 +136,21 @@
       >
         <mat-icon aria-hidden="true">menu</mat-icon>
       </button>
-      <div class="breadcrumbs">
-        <span>Workspace</span><mat-icon aria-hidden="true" iconPositionEnd>chevron_right</mat-icon><strong
-          >Workflow console</strong
-        >
-      </div>
+      @if(detailPage(); as page){
+        <nav class="detail-breadcrumb">
+          <ol class="breadcrumbs" aria-label="Breadcrumb">
+            <li><a [routerLink]="page.pageHeaderParent.path">{{page.pageHeaderParent.label}}</a></li>
+            @if(header){
+              <li class="breadcrumb-current"><mat-icon aria-hidden="true">chevron_right</mat-icon>
+                <span aria-current="page">{{header.title}}</span></li>
+            }
+          </ol>
+        </nav>
+      } @else {
+        <div class="breadcrumbs">
+          <span>Workspace</span><mat-icon aria-hidden="true">chevron_right</mat-icon><strong>Workflow console</strong>
+        </div>
+      }
       <span class="action-spacer"></span><span class="local-tag">LOCAL</span>
       <div class="account">
         <span class="avatar">{{api.admin ? 'A' : 'R'}}</span>
@@ -149,6 +160,11 @@
         </div>
       </div></mat-toolbar
     >
+    @if(header){
+      <console-detail-header [title]="header.title">
+        <ng-container meta [ngTemplateOutlet]="header.meta" />
+      </console-detail-header>
+    }
     <main class="workspace">
       @if(failing()){
       <div class="feedback feedback-error" role="alert">
@@ -159,7 +175,7 @@
         </div>
       </div>
       }
-      <router-outlet />
+      <router-outlet (activate)="activatePage($event)" (deactivate)="detailPage.set(null)" />
     </main>
   </mat-sidenav-content>
 </mat-sidenav-container>

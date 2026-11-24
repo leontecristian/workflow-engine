@@ -337,6 +337,10 @@ public class WorkflowRuntimeReadController {
         String previousMode = reads.previousDecisionsPolicy(taskId).mode().name();
         Map<String, Object> contract = new LinkedHashMap<>();
         contract.put("task", projection.task(task, node, false));
+        String workflowName = projection.workflowName(instance.definitionVersionId());
+        if (workflowName != null) {
+            contract.put("workflow", Map.of("name", workflowName, "instanceId", instance.id()));
+        }
         contract.put("outcomes", outcomes.stream().map(outcome -> canComplete
                 ? Map.of("key", outcome.key(), "label", outcome.label(), "requiresComment", outcome.requiresComment())
                 : Map.of("label", outcome.label(), "requiresComment", outcome.requiresComment())).toList());

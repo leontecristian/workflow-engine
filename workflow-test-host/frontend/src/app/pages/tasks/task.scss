@@ -1,4 +1,23 @@
 :host { display: block; }
+.task-header-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding-inline: 10px;
+  border-radius: 8px;
+  background: #dce2f9;
+  color: #0b3b8c;
+  font-size: 13px;
+  font-weight: 500;
+}
+.task-header-status::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #0b57d0;
+}
 details {
   box-sizing: border-box;
   max-width: 52rem;

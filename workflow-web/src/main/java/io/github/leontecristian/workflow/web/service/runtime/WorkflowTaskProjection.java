@@ -29,7 +29,9 @@ public final class WorkflowTaskProjection {
     private final Map<Long, String> activityNodes = new HashMap<>();
     private final Map<Long, Long> instanceVersions = new HashMap<>();
     private final Map<Long, String> taskTypeNames = new HashMap<>();
-    private final Map<Long, Map<String, JsonNode>> versionNodes = new HashMap<>();
+    private final Map<Long, PinnedDefinition> pinnedDefinitions = new HashMap<>();
+
+    private record PinnedDefinition(String name, Map<String, JsonNode> nodes) {}
 
     public WorkflowTaskProjection(WorkflowRuntimeQueryService reads, WorkflowAuthorizedRuntimeReadService access,
             WorkflowDefinitionService definitions,
@@ -58,15 +60,23 @@ public final class WorkflowTaskProjection {
     public JsonNode node(WorkflowTaskView task, long versionId, String nodeKey) {
         activityNodes.put(task.activityId(), nodeKey);
         instanceVersions.put(task.instanceId(), versionId);
-        var nodes = versionNodes.computeIfAbsent(versionId, id -> {
-            var version = definitions.findVersion(id).orElseThrow(() -> new IllegalStateException("Pinned definition missing"));
-            Map<String, JsonNode> result = new HashMap<>();
-            for (var node : wire.tree(version.documentJson()).path("nodes")) result.put(node.path("key").asText(), node);
-            return result;
-        });
-        var node = nodes.get(nodeKey);
+        var node = pinnedDefinition(versionId).nodes().get(nodeKey);
         if (node == null) throw new IllegalStateException("Pinned human contract missing");
         return node;
+    }
+
+    public String workflowName(long versionId) {
+        return pinnedDefinition(versionId).name();
+    }
+
+    private PinnedDefinition pinnedDefinition(long versionId) {
+        return pinnedDefinitions.computeIfAbsent(versionId, id -> {
+            var version = definitions.findVersion(id).orElseThrow(() -> new IllegalStateException("Pinned definition missing"));
+            var document = wire.tree(version.documentJson());
+            Map<String, JsonNode> nodes = new HashMap<>();
+            for (var node : document.path("nodes")) nodes.put(node.path("key").asText(), node);
+            return new PinnedDefinition(display(document.path("name").textValue()), nodes);
+        });
     }
 
     public Map<String, Object> task(WorkflowTaskView task, boolean navigation) {

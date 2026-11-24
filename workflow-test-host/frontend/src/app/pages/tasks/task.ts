@@ -1,4 +1,5 @@
-import { Component, DestroyRef, Injector, ViewChild, computed, effect, inject, linkedSignal, signal, untracked } from '@angular/core';
+import { Component, DestroyRef, Injector, TemplateRef, computed, effect, inject, linkedSignal, signal, untracked, viewChild } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButton } from '@angular/material/button';
@@ -7,6 +8,7 @@ import { WorkflowTaskComponent } from '@workflow-engine/ui/runtime';
 import { ConsoleSession } from '../../data/console-session';
 import { ConsoleTaskDiagnostics, type TaskDiagnostics } from '../../data/task-diagnostics';
 import { downloadJson } from '../../ui/download-json';
+import type { PageHeaderSource } from '../../shell/page-header';
 
 interface InspectionState {
   open: boolean;
@@ -19,12 +21,20 @@ interface InspectionState {
 @Component({
   selector: 'console-task',
   standalone: true,
-  imports: [WorkflowTaskComponent, RouterLink, MatButton],
+  imports: [WorkflowTaskComponent, RouterLink, MatButton, DatePipe],
   templateUrl: './task.html',
   styleUrl: './task.scss',
 })
-export class TaskPage {
-  @ViewChild(WorkflowTaskComponent) private taskView?: WorkflowTaskComponent;
+export class TaskPage implements PageHeaderSource {
+  readonly pageHeaderParent = { label: 'My tasks', path: '/my-tasks' };
+  private readonly taskView = viewChild(WorkflowTaskComponent);
+  private readonly headerMeta = viewChild<TemplateRef<unknown>>('headerMeta');
+  protected readonly headerContract = computed(() => this.taskView()?.contract());
+  readonly pageHeader = computed(() => {
+    const task = this.headerContract()?.task;
+    const meta = this.headerMeta();
+    return task && meta ? { title: task.nodeName || task.taskTypeName || 'Task', meta } : null;
+  });
   readonly session = inject(ConsoleSession);
   readonly id = signal('');
   private readonly route = inject(ActivatedRoute);
@@ -65,7 +75,7 @@ export class TaskPage {
     let previousContract: TaskContract | undefined;
     effect(() => {
       const scope = this.inspectionScope();
-      const contract = this.taskView?.contract();
+      const contract = this.headerContract();
       const earlier = scope === previousScope ? previousContract : undefined;
       if (scope !== previousScope || contract) {
         previousScope = scope;
@@ -97,7 +107,7 @@ export class TaskPage {
     const state = this.inspection();
     if (!scope || !state.open || state.loading) return;
     const controller = this.request = new AbortController();
-    const precondition = this.taskView?.contract()?.precondition;
+    const precondition = this.headerContract()?.precondition;
     this.inspection.set({ open: true, loading: true, precondition });
     const current = () => !controller.signal.aborted && this.inspectionScope() === scope;
     try {

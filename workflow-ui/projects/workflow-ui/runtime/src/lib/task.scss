@@ -22,6 +22,16 @@ p { margin: 12px 0 0; }
 .task-meta, .task-claim-guidance { color: var(--mat-sys-on-surface-variant); }
 .task-claim-guidance { margin-top: 4px; font-size: 0.875em; }
 .task-actions:empty { display: none; }
+.external-summary:not(:has(.task-meta, .task-actions > *, p, .admin-release)) {
+  display: none;
+  & + section { border-block-start: 0; }
+}
+.external-retry {
+  padding: 8px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 12px;
+  background: var(--mat-sys-surface, Canvas);
+}
 .admin-release { margin-top: 12px; }
 .admin-release mat-form-field { flex: 1 1 16rem; min-width: 0; }
 .previous-decisions-heading, .previous-decision-totals, .previous-decision-group-heading, .previous-decision-meta {

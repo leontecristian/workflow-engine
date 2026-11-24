@@ -16,3 +16,4 @@
 - [x] T3e. Restore Instance and Created on the F026 administration list and verify linked-instance authorization.
 - [x] T4b. Run focused checks, compare integration surfaces with HEAD, and record the results and existing budget increase.
 - [x] T5. Decouple sandbox history references from task-command tokens and verify authorization, pagination, upgrade and restart behavior.
+- [x] T6. Deliver the Option A task header, verify exact-task metadata and check the shell layout at desktop and narrow widths. See the [verification record](implementation.md#option-a-task-header-follow-up).

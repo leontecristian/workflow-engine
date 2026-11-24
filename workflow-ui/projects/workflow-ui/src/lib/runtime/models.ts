@@ -40,6 +40,8 @@ export interface PreviousDecision {
 export interface PreviousDecisionPage { items: PreviousDecision[]; nextCursor: string | null; }
 export interface TaskContract {
   task: TaskDetail;
+  /** Display context from the task's pinned workflow. Instance access is independently authorized. */
+  workflow?: { name: string; instanceId: Decimal };
   precondition?: string;
   previousDecisionsAvailable: boolean;
   taskType?: string;
