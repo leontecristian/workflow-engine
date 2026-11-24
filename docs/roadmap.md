@@ -1,8 +1,6 @@
 # Workflow engine roadmap
 
-**Updated 2026-11-20. Delivery baseline through F034, shared Task page (implemented revision 6).**
-
-The agreed sequence is working sandbox → first APOLO booking integration → graphical designer. APOLO source access is available. The next deliverable is a specification for one cross-team booking approval.
+**Updated 2026-11-24.** Shared libraries are implemented through F036. The first APOLO booking approval pilot is running locally. F037 improves task detail. The next priority is the shared **My tasks** list, where reviewers find their work.
 
 ## Contents
 
@@ -17,9 +15,7 @@ The agreed sequence is working sandbox → first APOLO booking integration → g
 
 ## 1. Current position
 
-**✅ Sandbox + shared libraries + delivery through F034 → APOLO booking scenario selection → ⏳ Graphical designer**
-
-### ✅ Implemented — F001–F034
+### ✅ Implemented — F001–F036
 
 | Features | Capability |
 | --- | --- |
@@ -42,6 +38,8 @@ The agreed sequence is working sandbox → first APOLO booking integration → g
 | ✅ [F032](features/F032-host-contract-review/implementation.md) | **Host contract review** — task-type capability beans, separate SINGLE and ALL resolver discovery, and one authorization service with explicit operation support. |
 | ✅ [F033](features/F033-optional-task-handlers/implementation.md) | **Optional task completion handlers** — hosts can register a form by pinned task type. The shared task page uses its generic form by default. Both paths passed the sandbox walkthrough. |
 | ✅ [F034](features/F034-shared-task-page/implementation.md) | **Shared Task page** — reviewers see the business context, complete structured decisions through named fields or a host form, and inspect recorded results. Task commands and receipt lookup use the task reference and its opaque precondition. The sandbox provides separate administrator diagnostics. |
+| ✅ [F035](features/F035-workflow-ui-http-adapter/implementation.md) | Shared Angular HTTP adapters use the host’s HTTP client. |
+| ✅ [F036](features/F036-workflow-ui-style-ownership/implementation.md) | Workflow component styles ship with the Angular library. |
 
 ### ✅ Family-start delivery
 
@@ -53,23 +51,19 @@ The agreed sequence is working sandbox → first APOLO booking integration → g
 
 [F025 — Workflow cancellation](features/F025-workflow-cancellation/spec.md) is **IMPLEMENTED revision 1**. It delivers immediate whole-instance cancellation, explicit host authorization, retained prior effects/submissions and shared web/UI support. Its [handover](features/F025-workflow-cancellation/implementation.md) records focused core/web/UI, SQL and browser evidence. Reassignment, compensation and APOLO withdrawal policy remain outside this slice.
 
-### ⏳ Still to deliver
+### Current delivery
 
-| Status | Capability | When |
-| --- | --- | --- |
-| Source reviewed | **APOLO booking integration** | Next: select the scenario and verify the host wiring described in section 4. |
-| ⬜ Not implemented | **Graphical designer** | After the first successful APOLO integration. |
+The APOLO pilot demonstrates booking submission, manager review, a recorded approval and a task displaying the captured booking details. The wider integration exit remains open in section 4. F037 renderer changes are in the working tree; verification results and handover are pending. [F037 implementation record](features/F037-task-business-context-renderer/implementation.md)
 
 **Verification:** ✅ means implemented, not production-ready. Historical acceptance gaps remain; production checks are required before deployment. See the [feature index](features/README.md) for evidence and section 8 for historical notes. The existing read-only graph is not the designer.
 
 ## 2. Selected priorities
 
-**Current selection (2026-11-19).** Specify one cross-team booking approval with the APOLO owner. In parallel, check whether the existing libraries can run inside APOLO’s backend WAR and Angular shell. The sandbox walkthrough provides a reference for the shared Task page. [Sandbox walkthrough](../README.md#try-the-optional-task-completion-forms) · [Integration steps](#4-first-apolo-booking-integration)
-
 | Order | Work | Completion condition |
 | --- | --- | --- |
-| 1 | Specify and deliver the first APOLO booking integration | The owner selects the scenario and the host demonstrates the integration exit in section 4. |
-| 2 | Deliver the graphical designer in workflow-ui | The authoring exit in section 5 is met after successful first APOLO integration. |
+| 1 | Finish [F037 — Compact task business context](features/F037-task-business-context-renderer/spec.md) | Record renderer verification and confirm the updated booking detail in APOLO. |
+| 2 | Refine the shared **My tasks** list in workflow-ui | Review the current list from the perspective of everyday APOLO users. Specify and deliver a layout that makes tasks easy to identify, scan and open on desktop and narrow screens. Account for closed-task discovery (section 3) when designing the list. |
+| Later | Graphical workflow designer | Confirm the first integration exit and deliver the authoring scope in section 5. |
 
 Production readiness applies before any deployment, regardless of designer timing. Historical verification debt is reconciled when relevant to a selected dependency or integration/release gate, rather than becoming a blanket prerequisite for new work.
 
@@ -79,9 +73,10 @@ Production readiness applies before any deployment, regardless of designer timin
 
 | Capability | Scope and dependencies | Exit condition |
 | --- | --- | --- |
+| **Closed tasks in My tasks** | Give reviewers a way to find their closed tasks from the shared My tasks list. Keep open work as the default and apply the host’s task-read permissions to closed tasks. | After completing a task, the reviewer can return to My tasks, select closed tasks, and reopen the read-only detail to see the recorded decision and any comment. |
 | **External variable-update command** — conditional scope | F009 supports start/service replacements, not a standalone external update command. Specify one only when a selected scenario requires it. | Authorized updates follow the agreed whole-value and aggregate concurrency contracts, with focused verification. |
 
-A shared GROUP/ROLE SINGLE task is one shared obligation; it cannot substitute for ALL contributions. Claim/release already exists in F017 and ALL is delivered in F021. The first integration may use SINGLE if that matches the selected business scenario.
+A shared GROUP/ROLE SINGLE task is one shared obligation; it cannot substitute for ALL contributions. Claim/release already exists in F017 and ALL is delivered in F021. The pilot uses SINGLE for its manager review.
 
 Assign feature IDs when specifications begin. Follow the [four-document workflow](specification-driven-development.md) and [language design](architecture/workflow-definition-language-design.md), including later feature decisions. Resolve material contracts before dependent code. Extend the console graph only for supported shapes and retain an explicit unavailable state for unsupported shapes.
 
@@ -89,19 +84,17 @@ Assign feature IDs when specifications begin. Follow the [four-document workflow
 
 **Source review complete.** APOLO revision `0a4ce46f7` shows that planning can mark bookings `Sent` across a budget and recalculate availability. Leave import also uses `Sent`. Calendar edits, transfers, recurrence and imports reach bookings through different services. A booking’s status alone therefore cannot identify its own cross-team approval attempt. [Booking source findings](integrations/apolo/booking-business-analysis.md#booking-edits-during-cross-team-approval)
 
-**Next steps**
+**Local pilot.** APOLO consumes the backend JARs and packaged Angular UI, runs the workflow migrations, and exposes administration and personal task routes. A saved booking starts a linked workflow for the booked employee’s manager. Version 2 adds Sent, Approved and Rejected booking effects with availability updates. A rejected booking can start a fresh attempt with its earlier decision retained. Approved and Sent bookings cannot be submitted again. [Booking status definition](integrations/apolo/booking-approval-v2.json)
 
-1. **Agree the booking scenario.** Identify who can submit, how APOLO resolves each reviewer, which stages are required, and how business access and no-self-approval are enforced. Specify what Approve and Reject change, including the effect on availability. Keep one identified approval basis across all required stages. [First integration requirements](integrations/apolo/approval-capability.md#first-apolo-integration)
-2. **Specify pending edits and recovery.** Read-only booking data and daily allocations after the booking’s own submission remain **PROPOSED**. Identify the protected fields and writers, how APOLO checks material, membership and eligibility through commit, and how an invalid attempt stays disqualified while earlier decisions are retained. Same-instance resubmission remains provisional. The interaction with budget-wide planning approval remains **OPEN**, including its effect on booking status and availability. [Booking edit proposal and open decision](integrations/apolo/booking-business-analysis.md#booking-edits-during-cross-team-approval)
-3. **Check host compatibility alongside specification.** Resolve the backend WAR dependency graph, especially Jackson and Hibernate, and build the packaged Angular library in APOLO’s shell. Verify that the host Liquibase master loads workflow migrations and that both sets of entities and repositories participate in one host transaction on SQL Server. The source review established the declared stack. Effective compatibility and runtime wiring still need evidence. [Technical findings](integrations/apolo/apolo-technical-summary.md#apolo-source-findings-2026-11-19)
-4. **Connect the selected flow.** Use an APOLO booking endpoint, a booking-to-instance link and a host route to the shared Task page. Map trusted identity, read access, command authorization and fresh completion validation to existing adapters. Register the pinned task type, assignment resolver and any required custom editor. Pair compatible web, UI and host transport versions. [Core migration](../workflow-core/README.md#migrating-to-f032) · [Web migration](../workflow-web/README.md#f032-java-adapter-migration) · [Task forms](../workflow-ui/README.md#optional-task-completion-forms)
-5. **Prove one booking decision end to end.** Observe the booking effect, workflow history, receipt and durable event record commit together. Exercise rollback from either side, an authorized retry with one booking effect, and a competing protected edit through an existing writer. Verify recovery and post-commit delivery. The current booking path sends JMS inline and the checked-in embedded broker disables persistence. If assignment alerts are needed, APOLO can consume `TASK_CREATED` and `TASK_REASSIGNED` after durable handoff. [Event delivery contract](architecture/workflow-engine-design.md#131-reliable-side-effects)
+**Review basis.** Version 3 captures booking details at submission. The reviewer sees those details even if the booking changes later. Edits alone do not invalidate the pilot review. [Snapshot definition](integrations/apolo/booking-approval-v3.json)
+
+**Open for the wider integration.** The pilot logs events after commit. Durable delivery and recovery, host-specific rollback, concurrency and retry evidence remain open. Cross-team stages, self-approval policy and interactions with budget-wide planning still require decisions for that broader scope. [Integration requirements](integrations/apolo/approval-capability.md#first-apolo-integration)
 
 **Exit:** one specified booking scenario works through real APOLO interfaces, with observed authorization, shared-transaction rollback in both directions, concurrency, idempotent retries, approved review-basis handling and durable recovery. Resolve the applicable ASM-01–07 and ASM-10/11 obligations for the demonstrated scope; local sandbox evidence alone cannot close them.
 
 ### Source integration and ownership
 
-The eventual move of `workflow-core` into APOLO as a sibling Maven module is agreed; timing, coordinates, release ownership and test-host location remain OPEN (ASM-09). An interim fixed library artifact or combined reactor can support the first integration. At the selected move point, keep one authoritative implementation, review/reparent against APOLO's effective root build and register backend's library dependency.
+The eventual move of `workflow-core` into APOLO as a sibling Maven module is agreed; timing, coordinates, release ownership and test-host location remain OPEN (ASM-09). The local pilot uses fixed library artifacts. At the selected move point, keep one authoritative implementation, review/reparent against APOLO's effective root build and register backend's library dependency.
 
 Preserve Java 17 APIs/bytecode, JDK 21 runtime, ordinary JAR packaging and neutral contracts. Core keeps its migration resources and stable changeset identities; APOLO executes the core master from its existing Liquibase lifecycle. The test host remains outside the production dependency graph. This roadmap does not perform or schedule the source move.
 
@@ -131,7 +124,7 @@ At the selected integration/release milestone, reuse applicable evidence and che
 | --- | --- |
 | Business decision engine, decision tables and FIRST/UNIQUE policies | Optional later work requiring a selected need; not a dependency of workflow routing, first integration or the designer. |
 | General delegation, timers/expiration, ANY/QUORUM, inclusive/parallel gateways, subprocesses and active-instance migration | Deferred. ALL is already delivered by F021 and is not part of this deferred scope. |
-| APOLO approval branches and recovery | APOLO selects approver sources, material-change policy and recovery paths. Same-instance resubmission remains provisional. |
+| APOLO approval branches and recovery | The pilot uses the employee’s manager, frozen inputs and a fresh attempt after rejection. Broader cross-team branches and recovery policies remain open. |
 | Durable administration audit recording in `workflow-web` | Deferred. Consider a shared implementation for hosts that need a durable record of definition and task-type changes. [F031](features/F031-shared-runtime-command-coordination/spec.md) supports an optional host recorder. The storage mechanism and opt-in contract for a shared recorder remain open. |
 | Source move and release ownership | Timing, coordinates, test-host placement and release responsibilities remain open; section 4 records the agreed boundary. |
 | Future feature IDs, dates and owners | Unassigned until the corresponding specification and scheduling decisions. |
